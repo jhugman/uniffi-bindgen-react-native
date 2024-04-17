@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "crates/uniffi-bindgen-react-native",
+    "xtask",
+]
+
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1"
+camino = "1.1.6"
+clap = { version = "4.5.4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+uniffi = "0.27.1"
+uniffi_bindgen = "0.27.1"
