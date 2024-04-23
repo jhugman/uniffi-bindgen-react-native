@@ -1,0 +1,5 @@
+[general]
+dirs = ["src/bindings/react_native/gen_typescript/templates"]
+
+[[syntax]]
+name = "ts"

@@ -3,8 +3,9 @@ use std::{fs, process::Command};
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
+use uniffi_common::{rm_dir, run_cmd};
 
-use crate::util::{build_root, cpp_modules, rm_dir, run_cmd};
+use crate::util::{build_root, cpp_modules};
 
 use super::Bootstrap;
 
@@ -49,9 +50,9 @@ impl HermesCmd {
         fs::create_dir_all(parent)?;
         let repo = format!("https://github.com/{}.git", self.repo);
 
-        let mut cmd = Command::new("git");
         run_cmd(
-            cmd.arg("clone")
+            Command::new("git")
+                .arg("clone")
                 .arg("-b")
                 .arg(self.branch.as_str())
                 .arg(&repo)
@@ -68,8 +69,8 @@ impl Bootstrap for HermesCmd {
     }
 
     fn clean() -> Result<()> {
-        rm_dir(&Self::build_dir()?)?;
-        rm_dir(&Self::src_dir()?)?;
+        rm_dir(Self::build_dir()?)?;
+        rm_dir(Self::src_dir()?)?;
         Ok(())
     }
 

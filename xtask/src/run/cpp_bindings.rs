@@ -3,10 +3,11 @@ use std::{fs, process::Command};
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
+use uniffi_common::{rm_dir, run_cmd_quietly};
 
 use crate::{
     bootstrap::{Bootstrap, HermesCmd, TestRunnerCmd},
-    util::{build_root, rm_dir, run_cmd_quietly, so_extension_name},
+    util::{build_root, so_extension_name},
 };
 
 #[derive(Debug, Args)]

@@ -13,3 +13,5 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 cargo_metadata = "0.18.1"
 clap = { workspace = true }
+pathdiff = { version = "0.2.1", features = ["camino"] }
+uniffi-common = { path = "../crates/uniffi-common" }

@@ -1,4 +1,4 @@
-use crate::util::{run_cmd_quietly, so_extension_name};
+use crate::util::so_extension_name;
 
 use std::process::Command;
 
@@ -7,6 +7,7 @@ use cargo_metadata::MetadataCommand;
 use clap::Args;
 
 use anyhow::Result;
+use uniffi_common::run_cmd_quietly;
 
 #[derive(Debug, Args)]
 pub(crate) struct CrateArg {

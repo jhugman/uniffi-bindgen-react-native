@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "crates/uniffi-bindgen-react-native",
+    "crates/*",
+    "fixtures/*",
     "xtask",
 ]
 

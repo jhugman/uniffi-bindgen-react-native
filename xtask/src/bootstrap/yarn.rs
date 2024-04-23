@@ -3,8 +3,9 @@ use std::process::Command;
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
+use uniffi_common::{rm_dir, run_cmd};
 
-use crate::util::{repository_root, rm_dir, run_cmd};
+use crate::util::repository_root;
 
 use super::Bootstrap;
 
@@ -24,7 +25,7 @@ impl Bootstrap for YarnCmd {
     }
 
     fn clean() -> Result<()> {
-        rm_dir(&Self::node_modules()?)
+        rm_dir(Self::node_modules()?)
     }
 
     fn prepare(&self) -> Result<()> {

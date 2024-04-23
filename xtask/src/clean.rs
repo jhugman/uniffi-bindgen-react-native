@@ -1,10 +1,11 @@
 use anyhow::Result;
 use camino::Utf8Path;
 use clap::Args;
+use uniffi_common::{rm_dir, run_cmd};
 
 use crate::{
     bootstrap::BootstrapCmd,
-    util::{build_root, cpp_modules, repository_root, rm_dir, run_cmd},
+    util::{build_root, cpp_modules, repository_root},
 };
 
 #[derive(Debug, Args)]
@@ -17,8 +18,8 @@ impl CleanCmd {
         BootstrapCmd::clean_all()?;
 
         // run this last.
-        rm_dir(&build_root()?)?;
-        rm_dir(&cpp_modules()?)?;
+        rm_dir(build_root()?)?;
+        rm_dir(cpp_modules()?)?;
         run_cargo_clean(&root)?;
         Ok(())
     }

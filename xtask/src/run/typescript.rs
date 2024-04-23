@@ -2,13 +2,20 @@ use std::{fs, process::Command};
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
-    util::{build_root, run_cmd_quietly},
+    util::{build_root, repository_root},
 };
 
 use anyhow::Result;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
+use pathdiff::diff_utf8_paths;
+use uniffi_common::run_cmd_quietly;
+
+fn typescript_dir() -> Result<Utf8PathBuf> {
+    let root = repository_root()?;
+    Ok(root.join("typescript"))
+}
 
 fn build_dir() -> Result<Utf8PathBuf> {
     let root = build_root()?;
@@ -42,29 +49,37 @@ impl EntryArg {
         let stem = file.file_stem().expect("a filename with an extension");
         let name = self.name.as_deref().unwrap_or(stem);
 
-        let file = self.compile_ts(&file, stem, name)?;
+        let file = self.prepare_ts(&file, stem, name)?;
         self.bundle(&file, name)
     }
 
-    pub(crate) fn compile_ts(
+    pub(crate) fn prepare_ts(
         &self,
         file: &Utf8Path,
         stem: &str,
         bundle_name: &str,
     ) -> Result<Utf8PathBuf> {
-        let tsc = YarnCmd::node_modules()?.join(".bin/tsc");
-        let outdir = ts_out_dir()?.join(bundle_name);
+        let dir = file.parent().expect("a parent directory for the file");
+        let tsconfig = dir.join("tsconfig.json");
+        let use_template_tsconfig = !tsconfig.exists();
 
-        let mut cmd = Command::new(tsc);
-        run_cmd_quietly(
-            cmd.arg("--esModuleInterop")
-                .arg("--allowJs")
-                .arg("--checkJs")
-                .arg("--outdir")
-                .arg(&outdir)
-                .arg(file),
-        )?;
-        Ok(outdir.join(format!("{stem}.js")))
+        let root = repository_root()?;
+        if use_template_tsconfig {
+            let template_file = typescript_dir()?.join("tsconfig.template.json");
+            let root = diff_utf8_paths(&root, dir).expect("A path between the file and the repo");
+            let contents = fs::read_to_string(template_file)?;
+            let contents = contents.replace("{{repository_root}}", root.as_str());
+            fs::write(&tsconfig, contents)?;
+        }
+
+        let outdir = ts_out_dir()?.join(bundle_name);
+        let result = self.compile_ts(&outdir, dir, &tsconfig);
+        if use_template_tsconfig {
+            fs::remove_file(tsconfig)?;
+        }
+        result?;
+        let rel_path = diff_utf8_paths(dir, root).expect("Under the repository");
+        Ok(outdir.join(rel_path).join(format!("{stem}.js")))
     }
 
     pub(crate) fn bundle(&self, file: &Utf8Path, bundle_name: &str) -> Result<Utf8PathBuf> {
@@ -85,5 +100,36 @@ impl EntryArg {
         )?;
 
         Ok(bundle_path)
+    }
+
+    fn compile_ts(
+        &self,
+        outdir: &Utf8Path,
+        dir: &Utf8Path,
+        tsconfig: &Utf8Path,
+    ) -> Result<(), anyhow::Error> {
+        // tsc.
+        // This does the compilation of the ts into js.
+        // The tsconfig.json file used to configure it has been copied to the current directory already.
+        let tsc = YarnCmd::node_modules()?.join(".bin/tsc");
+        let mut cmd = Command::new(tsc);
+        run_cmd_quietly(cmd.arg("--outdir").arg(outdir).current_dir(dir))?;
+
+        // tsc-alias:
+        // Rewrites absolute paths in to relative paths (configured using the tsconfig.json/paths) so that the
+        // metro bundler can include them in the bundle.
+        // This is so we can write `import * from 'uniffi-bindgen-react-native` in the generated code, the imported
+        // code comes from this package when we test this package, but also come from this when we generate code for
+        // client crates.
+        let tsc_alias = YarnCmd::node_modules()?.join(".bin/tsc-alias");
+        let mut cmd = Command::new(tsc_alias);
+        run_cmd_quietly(
+            cmd.arg("-p")
+                .arg(tsconfig)
+                .arg("--outDir")
+                .arg(".")
+                .current_dir(outdir),
+        )?;
+        Ok(())
     }
 }

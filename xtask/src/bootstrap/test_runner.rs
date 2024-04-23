@@ -3,10 +3,11 @@ use std::{fs, process::Command};
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
+use uniffi_common::{rm_dir, run_cmd};
 
 use crate::{
     bootstrap::HermesCmd,
-    util::{build_root, repository_root, rm_dir, run_cmd},
+    util::{build_root, repository_root},
 };
 
 use super::Bootstrap;
@@ -57,7 +58,7 @@ impl Bootstrap for TestRunnerCmd {
     }
 
     fn clean() -> Result<()> {
-        rm_dir(&Self::build_dir()?)?;
+        rm_dir(Self::build_dir()?)?;
         Ok(())
     }
 

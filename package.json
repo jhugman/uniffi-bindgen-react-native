@@ -9,6 +9,8 @@
   "devDependencies": {
     "metro": "^0.80.8",
     "metro-core": "^0.80.8",
+    "prettier": "^3.2.5",
+    "tsc-alias": "^1.8.8",
     "typescript": "^5.4.5"
   }
 }
