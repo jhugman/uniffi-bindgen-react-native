@@ -1,0 +1,11 @@
+{
+  "name": "uniffi-bindgen-react-native",
+  "version": "0.0.1",
+  "description": "Uniffi bindings generator for calling Rust from React Native",
+  "main": "index.js",
+  "repository": "https://github.com/jhugman/uniffi-bindgen-react-native.git",
+  "author": "James Hugman <james@hugman.tv>",
+  "license": "MIT",
+  "devDependencies": {
+  }
+}
