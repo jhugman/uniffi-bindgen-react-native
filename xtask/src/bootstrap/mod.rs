@@ -1,4 +1,5 @@
 mod hermes;
+mod test_runner;
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
@@ -7,6 +8,7 @@ use clap::{Args, Subcommand};
 use crate::clean::CleanCmd;
 
 pub(crate) use self::hermes::HermesCmd;
+pub(crate) use self::test_runner::TestRunnerCmd;
 
 #[derive(Debug, Args)]
 pub(crate) struct BootstrapCmd {
@@ -25,6 +27,7 @@ impl BootstrapCmd {
         if let Some(cmd) = &self.cmd {
             match cmd {
                 SubsystemCmd::Hermes(c) => c.bootstrap(clean)?,
+                SubsystemCmd::TestRunner(c) => c.bootstrap(clean)?,
             }
         } else {
             if clean {
@@ -37,12 +40,13 @@ impl BootstrapCmd {
 
     pub(crate) fn prepare_all() -> Result<()> {
         HermesCmd::default().bootstrap(false)?;
+        TestRunnerCmd.bootstrap(false)?;
         Ok(())
     }
 
     pub(crate) fn clean_all() -> Result<()> {
+        TestRunnerCmd::clean()?;
         HermesCmd::clean()?;
-
         Ok(())
     }
 }
@@ -53,6 +57,10 @@ enum SubsystemCmd {
     ///
     /// This command clones and compiles a copy for testing on the desktop.
     Hermes(HermesCmd),
+
+    /// The C++ test runner that takes Javascript and .so libraries and runs them against
+    /// Hermes.
+    TestRunner(TestRunnerCmd),
 }
 
 pub(crate) trait Bootstrap {
