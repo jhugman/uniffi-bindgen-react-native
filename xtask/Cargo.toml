@@ -11,4 +11,5 @@ test = false
 [dependencies]
 anyhow = { workspace = true }
 camino = { workspace = true }
+cargo_metadata = "0.18.1"
 clap = { workspace = true }

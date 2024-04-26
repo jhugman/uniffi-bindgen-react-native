@@ -20,6 +20,16 @@ impl TestRunnerCmd {
         Ok(root.join("cpp").join("test-harness"))
     }
 
+    pub(crate) fn hermes_extension_src_dir() -> Result<Utf8PathBuf> {
+        let root = repository_root()?;
+        Ok(root.join("cpp/hermes-extension"))
+    }
+
+    pub(crate) fn hermes_rust_extension_src_dir() -> Result<Utf8PathBuf> {
+        let root = repository_root()?;
+        Ok(root.join("cpp/hermes-rust-extension"))
+    }
+
     fn build_dir() -> Result<Utf8PathBuf> {
         let root = build_root()?;
         Ok(root.join("test-runner"))

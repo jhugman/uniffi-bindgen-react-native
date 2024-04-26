@@ -1,10 +1,12 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use run::RunCmd;
 
 use crate::{bootstrap::BootstrapCmd, clean::CleanCmd};
 
 mod bootstrap;
 mod clean;
+mod run;
 mod util;
 
 #[derive(Debug, Parser)]
@@ -19,6 +21,10 @@ enum Cmd {
     Bootstrap(BootstrapCmd),
     /// Remove everything as if just git cloned
     Clean(CleanCmd),
+    /// Run some Javascript against a Rust library.
+    ///
+    /// Optionally can compile the Rust.
+    Run(RunCmd),
 }
 
 fn main() -> Result<()> {
@@ -27,5 +33,6 @@ fn main() -> Result<()> {
     match args.cmd {
         Cmd::Bootstrap(c) => c.run(),
         Cmd::Clean(c) => c.run(),
+        Cmd::Run(c) => c.run(),
     }
 }

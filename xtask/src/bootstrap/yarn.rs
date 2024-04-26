@@ -4,7 +4,7 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
 
-use crate::util::{build_root, repository_root, rm_dir, run_cmd};
+use crate::util::{repository_root, rm_dir, run_cmd};
 
 use super::Bootstrap;
 
