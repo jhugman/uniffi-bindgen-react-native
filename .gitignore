@@ -59,3 +59,7 @@ project.xcworkspace
 .settings
 local.properties
 android.iml
+
+# JS
+node_modules/
+*.bundle.js

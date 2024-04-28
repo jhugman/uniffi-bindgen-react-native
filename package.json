@@ -7,5 +7,8 @@
   "author": "James Hugman <james@hugman.tv>",
   "license": "MIT",
   "devDependencies": {
+    "metro": "^0.80.8",
+    "metro-core": "^0.80.8",
+    "typescript": "^5.4.5"
   }
 }
