@@ -1,11 +1,13 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use fmt::FmtArgs;
 use run::RunCmd;
 
 use crate::{bootstrap::BootstrapCmd, clean::CleanCmd};
 
 mod bootstrap;
 mod clean;
+mod fmt;
 mod run;
 mod util;
 
@@ -25,6 +27,9 @@ enum Cmd {
     ///
     /// Optionally can compile the Rust.
     Run(RunCmd),
+
+    /// Format all code in the repository
+    Fmt(FmtArgs),
 }
 
 fn main() -> Result<()> {
@@ -34,5 +39,6 @@ fn main() -> Result<()> {
         Cmd::Bootstrap(c) => c.run(),
         Cmd::Clean(c) => c.run(),
         Cmd::Run(c) => c.run(),
+        Cmd::Fmt(c) => c.run(),
     }
 }
