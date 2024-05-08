@@ -63,3 +63,6 @@ android.iml
 # JS
 node_modules/
 *.bundle.js
+
+# Uniffi
+generated/
