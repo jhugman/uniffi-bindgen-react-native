@@ -56,8 +56,7 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         out_dir: &Utf8Path,
         try_format_code: bool,
     ) -> Result<()> {
-        let TsBindings { codegen, frontend } =
-            gen_typescript::generate_frontend_bindings(ci, config, try_format_code)?;
+        let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, config)?;
         let codegen_file = format!("{}.ts", &config.ffi_ts_filename);
         let codegen_path = out_dir.join(codegen_file);
         let frontend_path = out_dir.join(format!("{}.ts", ci.namespace()));

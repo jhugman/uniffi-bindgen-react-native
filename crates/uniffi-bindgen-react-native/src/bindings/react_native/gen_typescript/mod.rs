@@ -27,10 +27,9 @@ pub(crate) struct TsBindings {
     pub(crate) frontend: String,
 }
 
-pub(crate) fn generate_frontend_bindings(
+pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
     config: &ReactNativeConfig,
-    _try_format_code: bool,
 ) -> Result<TsBindings> {
     let codegen = CodegenWrapper::new(ci, config)
         .render()
