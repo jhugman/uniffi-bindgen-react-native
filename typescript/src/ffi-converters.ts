@@ -20,16 +20,17 @@ export abstract class FfiConverterPrimitive<T> implements FfiConverter<T, T> {
   abstract allocationSize(value: T): number;
 }
 
-export abstract class FfiConverterRustBuffer<TsType>
-  implements FfiConverter<RustBuffer, TsType>
+export abstract class FfiConverterArrayBuffer<TsType>
+  implements FfiConverter<ArrayBuffer, TsType>
 {
-  lift(value: RustBuffer): TsType {
-    return this.read(value);
+  lift(value: ArrayBuffer): TsType {
+    const buffer = RustBuffer.fromArrayBuffer(value);
+    return this.read(buffer);
   }
-  lower(value: TsType): RustBuffer {
+  lower(value: TsType): ArrayBuffer {
     const buffer = RustBuffer.withCapacity(this.allocationSize(value));
     this.write(value, buffer);
-    return buffer;
+    return buffer.arrayBuffer;
   }
   abstract read(from: RustBuffer): TsType;
   abstract write(value: TsType, into: RustBuffer): void;
@@ -166,7 +167,7 @@ export const FfiConverterBool = (() => {
   return new FfiConverterBool();
 })();
 
-export class FfiConverterOptional<Item> extends FfiConverterRustBuffer<
+export class FfiConverterOptional<Item> extends FfiConverterArrayBuffer<
   Item | undefined
 > {
   private static flagConverter = FfiConverterBool;
@@ -194,7 +195,7 @@ export class FfiConverterOptional<Item> extends FfiConverterRustBuffer<
   }
 }
 
-export class FfiConverterArray<Item> extends FfiConverterRustBuffer<
+export class FfiConverterArray<Item> extends FfiConverterArrayBuffer<
   Array<Item>
 > {
   private static sizeConverter = FfiConverterInt32;
@@ -224,7 +225,7 @@ export class FfiConverterArray<Item> extends FfiConverterRustBuffer<
   }
 }
 
-export class FfiConverterMap<K, V> extends FfiConverterRustBuffer<Map<K, V>> {
+export class FfiConverterMap<K, V> extends FfiConverterArrayBuffer<Map<K, V>> {
   private static sizeConverter = FfiConverterInt32;
   constructor(
     private keyConverter: FfiConverter<any, K>,

@@ -6,21 +6,21 @@ const CALL_ERROR = 1;
 const CALL_UNEXPECTED_ERROR = 2;
 const CALL_CANCELLED = 3;
 
-type StringReader = (rustBuffer: RustBuffer) => string;
-let FfiConverterString_read: StringReader;
-export function initializeWithStringReader(sr: StringReader) {
-  FfiConverterString_read = sr;
+type StringLifter = (arrayBuffer: ArrayBuffer) => string;
+let FfiConverterString_lift: StringLifter;
+export function initializeWithStringLifter(sr: StringLifter) {
+  FfiConverterString_lift = sr;
 }
 
-export class UniffiRustCallStatus {
-  code: number = CALL_SUCCESS;
-  errorBuf: RustBuffer;
-  constructor() {
-    this.errorBuf = RustBuffer.withCapacity(0);
-  }
+export type UniffiRustCallStatus = {
+  code: number;
+  errorBuf?: ArrayBuffer;
+};
+export function createCallStatus(): UniffiRustCallStatus {
+  return { code: CALL_SUCCESS };
 }
 
-type ErrorHandler = (buffer: RustBuffer) => Error;
+type ErrorHandler = (buffer: ArrayBuffer) => Error;
 type RustCaller<T> = (status: UniffiRustCallStatus) => T;
 
 export function rustCall<T>(caller: RustCaller<T>): T {
@@ -39,7 +39,7 @@ export function makeRustCall<T>(
   errorHandler?: ErrorHandler,
 ): T {
   // uniffiEnsureInitialized()
-  const callStatus = new UniffiRustCallStatus();
+  const callStatus = createCallStatus();
   let returnedVal = caller(callStatus);
   uniffiCheckCallStatus(callStatus, errorHandler);
   return returnedVal;
@@ -53,26 +53,28 @@ function uniffiCheckCallStatus(
     case CALL_SUCCESS:
       return;
 
-    case CALL_ERROR:
-      if (errorHandler) {
-        throw errorHandler(callStatus.errorBuf);
-      } else {
-        callStatus.errorBuf.deallocate();
-        throw new UniffiInternalError.UnexpectedRustCallError();
+    case CALL_ERROR: {
+      if (callStatus.errorBuf) {
+        if (errorHandler) {
+          throw errorHandler(callStatus.errorBuf);
+        }
       }
+      throw new UniffiInternalError.UnexpectedRustCallError();
+    }
 
-    case CALL_UNEXPECTED_ERROR:
+    case CALL_UNEXPECTED_ERROR: {
       // When the rust code sees a panic, it tries to construct a RustBuffer
       // with the message.  But if that code panics, then it just sends back
       // an empty buffer.
-      if (callStatus.errorBuf.length > 0) {
-        throw new UniffiInternalError.RustPanic(
-          FfiConverterString_read(callStatus.errorBuf),
-        );
-      } else {
-        callStatus.errorBuf.deallocate();
-        throw new UniffiInternalError.RustPanic("Rust panic");
+      if (callStatus.errorBuf) {
+        if (callStatus.errorBuf.byteLength > 0) {
+          throw new UniffiInternalError.RustPanic(
+            FfiConverterString_lift(callStatus.errorBuf),
+          );
+        }
       }
+      throw new UniffiInternalError.RustPanic("Rust panic");
+    }
 
     case CALL_CANCELLED:
       new UniffiInternalError.Unimplemented("Cancellation not supported yet");

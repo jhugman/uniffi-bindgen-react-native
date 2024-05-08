@@ -136,9 +136,7 @@ impl CodeOracle {
             FfiType::Float64 => "number".to_string(),
             FfiType::Handle => "bigint".to_string(),
             FfiType::RustArcPtr(_) => "bigint".to_string(),
-            FfiType::RustBuffer(maybe_suffix) => {
-                format!("RustBuffer{}", maybe_suffix.as_deref().unwrap_or_default())
-            }
+            FfiType::RustBuffer(_) => "ArrayBuffer".to_string(),
             FfiType::RustCallStatus => "UniffiRustCallStatus".to_string(),
             FfiType::ForeignBytes => "ForeignBytes".to_string(),
             FfiType::Callback(name) => self.ffi_callback_name(name),

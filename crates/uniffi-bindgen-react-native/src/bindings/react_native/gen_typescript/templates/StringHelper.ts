@@ -45,6 +45,6 @@ const FfiConverterString = (() => {
 
     return new FFIConverter();
 })();
-{{- self.add_import_from("initializeWithStringReader", "rust-call") }}
-initializeWithStringReader(FfiConverterString.read);
+{{- self.add_import_from("initializeWithStringLifter", "rust-call") }}
+initializeWithStringLifter(FfiConverterString.lift);
 {% endif %}
