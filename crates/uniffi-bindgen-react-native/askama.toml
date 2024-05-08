@@ -1,5 +1,11 @@
 [general]
-dirs = ["src/bindings/react_native/gen_typescript/templates"]
+dirs = ["src/bindings/react_native/gen_typescript/templates", "src/bindings/react_native/gen_cpp/templates"]
 
 [[syntax]]
 name = "ts"
+
+[[syntax]]
+name = "hpp"
+
+[[syntax]]
+name = "cpp"

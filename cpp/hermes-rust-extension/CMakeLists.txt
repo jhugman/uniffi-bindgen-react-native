@@ -42,10 +42,13 @@ if (NOT EXISTS "${RUST_TARGET_DIR}/lib${RUST_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUF
 endif ()
 
 # Add Hermes include directories
+include_directories("${HERMES_SRC_DIR}/API")
 include_directories("${HERMES_SRC_DIR}/API/jsi")
+include_directories("${HERMES_SRC_DIR}/public")
 include_directories("../includes")
 
 # Add Hermes library directories
+link_directories("${HERMES_BUILD_DIR}/API/hermes")
 link_directories("${HERMES_BUILD_DIR}/jsi")
 link_libraries(jsi)
 link_directories("${RUST_TARGET_DIR}")
