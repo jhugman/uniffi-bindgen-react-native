@@ -11,7 +11,7 @@ class {{ module_name }} : public jsi::HostObject {
   protected:
     std::map<std::string,jsi::Value> props;
     {%- for func in ci.iter_ffi_function_definitions() %}
-    static jsi::Value cpp_{{ func.name() }}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
+    static jsi::Value {% call cpp::cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     {%- endfor %}
   public:
     {{ module_name }}(jsi::Runtime &rt);
@@ -24,3 +24,5 @@ class {{ module_name }} : public jsi::HostObject {
     virtual void set(jsi::Runtime& rt,const jsi::PropNameID& name,const jsi::Value& value);
     virtual std::vector<jsi::PropNameID> getPropertyNames(jsi::Runtime& rt);
 };
+
+{%- import "macros.cpp" as cpp %}

@@ -1,8 +1,10 @@
-use anyhow::Result;
-use askama::Template;
-use uniffi_bindgen::ComponentInterface;
+mod filters;
 
 use super::ReactNativeConfig;
+use anyhow::Result;
+use askama::Template;
+use std::borrow::Borrow;
+use uniffi_bindgen::ComponentInterface;
 
 #[derive(Debug, Default)]
 pub(crate) struct CppBindings {
