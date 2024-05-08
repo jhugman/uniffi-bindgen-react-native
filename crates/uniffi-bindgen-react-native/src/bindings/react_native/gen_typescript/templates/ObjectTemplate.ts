@@ -168,8 +168,8 @@ const {{ ffi_converter_name }} = (() => {
 {# Objects as error #}
 {%- if is_error %}
 {# Due to some mismatches in the ffi converter mechanisms, errors are a RustBuffer holding a pointer #}
-public struct {{ ffi_converter_name }}__as_error: FfiConverterRustBuffer {
-    public static func lift(_ buf: RustBuffer) throws -> {{ type_name }} {
+public struct {{ ffi_converter_name }}__as_error: FfiConverterArrayBuffer {
+    public static func lift(_ buf: ArrayBuffer) throws -> {{ type_name }} {
         var reader = createReader(data: Data(rustBuffer: buf))
         return try {{ ffi_converter_name }}.read(from: &reader)
     }

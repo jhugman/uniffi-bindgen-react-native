@@ -1,4 +1,4 @@
-{{- self.add_import_from("FfiConverterRustBuffer", "ffi-converters") -}}
+{{- self.add_import_from("FfiConverterArrayBuffer", "ffi-converters") -}}
 {{- self.add_import_from("FfiConverterInt32", "ffi-converters") -}}
 {{- self.add_import_from("UniffiInternalError", "errors") -}}
 
@@ -18,7 +18,7 @@ export enum {{ type_name }} {
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
-    class FFIConverter extends FfiConverterRustBuffer<TypeName> {
+    class FFIConverter extends FfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}
@@ -120,7 +120,7 @@ export abstract class {{ type_name }} {
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
-    class FFIConverter extends FfiConverterRustBuffer<TypeName> {
+    class FFIConverter extends FfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}
@@ -186,10 +186,10 @@ const {{ ffi_converter_name }} = (() => {
 We always write these public functions just in case the enum is used as
 an external type by another crate.
 #}
-export function {{ ffi_converter_name }}_lift(buf: RustBuffer): {{ type_name }} {
+export function {{ ffi_converter_name }}_lift(buf: ArrayBuffer): {{ type_name }} {
     return {{ ffi_converter_name }}.lift(buf);
 }
 
-export function {{ ffi_converter_name }}_lower(value: {{ type_name }}): RustBuffer {
+export function {{ ffi_converter_name }}_lower(value: {{ type_name }}): ArrayBuffer {
     return {{ ffi_converter_name }}.lower(value);
 }

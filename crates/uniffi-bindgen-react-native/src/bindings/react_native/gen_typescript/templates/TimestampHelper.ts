@@ -1,5 +1,5 @@
 /*
-fileprivate struct FfiConverterTimestamp: FfiConverterRustBuffer {
+fileprivate struct FfiConverterTimestamp: FfiConverterArrayBuffer {
     typealias SwiftType = Date
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Date {

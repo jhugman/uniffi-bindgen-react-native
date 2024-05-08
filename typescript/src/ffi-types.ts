@@ -3,7 +3,7 @@ import { UniffiInternalError } from "./errors";
 export class RustBuffer {
   private readOffset: number = 0;
   private writeOffset: number = 0;
-  private arrayBuffer: ArrayBuffer;
+  public arrayBuffer: ArrayBuffer;
 
   private constructor(arrayBuffer: ArrayBuffer) {
     this.arrayBuffer = arrayBuffer;

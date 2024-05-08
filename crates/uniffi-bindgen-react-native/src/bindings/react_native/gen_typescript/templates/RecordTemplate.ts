@@ -21,7 +21,7 @@ export function create{{ name }}({% call ts::field_list_decl(rec, false) %}) {
 
 const {{ ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};
-    class FFIConverter extends FfiConverterRustBuffer<TypeName> {
+    class FFIConverter extends FfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             return {
             {%- for field in rec.fields() %}
@@ -53,10 +53,10 @@ const {{ ffi_converter_name }} = (() => {
 We always write these public functions just in case the struct is used as
 an external type by another crate.
 #}
-export function {{ ffi_converter_name }}_lift(buf: RustBuffer): {{ type_name }} {
+export function {{ ffi_converter_name }}_lift(buf: ArrayBuffer): {{ type_name }} {
     return {{ ffi_converter_name }}.lift(buf);
 }
 
-export function {{ ffi_converter_name }}_lower(value: {{ type_name }}): RustBuffer {
+export function {{ ffi_converter_name }}_lower(value: {{ type_name }}): ArrayBuffer {
     return {{ ffi_converter_name }}.lower(value);
 }
