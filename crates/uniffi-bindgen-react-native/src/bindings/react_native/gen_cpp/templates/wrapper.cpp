@@ -1,7 +1,17 @@
 {%- let namespace = ci.namespace() %}
 {%- let module_name = config.cpp_module.clone() %}
+#ifndef UNIFFI_EXPORT
+#if defined(_WIN32) || defined(_WIN64)
+#define UNIFFI_EXPORT __declspec(dllexport)
+#else
+#define UNIFFI_EXPORT __attribute__((visibility("default")))
+#endif
+#endif
+
 #include "{{ namespace }}.hpp"
 
+#include "registerNatives.h"
+#include "UniffiJsiTypes.h"
 #include <stdexcept>
 #include <map>
 #include <utility>
@@ -9,16 +19,35 @@
 
 using namespace facebook;
 
+// Initialization into the Hermes Runtime
+extern "C" void registerNatives(jsi::Runtime &rt) {
+    rt.global().setProperty(rt, "{{ module_name }}", {{ module_name }}::makeNativeObject(rt));
+}
+
+{%- include "RustBuffer.cpp" %}
+{%- include "ForeignBytes.cpp" %}
+{%- include "RustCallStatus.cpp" %}
+{%- include "Callback.cpp" %}
+{%- include "Handle.cpp" %}
+{%- include "RustArcPtr.cpp" %}
+
+// Calling into Rust.
 extern "C" {
     {%- for func in ci.iter_ffi_function_definitions() %}
-    int {{ func.name() }}(int a, int b);
+    {% call cpp::rust_fn_decl(func) %}
     {%- endfor %}
 }
 
 {{ module_name }}::{{ module_name }}(jsi::Runtime &rt) : props() {
+    // Map from Javascript names to the cpp names
     {%- for func in ci.iter_ffi_function_definitions() %}
     {%- let name = func.name() %}
-    props["{{ name }}"] = jsi::Function::createFromHostFunction(rt, jsi::PropNameID::forAscii(rt, "{{ name }}"), 2, cpp_{{ name }});
+    props["{{ name }}"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "{{ name }}"),
+        2,
+        {% call cpp::cpp_func_name(func) %}
+    );
     {%- endfor %}
 }
 
@@ -53,17 +82,9 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 {{ module_name }}::~{{ module_name }}() {
     // NOOP
 }
+
 {%- for func in ci.iter_ffi_function_definitions() %}
-{%- let func_name = func.name() %}
-jsi::Value {{ module_name }}::cpp_{{ func_name }}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
-    auto a = args[0].getNumber();
-    auto b = args[1].getNumber();
-    auto sum = {{ func_name }}(a, b);
-    return jsi::Value(sum);
-}
+{% call cpp::rust_fn_caller(module_name, func) %}
 {%- endfor %}
 
-#include "registerNatives.h"
-extern "C" void registerNatives(jsi::Runtime &rt) {
-    rt.global().setProperty(rt, "{{ module_name }}", {{ module_name }}::makeNativeObject(rt));
-}
+{%- import "macros.cpp" as cpp %}
