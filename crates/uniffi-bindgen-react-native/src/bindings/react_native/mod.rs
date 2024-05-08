@@ -1,3 +1,4 @@
+mod gen_cpp;
 mod gen_typescript;
 
 use std::{collections::HashMap, fs, process::Command};
@@ -9,7 +10,7 @@ use serde::Deserialize;
 use uniffi_bindgen::{BindingGenerator, BindingsConfig, ComponentInterface};
 use uniffi_common::{resolve, run_cmd_quietly};
 
-use self::gen_typescript::TsBindings;
+use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
 
 #[derive(Deserialize)]
 pub(crate) struct ReactNativeConfig {
@@ -56,10 +57,11 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         out_dir: &Utf8Path,
         try_format_code: bool,
     ) -> Result<()> {
+        let namespace = ci.namespace();
         let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, config)?;
         let codegen_file = format!("{}.ts", &config.ffi_ts_filename);
         let codegen_path = out_dir.join(codegen_file);
-        let frontend_path = out_dir.join(format!("{}.ts", ci.namespace()));
+        let frontend_path = out_dir.join(format!("{namespace}.ts"));
 
         fs::write(codegen_path, codegen)?;
         fs::write(frontend_path, frontend)?;
@@ -67,6 +69,13 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         if try_format_code {
             format_ts(out_dir)?;
         }
+
+        let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, config)?;
+        let cpp_path = out_dir.join(format!("{namespace}.cpp"));
+        let hpp_path = out_dir.join(format!("{namespace}.hpp"));
+
+        fs::write(cpp_path, cpp)?;
+        fs::write(hpp_path, hpp)?;
 
         Ok(())
     }

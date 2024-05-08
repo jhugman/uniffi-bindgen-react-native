@@ -1,8 +1,8 @@
 /*
-* This is free and unencumbered software released into the public domain.
-* For more information, please refer to the LICENSE file in the root directory
-* or at <http://unlicense.org/>
-*/
+ * This is free and unencumbered software released into the public domain.
+ * For more information, please refer to the LICENSE file in the root directory
+ * or at <http://unlicense.org/>
+ */
 
 #pragma once
 

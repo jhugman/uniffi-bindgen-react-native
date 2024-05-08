@@ -31,7 +31,7 @@ impl CppBindingArg {
         target_dir: &Utf8Path,
         lib_name: &str,
     ) -> Result<Utf8PathBuf> {
-        let cpp_file = self.cpp_file();
+        let cpp_file = self.cpp_file().canonicalize_utf8()?;
 
         let hermes_src = HermesCmd::src_dir()?;
         let hermes_build = HermesCmd::build_dir()?;
@@ -69,7 +69,7 @@ impl CppBindingArg {
     }
 
     pub(crate) fn compile_without_crate(&self, clean: bool) -> Result<Utf8PathBuf> {
-        let cpp_file = self.cpp_file();
+        let cpp_file = self.cpp_file().canonicalize_utf8()?;
         let lib_name = cpp_file.file_stem().expect("filename with stem");
 
         let hermes_src = HermesCmd::src_dir()?;

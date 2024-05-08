@@ -33,10 +33,13 @@ set(HERMES_EXTENSION_NAME "" CACHE STRING "Name of Hermes extension library")
 set(HERMES_EXTENSION_CPP "" CACHE PATH "Extension cpp (generated)")
 
 # Add Hermes include directories
+include_directories("${HERMES_SRC_DIR}/API")
 include_directories("${HERMES_SRC_DIR}/API/jsi")
+include_directories("${HERMES_SRC_DIR}/public")
 include_directories("../includes")
 
 # Add Hermes library directories
+link_directories("${HERMES_BUILD_DIR}/API/hermes")
 link_directories("${HERMES_BUILD_DIR}/jsi")
 link_libraries(jsi)
 
