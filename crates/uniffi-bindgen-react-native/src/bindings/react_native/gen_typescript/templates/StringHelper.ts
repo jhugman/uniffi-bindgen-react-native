@@ -24,22 +24,16 @@ const FfiConverterString = (() => {
         }
         read(from: RustBuffer): TypeName {
             const length = lengthConverter.read(from);
-            return from.read(length, (buffer, offset) => {
-                const slice = buffer.slice(offset, offset + length);
-                const decoder = new TextDecoder('utf-8');
-                return decoder.decode(slice);
-            });
+            return from.read(length, arrayBufferToString);
         }
         write(value: TypeName, into: RustBuffer): void {
-            const length = byteLength(value);
-            into.write(length, (buffer, offset) => {
-                const encoder = new TextEncoder();
-                const view = new Uint8Array(buffer, offset);
-                encoder.encodeInto(value, view);
-            });
+            const buffer = stringToArrayBuffer(value);
+            const numBytes = buffer.byteLength;
+            lengthConverter.write(numBytes, into);
+            into.write(numBytes, () => stringToArrayBuffer(value));
         }
         allocationSize(value: TypeName): number {
-            return lengthConverter.allocationSize(0) + byteLength(value);
+            return lengthConverter.allocationSize(0) + stringByteLength(value);
         }
     }
 
