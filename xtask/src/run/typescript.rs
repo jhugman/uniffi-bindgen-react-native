@@ -2,7 +2,7 @@ use std::{fs, process::Command};
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
-    util::{build_root, repository_root},
+    util::{build_root, find, repository_root},
 };
 
 use anyhow::Result;
@@ -66,7 +66,7 @@ impl EntryArg {
         let root = repository_root()?;
         if use_template_tsconfig {
             let template_file = typescript_dir()?.join("tsconfig.template.json");
-            let root = diff_utf8_paths(&root, dir).expect("A path between the file and the repo");
+            let root = diff_utf8_paths(root, dir).expect("A path between the file and the repo");
             let contents = fs::read_to_string(template_file)?;
             let contents = contents.replace("{{repository_root}}", root.as_str());
             fs::write(&tsconfig, contents)?;
@@ -78,8 +78,8 @@ impl EntryArg {
             fs::remove_file(tsconfig)?;
         }
         result?;
-        let rel_path = diff_utf8_paths(dir, root).expect("Under the repository");
-        Ok(outdir.join(rel_path).join(format!("{stem}.js")))
+        let entry = find(&outdir, &format!("{stem}.js")).expect("just made this js file");
+        Ok(entry)
     }
 
     pub(crate) fn bundle(&self, file: &Utf8Path, bundle_name: &str) -> Result<Utf8PathBuf> {
