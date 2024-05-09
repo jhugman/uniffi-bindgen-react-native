@@ -51,7 +51,6 @@ type TypedArray = NumberTypedArray | BigIntTypeArray;
 
 type TypedArrayConstructor<T extends TypedArray> = new (
   buffer: ArrayBuffer,
-  offset: number,
 ) => T;
 type NumberType = number | bigint;
 class FfiConverterNumber<
@@ -80,16 +79,18 @@ class FfiConverterNumber<
   }
 
   read(from: RustBuffer): T {
-    return from.read(this.byteSize, (buffer, offset) => {
-      const view = new this.viewConstructor(buffer, offset);
+    return from.read(this.byteSize, (slice) => {
+      const view = new this.viewConstructor(slice);
       return view.at(0) as T | undefined;
     });
   }
 
   write(value: T, into: RustBuffer): void {
-    into.write(this.byteSize, (buffer, offset) => {
-      const view = new this.viewConstructor(buffer, offset);
+    into.write(this.byteSize, () => {
+      const slice = new ArrayBuffer(this.byteSize);
+      const view = new this.viewConstructor(slice);
       view[0] = value;
+      return slice;
     });
   }
 
