@@ -24,12 +24,10 @@ extern "C" void registerNatives(jsi::Runtime &rt) {
     rt.global().setProperty(rt, "{{ module_name }}", {{ module_name }}::makeNativeObject(rt));
 }
 
-{%- include "RustBuffer.cpp" %}
-{%- include "ForeignBytes.cpp" %}
-{%- include "RustCallStatus.cpp" %}
-{%- include "Callback.cpp" %}
-{%- include "Handle.cpp" %}
-{%- include "RustArcPtr.cpp" %}
+{% include "RustCallStatus.cpp" %}
+{% include "Callback.cpp" %}
+{% include "Handle.cpp" %}
+{% include "RustArcPtr.cpp" %}
 
 // Calling into Rust.
 extern "C" {
@@ -37,6 +35,9 @@ extern "C" {
     {% call cpp::rust_fn_decl(func) %}
     {%- endfor %}
 }
+
+// This calls into Rust.
+{% include "RustBufferHelper.cpp" %}
 
 {{ module_name }}::{{ module_name }}(jsi::Runtime &rt) : props() {
     // Map from Javascript names to the cpp names

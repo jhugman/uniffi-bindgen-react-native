@@ -20,6 +20,11 @@
 {%- macro rust_fn_caller(module_name, func) %}
 {%- let func_name = func.name() %}
 jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+{%- call cpp_fn_rust_caller_body(func) %}
+}
+{%- endmacro %}
+
+{%- macro cpp_fn_rust_caller_body(func) %}
     {%- if func.has_rust_call_status_arg() %}
     RustCallStatus status = { 0 };
     {%- endif %}
@@ -45,7 +50,6 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
     {%- when None %}
     return jsi::Value::undefined();
     {%- endmatch %}
-}
-{%- endmacro %}
+{% endmacro %}
 
 {%- macro cpp_func_name(func) %}cpp_{{ func.name() }}{%- endmacro %}
