@@ -1,5 +1,6 @@
 import { RustBuffer } from "./ffi-types";
 
+// https://github.com/mozilla/uniffi-rs/blob/main/docs/manual/src/internals/lifting_and_lowering.md
 export interface FfiConverter<FfiType, TsType> {
   lift(value: FfiType): TsType;
   lower(value: TsType): FfiType;
@@ -60,6 +61,7 @@ class FfiConverterNumber<
   private constructor(
     private viewConstructor: TypedArrayConstructor<ArrayType>,
     private byteSize: number,
+    private numberConverter?: (v: any) => T,
   ) {
     super();
     this.viewConstructor = viewConstructor;
@@ -75,13 +77,22 @@ class FfiConverterNumber<
     viewConstructor: TypedArrayConstructor<T>,
     byteSize: number,
   ): FfiConverterNumber<bigint, T> {
-    return new FfiConverterNumber<bigint, T>(viewConstructor, byteSize);
+    return new FfiConverterNumber<bigint, T>(viewConstructor, byteSize, (v) =>
+      BigInt(v),
+    );
+  }
+
+  protected reverse(buf: ArrayBuffer): ArrayBuffer {
+    return new Uint8Array(buf).reverse().buffer;
   }
 
   read(from: RustBuffer): T {
     return from.read(this.byteSize, (slice) => {
-      const view = new this.viewConstructor(slice);
-      return view.at(0) as T | undefined;
+      const view = new this.viewConstructor(this.reverse(slice));
+      const raw = view.at(0);
+      return this.numberConverter
+        ? this.numberConverter(raw)
+        : (raw as T | undefined);
     });
   }
 
@@ -90,7 +101,7 @@ class FfiConverterNumber<
       const slice = new ArrayBuffer(this.byteSize);
       const view = new this.viewConstructor(slice);
       view[0] = value;
-      return slice;
+      return this.reverse(slice);
     });
   }
 
