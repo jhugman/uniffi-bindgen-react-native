@@ -22,7 +22,7 @@ const {{ ffi_converter_name }} = (() => {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}
-                case {{ loop.index0 }}: return {{ type_name }}.{{ variant|variant_name }};
+                case {{ loop.index0 + 1}}: return {{ type_name }}.{{ variant|variant_name }};
                 {%- endfor %}
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
@@ -30,7 +30,7 @@ const {{ ffi_converter_name }} = (() => {
         write(value: TypeName, into: RustBuffer): void {
             switch (value) {
                 {%- for variant in e.variants() %}
-                case {{ type_name }}.{{ variant|variant_name }}: return ordinalConverter.write({{ loop.index0 }}, into);
+                case {{ type_name }}.{{ variant|variant_name }}: return ordinalConverter.write({{ loop.index0 + 1 }}, into);
                 {%- endfor %}
             }
         }
@@ -113,6 +113,14 @@ export abstract class {{ type_name }} {
             }
         {%- endif %}
         ) { super({{kind_type_name}}.{{ variant|variant_name }}); }
+
+        asJSON(): any {
+            {%- if !variant.fields().is_empty() %}
+            return { ["{{ type_name }}.{{ var_name }}"]: this.members };
+            {%- else %}
+            return "{{ type_name }}.{{ var_name }}";
+            {%- endif %}
+        }
     }
     {%- endfor %}
 }
@@ -124,7 +132,7 @@ const {{ ffi_converter_name }} = (() => {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}
-                case {{ loop.index0 }}: return new {{ type_name }}.{{ variant.name()|class_name(ci) }}(
+                case {{ loop.index0 + 1 }}: return new {{ type_name }}.{{ variant.name()|class_name(ci) }}(
                 {%- if !variant.fields().is_empty() %}{
                     {%- for field in variant.fields() %}
                     {% call ts::field_name(field, loop.index) %}: {{ field|read_fn }}(from)
@@ -141,18 +149,23 @@ const {{ ffi_converter_name }} = (() => {
                 {%- for variant in e.variants() %}
                 case {{ kind_type_name }}.{{ variant|variant_name }}: {
                     if (value instanceof {{ type_name }}.{{ variant.name()|class_name(ci) }}) {
-                        ordinalConverter.write({{ loop.index0 }}, into);
+                        ordinalConverter.write({{ loop.index0 + 1 }}, into);
                         {%- if !variant.fields().is_empty() %}
                         {%- for field in variant.fields() %}
                         {{ field|write_fn }}(value.members.{% call ts::field_name(field, loop.index) %}, into);
                         {%- endfor %}
                         {%- endif %}
+                        return;
                     }
                     break;
                 }
                 {%- endfor %}
-                default: break;
+                default:
+                    // Throwing from here means that {{ kind_type_name }} hasn't matched an ordinal.
+                    throw new UniffiInternalError.UnexpectedEnumCase();
+                    break;
             }
+            // Throwing from here means that an instanceof check has failed.
             throw new UniffiInternalError.UnexpectedEnumCase();
         }
         allocationSize(value: TypeName): number {
