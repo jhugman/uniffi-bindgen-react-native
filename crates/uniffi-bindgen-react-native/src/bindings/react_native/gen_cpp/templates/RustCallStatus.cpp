@@ -1,3 +1,6 @@
+constexpr int8_t UNIFFI_CALL_STATUS_OK = 0;
+constexpr int8_t UNIFFI_CALL_STATUS_ERROR = 1;
+constexpr int8_t UNIFFI_CALL_STATUS_PANIC = 2;
 
 struct RustCallStatus {
     int8_t code;
