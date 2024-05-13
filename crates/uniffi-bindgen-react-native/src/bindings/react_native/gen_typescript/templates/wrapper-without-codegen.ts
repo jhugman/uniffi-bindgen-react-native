@@ -2,10 +2,11 @@ import { UniffiRustCallStatus, UniffiRustFutureContinuationCallback } from 'unif
 import { ForeignBytes, RustBuffer } from 'uniffi-bindgen-react-native/ffi-types';
 
 interface NativeModuleInterface {
-    {%- for func in ci.iter_ffi_function_definitions() %}
+    {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
+    {%- let is_internal = func.is_internal() %}
     {{ func.name() }}(
       {%- call ts::arg_list_ffi_decl(func) %}):
-      {%- match func.return_type() %}{% when Some with (return_type) %} {{ return_type.borrow()|ffi_type_name_by_value }}{% when None %} void{% endmatch %};
+      {%- match func.return_type() %}{% when Some with (return_type) %} {{ return_type.borrow()|ffi_type_name_for_cpp(is_internal) }}{% when None %} void{% endmatch %};
   {%- endfor %}
 }
 

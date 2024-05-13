@@ -5,9 +5,13 @@ use std::{collections::HashMap, fs, process::Command};
 
 use anyhow::Result;
 use camino::Utf8Path;
+use extend::ext;
 use heck::ToUpperCamelCase;
 use serde::Deserialize;
-use uniffi_bindgen::{BindingGenerator, BindingsConfig, ComponentInterface};
+use uniffi_bindgen::{
+    interface::{FfiArgument, FfiFunction, FfiType, Function},
+    BindingGenerator, BindingsConfig, ComponentInterface,
+};
 use uniffi_common::{resolve, run_cmd_quietly};
 
 use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
@@ -101,4 +105,110 @@ fn format_ts(out_dir: &Utf8Path) -> Result<()> {
         eprintln!("No prettier found. Install with `yarn add --dev prettier`");
     }
     Ok(())
+}
+
+#[ext]
+impl ComponentInterface {
+    fn ffi_function_string_to_arraybuffer(&self) -> FfiFunction {
+        let meta = uniffi_meta::FnMetadata {
+            module_path: "internal".to_string(),
+            name: "ffi__string_to_arraybuffer".to_owned(),
+            is_async: false,
+            inputs: Default::default(),
+            return_type: None,
+            throws: None,
+            checksum: None,
+            docstring: None,
+        };
+        let func: Function = meta.into();
+        let mut ffi = func.ffi_func().clone();
+        ffi.init(
+            Some(FfiType::ForeignBytes),
+            vec![FfiArgument::new("string", FfiType::RustBuffer(None))],
+        );
+        ffi.clone()
+    }
+
+    fn ffi_function_arraybuffer_to_string(&self) -> FfiFunction {
+        let meta = uniffi_meta::FnMetadata {
+            module_path: "internal".to_string(),
+            name: "ffi__arraybuffer_to_string".to_owned(),
+            is_async: false,
+            inputs: Default::default(),
+            return_type: None,
+            throws: None,
+            checksum: None,
+            docstring: None,
+        };
+        let func: Function = meta.into();
+        let mut ffi = func.ffi_func().clone();
+        ffi.init(
+            Some(FfiType::RustBuffer(None)),
+            vec![FfiArgument::new("buffer", FfiType::ForeignBytes)],
+        );
+        ffi.clone()
+    }
+
+    fn ffi_function_string_to_bytelength(&self) -> FfiFunction {
+        let meta = uniffi_meta::FnMetadata {
+            module_path: "internal".to_string(),
+            name: "ffi__string_to_byte_length".to_owned(),
+            is_async: false,
+            inputs: Default::default(),
+            return_type: None,
+            throws: None,
+            checksum: None,
+            docstring: None,
+        };
+        let func: Function = meta.into();
+        let mut ffi = func.ffi_func().clone();
+        ffi.init(
+            Some(FfiType::Int32),
+            vec![FfiArgument::new("string", FfiType::RustBuffer(None))],
+        );
+        ffi.clone()
+    }
+
+    fn iter_ffi_functions_js_to_cpp_and_back(&self) -> impl Iterator<Item = FfiFunction> {
+        vec![
+            self.ffi_function_string_to_bytelength(),
+            self.ffi_function_string_to_arraybuffer(),
+            self.ffi_function_arraybuffer_to_string(),
+        ]
+        .into_iter()
+    }
+
+    fn iter_ffi_functions_js_to_cpp(&self) -> impl Iterator<Item = FfiFunction> {
+        self.iter_ffi_functions_js_to_cpp_and_back()
+            .chain(self.iter_ffi_functions_js_to_rust())
+    }
+
+    fn iter_ffi_functions_js_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
+        self.iter_ffi_function_definitions().filter(|f| {
+            let name = f.name();
+            !name.contains("_rust_future_") && !name.contains("_rustbuffer_")
+        })
+    }
+
+    fn iter_ffi_functions_cpp_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
+        self.iter_ffi_functions_js_to_rust()
+    }
+}
+
+#[ext]
+impl FfiFunction {
+    fn is_internal(&self) -> bool {
+        self.name().contains("ffi__")
+    }
+}
+
+#[ext]
+impl FfiType {
+    fn requires_argument_cleanup(&self) -> bool {
+        // If this returns true, there is expected a Bridging<{{ self|ffi_type_name() }}>.argument_cleanup(v).
+        match self {
+            Self::RustBuffer(_) => true, // includes/RustBuffer.h
+            _ => false,
+        }
+    }
 }

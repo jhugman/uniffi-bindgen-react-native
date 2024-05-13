@@ -6,8 +6,9 @@
     #}
 
 {%- macro arg_list_ffi_decl(func) %}
+    {%- let is_internal = func.is_internal() %}
     {%- for arg in func.arguments() %}
-        {{- arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_type_name_by_value }}
+        {{- arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_type_name_for_cpp(is_internal) }}
         {%- if !loop.last %}, {% endif %}
     {%- endfor %}
     {%- if func.has_rust_call_status_arg() %}

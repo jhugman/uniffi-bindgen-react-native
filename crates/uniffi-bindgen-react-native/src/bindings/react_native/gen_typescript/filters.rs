@@ -104,8 +104,12 @@ pub fn variant_discr_literal(
     Ok(Type::Int32.as_codetype().literal(&literal, ci))
 }
 
-pub fn ffi_type_name_by_value(type_: &FfiType) -> Result<String, askama::Error> {
-    Ok(CodeOracle.ffi_type_label_by_value(type_))
+pub fn ffi_type_name_for_cpp(type_: &FfiType, is_internal: &bool) -> Result<String, askama::Error> {
+    Ok(if *is_internal {
+        CodeOracle.ffi_type_label_for_cpp(type_)
+    } else {
+        CodeOracle.ffi_type_label(type_)
+    })
 }
 
 pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {

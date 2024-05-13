@@ -20,6 +20,7 @@ use uniffi_bindgen::interface::{Callable, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 
 use super::ReactNativeConfig;
+use crate::bindings::react_native::{ComponentInterfaceExt, FfiFunctionExt};
 
 #[derive(Default)]
 pub(crate) struct TsBindings {

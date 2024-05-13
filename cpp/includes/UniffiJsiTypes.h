@@ -15,3 +15,4 @@
 
 #include "ForeignBytes.h"
 #include "RustBuffer.h"
+#include "UniffiString.h"

@@ -10,7 +10,7 @@ using namespace facebook;
 class {{ module_name }} : public jsi::HostObject {
   protected:
     std::map<std::string,jsi::Value> props;
-    {%- for func in ci.iter_ffi_function_definitions() %}
+    {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
     static jsi::Value {% call cpp::cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     {%- endfor %}
   public:

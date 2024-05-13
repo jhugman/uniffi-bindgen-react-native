@@ -118,6 +118,14 @@ impl CodeOracle {
         }
     }
 
+    pub(crate) fn ffi_type_label_for_cpp(&self, ffi_type: &FfiType) -> String {
+        match ffi_type {
+            FfiType::ForeignBytes => "ArrayBuffer".to_string(),
+            FfiType::RustBuffer(_) => "string".to_string(),
+            _ => self.ffi_type_label(ffi_type),
+        }
+    }
+
     pub(crate) fn ffi_type_label(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
             FfiType::Int8 | FfiType::UInt8 => "number".to_string(),

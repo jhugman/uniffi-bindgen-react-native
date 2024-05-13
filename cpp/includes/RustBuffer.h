@@ -17,18 +17,6 @@ RustBuffer rustbuffer_from_bytes(const ForeignBytes &bytes);
 namespace uniffi_jsi {
 using namespace facebook;
 
-/* ArrayBuffer constructor expects MutableBuffer*/
-class CMutableBuffer : public jsi::MutableBuffer {
-public:
-  CMutableBuffer(uint8_t *data, size_t len) : _data(data), len(len) {}
-  size_t size() const override { return len; }
-  uint8_t *data() override { return _data; }
-
-private:
-  uint8_t *_data;
-  size_t len;
-};
-
 template <> struct Bridging<RustBuffer> {
   static RustBuffer fromJs(jsi::Runtime &rt, const jsi::Value &value) {
     try {
@@ -53,7 +41,7 @@ template <> struct Bridging<RustBuffer> {
     uint8_t *bytes = new uint8_t[buf.len];
     std::memcpy(bytes, buf.data, buf.len);
 
-    // Construct an ArrayBuffer.
+    // Construct an ArrayBuffer with copy of the bytes from the RustBuffer.
     auto payload = std::make_shared<CMutableBuffer>(
         CMutableBuffer((uint8_t *)bytes, buf.len));
     auto arrayBuffer = jsi::ArrayBuffer(rt, payload);
@@ -62,8 +50,14 @@ template <> struct Bridging<RustBuffer> {
     // we can call into Rust to tell it it's okay to free that memory.
     rustbuffer_free(buf);
 
-    // Return the ArrayBuffer.
+    // Finally, return the ArrayBuffer.
     return jsi::Value(rt, arrayBuffer);
+  }
+
+  // If we want this to be used, we should make FfiType::requires_cleanup()
+  // return true.
+  static void argument_cleanup(jsi::Runtime &rt, RustBuffer buf) {
+    // NOOP
   }
 };
 
