@@ -84,8 +84,8 @@ static RegisterNativesFN loadRegisterNatives(const char *libraryPath) {
 
 /// Load all the libraries and call their "registerNatives()" function.
 /// \return true if all libraries were loaded successfully.
-static bool
-loadNativeLibraries(facebook::jsi::Runtime &rt, int argc, char **argv) {
+static bool loadNativeLibraries(facebook::jsi::Runtime &rt, int argc,
+                                char **argv) {
   try {
     for (int i = 2; i < argc; i++) {
       auto func = loadRegisterNatives(argv[i]);

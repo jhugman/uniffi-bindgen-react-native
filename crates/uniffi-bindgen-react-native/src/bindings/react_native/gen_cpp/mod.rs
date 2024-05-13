@@ -1,6 +1,7 @@
 mod filters;
 
 use super::ReactNativeConfig;
+use crate::bindings::react_native::{ComponentInterfaceExt, FfiTypeExt};
 use anyhow::Result;
 use askama::Template;
 use std::borrow::Borrow;

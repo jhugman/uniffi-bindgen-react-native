@@ -14,3 +14,4 @@ clap = { version = "4.5.4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 uniffi = "0.27.1"
 uniffi_bindgen = "0.27.1"
+uniffi_meta = "0.27.1"

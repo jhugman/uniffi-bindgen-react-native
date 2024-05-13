@@ -41,7 +41,7 @@ extern "C" {
 
 {{ module_name }}::{{ module_name }}(jsi::Runtime &rt) : props() {
     // Map from Javascript names to the cpp names
-    {%- for func in ci.iter_ffi_function_definitions() %}
+    {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
     {%- let name = func.name() %}
     props["{{ name }}"] = jsi::Function::createFromHostFunction(
         rt,
@@ -84,7 +84,11 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
     // NOOP
 }
 
-{%- for func in ci.iter_ffi_function_definitions() %}
+{%- include "StringHelper.cpp" %}
+
+// Methods calling directly into the uniffi generated C API of the Rust crate.
+{%- for func in ci.iter_ffi_functions_js_to_rust() %}
+
 {% call cpp::rust_fn_caller(module_name, func) %}
 {%- endfor %}
 
