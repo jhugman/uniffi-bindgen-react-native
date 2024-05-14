@@ -71,15 +71,18 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         fs::write(frontend_path, frontend)?;
 
         if try_format_code {
-            format_ts(out_dir)?;
+            let _ = format_ts(out_dir);
         }
 
         let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, config)?;
         let cpp_path = out_dir.join(format!("{namespace}.cpp"));
         let hpp_path = out_dir.join(format!("{namespace}.hpp"));
 
-        fs::write(cpp_path, cpp)?;
-        fs::write(hpp_path, hpp)?;
+        fs::write(&cpp_path, cpp)?;
+        fs::write(&hpp_path, hpp)?;
+        if try_format_code {
+            let _ = format_cpp(out_dir, &[&cpp_path, &hpp_path]);
+        }
 
         Ok(())
     }
@@ -105,6 +108,21 @@ fn format_ts(out_dir: &Utf8Path) -> Result<()> {
         eprintln!("No prettier found. Install with `yarn add --dev prettier`");
     }
     Ok(())
+}
+
+fn format_cpp(out_dir: &Utf8Path, files: &[&Utf8Path]) -> Result<()> {
+    let result = run_cmd_quietly(
+        Command::new("clang-format")
+            .current_dir(out_dir)
+            .arg("-i")
+            .arg("--style=file")
+            .arg("--fallback-style=LLVM")
+            .args(files),
+    );
+    if result.is_err() {
+        eprintln!("Could not format C++ code. Is `clang-format` installed?");
+    }
+    result
 }
 
 #[ext]
