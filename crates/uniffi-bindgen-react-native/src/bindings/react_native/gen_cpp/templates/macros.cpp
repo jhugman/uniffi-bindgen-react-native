@@ -67,7 +67,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 
         {#- Now copy the call status into JS. #}
         {%- if func.has_rust_call_status_arg() %}
-        // copy call status to js
+        uniffi_jsi::Bridging<RustCallStatus>::copyIntoJs(rt, status, args[count - 1]);
         {%- endif %}
 
         {# Finally, lift the result value from C into JS. #}
