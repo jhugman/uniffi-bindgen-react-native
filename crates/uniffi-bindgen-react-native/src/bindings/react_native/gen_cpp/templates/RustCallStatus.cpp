@@ -7,44 +7,21 @@ struct RustCallStatus {
     RustBuffer error_buf;
 };
 
-{#
-template <typename F>
-void check_rust_call(const RustCallStatus &status, F error_cb) {
-    switch (status.code) {
-    case 0:
-        return;
+namespace uniffi_jsi {
+using namespace facebook;
 
-    case 1:
-        if constexpr (!std::is_null_pointer_v<F>) {
-            error_cb(status.error_buf)->throw_underlying();
-        }
-        break;
-
-    case 2:
-        if (status.error_buf.len > 0) {
-            throw std::runtime_error({{ Type::String.borrow()|lift_fn }}(status.error_buf));
-        }
-
-        throw std::runtime_error("A Rust panic has occurred");
+template <> struct Bridging<RustCallStatus> {
+  static void copyIntoJs(jsi::Runtime &rt, const RustCallStatus status, const jsi::Value &jsStatus) {
+    auto statusObject = jsStatus.asObject(rt);
+    if (status.error_buf.data != nullptr) {
+        auto rbuf = uniffi_jsi::Bridging<RustBuffer>::toJs(rt, status.error_buf);
+        statusObject.setProperty(rt, "errorBuf", rbuf);
     }
-
-    throw std::runtime_error("Unexpected Rust call status");
-}
-
-template <typename F, typename EF, typename... Args, typename R = std::invoke_result_t<F, Args..., RustCallStatus *>>
-R rust_call(F f, EF error_cb, Args... args) {
-    initialize();
-
-    RustCallStatus status = { 0 };
-
-    if constexpr (std::is_void_v<R>) {
-        f(args..., &status);
-        check_rust_call(status, error_cb);
-    } else {
-        auto ret = f(args..., &status);
-        check_rust_call(status, error_cb);
-
-        return ret;
+    if (status.code != UNIFFI_CALL_STATUS_OK) {
+        auto code = uniffi_jsi::Bridging<uint8_t>::toJs(rt, status.code);
+        statusObject.setProperty(rt, "code", code);
     }
-}
-#}
+  }
+};
+
+} // namespace uniffi_jsi
