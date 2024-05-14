@@ -20,7 +20,7 @@ fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
         FfiType::Int64 => "int64_t",
         FfiType::Float32 => "float",
         FfiType::Float64 => "double",
-        FfiType::RustArcPtr(_) => "RustArcPtr",
+        FfiType::RustArcPtr(_) => "void *",
         FfiType::RustBuffer(_) => "RustBuffer",
         FfiType::ForeignBytes => "ForeignBytes",
         FfiType::Callback(_) => "Callback",
