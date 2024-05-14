@@ -8,6 +8,7 @@ import {
   Enumeration,
   EnumerationAvecDonnees,
   Retourneur,
+  Stringifier,
   copieCarte,
   copieDictionnaire,
   copieEnumeration,
@@ -79,6 +80,14 @@ const inputData = {
     BigInt("0x7fffffffffffffff"),
   ],
   u64: [BigInt("0"), BigInt("0xffffffffffffffff")],
+  string: [
+    "",
+    "abc",
+    "null\u0000byte",
+    "été",
+    "ښي لاس ته لوستلو لوستل",
+    "😻emoji 👨‍👧‍👦multi-emoji, 🇨🇭a flag, a canal, panama",
+  ],
 };
 
 test("Using an object to roundtrip primitives", () => {
@@ -107,4 +116,21 @@ test("Using an object to roundtrip primitives", () => {
   affirmAllerRetour(rt.identiqueU64.bind(rt), "identiqueU64", inputData.u64);
 
   rt.destroy();
+});
+
+test("Using an object to roundtrip strings", () => {
+  const rt = new Retourneur();
+  assertNotNull(rt);
+  affirmAllerRetour(rt.identiqueString.bind(rt), "identiqueString", inputData.string);
+  rt.destroy();
+});
+
+test("Using an object convert into strings", () => {
+  const st = new Stringifier();
+  assertNotNull(st);
+
+  const input = "JS on Hermes";
+  assertEqual(`uniffi 💚 ${input}!`, st.wellKnownString(input));
+
+  st.destroy();
 });
