@@ -25,6 +25,9 @@ export function stringify(a: any): string {
 }
 
 function replacer(key: string, value: any): any {
+  if (value === undefined || value === null) {
+    return value;
+  }
   if (value instanceof Set) {
     return [...value];
   }

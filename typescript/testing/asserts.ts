@@ -33,18 +33,28 @@ export function assertNull(
   assertTrue(thing === undefined || thing === null, `${m}: ${thing}`);
 }
 
-export function assertEqual<T>(left: T, right: T, message?: string): void {
+export function assertEqual<T>(
+  left: T,
+  right: T,
+  message?: string,
+  equality: (a: T, b: T) => boolean = isEqual,
+): void {
   const m = message ?? "Expected left and right to be equal";
   assertTrue(
-    isEqual(left, right),
+    equality(left, right),
     `${m}: ${stringify(left)} !== ${stringify(right)}`,
   );
 }
 
-export function assertNotEqual<T>(left: T, right: T, message?: string): void {
+export function assertNotEqual<T>(
+  left: T,
+  right: T,
+  message?: string,
+  equality: (a: T, b: T) => boolean = isEqual,
+): void {
   const m = message ?? "Expected left and right to not be equal";
   assertFalse(
-    isEqual(left, right),
+    equality(left, right),
     `${m}: ${stringify(left)} === ${stringify(right)}`,
   );
 }
