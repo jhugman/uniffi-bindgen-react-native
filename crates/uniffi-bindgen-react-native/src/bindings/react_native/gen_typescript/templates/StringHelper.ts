@@ -2,6 +2,7 @@
 {%- include "RustBufferTemplate.ts" %}
 {%- include "Int32Helper.ts" %}
 {{- self.add_import_from("UniffiInternalError", "errors") }}
+{{- self.add_import_from("FfiConverter", "ffi-converters") }}
 const stringToArrayBuffer = (s: string): ArrayBuffer =>
     rustCall((status) => NativeModule.{{ ci.ffi_function_string_to_arraybuffer().name() }}(s, status));
 
@@ -13,12 +14,15 @@ const stringByteLength = (s: string): number =>
 
 const FfiConverterString = (() => {
     const lengthConverter = FfiConverterInt32;
-    const byteLength = typeof globalThis.Buffer == 'undefined'
-        ? (str: string) => Buffer.byteLength(str, 'utf-8')
-        : (str: string) => new Blob([str]).size
-
-    class FFIConverter extends FfiConverterArrayBuffer<string> {
-        read(from: RustBuffer): string {
+    type TypeName = string;
+    class FFIConverter implements FfiConverter<ArrayBuffer, TypeName> {
+        lift(value: ArrayBuffer): TypeName {
+            return arrayBufferToString(value);
+        }
+        lower(value: TypeName): ArrayBuffer {
+            return stringToArrayBuffer(value);
+        }
+        read(from: RustBuffer): TypeName {
             const length = lengthConverter.read(from);
             return from.read(length, (buffer, offset) => {
                 const slice = buffer.slice(offset, offset + length);
