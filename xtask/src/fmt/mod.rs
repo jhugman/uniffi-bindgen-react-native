@@ -2,6 +2,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use glob::glob;
 use uniffi_common::{resolve, run_cmd};
 
 use crate::{
@@ -47,6 +48,12 @@ enum LanguageCmd {
     /// Use in conjunction with .prettierignore.
     #[clap(aliases = ["ts", "js", "prettier"])]
     Typescript(TypescriptArgs),
+
+    /// Format with clang-format.
+    ///
+    /// Requires installation of clang-format.
+    #[clap(aliases = ["cxx", "c"])]
+    Cpp(CppArgs),
 }
 
 impl CodeFormatter for LanguageCmd {
@@ -54,6 +61,7 @@ impl CodeFormatter for LanguageCmd {
         match self {
             Self::Rust(c) => c.format_code()?,
             Self::Typescript(c) => c.format_code()?,
+            Self::Cpp(c) => c.format_code()?,
         }
         Ok(())
     }
@@ -63,6 +71,7 @@ impl LanguageCmd {
     fn format_all() -> Result<()> {
         RustArgs::default().format_code()?;
         TypescriptArgs.format_code()?;
+        CppArgs.format_code()?;
         Ok(())
     }
 }
@@ -115,4 +124,35 @@ impl CodeFormatter for TypescriptArgs {
         let prettier = resolve(root, "node_modules/.bin/prettier")?.expect("prettier is installed");
         run_cmd(Command::new(prettier).arg(".").arg("--write"))
     }
+}
+
+#[derive(Debug, Default, Args)]
+struct CppArgs;
+
+impl CodeFormatter for CppArgs {
+    fn format_code(&self) -> Result<()> {
+        let root = repository_root()?;
+        run_cmd(
+            Command::new("clang-format")
+                .arg("-i")
+                .arg("--style=file")
+                .arg("--fallback-style=LLVM")
+                .args(file_paths(&format!("{root}/cpp/**/*.[ch]"))?)
+                .args(file_paths(&format!("{root}/cpp/**/*.[ch]pp"))?)
+                .current_dir(root),
+        )?;
+        Ok(())
+    }
+}
+
+fn file_paths(pattern: &str) -> Result<Vec<std::ffi::OsString>, anyhow::Error> {
+    let files = glob(pattern)?;
+    let files: Vec<_> = files
+        .into_iter()
+        .map(|pb| {
+            let file = pb.expect("is valid PathBuf");
+            file.into_os_string()
+        })
+        .collect();
+    Ok(files)
 }
