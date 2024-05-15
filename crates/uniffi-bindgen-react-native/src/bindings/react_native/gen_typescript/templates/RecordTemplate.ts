@@ -1,7 +1,9 @@
 {% include "RustBufferTemplate.ts" %}
+{{ self.add_import_from("uniffiCreateRecord", "records") }}
+
 {%- let rec = ci|get_record_definition(name) %}
 {%- call ts::docstring(rec, 0) %}
-type {{ type_name }} = {
+export type {{ type_name }} = {
     {%- for field in rec.fields() %}
     {%- call ts::docstring(field, 4) %}
     {{ field.name()|var_name }}: {{ field|type_name(ci) }}
@@ -9,15 +11,26 @@ type {{ type_name }} = {
     {%- endfor %}
 }
 
-// Default memberwise initializers are never public by default, so we
-// declare one manually.
-export function create{{ name }}({% call ts::field_list_decl(rec, false) %}) {
-    return {
-    {%- for field in rec.fields() %}
-        {{ field.name()|var_name }}{% if !loop.last %},{% endif %}
-    {%- endfor %}
-    };
-}
+/**
+ * Create a {{ type_name }} with defaults.
+ *
+ * The record is frozen with `Object.freeze()`.
+ *
+ * API Review required.
+ */
+export const create{{ type_name }} = (() => {
+    const defaults = () => ({
+        {%- for field in rec.fields() %}
+        {%- match field.default_value() %}
+        {%- when Some with(literal) %}
+        {{- field.name()|var_name }}: {{ literal|render_literal(field, ci) }}
+        {%- if !loop.last %},{% endif %}
+        {%- else %}
+        {%- endmatch -%}
+        {%- endfor %}
+    });
+    return uniffiCreateRecord<{{ type_name }}, ReturnType<typeof defaults>>(defaults);
+})();
 
 const {{ ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};

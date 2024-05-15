@@ -29,12 +29,12 @@ test("Round trip a list of enum", () => {
 });
 
 test("Round trip an object literal, without strings", () => {
-  const input = createDictionnaire(
-    Enumeration.DEUX,
-    true,
-    0,
-    BigInt("123456789"),
-  );
+  const input = createDictionnaire({
+    un: Enumeration.DEUX,
+    deux: true,
+    petitNombre: 0,
+    grosNombre: BigInt("123456789"),
+  });
   const output = copieDictionnaire(input);
   assertEqual(input, output);
 });
