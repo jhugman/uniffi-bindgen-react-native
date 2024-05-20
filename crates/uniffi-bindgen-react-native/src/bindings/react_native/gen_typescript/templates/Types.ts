@@ -64,9 +64,7 @@
 {%- include "DurationHelper.ts" %}
 
 {%- when Type::CallbackInterface { name, module_path } %}
-{#
 {%- include "CallbackInterfaceTemplate.ts" %}
-#}
 {%- when Type::Custom { name, module_path, builtin } %}
 {#
     {%- include "CustomType.ts" %}
