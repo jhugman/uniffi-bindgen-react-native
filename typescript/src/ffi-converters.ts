@@ -26,7 +26,7 @@ export abstract class FfiConverterPrimitive<T> implements FfiConverter<T, T> {
   abstract allocationSize(value: T): number;
 }
 
-export abstract class FfiConverterArrayBuffer<TsType>
+export abstract class AbstractFfiConverterArrayBuffer<TsType>
   implements FfiConverter<ArrayBuffer, TsType>
 {
   lift(value: ArrayBuffer): TsType {
@@ -184,7 +184,7 @@ export const FfiConverterBool = (() => {
   return new FfiConverterBool();
 })();
 
-export class FfiConverterOptional<Item> extends FfiConverterArrayBuffer<
+export class FfiConverterOptional<Item> extends AbstractFfiConverterArrayBuffer<
   Item | undefined
 > {
   private static flagConverter = FfiConverterBool;
@@ -212,7 +212,7 @@ export class FfiConverterOptional<Item> extends FfiConverterArrayBuffer<
   }
 }
 
-export class FfiConverterArray<Item> extends FfiConverterArrayBuffer<
+export class FfiConverterArray<Item> extends AbstractFfiConverterArrayBuffer<
   Array<Item>
 > {
   private static sizeConverter = FfiConverterInt32;
@@ -242,7 +242,9 @@ export class FfiConverterArray<Item> extends FfiConverterArrayBuffer<
   }
 }
 
-export class FfiConverterMap<K, V> extends FfiConverterArrayBuffer<Map<K, V>> {
+export class FfiConverterMap<K, V> extends AbstractFfiConverterArrayBuffer<
+  Map<K, V>
+> {
   private static sizeConverter = FfiConverterInt32;
   constructor(
     private keyConverter: FfiConverter<any, K>,

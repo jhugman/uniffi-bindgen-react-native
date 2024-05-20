@@ -1,4 +1,4 @@
-{{- self.import_infra("FfiConverterArrayBuffer", "ffi-converters") -}}
+{{- self.import_infra("AbstractFfiConverterArrayBuffer", "ffi-converters") -}}
 {{- self.import_infra("FfiConverterInt32", "ffi-converters") -}}
 {{- self.import_infra("UniffiInternalError", "errors") -}}
 
@@ -18,7 +18,7 @@ export enum {{ type_name }} {
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
-    class FFIConverter extends FfiConverterArrayBuffer<TypeName> {
+    class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}
@@ -70,7 +70,7 @@ export type {{ type_name }} = {# space #}
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
-    class FFIConverter extends FfiConverterArrayBuffer<TypeName> {
+    class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}
@@ -101,7 +101,6 @@ const {{ ffi_converter_name }} = (() => {
                 default:
                     // Throwing from here means that {{ kind_type_name }} hasn't matched an ordinal.
                     throw new UniffiInternalError.UnexpectedEnumCase();
-                    break;
             }
         }
         allocationSize(value: TypeName): number {

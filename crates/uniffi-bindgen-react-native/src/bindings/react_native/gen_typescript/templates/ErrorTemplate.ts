@@ -25,7 +25,7 @@ const {{ ffi_converter_name }} = (() => {
     const stringConverter = FfiConverterString;
 
     type TypeName = {{ type_name }};
-    class FfiConverter extends FfiConverterArrayBuffer<TypeName> {
+    class FfiConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (intConverter.read(from)) {
             {%- if e.is_flat() %}
