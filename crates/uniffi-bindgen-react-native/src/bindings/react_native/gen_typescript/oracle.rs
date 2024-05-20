@@ -147,7 +147,7 @@ impl CodeOracle {
             FfiType::Callback(name) => self.ffi_callback_name(name),
             FfiType::Struct(name) => self.ffi_struct_name(name),
             FfiType::Reference(inner) => self.ffi_type_label_by_reference(inner),
-            FfiType::VoidPointer => "biginh".to_string(),
+            FfiType::VoidPointer => "/*pointer*/ bigint".to_string(),
         }
     }
 
