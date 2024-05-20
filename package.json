@@ -6,7 +6,16 @@
   "repository": "https://github.com/jhugman/uniffi-bindgen-react-native.git",
   "license": "MPL-2.0",
   "author": "James Hugman <james@hugman.tv>",
-  "main": "index.js",
+  "type": "module",
+  "exports": {
+    "./errors": "./typescript/src/errors.ts",
+    "./ffi-converters": "./typescript/src/ffi-converters.ts",
+    "./ffi-types": "./typescript/src/ffi-types.ts",
+    "./handle-map": "./typescript/src/handle-map.ts",
+    "./objects": "./typescript/src/objects.ts",
+    "./rust-call": "./typescript/src/rust-call.ts",
+    "./records": "./typescript/src/records.ts"
+  },
   "devDependencies": {
     "metro": "^0.80.8",
     "metro-core": "^0.80.8",
