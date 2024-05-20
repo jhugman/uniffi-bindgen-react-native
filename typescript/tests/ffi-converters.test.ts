@@ -7,7 +7,7 @@ import { RustBuffer } from "../src/ffi-types";
 import {
   FfiConverter,
   FfiConverterArray,
-  FfiConverterArrayBuffer,
+  AbstractFfiConverterArrayBuffer,
   FfiConverterBool,
   FfiConverterInt16,
   FfiConverterInt32,
@@ -19,7 +19,10 @@ import {
 } from "../src/ffi-converters";
 import { assertEqual, test } from "../testing/asserts";
 
-class TestConverter<R extends any, T> extends FfiConverterArrayBuffer<T> {
+class TestConverter<
+  R extends any,
+  T,
+> extends AbstractFfiConverterArrayBuffer<T> {
   constructor(public inner: FfiConverter<R, T>) {
     super();
   }
@@ -34,7 +37,10 @@ class TestConverter<R extends any, T> extends FfiConverterArrayBuffer<T> {
   }
 }
 
-function testConverter<T>(converter: FfiConverterArrayBuffer<T>, input: T) {
+function testConverter<T>(
+  converter: AbstractFfiConverterArrayBuffer<T>,
+  input: T,
+) {
   const lowered = converter.lower(input);
   assertEqual(
     lowered.byteLength,

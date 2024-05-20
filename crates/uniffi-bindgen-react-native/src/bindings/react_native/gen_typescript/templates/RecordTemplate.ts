@@ -34,7 +34,7 @@ export const create{{ type_name }} = (() => {
 
 const {{ ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};
-    class FFIConverter extends FfiConverterArrayBuffer<TypeName> {
+    class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             return {
             {%- for field in rec.fields() %}

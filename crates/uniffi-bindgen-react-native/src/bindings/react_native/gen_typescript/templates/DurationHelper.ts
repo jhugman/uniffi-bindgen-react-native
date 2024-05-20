@@ -1,5 +1,5 @@
 /*
-fileprivate struct FfiConverterDuration: FfiConverterArrayBuffer {
+fileprivate struct FfiConverterDuration: AbstractFfiConverterArrayBuffer {
     typealias SwiftType = TimeInterval
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimeInterval {
