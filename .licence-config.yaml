@@ -1,0 +1,98 @@
+files:
+  "**/*.ts":
+    # Header comment with default license text
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.rs":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.java":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.kt":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.[ch]":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.[ch]pp":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.swift":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.mm":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/CMakeLists.txt":
+    header:
+      startBlock: "#"
+      linePrefix: "# "
+      endBlock: "#"
+
+  package.json:
+    # Forced & default JSON key values for package.json
+    json:
+      force:
+        license: "{SPDX}"
+      defaults:
+        homepage: "{HOMEPAGE}"
+        description: "{DESCRIPTION}"
+      sortPackage: true
+
+    # License file in the same directory as package.json
+    siblingLicenseFile:
+      name: "LICENSE"
+
+  README.md:
+    # Footer section with custom license text (link to license file)
+    footer:
+      startBlock: "\n\n## License\n\n"
+      linePrefix: ""
+      endBlock: ""
+      license: "[{SPDX}]({LICENSE_URL})"
+
+ignore:
+  - ".git"
+  - ".vscode"
+  - cpp_modules
+  - build
+  - target
+  - node_modules
+  - test
+  - ./**/generated
+  - ./**/templates
+
+# Default license text
+license: |
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at http://mozilla.org/MPL/2.0/
+
+# Values here will be replaced in `license` and `json` settings
+substitutions:
+  # `{YEARS}` will evaluate to `end` if `start` == `end`, and to `start–end` otherwise
+  YEARS:
+    start: 2024
+    # `{CURRENT_YEAR}` will evaluate to… 🥁… the current year
+    end: CURRENT_YEAR
+  DESCRIPTION: "Uniffi bindings generator for calling Rust from React Native"
+  HOMEPAGE: https://github.com/jhugman/uniffi-bindgen-react-native
+  LICENSE_URL: https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/LICENSE
+  SPDX: MPL-2.0
