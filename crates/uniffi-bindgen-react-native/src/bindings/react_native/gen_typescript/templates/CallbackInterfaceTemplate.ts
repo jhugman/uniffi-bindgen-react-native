@@ -7,8 +7,12 @@
 {%- let vtable = cbi.vtable() %}
 {%- let vtable_methods = cbi.vtable_methods() %}
 {%- let ffi_init_callback = cbi.ffi_init_callback() %}
-
-{% include "Protocol.ts" %}
+{{- self.import_infra("UniffiHandleMap", "handle-map") }}
+{{- self.import_infra_type("UniffiHandle", "handle-map") }}
+{{- self.import_infra_type("FfiConverter", "ffi-converters") }}
+{{- self.import_infra("FfiConverterUInt64", "ffi-converters") }}
+{% let obj = cbi %}
+{% include "ObjectInterfaceTemplate.ts" %}
 {% include "CallbackInterfaceImpl.ts" %}
 
 // FfiConverter protocol for callback interfaces

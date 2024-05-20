@@ -74,14 +74,4 @@ public struct FfiConverterType{{ name }}: FfiConverter {
 
 {%- endmatch %}
 
-{#
-We always write these public functions just incase the type is used as
-an external type by another crate.
-#}
-public func FfiConverterType{{ name }}_lift(_ value: {{ ffi_type_name }}) throws -> {{ type_name }} {
-    return try FfiConverterType{{ name }}.lift(value)
-}
-
-public func FfiConverterType{{ name }}_lower(_ value: {{ type_name }}) -> {{ ffi_type_name }} {
-    return FfiConverterType{{ name }}.lower(value)
-}
+{{- self.export_converter(ffi_converter_name) -}}

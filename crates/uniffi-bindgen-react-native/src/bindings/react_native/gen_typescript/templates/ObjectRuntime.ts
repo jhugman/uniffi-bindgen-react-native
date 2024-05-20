@@ -1,3 +1,3 @@
-{{- self.add_import_from("UniffiObjectInterface", "objects") -}}
-{{- self.add_import_from("UnsafeMutableRawPointer", "objects") -}}
-{{- self.add_import_from("FfiConverter", "ffi-converters") -}}
+{{- self.import_infra_type("UniffiObjectInterface", "objects") -}}
+{{- self.import_infra_type("UnsafeMutableRawPointer", "objects") -}}
+{{- self.import_infra_type("FfiConverter", "ffi-converters") -}}

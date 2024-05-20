@@ -1,1 +1,1 @@
-{{- self.add_import_from("FfiConverterUInt16", "ffi-converters") -}}
+{{- self.import_infra("FfiConverterUInt16", "ffi-converters") -}}

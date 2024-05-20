@@ -1,6 +1,6 @@
 {%- include "StringHelper.ts" %}
 {%- include "Int32Helper.ts" %}
-{{- self.add_import_from("rustCallWithError", "rust-call") }}
+{{- self.import_infra("rustCallWithError", "rust-call") }}
 
 {%- call ts::docstring(e, 0) %}
 export class {{ type_name }} extends Error {

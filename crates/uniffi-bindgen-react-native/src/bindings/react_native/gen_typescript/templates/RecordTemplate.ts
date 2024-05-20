@@ -1,5 +1,5 @@
 {% include "RustBufferTemplate.ts" %}
-{{ self.add_import_from("uniffiCreateRecord", "records") }}
+{{ self.import_infra("uniffiCreateRecord", "records") }}
 
 {%- let rec = ci|get_record_definition(name) %}
 {%- call ts::docstring(rec, 0) %}
@@ -62,14 +62,4 @@ const {{ ffi_converter_name }} = (() => {
     return new FFIConverter();
 })();
 
-{#
-We always write these public functions just in case the struct is used as
-an external type by another crate.
-#}
-export function {{ ffi_converter_name }}_lift(buf: ArrayBuffer): {{ type_name }} {
-    return {{ ffi_converter_name }}.lift(buf);
-}
-
-export function {{ ffi_converter_name }}_lower(value: {{ type_name }}): ArrayBuffer {
-    return {{ ffi_converter_name }}.lower(value);
-}
+{{- self.export_converter(ffi_converter_name) -}}

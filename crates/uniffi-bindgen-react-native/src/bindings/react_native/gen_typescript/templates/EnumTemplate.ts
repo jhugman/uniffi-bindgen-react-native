@@ -1,6 +1,6 @@
-{{- self.add_import_from("FfiConverterArrayBuffer", "ffi-converters") -}}
-{{- self.add_import_from("FfiConverterInt32", "ffi-converters") -}}
-{{- self.add_import_from("UniffiInternalError", "errors") -}}
+{{- self.import_infra("FfiConverterArrayBuffer", "ffi-converters") -}}
+{{- self.import_infra("FfiConverterInt32", "ffi-converters") -}}
+{{- self.import_infra("UniffiInternalError", "errors") -}}
 
 {% if e.is_flat() %}
 {%- call ts::docstring(e, 0) %}
@@ -128,14 +128,4 @@ const {{ ffi_converter_name }} = (() => {
 })();
 {%- endif %}{# endif enum.is_flat() #}
 
-{#
-We always write these public functions just in case the enum is used as
-an external type by another crate.
-#}
-export function {{ ffi_converter_name }}_lift(buf: ArrayBuffer): {{ type_name }} {
-    return {{ ffi_converter_name }}.lift(buf);
-}
-
-export function {{ ffi_converter_name }}_lower(value: {{ type_name }}): ArrayBuffer {
-    return {{ ffi_converter_name }}.lower(value);
-}
+{{- self.export_converter(ffi_converter_name) -}}

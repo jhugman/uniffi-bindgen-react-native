@@ -1,6 +1,6 @@
 {%- import "macros.ts" as ts %}
-{{- self.add_import_from("UniffiInternalError", "errors") -}}
-{{- self.add_import_from("rustCall", "rust-call") }}
+{{- self.import_infra("UniffiInternalError", "errors") -}}
+{{- self.import_infra("rustCall", "rust-call") }}
 {%- for type_ in ci.iter_types() %}
 {%- let type_name = type_|type_name(ci) %}
 {%- let ffi_converter_name = type_|ffi_converter_name %}
@@ -78,6 +78,9 @@
 {%- else %}
 {%- include "EnumTemplate.ts" %}
 {% endif %}
+
+{%- when Type::External{ name, module_path, namespace, kind, tagged } %}
+{%- include "ExternalTemplate.ts" %}
 
 {%- when Type::Object{ name, module_path, imp } %}
 {%- include "ObjectTemplate.ts" %}

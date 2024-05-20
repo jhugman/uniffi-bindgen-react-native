@@ -18,11 +18,14 @@ mod record;
 
 use anyhow::{Context, Result};
 use askama::Template;
+use heck::ToUpperCamelCase;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use uniffi_bindgen::interface::{Callable, FfiType, Type, UniffiTrait};
+use uniffi_bindgen::bindings::swift::gen_swift::filters::ffi_converter_name;
+use uniffi_bindgen::interface::{Callable, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
+use uniffi_meta::{AsType, ExternalKind};
 
 use super::ReactNativeConfig;
 use crate::bindings::react_native::{ComponentInterfaceExt, FfiFunctionExt};
@@ -67,7 +70,9 @@ struct FrontendWrapper<'a> {
     ci: &'a ComponentInterface,
     config: &'a ReactNativeConfig,
     type_helper_code: String,
-    type_imports: BTreeMap<String, BTreeSet<String>>,
+    type_imports: BTreeMap<String, BTreeSet<Imported>>,
+    exported_converters: BTreeSet<String>,
+    imported_converters: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl<'a> FrontendWrapper<'a> {
@@ -75,11 +80,15 @@ impl<'a> FrontendWrapper<'a> {
         let type_renderer = TypeRenderer::new(config, ci);
         let type_helper_code = type_renderer.render().unwrap();
         let type_imports = type_renderer.imports.into_inner();
+        let exported_converters = type_renderer.exported_converters.into_inner();
+        let imported_converters = type_renderer.imported_converters.into_inner();
         Self {
             config,
             ci,
             type_helper_code,
             type_imports,
+            exported_converters,
+            imported_converters,
         }
     }
 }
@@ -97,7 +106,12 @@ pub struct TypeRenderer<'a> {
     // Track included modules for the `include_once()` macro
     include_once_names: RefCell<HashSet<String>>,
     // Track imports added with the `add_import()` macro
-    imports: RefCell<BTreeMap<String, BTreeSet<String>>>,
+    imports: RefCell<BTreeMap<String, BTreeSet<Imported>>>,
+
+    exported_converters: RefCell<BTreeSet<String>>,
+
+    // Track imports added with the `add_import()` macro
+    imported_converters: RefCell<BTreeMap<String, BTreeSet<String>>>,
 }
 
 impl<'a> TypeRenderer<'a> {
@@ -107,6 +121,8 @@ impl<'a> TypeRenderer<'a> {
             ci,
             include_once_names: RefCell::new(HashSet::new()),
             imports: RefCell::new(Default::default()),
+            exported_converters: RefCell::new(Default::default()),
+            imported_converters: RefCell::new(Default::default()),
         }
     }
 
@@ -127,7 +143,7 @@ impl<'a> TypeRenderer<'a> {
     // Call this inside your template to cause an import statement to be added at the top of the
     // file.  Imports will be sorted and de-deuped.
     // ```
-    // {{ self.add_import_from("foo", "bar")}}
+    // {{ self.import_infra("foo", "bar")}}
     // ```
     // will cause output:
     // ```
@@ -135,10 +151,80 @@ impl<'a> TypeRenderer<'a> {
     // ```
     //
     // Returns an empty string so that it can be used inside an askama `{{ }}` block.
-    fn add_import_from(&self, what: &str, from: &str) -> &str {
+    fn import_infra(&self, what: &str, from: &str) -> &str {
+        self.add_import(
+            Imported::JSType(what.to_owned()),
+            &format!("uniffi-bindgen-react-native/{from}"),
+        )
+    }
+
+    fn import_infra_type(&self, what: &str, from: &str) -> &str {
+        self.add_import(
+            Imported::TSType(what.to_owned()),
+            &format!("uniffi-bindgen-react-native/{from}"),
+        )
+    }
+
+    fn import_ext(&self, what: &str, from: &str) -> &str {
+        self.add_import(Imported::JSType(what.to_owned()), &format!("./{from}"))
+    }
+
+    fn import_ext_type(&self, what: &str, from: &str) -> &str {
+        self.add_import(Imported::TSType(what.to_owned()), &format!("./{from}"))
+    }
+
+    fn add_import(&self, what: Imported, from: &str) -> &str {
         let mut map = self.imports.borrow_mut();
+        let set = map.entry(from.to_owned()).or_default();
+        set.insert(what);
+        ""
+    }
+
+    fn import_external_type(&self, external: &impl AsType) -> &str {
+        match external.as_type() {
+            Type::External {
+                namespace,
+                name,
+                kind,
+                ..
+            } => {
+                match kind {
+                    ExternalKind::DataClass => {
+                        self.import_ext_type(&name, &namespace);
+                    }
+                    ExternalKind::Interface => {
+                        self.import_ext(&name, &namespace);
+                    }
+                    ExternalKind::Trait => {
+                        self.import_ext(&name, &namespace);
+                    }
+                }
+                let converters = format!("uniffi{}Converters", namespace.to_upper_camel_case());
+                self.import_ext(&format!("uniffiConverters as {converters}"), &namespace);
+                let ffi_converter_name = ffi_converter_name(external).expect("");
+                self.import_converter(&ffi_converter_name, &converters);
+                ""
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn import_converter(&self, what: &str, from: &str) -> &str {
+        let mut map = self.imported_converters.borrow_mut();
         let set = map.entry(from.to_owned()).or_default();
         set.insert(what.to_owned());
         ""
     }
+
+    fn export_converter(&self, what: &str) -> &str {
+        let mut set = self.exported_converters.borrow_mut();
+        set.insert(what.to_owned());
+        ""
+    }
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum Imported {
+    TSType(String),
+    JSType(String),
 }
