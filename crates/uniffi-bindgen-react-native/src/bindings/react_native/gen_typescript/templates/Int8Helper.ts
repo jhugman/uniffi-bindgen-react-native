@@ -1,1 +1,1 @@
-{{- self.add_import_from("FfiConverterInt8", "ffi-converters") -}}
+{{- self.import_infra("FfiConverterInt8", "ffi-converters") -}}

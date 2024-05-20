@@ -1,5 +1,6 @@
-private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
-private let UNIFFI_RUST_FUTURE_POLL_MAYBE_READY: Int8 = 1
+{{- self.import_infra("UniffiHandleMap", "handle-map") }}
+{{- self.import_infra_type("UniffiHandle", "handle-map") }}
+{{- self.import_infra("RustBuffer", "ffi-types") }}
 
 fileprivate let uniffiContinuationHandleMap = UniffiHandleMap<UnsafeContinuation<Int8, Never>>()
 

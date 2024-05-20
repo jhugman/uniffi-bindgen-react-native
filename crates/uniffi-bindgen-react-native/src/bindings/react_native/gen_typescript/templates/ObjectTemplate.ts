@@ -101,7 +101,7 @@ const {{ ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};
     class FFIConverter implements FfiConverter<UnsafeMutableRawPointer, TypeName> {
         {%- if obj.has_callback_interface() %}
-            {{- self.add_import_from("UniffiHandleMap", "handle-map")}}
+            {{- self.import_infra("UniffiHandleMap", "handle-map")}}
         handleMap = UniffiHandleMap<{{ type_name }}>();
         lift(value: UnsafeMutableRawPointer): TypeName {
             // TODO look in a handle map.
@@ -188,14 +188,4 @@ public struct {{ ffi_converter_name }}__as_error: FfiConverterArrayBuffer {
 }
 {%- endif %}
 
-{#
-We always write these public functions just in case the enum is used as
-an external type by another crate.
-#}
-export function {{ ffi_converter_name }}_lift(pointer: UnsafeMutableRawPointer): {{ type_name }} {
-    return {{ ffi_converter_name }}.lift(pointer)
-}
-
-export function {{ ffi_converter_name }}_lower(value: {{ type_name }}): UnsafeMutableRawPointer {
-    return {{ ffi_converter_name }}.lower(value)
-}
+{{- self.export_converter(ffi_converter_name) -}}

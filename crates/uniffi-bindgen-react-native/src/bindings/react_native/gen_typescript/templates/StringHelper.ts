@@ -1,8 +1,8 @@
 {%- if self.include_once_check("StringHelper.ts") %}
 {%- include "RustBufferTemplate.ts" %}
 {%- include "Int32Helper.ts" %}
-{{- self.add_import_from("UniffiInternalError", "errors") }}
-{{- self.add_import_from("FfiConverter", "ffi-converters") }}
+{{- self.import_infra("UniffiInternalError", "errors") }}
+{{- self.import_infra_type("FfiConverter", "ffi-converters") }}
 const stringToArrayBuffer = (s: string): ArrayBuffer =>
     rustCall((status) => NativeModule.{{ ci.ffi_function_string_to_arraybuffer().name() }}(s, status));
 
@@ -39,6 +39,6 @@ const FfiConverterString = (() => {
 
     return new FFIConverter();
 })();
-{{- self.add_import_from("initializeWithStringLifter", "rust-call") }}
+{{- self.import_infra("initializeWithStringLifter", "rust-call") }}
 initializeWithStringLifter(FfiConverterString.lift);
 {% endif %}

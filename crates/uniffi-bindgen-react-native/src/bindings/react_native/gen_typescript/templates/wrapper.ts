@@ -8,8 +8,25 @@ import NativeModule from "./{{ config.ffi_ts_filename }}";
 {%-   let things = entry.1 %}
 import {
 {%-   for thing in things %}
-  {{ thing }}{% if !loop.last %}, {% endif %}
-{%-   endfor %} } from "uniffi-bindgen-react-native/{{ file }}";
+{%-     match thing %}
+{%-       when Imported::TSType with (type_) %}
+  type {{ type_ }}
+{%-       when Imported::JSType with (type_) %}
+  {{ type_ }}
+{%-     endmatch %}
+{%-     if !loop.last %}, {% endif %}
+{%-   endfor %} } from "{{ file }}";
+{%- endfor %}
+
+// Get converters from the other files, if any.
+{%- for entry in self.imported_converters.borrow() %}
+{%-   let uniffiConverters = entry.0 %}
+{%-   let converters = entry.1 %}
+const {
+{%-   for converter in converters %}
+        {{- converter }},
+{%-   endfor %}
+} = {{ uniffiConverters }};
 {%- endfor %}
 
 {%- call ts::docstring_value(ci.namespace_docstring(), 0) %}
@@ -31,9 +48,13 @@ import {{ config.ffi_module_name() }}
 // Public interface members begin here.
 {{ type_helper_code }}
 
-{%- if ci.has_async_fns() %}
-{% include "Async.ts" %}
-{%- endif %}
+{% if !self.exported_converters.is_empty() %}
+export const uniffiConverters = Object.freeze({
+  {%- for converter in self.exported_converters.borrow() %}
+  {{ converter }},
+  {%- endfor %}
+});
+{% endif %}
 
 {%- for func in ci.function_definitions() %}
 {%- include "TopLevelFunctionTemplate.ts" %}
