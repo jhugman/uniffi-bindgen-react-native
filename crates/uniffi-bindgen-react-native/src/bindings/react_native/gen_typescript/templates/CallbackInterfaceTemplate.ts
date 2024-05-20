@@ -11,33 +11,32 @@
 {{- self.import_infra_type("UniffiHandle", "handle-map") }}
 {{- self.import_infra_type("FfiConverter", "ffi-converters") }}
 {{- self.import_infra("FfiConverterUInt64", "ffi-converters") }}
-{% let obj = cbi %}
+{#- obj is used to generate an interface with ObjectInterfaceTemplate.ts #}
+{%- let obj = cbi %}
 {% include "ObjectInterfaceTemplate.ts" %}
 {% include "CallbackInterfaceImpl.ts" %}
 
 // FfiConverter protocol for callback interfaces
-fileprivate struct {{ ffi_converter_name }} {
-    fileprivate static var handleMap = UniffiHandleMap<{{ type_name }}>()
-}
-
-extension {{ ffi_converter_name }} : FfiConverter {
-    typealias SwiftType = {{ type_name }}
-    typealias FfiType = UInt64
-
-    public static func lift(_ handle: UInt64) throws -> SwiftType {
-        try handleMap.get(handle: handle)
+const {{ ffi_converter_name }} = (() => {
+    type TypeName = {{ type_name }};
+    const handleConverter = FfiConverterUInt64;
+    const handleMap = new UniffiHandleMap<TypeName>();
+    class FFIConverter implements FfiConverter<UniffiHandle, TypeName> {
+        lift(value: UniffiHandle): TypeName {
+            return handleMap.get(value);
+        }
+        lower(value: TypeName): UniffiHandle {
+            return handleMap.insert(value);
+        }
+        read(from: RustBuffer): TypeName  {
+            return this.lift(handleConverter.read(from));
+        }
+        write(value: TypeName, into: RustBuffer): void {
+            handleConverter.write(this.lower(value), into);
+        }
+        allocationSize(value: TypeName): number {
+            return handleConverter.allocationSize(BigInt("0"));
+        }
     }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        let handle: UInt64 = try readInt(&buf)
-        return try lift(handle)
-    }
-
-    public static func lower(_ v: SwiftType) -> UInt64 {
-        return handleMap.insert(obj: v)
-    }
-
-    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(v))
-    }
-}
+    return new FFIConverter();
+})();
