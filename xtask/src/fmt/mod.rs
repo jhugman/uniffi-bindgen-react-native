@@ -54,6 +54,12 @@ enum LanguageCmd {
     /// Requires installation of clang-format.
     #[clap(aliases = ["cxx", "c"])]
     Cpp(CppArgs),
+
+    /// Add licence declarations to each source file.
+    ///
+    /// Configure this with .license-config.yaml
+    #[clap(aliases = ["mpl"])]
+    Licence(LicenceArgs),
 }
 
 impl CodeFormatter for LanguageCmd {
@@ -62,6 +68,7 @@ impl CodeFormatter for LanguageCmd {
             Self::Rust(c) => c.format_code()?,
             Self::Typescript(c) => c.format_code()?,
             Self::Cpp(c) => c.format_code()?,
+            Self::Licence(c) => c.format_code()?,
         }
         Ok(())
     }
@@ -69,6 +76,8 @@ impl CodeFormatter for LanguageCmd {
 
 impl LanguageCmd {
     fn format_all() -> Result<()> {
+        // We add to the source code, before formatting.
+        LicenceArgs.format_code()?;
         RustArgs::default().format_code()?;
         TypescriptArgs.format_code()?;
         CppArgs.format_code()?;
@@ -155,4 +164,22 @@ fn file_paths(pattern: &str) -> Result<Vec<std::ffi::OsString>, anyhow::Error> {
         })
         .collect();
     Ok(files)
+}
+
+#[derive(Debug, Default, Args)]
+struct LicenceArgs;
+
+impl CodeFormatter for LicenceArgs {
+    fn format_code(&self) -> Result<()> {
+        YarnCmd.ensure_ready()?;
+        let root = repository_root()?;
+        run_cmd(
+            Command::new("./node_modules/.bin/source-licenser")
+                .arg(".")
+                .arg("--config-file")
+                .arg(".licence-config.yaml")
+                .current_dir(root),
+        )?;
+        Ok(())
+    }
 }
