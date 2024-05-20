@@ -1,3 +1,8 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ */
 /**
  * This function simulates the Rust toString method, which expands the exponent,
  * so 1.7e6 is presented as 1700000, and 3.14e-15 is presented as 0.00000000000000314.
