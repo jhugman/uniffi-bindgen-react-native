@@ -26,6 +26,6 @@ macro_rules! impl_code_type_for_miscellany {
     };
 }
 
-impl_code_type_for_miscellany!(TimestampCodeType, "java.time.Instant", "Timestamp");
+impl_code_type_for_miscellany!(TimestampCodeType, "UniffiTimestamp", "Timestamp");
 
-impl_code_type_for_miscellany!(DurationCodeType, "java.time.Duration", "Duration");
+impl_code_type_for_miscellany!(DurationCodeType, "UniffiDuration", "Duration");

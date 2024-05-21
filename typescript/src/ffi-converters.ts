@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+import { UniffiInternalError } from "./errors";
 import { RustBuffer } from "./ffi-types";
 
 // https://github.com/mozilla/uniffi-rs/blob/main/docs/manual/src/internals/lifting_and_lowering.md
@@ -182,6 +183,84 @@ export const FfiConverterBool = (() => {
     }
   }
   return new FfiConverterBool();
+})();
+
+// Duration
+//
+// There is currently no JS API for duration, so we'll make this just milliseconds.
+//
+// Later on we'll need to put a Temporal based converter,
+// and switch on from a config file.
+export type UniffiDuration = number;
+export const FfiConverterDuration = (() => {
+  const secondsConverter = FfiConverterUInt64;
+  const nanosConverter = FfiConverterUInt32;
+  const msPerSecBigInt = BigInt("1000");
+  const nanosPerMs = 1e6;
+  class FFIConverter extends AbstractFfiConverterArrayBuffer<UniffiDuration> {
+    read(from: RustBuffer): UniffiDuration {
+      const secsBigInt = secondsConverter.read(from);
+      const nanos = nanosConverter.read(from);
+      const ms = Number(secsBigInt * msPerSecBigInt);
+      if (ms === Number.POSITIVE_INFINITY || ms === Number.NEGATIVE_INFINITY) {
+        throw new UniffiInternalError.NumberOverflow();
+      }
+      return ms + nanos / 1000;
+    }
+    write(value: UniffiDuration, into: RustBuffer): void {
+      const ms = value.valueOf();
+      const secsBigInt = BigInt(ms) / msPerSecBigInt;
+      const remainingNanos = (ms % 1000) * nanosPerMs;
+      secondsConverter.write(secsBigInt, into);
+      nanosConverter.write(remainingNanos, into);
+    }
+    allocationSize(_value: UniffiDuration): number {
+      return (
+        secondsConverter.allocationSize(msPerSecBigInt) +
+        nanosConverter.allocationSize(0)
+      );
+    }
+  }
+  return new FFIConverter();
+})();
+
+// We'll provide native js Date here; later on we'll need to put a Temporal based converter,
+// and switch on from a config file.
+export type UniffiTimestamp = Date;
+export const FfiConverterTimestamp = (() => {
+  const secondsConverter = FfiConverterInt64;
+  const nanosConverter = FfiConverterUInt32;
+  const msPerSecBigInt = BigInt("1000");
+  const nanosPerMs = 1e6;
+  class FFIConverter extends AbstractFfiConverterArrayBuffer<UniffiTimestamp> {
+    read(from: RustBuffer): UniffiTimestamp {
+      const secsBigInt = secondsConverter.read(from);
+      const nanos = nanosConverter.read(from);
+      const ms = Number(secsBigInt * msPerSecBigInt);
+      if (ms === Number.POSITIVE_INFINITY || ms === Number.NEGATIVE_INFINITY) {
+        throw new UniffiInternalError.NumberOverflow();
+      }
+      if (ms >= 0) {
+        return new Date(ms + nanos / 1000);
+      } else {
+        return new Date(ms - nanos / 1000);
+      }
+    }
+    write(value: UniffiTimestamp, into: RustBuffer): void {
+      const ms = value.valueOf();
+      const secsBigInt = BigInt(ms) / msPerSecBigInt;
+      const remainingNanos = (ms % 1000) * nanosPerMs;
+      secondsConverter.write(secsBigInt, into);
+      nanosConverter.write(remainingNanos, into);
+    }
+    allocationSize(_value: UniffiTimestamp): number {
+      return (
+        secondsConverter.allocationSize(msPerSecBigInt) +
+        nanosConverter.allocationSize(0)
+      );
+    }
+  }
+  return new FFIConverter();
 })();
 
 export class FfiConverterOptional<Item> extends AbstractFfiConverterArrayBuffer<
