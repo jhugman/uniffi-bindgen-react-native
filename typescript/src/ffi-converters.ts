@@ -356,3 +356,22 @@ export class FfiConverterMap<K, V> extends AbstractFfiConverterArrayBuffer<
     return size;
   }
 }
+
+export const FfiConverterArrayBuffer = (() => {
+  const lengthConverter = FfiConverterInt32;
+  class FFIConverter extends FfiConverterPrimitive<ArrayBuffer> {
+    read(from: RustBuffer): ArrayBuffer {
+      const length = lengthConverter.read(from);
+      return from.read(length, (buffer) => buffer);
+    }
+    write(value: ArrayBuffer, into: RustBuffer): void {
+      const length = value.byteLength;
+      lengthConverter.write(length, into);
+      into.write(length, () => value);
+    }
+    allocationSize(value: ArrayBuffer): number {
+      return lengthConverter.allocationSize(0) + value.byteLength;
+    }
+  }
+  return new FFIConverter();
+})();
