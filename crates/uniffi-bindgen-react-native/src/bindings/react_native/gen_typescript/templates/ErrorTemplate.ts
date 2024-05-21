@@ -1,5 +1,3 @@
-{%- include "StringHelper.ts" %}
-{%- include "Int32Helper.ts" %}
 {{- self.import_infra("rustCallWithError", "rust-call") }}
 
 {%- call ts::docstring(e, 0) %}

@@ -13,11 +13,13 @@ use camino::Utf8Path;
 use extend::ext;
 use heck::ToUpperCamelCase;
 use serde::Deserialize;
+use topological_sort::TopologicalSort;
 use uniffi_bindgen::{
     interface::{FfiArgument, FfiFunction, FfiType, Function},
     BindingGenerator, BindingsConfig, ComponentInterface,
 };
 use uniffi_common::{resolve, run_cmd_quietly};
+use uniffi_meta::Type;
 
 use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
 
@@ -220,6 +222,102 @@ impl ComponentInterface {
     fn iter_ffi_functions_cpp_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
         self.iter_ffi_functions_js_to_rust()
     }
+
+    /// We want to control the ordering of definitions in typescript, especially
+    /// the FfiConverters which rely on Immediately Invoked Function Expressions (IIFE),
+    /// or straight up expressions.
+    ///
+    /// These are mostly the structural types, but might also be others.
+    ///
+    /// The current implementations of the FfiConverters for Enums and Records do not
+    /// require other FfiConverters at initialization, so we don't need to worry about
+    /// ordering around their members.
+    ///
+    /// We can simplify code generation a little bit by including types which may
+    /// not be used— e.g. UInt64 is used by object internally, but unlikely to be used by
+    /// client code— we do this here, and clean up the codegen at a later stage.
+    fn iter_sorted_types(&self) -> impl Iterator<Item = Type> {
+        let mut graph = TopologicalSort::<String>::new();
+        let mut types: HashMap<String, Type> = Default::default();
+        for type_ in self.iter_types() {
+            match type_ {
+                Type::Object { name, .. } => {
+                    // Objects only rely on a pointer, not the fields backing it.
+                    add_edge(&mut graph, &mut types, type_, &Type::UInt64);
+                    // Fields in the constructor are executed long after everything has
+                    // been initialized.
+                    if self.is_name_used_as_error(name) {
+                        add_edge(&mut graph, &mut types, type_, &Type::Int32);
+                        add_edge(&mut graph, &mut types, type_, &Type::String);
+                    }
+                }
+                Type::Enum { name, .. } => {
+                    // Ordinals are Int32.
+                    add_edge(&mut graph, &mut types, type_, &Type::Int32);
+                    if self.is_name_used_as_error(name) {
+                        add_edge(&mut graph, &mut types, type_, &Type::String);
+                    }
+                }
+                Type::Optional { inner_type } => {
+                    add_edge(&mut graph, &mut types, type_, &Type::Boolean);
+                    add_edge(&mut graph, &mut types, type_, inner_type.as_ref());
+                }
+                Type::Sequence { inner_type } => {
+                    add_edge(&mut graph, &mut types, type_, &Type::Int32);
+                    add_edge(&mut graph, &mut types, type_, inner_type.as_ref());
+                }
+                Type::Map {
+                    key_type,
+                    value_type,
+                } => {
+                    add_edge(&mut graph, &mut types, type_, key_type.as_ref());
+                    add_edge(&mut graph, &mut types, type_, value_type.as_ref());
+                }
+                _ => {
+                    let name = store_with_name(&mut types, type_);
+                    graph.insert(name);
+                }
+            }
+        }
+
+        let mut sorted: Vec<Type> = Vec::new();
+        while !graph.peek_all().is_empty() {
+            sorted.extend(graph.pop_all().iter().filter_map(|name| types.remove(name)));
+        }
+
+        if !graph.is_empty() {
+            eprintln!(
+                "WARN: Cyclic dependency for typescript types: {:?}",
+                types.values()
+            );
+            // We only warn if we have a cyclic dependency because by this stage,
+            // the code generation should may be able to handle a cycle.
+            // In practice, however, this will only occur if this method changes.
+        }
+
+        // I think that types should be empty by now, but we should add the remaining
+        // values in to sorted, then return.
+        sorted.into_iter().chain(types.into_values())
+    }
+}
+
+fn add_edge(
+    graph: &mut TopologicalSort<String>,
+    types: &mut HashMap<String, Type>,
+    src: &Type,
+    dest: &Type,
+) {
+    let src_name = store_with_name(types, src);
+    let dest_name = store_with_name(types, dest);
+    if src_name != dest_name {
+        graph.add_dependency(dest_name, src_name);
+    }
+}
+
+fn store_with_name(types: &mut HashMap<String, Type>, type_: &Type) -> String {
+    let name = format!("{type_:?}");
+    types.entry(name.clone()).or_insert_with(|| type_.clone());
+    name
 }
 
 #[ext]
