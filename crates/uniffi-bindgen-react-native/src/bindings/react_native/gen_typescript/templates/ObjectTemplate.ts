@@ -22,13 +22,16 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
     {%- endfor %}
     {%- if is_error %}, Error{% endif %} {
 
-    private pointer: bigint;
+    private pointer: UnsafeMutableRawPointer;
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
     {%- call ts::ctor_decl(cons, 4) %}
     {%- when None %}
     // No primary constructor declared for this class.
+    private constructor(pointer: UnsafeMutableRawPointer) {
+        this.pointer = pointer;
+    }
     {%- endmatch %}
 
     {% for cons in obj.alternate_constructors() %}
@@ -102,7 +105,7 @@ const {{ ffi_converter_name }} = (() => {
     class FFIConverter implements FfiConverter<UnsafeMutableRawPointer, TypeName> {
         {%- if obj.has_callback_interface() %}
             {{- self.import_infra("UniffiHandleMap", "handle-map")}}
-        handleMap = UniffiHandleMap<{{ type_name }}>();
+        handleMap = new UniffiHandleMap<{{ type_name }}>();
         lift(value: UnsafeMutableRawPointer): TypeName {
             // TODO look in a handle map.
             return create{{ type_name }}(value);
