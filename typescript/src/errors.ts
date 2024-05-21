@@ -7,7 +7,11 @@ export class UniffiInternalError extends Error {
   private constructor(message: string) {
     super(message);
   }
-
+  static NumberOverflow = class NumberOverflow extends UniffiInternalError {
+    constructor() {
+      super("Cannot convert a large BigInt into a number");
+    }
+  };
   static BufferOverflow = class BufferOverflow extends UniffiInternalError {
     constructor() {
       super(
