@@ -42,89 +42,31 @@ const {{ ffi_converter_name }} = (() => {
 })();
 
 {% else %}
-/// Typescript doesn't have the concept of enums with variant properties,
-/// so we need to be a little creative here.
-///
-/// For a Rust enum:
-/// ```rs
-/// enum FilePath {
-///   Local { path: String }
-///   Remote { host: String, path: String }
-/// }
-/// ```
-/// Currently:
-/// ```ts
-/// class FilePath {
-///   static Local = class Local extends FilePath { constructor(public members: { path: string })} {}
-///   static Remote = class Remote extends FilePath { constructor(public members: { host: string, path: string })} {}
-/// }
-/// ```
-///
-/// This gives nice construction properties:
-/// ```ts
-/// const path: FilePath = new FilePath.Local({ path: "/" });
-/// ```
-/// but not very nice pattern matching.
-///
-/// To help with switch statements, a companion enum (not ideal) called `FilePathKind` is generated:
-///
-/// ```ts
-/// enum FilePathKind {
-///   LOCAL,
-///   REMOTE
-/// }
-/// ```
-///
-/// so:
-/// ```ts
-/// switch path.kind {
-///     case FilePathKind.LOCAL:
-///         console.log("It's a local file path");
-///         break;
-///     case FilePathKind.REMOTE:
-///         console.log("It's a remote file path");
-///         break;
-/// }
-/// ```
-///
-///
+
+// Enum: {{ type_name }}
 {%- let kind_type_name = format!("{type_name}Kind") %}
 export enum {{ kind_type_name }} {
     {%- for variant in e.variants() %}
-    {{ variant|variant_name }} = {{ loop.index0 }}
+    {{ variant|variant_name }} = "{{ variant.name() }}"
     {%- if !loop.last %},{% endif -%}
     {% endfor %}
 }
 
 {%- call ts::docstring(e, 0) %}
-export abstract class {{ type_name }} {
-    protected constructor(public kind: {{ kind_type_name }}) {}
+export type {{ type_name }} = {# space #}
+{%- for variant in e.variants() %}
+{%-   call ts::docstring(variant, 4) %}
+    { kind: {{ kind_type_name }}.{{ variant|variant_name }}
+    {%- if !variant.fields().is_empty() %}; value: { {# space #}
+        {%- for field in variant.fields() %}
+        {%- call ts::field_name(field, loop.index) %}: {{ field|type_name(ci) }}
+        {%- if !loop.last %}; {% endif -%}
+        {%- endfor %} }
+    {%- endif %} }
+    {%- if !loop.last %} |{% endif %}
+{%- endfor %};
 
-    {%-   for variant in e.variants() %}
-    {%-    call ts::docstring(variant, 4) %}
-    {%-    let var_name = variant.name()|class_name(ci) %}
-    static {{ var_name }} = class {{ var_name }} extends {{ type_name }} {
-        constructor(
-        {%- if !variant.fields().is_empty() %}
-            public members: {
-                {%- for field in variant.fields() %}
-                {% call ts::field_name(field, loop.index) %}: {{ field|type_name(ci) }}
-                {%- if loop.last -%}{%- else -%},{%- endif -%}{% endfor %}
-            }
-        {%- endif %}
-        ) { super({{kind_type_name}}.{{ variant|variant_name }}); }
-
-        asJSON(): any {
-            {%- if !variant.fields().is_empty() %}
-            return { ["{{ type_name }}.{{ var_name }}"]: this.members };
-            {%- else %}
-            return "{{ type_name }}.{{ var_name }}";
-            {%- endif %}
-        }
-    }
-    {%- endfor %}
-}
-
+// FfiConverter for enum {{ type_name }}
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
@@ -132,14 +74,12 @@ const {{ ffi_converter_name }} = (() => {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}
-                case {{ loop.index0 + 1 }}: return new {{ type_name }}.{{ variant.name()|class_name(ci) }}(
-                {%- if !variant.fields().is_empty() %}{
+                case {{ loop.index }}: return { kind: {{ kind_type_name }}.{{ variant|variant_name }}
+                {%- if !variant.fields().is_empty() %}, value: {
                     {%- for field in variant.fields() %}
                     {% call ts::field_name(field, loop.index) %}: {{ field|read_fn }}(from)
-                    {%- if loop.last -%}{%- else -%},{%- endif -%}{% endfor %}
-                }
-                {%- endif %}
-                );
+                    {%- if !loop.last -%}, {% endif -%}{% endfor %} }
+                {%- endif %} };
                 {%- endfor %}
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
@@ -148,16 +88,14 @@ const {{ ffi_converter_name }} = (() => {
             switch (value.kind) {
                 {%- for variant in e.variants() %}
                 case {{ kind_type_name }}.{{ variant|variant_name }}: {
-                    if (value instanceof {{ type_name }}.{{ variant.name()|class_name(ci) }}) {
-                        ordinalConverter.write({{ loop.index0 + 1 }}, into);
-                        {%- if !variant.fields().is_empty() %}
-                        {%- for field in variant.fields() %}
-                        {{ field|write_fn }}(value.members.{% call ts::field_name(field, loop.index) %}, into);
-                        {%- endfor %}
-                        {%- endif %}
-                        return;
-                    }
-                    break;
+                    ordinalConverter.write({{ loop.index }}, into);
+                    {%- if !variant.fields().is_empty() %}
+                    const inner = value.value;
+                    {%-   for field in variant.fields() %}
+                    {{ field|write_fn }}(inner.{% call ts::field_name(field, loop.index) %}, into);
+                    {%-   endfor %}
+                    {%- endif %}
+                    return;
                 }
                 {%- endfor %}
                 default:
@@ -165,30 +103,25 @@ const {{ ffi_converter_name }} = (() => {
                     throw new UniffiInternalError.UnexpectedEnumCase();
                     break;
             }
-            // Throwing from here means that an instanceof check has failed.
-            throw new UniffiInternalError.UnexpectedEnumCase();
         }
         allocationSize(value: TypeName): number {
             switch (value.kind) {
                 {%- for variant in e.variants() %}
                 case {{ kind_type_name }}.{{ variant|variant_name }}: {
-                    if (value instanceof {{ type_name }}.{{ variant.name()|class_name(ci) }}) {
-                        {%- if !variant.fields().is_empty() %}
-                        let size = ordinalConverter.allocationSize({{ loop.index0 }});
-                        {%- for field in variant.fields() %}
-                        size += {{ field|allocation_size_fn }}(value.members.{% call ts::field_name(field, loop.index) %});
-                        {%- endfor %}
-                        return size;
-                        {%- else %}
-                        return ordinalConverter.allocationSize({{ loop.index0 }});
-                        {%- endif %}
-                    }
-                    break;
+                    {%- if !variant.fields().is_empty() %}
+                    const inner = value.value;
+                    let size = ordinalConverter.allocationSize({{ loop.index }});
+                    {%- for field in variant.fields() %}
+                    size += {{ field|allocation_size_fn }}(inner.{% call ts::field_name(field, loop.index) %});
+                    {%- endfor %}
+                    return size;
+                    {%- else %}
+                    return ordinalConverter.allocationSize({{ loop.index }});
+                    {%- endif %}
                 }
                 {%- endfor %}
-                default: break;
+                default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
-            throw new UniffiInternalError.UnexpectedEnumCase();
         }
     }
     return new FFIConverter();

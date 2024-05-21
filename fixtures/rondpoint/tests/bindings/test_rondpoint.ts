@@ -11,7 +11,8 @@
 import { assertEqual, assertNotEqual, assertNotNull, test } from "@/asserts";
 import {
   Enumeration,
-  EnumerationAvecDonnees,
+  type EnumerationAvecDonnees,
+  EnumerationAvecDonneesKind,
   Optionneur,
   OptionneurDictionnaire,
   Retourneur,
@@ -50,10 +51,16 @@ test("Round trip an object literal, without strings", () => {
 });
 
 test("Round trip a map<string, *> of strings to enums with values", () => {
-  const input = new Map([
-    ["0", new EnumerationAvecDonnees.Zero()],
-    ["1", new EnumerationAvecDonnees.Un({ premier: 1 })],
-    ["2", new EnumerationAvecDonnees.Deux({ premier: 2, second: "deux" })],
+  const input = new Map<string, EnumerationAvecDonnees>([
+    ["0", { kind: EnumerationAvecDonneesKind.ZERO }],
+    ["1", { kind: EnumerationAvecDonneesKind.UN, value: { premier: 1 } }],
+    [
+      "2",
+      {
+        kind: EnumerationAvecDonneesKind.DEUX,
+        value: { premier: 2, second: "deux" },
+      },
+    ],
   ]);
   const output = copieCarte(input);
   assertEqual(input, output);
