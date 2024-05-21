@@ -117,6 +117,7 @@ pub fn ffi_type_name_for_cpp(type_: &FfiType, is_internal: &bool) -> Result<Stri
     })
 }
 
+#[allow(unused)]
 pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_type_label(ffi_type))
 }
@@ -126,6 +127,7 @@ pub fn ffi_type_name_for_ffi_struct(type_: &FfiType) -> Result<String, askama::E
     Ok(CodeOracle.ffi_type_label_for_ffi_struct(type_))
 }
 
+#[allow(unused)]
 pub fn ffi_default_value(type_: &FfiType) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_default_value(type_))
 }
@@ -169,6 +171,7 @@ pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
 }
 
 /// Get the idiomatic Typescript rendering of an FFI struct name
+#[allow(unused)]
 pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_struct_name(nm))
 }
