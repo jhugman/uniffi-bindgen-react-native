@@ -88,6 +88,7 @@ impl CodeOracle {
     /// This is used to:
     ///   - Set a default return value for error results
     ///   - Set a default for structs, which JNA sometimes requires
+    #[allow(unused)]
     pub(crate) fn ffi_default_value(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
             FfiType::UInt8 | FfiType::Int8 => "0.toByte()".to_owned(),
