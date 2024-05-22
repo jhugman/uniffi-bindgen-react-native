@@ -2,6 +2,10 @@
 {{- self.import_infra("UniffiInternalError", "errors") -}}
 {{- self.import_infra("rustCall", "rust-call") }}
 
+{%- for func in ci.function_definitions() %}
+{%- include "TopLevelFunctionTemplate.ts" %}
+{%- endfor %}
+
 {%- for type_ in ci.iter_types() %}
 {%- let type_name = type_|type_name(ci) %}
 {%- let ffi_converter_name = type_|ffi_converter_name %}

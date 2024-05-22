@@ -55,7 +55,3 @@ export const uniffiConverters = Object.freeze({
   {%- endfor %}
 });
 {% endif %}
-
-{%- for func in ci.function_definitions() %}
-{%- include "TopLevelFunctionTemplate.ts" %}
-{%- endfor %}
