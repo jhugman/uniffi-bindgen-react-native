@@ -8,6 +8,7 @@
   "author": "James Hugman <james@hugman.tv>",
   "type": "module",
   "exports": {
+    "./async-rust-call": "./typescript/src/async-rust-call.ts",
     "./errors": "./typescript/src/errors.ts",
     "./ffi-converters": "./typescript/src/ffi-converters.ts",
     "./ffi-types": "./typescript/src/ffi-types.ts",
