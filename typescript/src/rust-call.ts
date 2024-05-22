@@ -25,7 +25,7 @@ export function createCallStatus(): UniffiRustCallStatus {
   return { code: CALL_SUCCESS };
 }
 
-type ErrorHandler = (buffer: ArrayBuffer) => Error;
+export type UniffiErrorHandler = (buffer: ArrayBuffer) => Error;
 type RustCaller<T> = (status: UniffiRustCallStatus) => T;
 
 export function rustCall<T>(caller: RustCaller<T>): T {
@@ -33,7 +33,7 @@ export function rustCall<T>(caller: RustCaller<T>): T {
 }
 
 export function rustCallWithError<T>(
-  errorHandler: ErrorHandler,
+  errorHandler: UniffiErrorHandler,
   caller: RustCaller<T>,
 ): T {
   return makeRustCall(caller, errorHandler);
@@ -41,7 +41,7 @@ export function rustCallWithError<T>(
 
 export function makeRustCall<T>(
   caller: RustCaller<T>,
-  errorHandler?: ErrorHandler,
+  errorHandler?: UniffiErrorHandler,
 ): T {
   // uniffiEnsureInitialized()
   const callStatus = createCallStatus();
@@ -52,7 +52,7 @@ export function makeRustCall<T>(
 
 function uniffiCheckCallStatus(
   callStatus: UniffiRustCallStatus,
-  errorHandler?: ErrorHandler,
+  errorHandler?: UniffiErrorHandler,
 ) {
   switch (callStatus.code) {
     case CALL_SUCCESS:
@@ -88,5 +88,3 @@ function uniffiCheckCallStatus(
       throw new UniffiInternalError.UnexpectedRustCallStatusCode();
   }
 }
-
-export type UniffiRustFutureContinuationCallback = () => void;

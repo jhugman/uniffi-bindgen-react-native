@@ -54,7 +54,7 @@
 {%- macro returns(callable) %}
     {%- match callable.return_type() %}
     {%-  when Some with (return_type) %}: {% if callable.is_async() %}Promise<{{ return_type|type_name(ci) }}>{% else %}{{ return_type|type_name(ci) }}{% endif %}
-    {%-  when None %}
+    {%-  when None %}: {% if callable.is_async() %}Promise<void>{% else %}void{% endif %}
     {%- endmatch %}
 {%- endmacro %}
 
@@ -87,7 +87,7 @@
 
 {%- macro call_body(callable) %}
 {%- if callable.is_async() %}
-    return {%- call call_async(callable) %};
+    return {# space #}{%- call call_async(callable) %};
 {%- else %}
 {%-     match callable.return_type() -%}
 {%-         when Some with (return_type) %}
@@ -99,34 +99,34 @@
 
 {%- endmacro %}
 
-{%- macro call_async(callable) %}
-        {% call try(callable) %} await uniffiRustCallAsync(
-            rustFutureFunc: {
-                {{ callable.ffi_func().name() }}(
+{%- macro call_async(callable) -%}
+        await uniffiRustCallAsync({
+            rustFutureFunc: () => {
+                return NativeModule.{{ callable.ffi_func().name() }}(
                     {%- if callable.takes_self() %}
-                    self.uniffiClonePointer(){% if !callable.arguments().is_empty() %},{% endif %}
+                    this.uniffiClonePointer(){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
                     {{ arg|lower_fn }}({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
                     {%- endfor %}
-                )
+                );
             },
-            pollFunc: {{ callable.ffi_rust_future_poll(ci) }},
-            completeFunc: {{ callable.ffi_rust_future_complete(ci) }},
-            freeFunc: {{ callable.ffi_rust_future_free(ci) }},
+            pollFunc: NativeModule.{{ callable.ffi_rust_future_poll(ci) }},
+            completeFunc: NativeModule.{{ callable.ffi_rust_future_complete(ci) }},
+            freeFunc: NativeModule.{{ callable.ffi_rust_future_free(ci) }},
             {%- match callable.return_type() %}
             {%- when Some(return_type) %}
             liftFunc: {{ return_type|lift_fn }},
             {%- when None %}
-            liftFunc: { $0 },
+            liftFunc: (_v) => {},
             {%- endmatch %}
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
             errorHandler: {{ e|ffi_error_converter_name }}.lift
             {%- else %}
-            errorHandler: nil
+            errorHandler: undefined,
             {% endmatch %}
-        )
+        })
 {%- endmacro %}
 
 {%- macro arg_list_lowered(func) %}
