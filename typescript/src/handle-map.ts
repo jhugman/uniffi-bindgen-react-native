@@ -5,16 +5,18 @@
  */
 import { UniffiInternalError } from "./errors";
 
+export type UniffiHandle = bigint;
+const intialHandle = BigInt("0");
 export class UniffiHandleMap<T> {
-  private map = new Map<number, T>();
-  private currentHandle: number = 0;
+  private map = new Map<UniffiHandle, T>();
+  private currentHandle: UniffiHandle = intialHandle;
 
-  insert(value: T): number {
+  insert(value: T): UniffiHandle {
     this.map.set(this.currentHandle, value);
     return this.currentHandle++;
   }
 
-  get(handle: number): T {
+  get(handle: UniffiHandle): T {
     const obj = this.map.get(handle);
     if (obj === undefined) {
       throw new UniffiInternalError.UnexpectedStaleHandle();
@@ -22,7 +24,7 @@ export class UniffiHandleMap<T> {
     return obj;
   }
 
-  remove(handle: number): T {
+  remove(handle: UniffiHandle): T {
     const obj = this.map.get(handle);
     if (obj === undefined) {
       throw new UniffiInternalError.UnexpectedStaleHandle();
