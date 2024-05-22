@@ -19,9 +19,9 @@ class {{ trait_impl }} {
         ) => {
             const makeCall = {# space #}
             {%- if meth.is_async() %}async {% else %} {% endif-%}
-            ()
-            {%- call ts::returns(meth) %} => {
-                const uniffiObj = {{ ffi_converter_name }}.handleMap.get(uniffiHandle);
+            (): {% call ts::return_type(meth) %} => {
+                // Was converter.handleMap.get(uniffiHandle);
+                const uniffiObj = {{ ffi_converter_name }}.lift(uniffiHandle);
                 if (uniffiObj === undefined) {
                     throw new UniffiInternalError.UnexpectedStaleHandle()
                 }
