@@ -43,25 +43,18 @@
 {%- macro func_decl(func_decl, callable, indent, export) %}
 {%- call docstring(callable, indent) %}
 {{ export }}{% call async(callable) %}{{ func_decl }} {{ callable.name()|fn_name }}(
-    {%- call arg_list_decl(callable) -%})
+    {%- call arg_list_decl(callable) -%}): {# space #}
 
-    {%- call returns(callable) %}
+    {%- call return_type(callable) %}
     {%- call throws(callable) %} {
     {%- call call_body(callable) %}
     }
 {%- endmacro %}
 
-{%- macro returns(callable) %}
+{%- macro return_type(callable) %}
     {%- match callable.return_type() %}
-    {%-  when Some with (return_type) %}: {% if callable.is_async() %}Promise<{{ return_type|type_name(ci) }}>{% else %}{{ return_type|type_name(ci) }}{% endif %}
-    {%-  when None %}: {% if callable.is_async() %}Promise<void>{% else %}void{% endif %}
-    {%- endmatch %}
-{%- endmacro %}
-
-{%- macro return_type_name(callable) %}
-    {%- match callable.return_type() %}
-    {%-  when Some with (return_type) %}{{ return_type|type_name(ci) }}
-    {%-  when None %}()
+    {%-  when Some with (return_type) %}{% if callable.is_async() %}Promise<{{ return_type|type_name(ci) }}>{% else %}{{ return_type|type_name(ci) }}{% endif %}
+    {%-  when None %}{% if callable.is_async() %}Promise<void>{% else %}void{% endif %}
     {%- endmatch %}
 {%- endmacro %}
 
