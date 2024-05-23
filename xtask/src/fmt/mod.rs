@@ -7,8 +7,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use glob::glob;
-use uniffi_common::{resolve, run_cmd};
+use uniffi_common::run_cmd;
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
@@ -135,8 +134,12 @@ impl CodeFormatter for TypescriptArgs {
     fn format_code(&self) -> Result<()> {
         YarnCmd.ensure_ready()?;
         let root = repository_root()?;
-        let prettier = resolve(root, "node_modules/.bin/prettier")?.expect("prettier is installed");
-        run_cmd(Command::new(prettier).arg(".").arg("--write"))
+        if let Some(mut prettier) = uniffi_common::fmt::prettier(root)? {
+            run_cmd(&mut prettier)?
+        } else {
+            unreachable!("Is prettier in package.json dependencies?")
+        }
+        Ok(())
     }
 }
 
@@ -146,29 +149,13 @@ struct CppArgs;
 impl CodeFormatter for CppArgs {
     fn format_code(&self) -> Result<()> {
         let root = repository_root()?;
-        run_cmd(
-            Command::new("clang-format")
-                .arg("-i")
-                .arg("--style=file")
-                .arg("--fallback-style=LLVM")
-                .args(file_paths(&format!("{root}/cpp/**/*.[ch]"))?)
-                .args(file_paths(&format!("{root}/cpp/**/*.[ch]pp"))?)
-                .current_dir(root),
-        )?;
+        if let Some(mut clang_format) = uniffi_common::fmt::clang_format(root.join("cpp"))? {
+            run_cmd(&mut clang_format)?;
+        } else {
+            eprintln!("clang-format doesn't seem to be installed")
+        }
         Ok(())
     }
-}
-
-fn file_paths(pattern: &str) -> Result<Vec<std::ffi::OsString>, anyhow::Error> {
-    let files = glob(pattern)?;
-    let files: Vec<_> = files
-        .into_iter()
-        .map(|pb| {
-            let file = pb.expect("is valid PathBuf");
-            file.into_os_string()
-        })
-        .collect();
-    Ok(files)
 }
 
 #[derive(Debug, Default, Args)]

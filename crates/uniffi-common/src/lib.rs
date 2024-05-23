@@ -5,6 +5,7 @@
  */
 mod commands;
 mod files;
+pub mod fmt;
 
 pub use commands::*;
 pub use files::*;

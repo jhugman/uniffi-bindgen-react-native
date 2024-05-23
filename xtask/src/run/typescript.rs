@@ -7,7 +7,7 @@ use std::{fs, process::Command};
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
-    util::{build_root, find, repository_root},
+    util::{build_root, repository_root},
 };
 
 use anyhow::Result;
@@ -15,7 +15,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use pathdiff::diff_utf8_paths;
-use uniffi_common::run_cmd_quietly;
+use uniffi_common::{find, run_cmd_quietly};
 
 fn typescript_dir() -> Result<Utf8PathBuf> {
     let root = repository_root()?;
