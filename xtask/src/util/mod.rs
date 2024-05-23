@@ -33,11 +33,3 @@ pub(crate) fn so_extension_name() -> &'static str {
         unimplemented!("Building only on windows, macos and unix supported right now")
     }
 }
-
-pub(crate) fn find<P: AsRef<Utf8Path>>(base: P, filename: &str) -> Option<Utf8PathBuf> {
-    let path = glob::glob(&format!("{base}/**/{filename}", base = base.as_ref()))
-        .unwrap()
-        .find_map(Result::ok)?;
-    let path: Utf8PathBuf = path.try_into().unwrap_or_else(|_| panic!("not a utf path"));
-    Some(path)
-}

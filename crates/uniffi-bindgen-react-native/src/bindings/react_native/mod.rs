@@ -6,7 +6,7 @@
 mod gen_cpp;
 mod gen_typescript;
 
-use std::{collections::HashMap, fs, process::Command};
+use std::{collections::HashMap, fs};
 
 use anyhow::Result;
 use camino::Utf8Path;
@@ -18,10 +18,12 @@ use uniffi_bindgen::{
     interface::{FfiArgument, FfiFunction, FfiType, Function},
     BindingGenerator, BindingsConfig, ComponentInterface,
 };
-use uniffi_common::{resolve, run_cmd_quietly};
+use uniffi_common::{fmt, run_cmd_quietly};
 use uniffi_meta::Type;
 
 use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
+
+use super::OutputArgs;
 
 #[derive(Deserialize)]
 pub(crate) struct ReactNativeConfig {
@@ -40,7 +42,7 @@ impl BindingsConfig for ReactNativeConfig {
         let ns = ci.namespace();
         let cpp_module = format!("Native{}", ns.to_upper_camel_case());
         self.ffi_ts_filename = if self.use_codegen {
-            format!("Native{cpp_module}")
+            cpp_module.to_string()
         } else {
             format!("{ns}-ffi")
         };
@@ -56,7 +58,23 @@ impl BindingsConfig for ReactNativeConfig {
     }
 }
 
-pub(crate) struct ReactNativeBindingGenerator;
+pub(crate) struct ReactNativeBindingGenerator {
+    output: OutputArgs,
+}
+
+impl ReactNativeBindingGenerator {
+    pub(crate) fn new(output: OutputArgs) -> Self {
+        Self { output }
+    }
+
+    pub(crate) fn format_code(&self) -> Result<()> {
+        if !self.output.no_format {
+            format_ts(&self.output.ts_dir.canonicalize_utf8()?)?;
+            format_cpp(&self.output.cpp_dir.canonicalize_utf8()?)?;
+        }
+        Ok(())
+    }
+}
 
 impl BindingGenerator for ReactNativeBindingGenerator {
     type Config = ReactNativeConfig;
@@ -65,31 +83,29 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         &self,
         ci: &ComponentInterface,
         config: &Self::Config,
-        out_dir: &Utf8Path,
-        try_format_code: bool,
+        // We get the output directories from the OutputArgs
+        _out_dir: &Utf8Path,
+        // We will format the code all at once instead of here
+        _try_format_code: bool,
     ) -> Result<()> {
         let namespace = ci.namespace();
         let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, config)?;
         let codegen_file = format!("{}.ts", &config.ffi_ts_filename);
+
+        let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
         let codegen_path = out_dir.join(codegen_file);
         let frontend_path = out_dir.join(format!("{namespace}.ts"));
 
         fs::write(codegen_path, codegen)?;
         fs::write(frontend_path, frontend)?;
 
-        if try_format_code {
-            let _ = format_ts(out_dir);
-        }
-
+        let out_dir = &self.output.cpp_dir.canonicalize_utf8()?;
         let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, config)?;
         let cpp_path = out_dir.join(format!("{namespace}.cpp"));
         let hpp_path = out_dir.join(format!("{namespace}.hpp"));
 
-        fs::write(&cpp_path, cpp)?;
-        fs::write(&hpp_path, hpp)?;
-        if try_format_code {
-            let _ = format_cpp(out_dir, &[&cpp_path, &hpp_path]);
-        }
+        fs::write(cpp_path, cpp)?;
+        fs::write(hpp_path, hpp)?;
 
         Ok(())
     }
@@ -104,32 +120,21 @@ impl BindingGenerator for ReactNativeBindingGenerator {
 }
 
 fn format_ts(out_dir: &Utf8Path) -> Result<()> {
-    if let Some(prettier) = resolve(out_dir, "node_modules/.bin/prettier")? {
-        run_cmd_quietly(
-            Command::new(prettier)
-                .arg(".")
-                .arg("--write")
-                .current_dir(out_dir),
-        )?;
+    if let Some(mut prettier) = fmt::prettier(out_dir)? {
+        run_cmd_quietly(&mut prettier)?
     } else {
         eprintln!("No prettier found. Install with `yarn add --dev prettier`");
     }
     Ok(())
 }
 
-fn format_cpp(out_dir: &Utf8Path, files: &[&Utf8Path]) -> Result<()> {
-    let result = run_cmd_quietly(
-        Command::new("clang-format")
-            .current_dir(out_dir)
-            .arg("-i")
-            .arg("--style=file")
-            .arg("--fallback-style=LLVM")
-            .args(files),
-    );
-    if result.is_err() {
-        eprintln!("Could not format C++ code. Is `clang-format` installed?");
+fn format_cpp(out_dir: &Utf8Path) -> Result<()> {
+    if let Some(mut clang_format) = fmt::clang_format(out_dir)? {
+        run_cmd_quietly(&mut clang_format)?
+    } else {
+        eprintln!("Skipping formatting C++. Is clang-format installed?");
     }
-    result
+    Ok(())
 }
 
 #[ext]
