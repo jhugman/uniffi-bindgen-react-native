@@ -20,13 +20,15 @@ import {
 
 // Get converters from the other files, if any.
 {%- for entry in self.imported_converters.borrow() %}
-{%-   let uniffiConverters = entry.0 %}
+import {{ entry.0.1 }} from "{{ entry.0.0 }}";
+{%- endfor %}
+{%- for entry in self.imported_converters.borrow() %}
 {%-   let converters = entry.1 %}
 const {
 {%-   for converter in converters %}
         {{- converter }},
 {%-   endfor %}
-} = {{ uniffiConverters }};
+} = {{ entry.0.1 }};
 {%- endfor %}
 
 {%- call ts::docstring_value(ci.namespace_docstring(), 0) %}
@@ -49,7 +51,7 @@ import {{ config.ffi_module_name() }}
 {{ type_helper_code }}
 
 {% if !self.exported_converters.is_empty() %}
-export const uniffiConverters = Object.freeze({
+export default Object.freeze({
   {%- for converter in self.exported_converters.borrow() %}
   {{ converter }},
   {%- endfor %}
