@@ -5,8 +5,8 @@
  */
 import { UniffiHandleMap, type UniffiHandle } from "./handle-map";
 import {
-  UniffiErrorHandler,
-  UniffiRustCallStatus,
+  type UniffiErrorHandler,
+  type UniffiRustCallStatus,
   makeRustCall,
 } from "./rust-call";
 

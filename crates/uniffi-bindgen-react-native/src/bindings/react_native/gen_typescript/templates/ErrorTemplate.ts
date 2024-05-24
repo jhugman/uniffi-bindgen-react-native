@@ -14,7 +14,7 @@ export class {{ type_name }} extends Error {
     }
     {% endfor -%}
     {% else %}
-    // non-flat errors aren't implement yet.
+    // non-flat errors aren't implemented yet.
     {%- endif %}
 }
 
@@ -37,7 +37,6 @@ const {{ ffi_converter_name }} = (() => {
             {%  endif %}
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
-            throw new Error("Method not implemented.")
         }
         write(value: TypeName, into: RustBuffer): void {
             {%- if e.is_flat() %}
@@ -56,7 +55,6 @@ const {{ ffi_converter_name }} = (() => {
         allocationSize(value: TypeName): number {
             throw new Error("Method not implemented.")
         }
-
     }
     return new FfiConverter();
 })();
