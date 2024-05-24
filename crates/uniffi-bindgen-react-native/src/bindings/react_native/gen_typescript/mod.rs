@@ -72,7 +72,7 @@ struct FrontendWrapper<'a> {
     type_helper_code: String,
     type_imports: BTreeMap<String, BTreeSet<Imported>>,
     exported_converters: BTreeSet<String>,
-    imported_converters: BTreeMap<String, BTreeSet<String>>,
+    imported_converters: BTreeMap<(String, String), BTreeSet<String>>,
 }
 
 impl<'a> FrontendWrapper<'a> {
@@ -111,7 +111,7 @@ pub struct TypeRenderer<'a> {
     exported_converters: RefCell<BTreeSet<String>>,
 
     // Track imports added with the `add_import()` macro
-    imported_converters: RefCell<BTreeMap<String, BTreeSet<String>>>,
+    imported_converters: RefCell<BTreeMap<(String, String), BTreeSet<String>>>,
 }
 
 impl<'a> TypeRenderer<'a> {
@@ -200,18 +200,20 @@ impl<'a> TypeRenderer<'a> {
                     }
                 }
                 let converters = format!("uniffi{}Converters", namespace.to_upper_camel_case());
-                self.import_ext(&format!("uniffiConverters as {converters}"), &namespace);
-                let ffi_converter_name = ffi_converter_name(external).expect("");
-                self.import_converter(&ffi_converter_name, &converters);
+                let src = format!("./{namespace}");
+                let ffi_converter_name = ffi_converter_name(external)
+                    .expect("FfiConverter for External type will always exist");
+                self.import_converter(&ffi_converter_name, &src, &converters);
                 ""
             }
             _ => unreachable!(),
         }
     }
 
-    fn import_converter(&self, what: &str, from: &str) -> &str {
+    fn import_converter(&self, what: &str, src: &str, converters: &str) -> &str {
         let mut map = self.imported_converters.borrow_mut();
-        let set = map.entry(from.to_owned()).or_default();
+        let key = (src.to_owned(), converters.to_owned());
+        let set = map.entry(key).or_default();
         set.insert(what.to_owned());
         ""
     }
