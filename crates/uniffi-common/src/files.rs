@@ -7,7 +7,6 @@ use std::fs;
 
 use anyhow::{bail, Result};
 use camino::{Utf8Path, Utf8PathBuf};
-use glob;
 
 /// Finds a file in the given directory.
 ///

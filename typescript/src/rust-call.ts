@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
-import { RustBuffer } from "./ffi-types";
 
 const CALL_SUCCESS = 0;
 const CALL_ERROR = 1;
@@ -82,7 +81,9 @@ function uniffiCheckCallStatus(
     }
 
     case CALL_CANCELLED:
-      new UniffiInternalError.Unimplemented("Cancellation not supported yet");
+      throw new UniffiInternalError.Unimplemented(
+        "Cancellation not supported yet",
+      );
 
     default:
       throw new UniffiInternalError.UnexpectedRustCallStatusCode();

@@ -37,7 +37,7 @@ export class RustBuffer {
     return value as T;
   }
 
-  write<T>(numBytes: number, writer: () => ArrayBuffer) {
+  write(numBytes: number, writer: () => ArrayBuffer) {
     const start = this.writeOffset;
     const end = this.checkOverflow(start, numBytes);
 
