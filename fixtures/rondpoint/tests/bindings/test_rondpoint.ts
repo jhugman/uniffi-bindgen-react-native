@@ -14,15 +14,15 @@ import {
   type EnumerationAvecDonnees,
   EnumerationAvecDonneesKind,
   Optionneur,
+  DictionnaireFactory,
   OptionneurDictionnaire,
+  OptionneurDictionnaireFactory,
   Retourneur,
   Stringifier,
   copieCarte,
   copieDictionnaire,
   copieEnumeration,
   copieEnumerations,
-  createDictionnaire,
-  createOptionneurDictionnaire,
   switcheroo,
 } from "../../generated/rondpoint";
 import { numberToString } from "@/simulated";
@@ -40,7 +40,7 @@ test("Round trip a list of enum", () => {
 });
 
 test("Round trip an object literal, without strings", () => {
-  const input = createDictionnaire({
+  const input = DictionnaireFactory.create({
     un: Enumeration.DEUX,
     deux: true,
     petitNombre: 0,
@@ -147,8 +147,9 @@ test("Using an object to roundtrip primitives", () => {
 
 test("Testing defaulting properties in record types", () => {
   const rt = new Retourneur();
-  const defaults: OptionneurDictionnaire = createOptionneurDictionnaire({});
-  const explicit = createOptionneurDictionnaire({
+  const defaulted: OptionneurDictionnaire =
+    OptionneurDictionnaireFactory.create({});
+  const explicit = OptionneurDictionnaireFactory.create({
     i8Var: -8,
     u8Var: 8,
     i16Var: -16,
@@ -165,7 +166,10 @@ test("Testing defaulting properties in record types", () => {
     enumerationVar: Enumeration.DEUX,
     dictionnaireVar: undefined,
   });
-  assertEqual(explicit, defaults);
+  assertEqual(explicit, defaulted);
+
+  const actualDefaults = OptionneurDictionnaireFactory.defaults();
+  assertEqual(defaulted, actualDefaults);
 
   affirmAllerRetour(
     rt.identiqueOptionneurDictionnaire.bind(rt),
