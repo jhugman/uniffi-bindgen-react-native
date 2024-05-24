@@ -12,13 +12,9 @@ export type {{ type_name }} = {
 }
 
 /**
- * Create a {{ type_name }} with defaults.
- *
- * The record is frozen with `Object.freeze()`.
- *
- * API Review required.
+ * Generated factory for {@link {{ type_name }}} record objects.
  */
-export const create{{ type_name }} = (() => {
+export const {{ type_name }}Factory = (() => {
     const defaults = () => ({
         {%- for field in rec.fields() %}
         {%- match field.default_value() %}
@@ -29,7 +25,20 @@ export const create{{ type_name }} = (() => {
         {%- endmatch -%}
         {%- endfor %}
     });
-    return uniffiCreateRecord<{{ type_name }}, ReturnType<typeof defaults>>(defaults);
+    return Object.freeze({
+        /**
+         * Create a frozen instance of {@link {{ type_name }}}, with defaults specified
+         * in Rust, in the {@link {{ ci.namespace() }}} crate.
+         */
+        create: (() => {
+            return uniffiCreateRecord<{{ type_name }}, ReturnType<typeof defaults>>(defaults);
+        })(),
+
+        /**
+         * Defaults specified in the {@link {{ ci.namespace() }}} crate.
+         */
+        defaults: () => Object.freeze(defaults()) as Partial<{{ type_name }}>,
+    });
 })();
 
 const {{ ffi_converter_name }} = (() => {
