@@ -142,7 +142,7 @@ test("Using an object to roundtrip primitives", () => {
   affirmAllerRetour(rt.identiqueU64.bind(rt), "identiqueU64", inputData.u64);
   affirmAllerRetour(rt.identiqueDouble.bind(rt), "identiqueF32", inputData.f64);
 
-  rt.destroy();
+  rt.uniffiDestroy();
 });
 
 test("Testing defaulting properties in record types", () => {
@@ -176,7 +176,7 @@ test("Testing defaulting properties in record types", () => {
     "identiqueOptionneurDictionnaire",
     [explicit],
   );
-  rt.destroy();
+  rt.uniffiDestroy();
 });
 
 test("Using an object to roundtrip strings", () => {
@@ -187,7 +187,7 @@ test("Using an object to roundtrip strings", () => {
     "identiqueString",
     inputData.string,
   );
-  rt.destroy();
+  rt.uniffiDestroy();
 });
 
 // Test one way across the FFI.
@@ -251,7 +251,7 @@ test("Using an object convert into strings", () => {
     numberToString,
   );
 
-  st.destroy();
+  st.uniffiDestroy();
 });
 
 test("Default arguments are defaulting", () => {
@@ -297,7 +297,7 @@ test("Default arguments are defaulting", () => {
   // enums
   assertEqual(op.sinonEnum(), Enumeration.TROIS);
 
-  op.destroy();
+  op.uniffiDestroy();
 });
 
 test("Default arguments are overridden", () => {
@@ -345,5 +345,5 @@ test("Default arguments are overridden", () => {
 
   affirmAllerRetour(op.sinonEnum.bind(op), "sinonEnum", inputData.enums);
 
-  op.destroy();
+  op.uniffiDestroy();
 });
