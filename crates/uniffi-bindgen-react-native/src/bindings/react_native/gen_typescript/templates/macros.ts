@@ -22,8 +22,11 @@
 // passed to rust via `arg_list_lowered`
 #}
 
-
 {%- macro to_ffi_call(func) -%}
+{%- call to_ffi_method_call("unreachable", func) %}
+{%- endmacro %}
+
+{%- macro to_ffi_method_call(obj_factory, func) -%}
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
         rustCallWithError({{ e|ffi_error_converter_name }}.lift, callStatus => {
@@ -33,21 +36,32 @@
     {%- if func.return_type().is_some() %}
         return
     {%- endif %} NativeModule.{{ func.ffi_func().name() }}(
-        {%- if func.takes_self() %}this.uniffiClonePointer(), {% endif %}
+        {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
         {%- call arg_list_lowered(func) %}
         callStatus);
     })
 {%- endmacro -%}
 
-// eg, `public func foo_bar() { body }`
-{%- macro func_decl(func_decl, callable, indent, export) %}
+// eg. `export function fooBar() { body }`
+{%- macro top_func_decl(func_decl, callable, indent) %}
+{%- call func_decl("export ", func_decl, "unreachable", callable, indent) %}
+{%- endmacro %}
+
+// e.g. `fooBar() { body }`, which accepts an obj_factory to create, clone and free
+// pointers.
+{%- macro method_decl(func_decl, obj_factory, callable, indent) %}
+{%- call func_decl("", func_decl, obj_factory, callable, indent) %}
+{%- endmacro %}
+
+// Internal macro common to method_decl and top_func_decl
+{%- macro func_decl(prefix, func_decl, obj_factory, callable, indent) %}
 {%- call docstring(callable, indent) %}
-{{ export }}{% call async(callable) %}{{ func_decl }} {{ callable.name()|fn_name }}(
+{{ prefix }}{% call async(callable) %}{{ func_decl }} {{ callable.name()|fn_name }}(
     {%- call arg_list_decl(callable) -%}): {# space #}
 
     {%- call return_type(callable) %}
     {%- call throws(callable) %} {
-    {%- call call_body(callable) %}
+    {%- call call_body(obj_factory, callable) %}
     }
 {%- endmacro %}
 
@@ -59,13 +73,13 @@
 {%- endmacro %}
 
 // primary ctor - no name, no return-type.
-{%- macro ctor_decl(callable, indent) %}
+{%- macro ctor_decl(obj_factory, callable, indent) %}
 {%- call docstring(callable, indent) %}
     constructor(
     {%- call arg_list_decl(callable) -%}) {%- call async(callable) %} {%- call throws(callable) %} {
     {%- if callable.is_async() %}
         const pointer =
-            {%- call call_async(callable) %}
+            {%- call call_async(obj_factory, callable) %}
             {# The async mechanism returns an already constructed self.
             We work around that by cloning the pointer from that object, then
             assune the old object dies as there are no other references possible.
@@ -73,31 +87,31 @@
             .uniffiClonePointer()
         {%- else %}
         this.pointer =
-            {% call to_ffi_call(callable) %}
+            {% call to_ffi_method_call(obj_factory, callable) %}
     {%- endif %}
     }
 {%- endmacro %}
 
-{%- macro call_body(callable) %}
+{%- macro call_body(obj_factory, callable) %}
 {%- if callable.is_async() %}
-    return {# space #}{%- call call_async(callable) %};
+    return {# space #}{%- call call_async(obj_factory, callable) %};
 {%- else %}
 {%-     match callable.return_type() -%}
 {%-         when Some with (return_type) %}
-    return {{ return_type|lift_fn }}({% call to_ffi_call(callable) %});
+    return {{ return_type|lift_fn }}({% call to_ffi_method_call(obj_factory, callable) %});
 {%-         when None %}
-{%-             call to_ffi_call(callable) %};
+{%-             call to_ffi_method_call(obj_factory, callable) %};
 {%-     endmatch %}
 {%- endif %}
 
 {%- endmacro %}
 
-{%- macro call_async(callable) -%}
+{%- macro call_async(obj_factory, callable) -%}
         await uniffiRustCallAsync({
             rustFutureFunc: () => {
                 return NativeModule.{{ callable.ffi_func().name() }}(
                     {%- if callable.takes_self() %}
-                    this.uniffiClonePointer(){% if !callable.arguments().is_empty() %},{% endif %}
+                    {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
                     {{ arg|lower_fn }}({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
