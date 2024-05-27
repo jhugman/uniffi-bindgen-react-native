@@ -3,6 +3,7 @@
 {%- endif %}
 {%- let obj = ci|get_object_definition(name) %}
 {%- let (protocol_name, impl_class_name) = obj|object_names(ci) %}
+{%- let obj_factory = format!("uniffiType{}ObjectFactory", type_name) %}
 {%- let methods = obj.methods() %}
 
 {%- let is_error = ci.is_name_used_as_error(name) %}
@@ -26,7 +27,7 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
-    {%- call ts::ctor_decl(cons, 4) %}
+    {%- call ts::ctor_decl(obj_factory, cons, 4) %}
     {%- when None %}
     // No primary constructor declared for this class.
     private constructor(pointer: UnsafeMutableRawPointer) {
@@ -35,20 +36,17 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
     {%- endmatch %}
 
     {% for cons in obj.alternate_constructors() %}
-    {%- call ts::func_decl("public static", cons, 4, "") %}
+    {%- call ts::method_decl("public static", obj_factory, cons, 4) %}
     {% endfor %}
 
     {% for meth in obj.methods() -%}
-    {%- call ts::func_decl("public", meth, 4, "") %}
+    {%- call ts::method_decl("public", obj_factory, meth, 4) %}
     {% endfor %}
 
     // UniffiObjectInterface
-    destroy(): void {
-        rustCall(callStatus => { NativeModule.{{ obj.ffi_object_free().name() }}(this.pointer, callStatus) });
-    }
-
-    uniffiClonePointer(): UnsafeMutableRawPointer {
-        return rustCall(callStatus => NativeModule.{{ obj.ffi_object_clone().name() }}(this.pointer, callStatus) );
+    uniffiDestroy(): void {
+        const pointer = {{ obj_factory }}.pointer(this);
+        {{ obj_factory }}.freePointer(pointer);
     }
 
     {%- for tm in obj.uniffi_traits() %}
@@ -84,11 +82,26 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
 
 }
 
-function create{{ impl_class_name }}(pointer: UnsafeMutableRawPointer): {{ impl_class_name }} {
-    const instance = Object.create({{ impl_class_name }}.prototype);
-    instance.pointer = pointer;
-    return instance;
-}
+const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
+    create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
+        const instance = Object.create({{ type_name }}.prototype);
+        instance.pointer = pointer;
+        return instance;
+    },
+
+    pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
+        return (obj as any).pointer;
+    },
+
+    clonePointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
+        const pointer = this.pointer(obj);
+        return rustCall(callStatus => NativeModule.{{ obj.ffi_object_clone().name() }}(pointer, callStatus) );
+    },
+
+    freePointer(pointer: UnsafeMutableRawPointer): void {
+        rustCall(callStatus => { NativeModule.{{ obj.ffi_object_free().name() }}(pointer, callStatus) });
+    }
+};
 
 {%- if obj.has_callback_interface() %}
 {%- let callback_handler = format!("uniffiCallbackInterface{}", name) %}
@@ -99,37 +112,8 @@ function create{{ impl_class_name }}(pointer: UnsafeMutableRawPointer): {{ impl_
 {% include "CallbackInterfaceImpl.ts" %}
 {%- endif %}
 
-const {{ ffi_converter_name }} = (() => {
-    const pointerConverter = FfiConverterUInt64;
-    type TypeName = {{ type_name }};
-    class FFIConverter implements FfiConverter<UnsafeMutableRawPointer, TypeName> {
-        {%- if obj.has_callback_interface() %}
-            {{- self.import_infra("UniffiHandleMap", "handle-map")}}
-        handleMap = new UniffiHandleMap<{{ type_name }}>();
-        lift(value: UnsafeMutableRawPointer): TypeName {
-            // TODO look in a handle map.
-            return create{{ type_name }}(value);
-        }
-        {% else %}
-        lift(value: UnsafeMutableRawPointer): TypeName {
-            return create{{ type_name }}(value);
-        }
-        {%- endif %}
-        lower(value: TypeName): UnsafeMutableRawPointer {
-            return value.uniffiClonePointer();
-        }
-        read(from: RustBuffer): TypeName {
-            return this.lift(pointerConverter.read(from));
-        }
-        write(value: TypeName, into: RustBuffer): void {
-            pointerConverter.write(this.lower(value), into);
-        }
-        allocationSize(value: TypeName): number {
-            return pointerConverter.allocationSize(BigInt(0));
-        }
-    }
-    return new FFIConverter();
-})();
+// FfiConverter for {{ type_name }}
+const {{ ffi_converter_name }} =  new FfiConverterObject({{ obj_factory }});
 {#
     typealias FfiType = UnsafeMutableRawPointer
     typealias SwiftType = {{ type_name }}
