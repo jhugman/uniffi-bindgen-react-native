@@ -73,6 +73,10 @@ export function test<T>(testName: string, testBlock: () => T): T {
   }
 }
 
+export function xtest<T>(testName: string, testBlock: () => T): void {
+  console.log(`Skipping: ${testName}`);
+}
+
 function isEqual<T>(a: T, b: T): boolean {
   return a === b || a == b || stringify(a) === stringify(b);
 }
