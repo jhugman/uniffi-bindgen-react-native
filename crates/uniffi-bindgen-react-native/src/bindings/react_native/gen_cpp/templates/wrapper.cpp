@@ -27,7 +27,6 @@ extern "C" void registerNatives(jsi::Runtime &rt) {
 {% include "RustCallStatus.cpp" %}
 {% include "Callback.cpp" %}
 {% include "Handle.cpp" %}
-{% include "RustArcPtr.cpp" %}
 
 // Calling into Rust.
 extern "C" {
