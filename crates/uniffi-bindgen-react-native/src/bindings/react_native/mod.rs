@@ -199,11 +199,38 @@ impl ComponentInterface {
         ffi.clone()
     }
 
+    fn ffi_function_bless_pointer(&self) -> FfiFunction {
+        let meta = uniffi_meta::FnMetadata {
+            module_path: "internal".to_string(),
+            name: "ffi__bless_pointer".to_owned(),
+            is_async: false,
+            inputs: Default::default(),
+            return_type: None,
+            throws: None,
+            checksum: None,
+            docstring: None,
+        };
+        let func: Function = meta.into();
+        let mut ffi = func.ffi_func().clone();
+        ffi.init(
+            Some(FfiType::RustArcPtr(String::from(""))),
+            vec![
+                FfiArgument::new("pointer", FfiType::UInt64),
+                FfiArgument::new(
+                    "destructor",
+                    FfiType::Callback(String::from("UniffiRustArcPtrDestructor")),
+                ),
+            ],
+        );
+        ffi.clone()
+    }
+
     fn iter_ffi_functions_js_to_cpp_and_back(&self) -> impl Iterator<Item = FfiFunction> {
         vec![
             self.ffi_function_string_to_bytelength(),
             self.ffi_function_string_to_arraybuffer(),
             self.ffi_function_arraybuffer_to_string(),
+            self.ffi_function_bless_pointer(),
         ]
         .into_iter()
     }

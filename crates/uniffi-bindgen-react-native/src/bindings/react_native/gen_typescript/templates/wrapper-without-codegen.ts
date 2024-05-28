@@ -1,5 +1,5 @@
 import { type UniffiRustFutureContinuationCallback } from 'uniffi-bindgen-react-native/async-rust-call';
-import { type UniffiRustCallStatus } from 'uniffi-bindgen-react-native/rust-call';
+import { type UniffiRustArcPtrDestructor, type UniffiRustArcPtr, type UniffiRustCallStatus } from 'uniffi-bindgen-react-native/rust-call';
 
 interface NativeModuleInterface {
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
