@@ -91,6 +91,10 @@ test("Given 1000 objects, when they go out of scope, then they are dropped by ru
   const makeCoveralls = (n: number): void => {
     for (let i = 0; i < n; i++) {
       const c = new Coveralls(`GC testing ${i}`);
+      // The test should not have this destroy method here: we're explictly
+      // tyring to test that the JS GC calls the detructor.
+      // Currently it does not.
+      c.uniffiDestroy();
     }
   };
 
