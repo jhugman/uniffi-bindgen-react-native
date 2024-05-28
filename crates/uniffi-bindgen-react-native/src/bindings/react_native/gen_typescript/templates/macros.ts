@@ -86,8 +86,9 @@
             #}
             .uniffiClonePointer()
         {%- else %}
-        this.pointer =
-            {% call to_ffi_method_call(obj_factory, callable) %}
+        const pointer =
+            {% call to_ffi_method_call(obj_factory, callable) %};
+        this._rustArcPtr = {{ obj_factory }}.bless(pointer);
     {%- endif %}
     }
 {%- endmacro %}

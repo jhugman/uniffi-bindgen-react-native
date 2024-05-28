@@ -23,7 +23,7 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
     {%- endfor %}
     {%- if is_error %}, Error{% endif %} {
 
-    private pointer: UnsafeMutableRawPointer;
+    private _rustArcPtr: UniffiRustArcPtr;
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
@@ -31,7 +31,7 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
     {%- when None %}
     // No primary constructor declared for this class.
     private constructor(pointer: UnsafeMutableRawPointer) {
-        this.pointer = pointer;
+        this._rustArcPtr = {{ obj_factory }}.bless(pointer);
     }
     {%- endmatch %}
 
@@ -46,7 +46,8 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
     // UniffiObjectInterface
     uniffiDestroy(): void {
         const pointer = {{ obj_factory }}.pointer(this);
-        {{ obj_factory }}.freePointer(pointer);
+        this._rustArcPtr.d(pointer);
+        delete (this as any)._rustArcPtr;
     }
 
     {%- for tm in obj.uniffi_traits() %}
@@ -85,12 +86,21 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
 const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
     create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
         const instance = Object.create({{ type_name }}.prototype);
-        instance.pointer = pointer;
+        instance._rustArcPtr = this.bless(pointer);
         return instance;
     },
 
+    bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
+        const d = this.freePointer;
+        return { p, d };
+    },
+
     pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
-        return (obj as any).pointer;
+        const ptr = (obj as any)._rustArcPtr;
+        if (ptr === undefined) {
+            throw new UniffiInternalError.UnexpectedNullPointer();
+        }
+        return ptr.p;
     },
 
     clonePointer(obj: {{ type_name }}): UnsafeMutableRawPointer {

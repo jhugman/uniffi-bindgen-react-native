@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
+import { UnsafeMutableRawPointer } from "./objects";
 
 const CALL_SUCCESS = 0;
 const CALL_ERROR = 1;
@@ -89,3 +90,12 @@ function uniffiCheckCallStatus(
       throw new UniffiInternalError.UnexpectedRustCallStatusCode();
   }
 }
+
+export type UniffiRustArcPtrDestructor = (pointer: bigint) => void;
+
+export type UniffiRustArcPtr = {
+  // pointer
+  p: UnsafeMutableRawPointer;
+  // destructor
+  d: UniffiRustArcPtrDestructor;
+};
