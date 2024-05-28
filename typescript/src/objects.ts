@@ -6,6 +6,7 @@
 
 import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
+import { UniffiRustArcPtrDestructor, UniffiRustArcPtr } from "./rust-call";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.
@@ -29,6 +30,7 @@ export type UnsafeMutableRawPointer = bigint;
  * Methods of this interface are not exposed to the API.
  */
 export interface UniffiObjectFactory<T> {
+  bless(pointer: UnsafeMutableRawPointer): UniffiRustArcPtr;
   create(pointer: UnsafeMutableRawPointer): T;
   pointer(obj: T): UnsafeMutableRawPointer;
   clonePointer(obj: T): UnsafeMutableRawPointer;
