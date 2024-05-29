@@ -11,7 +11,7 @@
 {%- include "ObjectInterfaceTemplate.ts" %}
 
 {% call ts::docstring(obj, 0) %}
-export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectInterface
+export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ protocol_name }}
     {%- for tm in obj.uniffi_traits() %}
     {%-     match tm %}
     {%-         when UniffiTrait::Display { fmt } %}, CustomStringConvertible
@@ -31,6 +31,7 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
     {%- when None %}
     // No primary constructor declared for this class.
     private constructor(pointer: UnsafeMutableRawPointer) {
+        super();
         this._rustArcPtr = {{ obj_factory }}.bless(pointer);
     }
     {%- endmatch %}
@@ -43,11 +44,13 @@ export class {{ impl_class_name }} implements {{ protocol_name }}, UniffiObjectI
     {%- call ts::method_decl("public", obj_factory, meth, 4) %}
     {% endfor %}
 
-    // UniffiObjectInterface
+    // AbstractUniffiObject
     uniffiDestroy(): void {
-        const pointer = {{ obj_factory }}.pointer(this);
-        this._rustArcPtr.d(pointer);
-        delete (this as any)._rustArcPtr;
+        if ((this as any)._rustArcPtr) {
+            const pointer = {{ obj_factory }}.pointer(this);
+            this._rustArcPtr.d(pointer);
+            delete (this as any)._rustArcPtr;
+        }
     }
 
     {%- for tm in obj.uniffi_traits() %}

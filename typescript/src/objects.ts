@@ -6,7 +6,7 @@
 
 import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
-import { UniffiRustArcPtrDestructor, UniffiRustArcPtr } from "./rust-call";
+import { UniffiRustArcPtr } from "./rust-call";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.
@@ -15,8 +15,24 @@ import { UniffiRustArcPtrDestructor, UniffiRustArcPtr } from "./rust-call";
  * This typesscript interface contains the unffi methods that are needed to make
  * the FFI work. It should shrink to zero methods.
  */
-export interface UniffiObjectInterface {
-  uniffiDestroy(): void;
+export abstract class AbstractUniffiObject {
+  /**
+   * Explicitly tell Rust to destroy the native peer that backs this object.
+   *
+   * Once this method has been called, any following method calls will throw an error.
+   */
+  public abstract uniffiDestroy(): void;
+
+  /**
+   * A convenience method to use this object, then destroy it after its use.
+   * @param block
+   * @returns
+   */
+  public uniffiUse<T>(block: (obj: this) => T): T {
+    const v = block(this);
+    this.uniffiDestroy();
+    return v;
+  }
 }
 
 /**

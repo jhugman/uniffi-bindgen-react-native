@@ -1,4 +1,4 @@
-{{- self.import_infra_type("UniffiObjectInterface", "objects") -}}
+{{- self.import_infra("AbstractUniffiObject", "objects") -}}
 {{- self.import_infra_type("UnsafeMutableRawPointer", "objects") -}}
 {{- self.import_infra("FfiConverterObject", "objects") -}}
 {{- self.import_infra_type("UniffiObjectFactory", "objects") -}}
