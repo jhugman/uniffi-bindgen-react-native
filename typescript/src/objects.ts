@@ -6,7 +6,7 @@
 
 import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
-import { UniffiRustArcPtr } from "./rust-call";
+import type { UniffiRustArcPtr } from "./rust-call";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.

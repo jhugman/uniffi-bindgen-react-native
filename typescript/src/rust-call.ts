@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
-import { UnsafeMutableRawPointer } from "./objects";
+import type { UnsafeMutableRawPointer } from "./objects";
 
 const CALL_SUCCESS = 0;
 const CALL_ERROR = 1;
