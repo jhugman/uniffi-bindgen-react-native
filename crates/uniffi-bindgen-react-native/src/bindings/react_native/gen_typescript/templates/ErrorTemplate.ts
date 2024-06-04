@@ -7,6 +7,7 @@ export class {{ type_name }} extends Error {
     }
     {%- if e.is_flat() %}
     {%-   for variant in e.variants() %}
+    {%-    call ts::docstring(variant, 4) %}
     {%-    let var_name = variant.name()|class_name(ci) %}
     static {{ var_name }}: typeof _{{ type_name }}_{{ var_name }};
     {% endfor -%}
@@ -16,7 +17,6 @@ export class {{ type_name }} extends Error {
 }
 {%- if e.is_flat() %}
 {%-   for variant in e.variants() %}
-{%-    call ts::docstring(variant, 4) %}
 {%-    let var_name = variant.name()|class_name(ci) %}
 class _{{ type_name }}_{{ var_name }} extends {{ type_name }} {
     constructor(message: string) { super(message); }
