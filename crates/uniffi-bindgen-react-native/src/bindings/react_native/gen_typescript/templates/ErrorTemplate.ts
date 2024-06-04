@@ -22,7 +22,7 @@ class _{{ type_name }}_{{ var_name }} extends {{ type_name }} {
     constructor(message: string) { super(message); }
 }
 {{ type_name }}.{{ var_name }} = _{{ type_name }}_{{ var_name }};
-{% endfor -%}
+{%-  endfor %}
 {%- endif %}
 
 
