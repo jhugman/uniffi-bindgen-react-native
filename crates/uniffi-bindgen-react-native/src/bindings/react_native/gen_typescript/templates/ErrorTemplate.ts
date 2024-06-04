@@ -2,21 +2,29 @@
 
 {%- call ts::docstring(e, 0) %}
 export class {{ type_name }} extends Error {
-    private constructor(message: string) {
+    constructor(message: string) {
         super(message);
     }
     {%- if e.is_flat() %}
     {%-   for variant in e.variants() %}
     {%-    call ts::docstring(variant, 4) %}
     {%-    let var_name = variant.name()|class_name(ci) %}
-    static {{ var_name }} = class {{ var_name }} extends {{ type_name }} {
-        constructor(message: string) { super(message); }
-    }
+    static {{ var_name }}: typeof _{{ type_name }}_{{ var_name }};
     {% endfor -%}
     {% else %}
     // non-flat errors aren't implemented yet.
     {%- endif %}
 }
+{%- if e.is_flat() %}
+{%-   for variant in e.variants() %}
+{%-    let var_name = variant.name()|class_name(ci) %}
+class _{{ type_name }}_{{ var_name }} extends {{ type_name }} {
+    constructor(message: string) { super(message); }
+}
+{{ type_name }}.{{ var_name }} = _{{ type_name }}_{{ var_name }};
+{%-  endfor %}
+{%- endif %}
+
 
 const {{ ffi_converter_name }} = (() => {
     const intConverter = FfiConverterInt32;
