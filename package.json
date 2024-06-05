@@ -6,7 +6,8 @@
   "author": "James Hugman <james@hugman.tv>",
   "type": "module",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepare": "yarn build"
   },
   "exports": {
     "./async-rust-call": "./dist/async-rust-call.js",
