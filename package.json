@@ -3,7 +3,10 @@
   "version": "0.0.1",
   "description": "Uniffi bindings generator for calling Rust from React Native",
   "license": "MPL-2.0",
-  "author": "James Hugman <james@hugman.tv>",
+  "author": {
+    "name": "James Hugman",
+    "email": "james@hugman.tv"
+  },
   "type": "module",
   "scripts": {
     "build": "tsc",
