@@ -5,7 +5,10 @@
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": "https://github.com/jhugman/uniffi-bindgen-react-native.git",
   "license": "MPL-2.0",
-  "author": "James Hugman <james@hugman.tv>",
+  "author": {
+    "name": "James Hugman",
+    "email": "james@hugman.tv"
+  },
   "type": "module",
   "exports": {
     "./async-rust-call": "./typescript/src/async-rust-call.ts",
