@@ -2,20 +2,22 @@
   "name": "uniffi-bindgen-react-native",
   "version": "0.0.1",
   "description": "Uniffi bindings generator for calling Rust from React Native",
-  "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
-  "repository": "https://github.com/jhugman/uniffi-bindgen-react-native.git",
   "license": "MPL-2.0",
   "author": "James Hugman <james@hugman.tv>",
   "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "yarn build"
+  },
   "exports": {
-    "./async-rust-call": "./typescript/src/async-rust-call.ts",
-    "./errors": "./typescript/src/errors.ts",
-    "./ffi-converters": "./typescript/src/ffi-converters.ts",
-    "./ffi-types": "./typescript/src/ffi-types.ts",
-    "./handle-map": "./typescript/src/handle-map.ts",
-    "./objects": "./typescript/src/objects.ts",
-    "./rust-call": "./typescript/src/rust-call.ts",
-    "./records": "./typescript/src/records.ts"
+    "./async-rust-call": "./dist/async-rust-call.js",
+    "./errors": "./dist/errors.js",
+    "./ffi-converters": "./dist/ffi-converters.js",
+    "./ffi-types": "./dist/ffi-types.js",
+    "./handle-map": "./dist/handle-map.js",
+    "./objects": "./dist/objects.js",
+    "./rust-call": "./dist/rust-call.js",
+    "./records": "./dist/records.js"
   },
   "devDependencies": {
     "metro": "^0.80.8",
