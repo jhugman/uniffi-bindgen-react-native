@@ -22,6 +22,9 @@
     "./rust-call": "./dist/rust-call.js",
     "./records": "./dist/records.js"
   },
+  "bin": {
+    "uniffi-bindgen-react-native": "./bin/cli.sh"
+  },
   "devDependencies": {
     "metro": "^0.80.8",
     "metro-core": "^0.80.8",
