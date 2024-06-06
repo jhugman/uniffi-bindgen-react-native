@@ -17,6 +17,9 @@
     "./rust-call": "./typescript/src/rust-call.ts",
     "./records": "./typescript/src/records.ts"
   },
+  "bin": {
+    "uniffi-bindgen-react-native": "./bin/cli.sh"
+  },
   "devDependencies": {
     "metro": "^0.80.8",
     "metro-core": "^0.80.8",
