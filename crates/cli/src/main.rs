@@ -1,0 +1,50 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ */
+use anyhow::{Error, Result};
+use camino::Utf8PathBuf;
+use clap::Parser;
+use config::ProjectConfig;
+
+mod android;
+mod building;
+mod cli;
+mod config;
+mod ios;
+mod repo;
+mod rust;
+mod workspace;
+
+fn main() -> Result<()> {
+    let args = cli::CliArgs::parse();
+    args.cmd.run()
+}
+
+pub(crate) trait AsConfig<T>
+where
+    T: TryFrom<ProjectConfig, Error = Error>,
+{
+    fn config_file(&self) -> Option<Utf8PathBuf>;
+    fn get(&self) -> Option<T>;
+
+    fn as_config(&self) -> Result<T> {
+        if let Some(t) = self.get() {
+            Ok(t)
+        } else if let Some(f) = self.config_file() {
+            let config: ProjectConfig = f.try_into()?;
+            config.try_into()
+        } else {
+            anyhow::bail!("Could not find a suitable value")
+        }
+    }
+}
+
+impl TryFrom<Utf8PathBuf> for ProjectConfig {
+    type Error = Error;
+
+    fn try_from(value: Utf8PathBuf) -> Result<Self, Self::Error> {
+        uniffi_common::read_from_file(value)
+    }
+}
