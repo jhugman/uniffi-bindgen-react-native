@@ -7,6 +7,7 @@ use std::fs;
 
 use anyhow::{bail, Result};
 use camino::{Utf8Path, Utf8PathBuf};
+use serde::Deserialize;
 
 /// Finds a file in the given directory.
 ///
@@ -78,4 +79,25 @@ pub fn mk_dir<P: AsRef<Utf8Path>>(dir: P) -> Result<()> {
         fs::create_dir_all(dir)?;
         Ok(())
     }
+}
+
+pub fn read_from_file<P, T>(file: P) -> Result<T>
+where
+    P: AsRef<Utf8Path>,
+    for<'a> T: Deserialize<'a>,
+{
+    let s = std::fs::read_to_string(file.as_ref())?;
+    Ok(if is_yaml(&file) {
+        serde_yaml::from_str(&s)?
+    } else {
+        serde_json::from_str(&s)?
+    })
+}
+
+fn is_yaml<P>(file: P) -> bool
+where
+    P: AsRef<Utf8Path>,
+{
+    let ext = file.as_ref().extension().unwrap_or_default();
+    ext == "yaml" || ext == "yml"
 }
