@@ -5,11 +5,16 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/
 #
 set -e
-root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-manifest_path="${root_dir}/crates/uniffi-bindgen-react-native/Cargo.toml"
-
-executable="$root_dir/target/debug/uniffi-bindgen-react-native"
-if [ ! -x "$executable" ]; then
-    cargo build --manifest-path "${manifest_path}"
+script_dir="$(dirname "${BASH_SOURCE[0]}")"
+if [[ "$script_dir" == *".bin" ]] ; then
+    root_dir="$(cd "$script_dir/../uniffi-bindgen-react-native" && pwd)"
+elif [[ "$script_dir" == *"bin" ]] ; then
+    root_dir="$(cd "$script_dir/.." && pwd)"
+else
+    echo "Unable to locate the uniffi-bindgen-react-native directory" 2>/dev/null
+    exit 1
 fi
- "$executable" "$@"
+
+manifest_path="${root_dir}/crates/cli/Cargo.toml"
+
+cargo run --manifest-path "${manifest_path}" -- "$@"

@@ -1,0 +1,24 @@
+[package]
+name = "urn-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "urn-cli"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+askama = "0.12.1"
+camino = { workspace = true }
+clap = { workspace = true }
+heck = "0.5.0"
+paste = "1.0.14"
+serde = { workspace = true }
+textwrap = "0.16.1"
+uniffi_bindgen = { workspace = true }
+uniffi_meta = { workspace = true }
+uniffi-common = { path = "../uniffi-common" }
+extend = "1.2.0"
+topological-sort = "0.2.2"
