@@ -10,6 +10,7 @@ resolver = "2"
 [workspace.dependencies]
 anyhow = "1"
 camino = "1.1.6"
+cargo_metadata = "0.18.1"
 clap = { version = "4.5.4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 uniffi = "0.27.1"

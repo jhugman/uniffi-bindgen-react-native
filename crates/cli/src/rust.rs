@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 use anyhow::{Error, Result};
 use camino::Utf8PathBuf;
+use uniffi_common::CrateMetadata;
 
 use crate::{repo::GitRepoArgs, workspace};
 
@@ -33,6 +34,10 @@ impl CrateConfig {
 
     pub(crate) fn manifest_path(&self) -> Result<Utf8PathBuf> {
         Ok(self.directory()?.join(&self.manifest_path))
+    }
+
+    pub(crate) fn metadata(&self) -> Result<CrateMetadata> {
+        self.manifest_path()?.try_into()
     }
 }
 
