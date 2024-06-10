@@ -41,6 +41,12 @@ pub(crate) struct AndroidConfig {
     pub(crate) package_name: String,
 }
 
+impl Default for AndroidConfig {
+    fn default() -> Self {
+        uniffi_common::default()
+    }
+}
+
 impl AndroidConfig {
     fn default_package_name() -> String {
         // TODO: derive this from package.json.
