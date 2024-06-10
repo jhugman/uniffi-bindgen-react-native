@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <hermes/hermes.h>
+#include <jsi/jsi.h>
 
 /// Register host functions into the given runtime.
 extern "C" void registerNatives(facebook::jsi::Runtime &rt);

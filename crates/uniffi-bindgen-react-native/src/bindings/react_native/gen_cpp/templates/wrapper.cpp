@@ -21,7 +21,7 @@ using namespace facebook;
 
 // Initialization into the Hermes Runtime
 extern "C" void registerNatives(jsi::Runtime &rt) {
-    rt.global().setProperty(rt, "{{ module_name }}", {{ module_name }}::makeNativeObject(rt));
+    {{ module_name }}::registerModule(rt);
 }
 
 {% include "RustCallStatus.cpp" %}
@@ -51,7 +51,15 @@ extern "C" {
     {%- endfor %}
 }
 
-jsi::Object {{ module_name }}::makeNativeObject(jsi::Runtime& rt) {
+void {{ module_name }}::registerModule(jsi::Runtime &rt) {
+    rt.global().setProperty(rt, "{{ module_name }}", {{ module_name }}::makeNativeObject(rt));
+}
+
+void {{ module_name }}::unregisterModule(jsi::Runtime &rt) {
+    // NOOP
+}
+
+jsi::Object {{ module_name }}::makeNativeObject(jsi::Runtime &rt) {
     auto obj = std::make_shared<{{ module_name }}>(rt);
     auto rval = rt.global().createFromHostObject(rt,obj);
 

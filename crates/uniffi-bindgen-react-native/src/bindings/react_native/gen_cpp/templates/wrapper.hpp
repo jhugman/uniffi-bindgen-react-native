@@ -16,7 +16,24 @@ class {{ module_name }} : public jsi::HostObject {
   public:
     {{ module_name }}(jsi::Runtime &rt);
 
-    static jsi::Object makeNativeObject(jsi::Runtime& rt);
+    /**
+     * The entry point into the crate.
+     *
+     * React Native must call `{{ module_name }}.registerModule(rt)` before using
+     * the Javascript interface.
+     */
+    static void registerModule(jsi::Runtime &rt);
+
+    /**
+     * Some cleanup into the crate goes here.
+     *
+     * Current implementation is empty, however, this is not guaranteed to always be the case.
+     *
+     * Clients should call `{{ module_name }}.unregisterModule(rt)` after final use where possible.
+     */
+    static void unregisterModule(jsi::Runtime &rt);
+
+    static jsi::Object makeNativeObject(jsi::Runtime &rt);
 
     virtual ~{{ module_name }}();
 
