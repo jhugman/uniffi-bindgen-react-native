@@ -7,8 +7,9 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use serde::Deserialize;
+use uniffi_common::CrateMetadata;
 
-use crate::android::AndroidArgs;
+use crate::{android::AndroidArgs, ios::IOsArgs};
 
 #[derive(Args, Debug)]
 pub(crate) struct BuildArgs {
@@ -19,6 +20,7 @@ pub(crate) struct BuildArgs {
 #[derive(Subcommand, Debug)]
 pub(crate) enum BuildCmd {
     Android(AndroidArgs),
+    Ios(IOsArgs),
 }
 
 impl BuildArgs {
@@ -31,6 +33,7 @@ impl BuildCmd {
     pub(crate) fn build(&self) -> Result<()> {
         match self {
             Self::Android(a) => a.build(),
+            Self::Ios(a) => a.build(),
         }
     }
 }
@@ -40,6 +43,12 @@ pub(crate) struct CommonBuildArgs {
     /// Build a release build
     #[clap(long, short, default_value = "false")]
     pub(crate) release: bool,
+}
+
+impl CommonBuildArgs {
+    pub(crate) fn profile<'a>(&self) -> &'a str {
+        CrateMetadata::profile(self.release)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
