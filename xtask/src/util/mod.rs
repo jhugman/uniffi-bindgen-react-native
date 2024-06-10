@@ -21,15 +21,3 @@ pub fn cpp_modules() -> Result<Utf8PathBuf> {
     let dir = repository_root()?;
     Ok(dir.join("cpp_modules"))
 }
-
-pub(crate) fn so_extension_name() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "dll"
-    } else if cfg!(target_os = "macos") {
-        "dylib"
-    } else if cfg!(target_os = "unix") {
-        "so"
-    } else {
-        unimplemented!("Building only on windows, macos and unix supported right now")
-    }
-}

@@ -3,16 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use crate::util::so_extension_name;
-
 use std::process::Command;
 
 use camino::Utf8PathBuf;
-use cargo_metadata::MetadataCommand;
 use clap::Args;
 
 use anyhow::Result;
-use uniffi_common::run_cmd_quietly;
+use uniffi_common::{run_cmd_quietly, CrateMetadata};
 
 #[derive(Debug, Args)]
 pub(crate) struct CrateArg {
@@ -32,93 +29,27 @@ pub(crate) struct CrateArg {
 }
 
 impl CrateArg {
-    pub(crate) fn cargo_build(&self, clean: bool) -> Result<CrateInfo> {
-        let crate_info = CrateInfo::try_from(self.crate_dir.clone().expect("crate has no path"))?;
-        let lib_path = crate_info.library_path(self.release);
+    pub(crate) fn cargo_build(&self, clean: bool) -> Result<CrateMetadata> {
+        let metadata = CrateMetadata::try_from(self.crate_dir.clone().expect("crate has no path"))?;
+        let profile = CrateMetadata::profile(self.release);
+        let lib_path = metadata.library_path(None, profile)?;
         if lib_path.exists() && clean {
-            crate_info.cargo_clean()?;
+            metadata.cargo_clean()?;
         }
         if !lib_path.exists() || !self.no_cargo {
-            crate_info.cargo_build(self.release)?;
+            cargo_build(&metadata, self.release)?;
         }
-        Ok(crate_info)
+        Ok(metadata)
     }
 }
 
-pub(crate) struct CrateInfo {
-    pub(crate) crate_dir: Utf8PathBuf,
-    #[allow(unused)]
-    pub(crate) manifest_path: Utf8PathBuf,
-    pub(crate) target_dir: Utf8PathBuf,
-    pub(crate) library_name: String,
-}
-
-impl TryFrom<Utf8PathBuf> for CrateInfo {
-    type Error = anyhow::Error;
-
-    fn try_from(arg: Utf8PathBuf) -> Result<Self> {
-        let crate_dir = arg.canonicalize_utf8()?;
-        let manifest_path = crate_dir.join("Cargo.toml");
-        if !manifest_path.exists() {
-            anyhow::bail!("Crate manifest doesn't exist");
-        }
-        // Run `cargo metadata`
-        let metadata = MetadataCommand::new()
-            .current_dir(&crate_dir)
-            .manifest_path(&manifest_path)
-            .exec()?;
-
-        // Get the library name
-        let lib = "lib".to_owned();
-        let library_name = metadata
-            .packages
-            .iter()
-            .find(|package| package.manifest_path == *manifest_path)
-            .and_then(|package| {
-                package
-                    .targets
-                    .iter()
-                    .find(|target| target.kind.contains(&lib))
-            })
-            .map(|target| target.name.clone())
-            .expect("The crate isn't a library: it needs a [lib] section in Cargo.toml");
-
-        let target_dir = metadata.target_directory;
-
-        Ok(Self {
-            crate_dir,
-            manifest_path,
-            library_name,
-            target_dir,
-        })
+fn cargo_build(metadata: &CrateMetadata, release: bool) -> Result<()> {
+    let mut cmd = Command::new("cargo");
+    cmd.current_dir(metadata.crate_dir());
+    cmd.arg("build");
+    if release {
+        cmd.arg("--release");
     }
-}
-
-impl CrateInfo {
-    pub(crate) fn library_path(&self, is_release: bool) -> Utf8PathBuf {
-        let lib_name = &self.library_name;
-        let ext = so_extension_name();
-
-        let build_type = if is_release { "release" } else { "debug" };
-        let lib_name = format!("lib{lib_name}.{ext}");
-        let target = &self.target_dir;
-        target.join(build_type).join(lib_name)
-    }
-
-    pub(crate) fn cargo_clean(&self) -> Result<()> {
-        let mut cmd = Command::new("cargo");
-        run_cmd_quietly(cmd.arg("clean").current_dir(&self.crate_dir))?;
-        Ok(())
-    }
-
-    pub(crate) fn cargo_build(&self, release: bool) -> Result<()> {
-        let mut cmd = Command::new("cargo");
-        cmd.current_dir(&self.crate_dir);
-        cmd.arg("build");
-        if release {
-            cmd.arg("--release");
-        }
-        run_cmd_quietly(&mut cmd)?;
-        Ok(())
-    }
+    run_cmd_quietly(&mut cmd)?;
+    Ok(())
 }

@@ -8,11 +8,11 @@ use std::{fs, process::Command};
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use uniffi_common::{rm_dir, run_cmd_quietly};
+use uniffi_common::{rm_dir, run_cmd_quietly, so_extension};
 
 use crate::{
     bootstrap::{Bootstrap, HermesCmd, TestRunnerCmd},
-    util::{build_root, so_extension_name},
+    util::build_root,
 };
 
 #[derive(Debug, Args)]
@@ -70,7 +70,7 @@ impl CppBindingArg {
         let mut cmd = Command::new("ninja");
         run_cmd_quietly(cmd.current_dir(&build_dir))?;
 
-        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension_name())))
+        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension(None))))
     }
 
     pub(crate) fn compile_without_crate(&self, clean: bool) -> Result<Utf8PathBuf> {
@@ -107,6 +107,6 @@ impl CppBindingArg {
         let mut cmd = Command::new("ninja");
         run_cmd_quietly(cmd.current_dir(&build_dir))?;
 
-        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension_name())))
+        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension(None))))
     }
 }

@@ -10,6 +10,7 @@ mod typescript;
 use anyhow::{Ok, Result};
 use camino::Utf8PathBuf;
 use clap::Args;
+use uniffi_common::CrateMetadata;
 
 use crate::{
     bootstrap::{Bootstrap, TestRunnerCmd},
@@ -49,18 +50,18 @@ impl RunCmd {
     fn prepare_library_path(&self) -> Result<Option<Utf8PathBuf>> {
         let clean = self.clean;
         let (release, info) = if let Some(crate_) = &self.crate_ {
-            (crate_.release, Some(crate_.cargo_build(clean)?))
+            (
+                CrateMetadata::profile(crate_.release),
+                Some(crate_.cargo_build(clean)?),
+            )
         } else {
-            (false, None)
+            (CrateMetadata::profile(false), None)
         };
 
         match (&info, &self.cpp_binding) {
             (Some(crate_), Some(cpp)) => {
-                let crate_lib = crate_.library_path(release);
-                let target_dir = crate_lib
-                    .parent()
-                    .expect("target directory is parent of library file");
-                let lib_name = crate_.library_name.as_str();
+                let target_dir = crate_.target_dir();
+                let lib_name = crate_.library_name();
                 let so_file = cpp.compile_with_crate(clean, target_dir, lib_name)?;
                 Ok(Some(so_file))
             }
@@ -71,11 +72,9 @@ impl RunCmd {
             #[allow(unreachable_code)]
             #[allow(unused)]
             (Some(crate_), None) => {
-                let crate_lib = crate_.library_path(release);
-                let target_dir = crate_lib
-                    .parent()
-                    .expect("target directory is parent of library file");
-                let lib_name = crate_.library_name.as_str();
+                let crate_lib = crate_.library_path(None, release)?;
+                let target_dir = crate_.target_dir();
+                let lib_name = crate_lib.as_str();
                 unimplemented!("Not yet able to generate cpp and js from a crate");
 
                 let cpp_file = build_root()?.join(lib_name).join("extension.cpp");
