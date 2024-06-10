@@ -62,7 +62,7 @@ impl CppBindingArg {
                 .arg(format!("-DHERMES_BUILD_DIR={}", &hermes_build))
                 .arg(format!("-DHERMES_EXTENSION_NAME={}", &extension_name))
                 .arg(format!("-DRUST_LIB_NAME={lib_name}"))
-                .arg(format!("-DRUST_TARGET_DIR={}", &target_dir))
+                .arg(format!("-DRUST_TARGET_DIR={}/debug", &target_dir))
                 .arg(format!("-DHERMES_EXTENSION_CPP={cpp_file}",))
                 .arg(&src_dir),
         )?;
