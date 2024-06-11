@@ -10,7 +10,7 @@ mod typescript;
 use anyhow::{Ok, Result};
 use camino::Utf8PathBuf;
 use clap::Args;
-use uniffi_common::CrateMetadata;
+use ubrn_common::CrateMetadata;
 
 use crate::{
     bootstrap::{Bootstrap, TestRunnerCmd},

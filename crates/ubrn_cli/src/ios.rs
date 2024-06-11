@@ -10,7 +10,7 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
 use serde::Deserialize;
-use uniffi_common::{rm_dir, run_cmd};
+use ubrn_common::{rm_dir, run_cmd};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
@@ -72,7 +72,7 @@ impl IOsConfig {
 
 impl Default for IOsConfig {
     fn default() -> Self {
-        uniffi_common::default()
+        ubrn_common::default()
     }
 }
 

@@ -15,6 +15,6 @@ else
     exit 1
 fi
 
-manifest_path="${root_dir}/crates/cli/Cargo.toml"
+manifest_path="${root_dir}/crates/ubrn_cli/Cargo.toml"
 
 cargo run --manifest-path "${manifest_path}" -- "$@"
