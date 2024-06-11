@@ -7,7 +7,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use uniffi_common::run_cmd;
+use ubrn_common::run_cmd;
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
@@ -134,7 +134,7 @@ impl CodeFormatter for TypescriptArgs {
     fn format_code(&self) -> Result<()> {
         YarnCmd.ensure_ready()?;
         let root = repository_root()?;
-        if let Some(mut prettier) = uniffi_common::fmt::prettier(root)? {
+        if let Some(mut prettier) = ubrn_common::fmt::prettier(root)? {
             run_cmd(&mut prettier)?
         } else {
             unreachable!("Is prettier in package.json dependencies?")
@@ -149,7 +149,7 @@ struct CppArgs;
 impl CodeFormatter for CppArgs {
     fn format_code(&self) -> Result<()> {
         let root = repository_root()?;
-        if let Some(mut clang_format) = uniffi_common::fmt::clang_format(root.join("cpp"))? {
+        if let Some(mut clang_format) = ubrn_common::fmt::clang_format(root.join("cpp"))? {
             run_cmd(&mut clang_format)?;
         } else {
             eprintln!("clang-format doesn't seem to be installed")

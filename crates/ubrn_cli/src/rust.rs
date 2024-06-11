@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use anyhow::{Error, Result};
 use camino::Utf8PathBuf;
-use uniffi_common::CrateMetadata;
+use ubrn_common::CrateMetadata;
 
 use crate::{repo::GitRepoArgs, workspace};
 

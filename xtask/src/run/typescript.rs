@@ -15,7 +15,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use pathdiff::diff_utf8_paths;
-use uniffi_common::{find, run_cmd_quietly};
+use ubrn_common::{find, run_cmd_quietly};
 
 fn typescript_dir() -> Result<Utf8PathBuf> {
     let root = repository_root()?;

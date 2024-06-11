@@ -9,7 +9,7 @@ use camino::Utf8PathBuf;
 use clap::Args;
 
 use anyhow::Result;
-use uniffi_common::{run_cmd_quietly, CrateMetadata};
+use ubrn_common::{run_cmd_quietly, CrateMetadata};
 
 #[derive(Debug, Args)]
 pub(crate) struct CrateArg {

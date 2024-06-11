@@ -14,11 +14,11 @@ use extend::ext;
 use heck::ToUpperCamelCase;
 use serde::Deserialize;
 use topological_sort::TopologicalSort;
+use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{
     interface::{FfiArgument, FfiFunction, FfiType, Function},
     BindingGenerator, BindingsConfig, ComponentInterface,
 };
-use uniffi_common::{fmt, run_cmd_quietly};
 use uniffi_meta::Type;
 
 use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};

@@ -8,7 +8,7 @@ use std::{fs, process::Command};
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use uniffi_common::{rm_dir, run_cmd_quietly, so_extension};
+use ubrn_common::{rm_dir, run_cmd_quietly, so_extension};
 
 use crate::{
     bootstrap::{Bootstrap, HermesCmd, TestRunnerCmd},

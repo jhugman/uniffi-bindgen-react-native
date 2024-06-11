@@ -10,7 +10,7 @@ use clap::Args;
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
-use uniffi_common::{rm_dir, run_cmd};
+use ubrn_common::{rm_dir, run_cmd};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
@@ -43,7 +43,7 @@ pub(crate) struct AndroidConfig {
 
 impl Default for AndroidConfig {
     fn default() -> Self {
-        uniffi_common::default()
+        ubrn_common::default()
     }
 }
 

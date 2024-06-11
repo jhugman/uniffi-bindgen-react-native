@@ -45,6 +45,6 @@ impl TryFrom<Utf8PathBuf> for ProjectConfig {
     type Error = Error;
 
     fn try_from(value: Utf8PathBuf) -> Result<Self, Self::Error> {
-        uniffi_common::read_from_file(value)
+        ubrn_common::read_from_file(value)
     }
 }

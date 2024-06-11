@@ -7,7 +7,7 @@ for test in "${root}"/typescript/tests/*.test.ts ; do
     cargo xtask run "${test}"
 done
 
-uniffi_bindgen_manifest="${root}/crates/uniffi-bindgen-react-native/Cargo.toml"
+uniffi_bindgen_manifest="${root}/crates/ubrn_bindgen/Cargo.toml"
 for fixture in $(cd "${root}/fixtures" && ls) ; do
     # This should all go in either an xtask or into our uniffi-bindgen command.
     # This builds the crate into the target dir.

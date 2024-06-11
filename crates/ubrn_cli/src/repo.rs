@@ -9,7 +9,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use serde::Deserialize;
-use uniffi_common::run_cmd;
+use ubrn_common::run_cmd;
 
 use crate::{config::ProjectConfig, workspace, AsConfig};
 

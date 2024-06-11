@@ -11,7 +11,7 @@ use std::str::FromStr;
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{command, Args};
-use uniffi_common::mk_dir;
+use ubrn_common::mk_dir;
 
 use self::react_native::ReactNativeBindingGenerator;
 

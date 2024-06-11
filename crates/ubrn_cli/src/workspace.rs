@@ -7,9 +7,9 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 
 pub(crate) fn package_json() -> Result<Utf8PathBuf> {
-    let pwd = uniffi_common::pwd()?;
+    let pwd = ubrn_common::pwd()?;
 
-    let package_json = uniffi_common::resolve(pwd, "package.json")?;
+    let package_json = ubrn_common::resolve(pwd, "package.json")?;
     Ok(package_json.expect("Must be run under a directory containing a package.json file"))
 }
 

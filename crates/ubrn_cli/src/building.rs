@@ -7,7 +7,7 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use serde::Deserialize;
-use uniffi_common::CrateMetadata;
+use ubrn_common::CrateMetadata;
 
 use crate::{android::AndroidArgs, ios::IOsArgs};
 
