@@ -17,7 +17,7 @@ use ubrn_common::mk_dir;
 use self::react_native::ReactNativeBindingGenerator;
 
 #[derive(Args, Debug)]
-pub(crate) struct BindingsArgs {
+pub struct BindingsArgs {
     #[command(flatten)]
     source: SourceArgs,
     #[command(flatten)]
@@ -25,7 +25,7 @@ pub(crate) struct BindingsArgs {
 }
 
 #[derive(Args, Clone, Debug)]
-pub(crate) struct OutputArgs {
+pub struct OutputArgs {
     /// By default, bindgen will attempt to format the code with prettier and clang-format.
     #[clap(long)]
     no_format: bool,
@@ -40,7 +40,7 @@ pub(crate) struct OutputArgs {
 }
 
 #[derive(Args, Clone, Debug)]
-pub(crate) struct SourceArgs {
+pub struct SourceArgs {
     /// The path to a dynamic library to attempt to extract the definitions from
     /// and extend the component interface with.
     #[clap(long)]
@@ -65,7 +65,7 @@ pub(crate) struct SourceArgs {
 }
 
 impl BindingsArgs {
-    pub(crate) fn run(&self) -> Result<()> {
+    pub fn run(&self) -> Result<()> {
         let input = &self.source;
         let out = &self.output;
 

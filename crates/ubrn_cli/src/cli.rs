@@ -23,6 +23,8 @@ pub(crate) enum CliCmd {
     Checkout(CheckoutArgs),
     /// Build for android, ios or testing
     Build(BuildArgs),
+    /// Generate the just the bindings
+    Bindings(BindingsArgs),
 }
 
 impl CliCmd {
@@ -30,6 +32,7 @@ impl CliCmd {
         match self {
             Self::Checkout(c) => AsConfig::<GitRepoArgs>::as_config(c)?.checkout(),
             Self::Build(b) => b.build(),
+            Self::Bindings(b) => b.run(),
         }
     }
 }
