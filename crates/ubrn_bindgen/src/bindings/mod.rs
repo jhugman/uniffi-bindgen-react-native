@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+pub mod metadata;
 pub(crate) mod react_native;
 
 use std::str::FromStr;

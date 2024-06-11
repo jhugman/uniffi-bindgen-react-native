@@ -1,5 +1,5 @@
 {%- let namespace = ci.namespace() %}
-{%- let module_name = config.cpp_module.clone() %}
+{%- let module_name = config.cpp_module() %}
 #ifndef UNIFFI_EXPORT
 #if defined(_WIN32) || defined(_WIN64)
 #define UNIFFI_EXPORT __declspec(dllexport)
