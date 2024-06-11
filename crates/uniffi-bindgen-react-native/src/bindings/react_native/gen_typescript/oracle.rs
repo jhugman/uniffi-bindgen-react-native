@@ -52,7 +52,7 @@ impl CodeOracle {
 
     /// Get the idiomatic Typescript rendering of an FFI callback function name
     pub(crate) fn ffi_callback_name(&self, nm: &str) -> String {
-        format!("Uniffi{}", nm.to_upper_camel_case())
+        nm.to_upper_camel_case()
     }
 
     /// Get the idiomatic Typescript rendering of an FFI struct name
@@ -126,6 +126,7 @@ impl CodeOracle {
 
     pub(crate) fn ffi_type_label_for_cpp(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
+            FfiType::RustArcPtr(_) => "UniffiRustArcPtr".to_string(),
             FfiType::ForeignBytes => "ArrayBuffer".to_string(),
             FfiType::RustBuffer(_) => "string".to_string(),
             _ => self.ffi_type_label(ffi_type),

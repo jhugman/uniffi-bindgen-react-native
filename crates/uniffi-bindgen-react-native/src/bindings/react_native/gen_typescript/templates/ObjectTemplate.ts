@@ -93,9 +93,9 @@ const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
         return instance;
     },
 
-    bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
-        const d = this.freePointer;
-        return { p, d };
+    bless(pointer: UnsafeMutableRawPointer): UniffiRustArcPtr {
+        const destructor = this.freePointer;
+        return uniffiBlessPointer(pointer, destructor);
     },
 
     pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
