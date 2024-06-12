@@ -14,6 +14,8 @@ use camino::Utf8PathBuf;
 use clap::{command, Args};
 use ubrn_common::mk_dir;
 
+use crate::ModuleMetadata;
+
 use self::react_native::ReactNativeBindingGenerator;
 
 #[derive(Args, Debug)]
@@ -65,7 +67,7 @@ pub struct SourceArgs {
 }
 
 impl BindingsArgs {
-    pub fn run(&self) -> Result<()> {
+    pub fn run(&self) -> Result<Vec<ModuleMetadata>> {
         let input = &self.source;
         let out = &self.output;
 
@@ -77,7 +79,7 @@ impl BindingsArgs {
 
         let try_format_code = !out.no_format;
 
-        if input.library_mode {
+        let configs: Vec<ModuleMetadata> = if input.library_mode {
             uniffi_bindgen::library_mode::generate_external_bindings(
                 &generator,
                 &input.source,
@@ -85,8 +87,10 @@ impl BindingsArgs {
                 input.config.as_deref(),
                 &dummy_dir,
                 try_format_code,
-            )
-            .unwrap();
+            )?
+            .iter()
+            .map(|s| (&s.config).into())
+            .collect()
         } else {
             uniffi_bindgen::generate_external_bindings(
                 &generator,
@@ -96,14 +100,14 @@ impl BindingsArgs {
                 input.lib_file.clone(),
                 input.crate_name.as_deref(),
                 try_format_code,
-            )
-            .unwrap();
-        }
+            )?;
+            Default::default()
+        };
 
         if try_format_code {
             let _ = generator.format_code();
         }
 
-        Ok(())
+        Ok(configs)
     }
 }

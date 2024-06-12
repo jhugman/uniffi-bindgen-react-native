@@ -32,7 +32,10 @@ impl CliCmd {
         match self {
             Self::Checkout(c) => AsConfig::<GitRepoArgs>::as_config(c)?.checkout(),
             Self::Build(b) => b.build(),
-            Self::Bindings(b) => b.run(),
+            Self::Bindings(b) => {
+                b.run()?;
+                Ok(())
+            }
         }
     }
 }
