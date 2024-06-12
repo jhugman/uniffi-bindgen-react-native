@@ -9,6 +9,7 @@ use std::process::Command;
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
+use heck::ToUpperCamelCase;
 use serde::Deserialize;
 use ubrn_common::{rm_dir, run_cmd};
 
@@ -43,8 +44,10 @@ impl IOsConfig {
     }
 
     fn default_framework_name() -> String {
-        // TODO: derive this from package.json.
-        "RustFramework".to_string()
+        format!(
+            "{}Framework",
+            workspace::package_json().name().to_upper_camel_case()
+        )
     }
 
     fn default_cargo_extras() -> ExtraArgs {

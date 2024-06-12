@@ -49,8 +49,7 @@ impl Default for AndroidConfig {
 
 impl AndroidConfig {
     fn default_package_name() -> String {
-        // TODO: derive this from package.json.
-        "com.example.rust.package".to_string()
+        workspace::package_json().android_package_name()
     }
 
     fn default_cargo_extras() -> ExtraArgs {
