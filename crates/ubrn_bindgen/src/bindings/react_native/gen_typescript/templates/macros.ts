@@ -35,7 +35,7 @@
     {%- endmatch %}
     {%- if func.return_type().is_some() %}
         return
-    {%- endif %} NativeModule.{{ func.ffi_func().name() }}(
+    {%- endif %} nativeModule().{{ func.ffi_func().name() }}(
         {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
         {%- call arg_list_lowered(func) %}
         callStatus);
@@ -111,7 +111,7 @@
 {%- macro call_async(obj_factory, callable) -%}
         await uniffiRustCallAsync({
             rustFutureFunc: () => {
-                return NativeModule.{{ callable.ffi_func().name() }}(
+                return nativeModule().{{ callable.ffi_func().name() }}(
                     {%- if callable.takes_self() %}
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
@@ -120,9 +120,9 @@
                     {%- endfor %}
                 );
             },
-            pollFunc: NativeModule.{{ callable.ffi_rust_future_poll(ci) }},
-            completeFunc: NativeModule.{{ callable.ffi_rust_future_complete(ci) }},
-            freeFunc: NativeModule.{{ callable.ffi_rust_future_free(ci) }},
+            pollFunc: nativeModule().{{ callable.ffi_rust_future_poll(ci) }},
+            completeFunc: nativeModule().{{ callable.ffi_rust_future_complete(ci) }},
+            freeFunc: nativeModule().{{ callable.ffi_rust_future_free(ci) }},
             {%- match callable.return_type() %}
             {%- when Some(return_type) %}
             liftFunc: {{ return_type|lift_fn }},

@@ -13,7 +13,9 @@ interface NativeModuleInterface {
 // Casting globalThis to any allows us to look for `{{ config.cpp_module }}`
 // if it was added via JSI.
 //
-// The empty object is there for testing purposes only, and may be removed.
-export default ((globalThis as any).{{ config.cpp_module}} ?? {}) as NativeModuleInterface;
+// We use a getter here rather than simply `globalThis.{{ config.cpp_module }}` so that
+// if/when the startup sequence isn't just so, an empty value isn't inadvertantly cached.
+const getter: () => NativeModuleInterface = () => (globalThis as any).{{ config.cpp_module }};
+export default getter;
 
 {%- import "macros.ts" as ts %}
