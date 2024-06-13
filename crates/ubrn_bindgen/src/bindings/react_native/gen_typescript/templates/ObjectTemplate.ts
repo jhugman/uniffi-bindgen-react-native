@@ -108,11 +108,11 @@ const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
 
     clonePointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
         const pointer = this.pointer(obj);
-        return rustCall(callStatus => NativeModule.{{ obj.ffi_object_clone().name() }}(pointer, callStatus) );
+        return rustCall(callStatus => nativeModule().{{ obj.ffi_object_clone().name() }}(pointer, callStatus) );
     },
 
     freePointer(pointer: UnsafeMutableRawPointer): void {
-        rustCall(callStatus => { NativeModule.{{ obj.ffi_object_free().name() }}(pointer, callStatus) });
+        rustCall(callStatus => { nativeModule().{{ obj.ffi_object_free().name() }}(pointer, callStatus) });
     }
 };
 
