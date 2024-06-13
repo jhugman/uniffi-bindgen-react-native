@@ -7,7 +7,7 @@ use crate::{
     building::BuildArgs,
     generate::GenerateArgs,
     repo::{CheckoutArgs, GitRepoArgs},
-    AsConfig,
+    workspace, AsConfig,
 };
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -31,7 +31,9 @@ pub(crate) enum CliCmd {
 impl CliCmd {
     pub(crate) fn run(&self) -> Result<()> {
         match self {
-            Self::Checkout(c) => AsConfig::<GitRepoArgs>::as_config(c)?.checkout(),
+            Self::Checkout(c) => {
+                AsConfig::<GitRepoArgs>::as_config(c)?.checkout(&workspace::project_root()?)
+            }
             Self::Build(b) => b.build(),
             Self::Generate(g) => g.run(),
         }

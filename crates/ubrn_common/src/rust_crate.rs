@@ -54,6 +54,16 @@ impl CrateMetadata {
         &self.library_name
     }
 
+    pub fn project_root(&self) -> &Utf8Path {
+        self.target_dir
+            .parent()
+            .expect("Project root is the target_dir parent")
+    }
+
+    pub fn manifest_path(&self) -> &Utf8Path {
+        &self.manifest_path
+    }
+
     pub fn cargo_clean(&self) -> Result<()> {
         let mut cmd = Command::new("cargo");
         run_cmd_quietly(cmd.arg("clean").current_dir(&self.crate_dir))?;

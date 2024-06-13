@@ -15,6 +15,7 @@ camino = { workspace = true }
 clap = { workspace = true }
 heck = "0.5.0"
 paste = "1.0.14"
+pathdiff = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
 ubrn_bindgen = { path = "../ubrn_bindgen" }

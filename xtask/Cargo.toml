@@ -12,5 +12,5 @@ test = false
 anyhow = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
-pathdiff = { version = "0.2.1", features = ["camino"] }
+pathdiff = { workspace = true }
 ubrn_common = { path = "../crates/ubrn_common" }

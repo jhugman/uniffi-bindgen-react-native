@@ -11,7 +11,7 @@ use clap::Args;
 use serde::Deserialize;
 use ubrn_common::run_cmd;
 
-use crate::{config::ProjectConfig, workspace, AsConfig};
+use crate::{config::ProjectConfig, AsConfig};
 
 #[derive(Args, Clone, Debug, Deserialize)]
 pub(crate) struct GitRepoArgs {
@@ -57,22 +57,21 @@ impl AsConfig<GitRepoArgs> for CheckoutArgs {
 }
 
 impl GitRepoArgs {
-    pub(crate) fn directory(&self) -> Result<Utf8PathBuf> {
+    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
         // Use Utf8Path for URL operations is a little bit hacky,
         // but as we only need URL for this operation, we can avoid
         // dragging in another dependency.
         let url_path = Utf8Path::new(self.repo.as_str());
         let repo_name = url_path.file_name().unwrap();
         let repo_name = repo_name.strip_suffix(".git").unwrap_or(repo_name);
-        let root = workspace::project_root()?;
-        Ok(root.join("rust_modules").join(repo_name))
+        Ok(project_root.join("rust_modules").join(repo_name))
     }
 
-    pub(crate) fn checkout(&self) -> Result<()> {
+    pub(crate) fn checkout(&self, project_root: &Utf8Path) -> Result<()> {
         let mut cmd = Command::new("git");
         cmd.arg("clone")
             .arg(&self.repo)
-            .arg(self.directory()?)
+            .arg(self.directory(project_root)?)
             .arg("--single-branch")
             .arg("--branch")
             .arg(&self.branch);

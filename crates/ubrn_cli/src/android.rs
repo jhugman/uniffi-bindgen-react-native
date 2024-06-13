@@ -9,7 +9,7 @@ use std::{fmt::Display, fs, process::Command, str::FromStr};
 use clap::Args;
 
 use anyhow::{Error, Result};
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
 
 use crate::{
@@ -81,12 +81,12 @@ impl AndroidConfig {
 }
 
 impl AndroidConfig {
-    fn directory(&self) -> Result<Utf8PathBuf> {
-        Ok(workspace::project_root()?.join(&self.directory))
+    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.directory)
     }
 
-    fn jni_libs(&self) -> Result<Utf8PathBuf> {
-        Ok(self.directory()?.join(&self.jni_libs))
+    pub(crate) fn jni_libs(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.directory(project_root).join(&self.jni_libs)
     }
 }
 
@@ -103,13 +103,14 @@ pub(crate) struct AndroidArgs {
 impl AndroidArgs {
     pub(crate) fn build(&self) -> Result<()> {
         let config: ProjectConfig = self.config.clone().try_into()?;
+        let project_root = config.project_root();
         let crate_ = &config.crate_;
         let rust_dir = crate_.directory()?;
         let manifest_path = crate_.manifest_path()?;
 
         let android = &config.android;
 
-        let jni_libs = android.jni_libs()?;
+        let jni_libs = android.jni_libs(project_root);
         rm_dir(&jni_libs)?;
 
         for target in &android.targets {

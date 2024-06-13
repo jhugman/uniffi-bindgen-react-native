@@ -5,6 +5,7 @@
  */
 mod npm;
 
+use camino::{Utf8Path, Utf8PathBuf};
 pub(crate) use npm::PackageJson;
 
 use serde::Deserialize;
@@ -28,4 +29,10 @@ pub(crate) struct ProjectConfig {
 
     #[serde(default, rename = "turboModule")]
     pub(crate) tm: TurboModulesConfig,
+}
+
+impl ProjectConfig {
+    pub(crate) fn project_root(&self) -> &Utf8Path {
+        &self.crate_.project_root
+    }
 }
