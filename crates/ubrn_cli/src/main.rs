@@ -12,6 +12,7 @@ mod android;
 mod building;
 mod cli;
 mod config;
+mod generate;
 mod ios;
 mod repo;
 mod rust;

@@ -23,6 +23,7 @@ for fixture in $(cd "${root}/fixtures" && ls) ; do
     # We should use the so or dylib file here but for now we can just use the UDL
     # fie.
     RUST_BACKTRACE=1 cargo run --manifest-path "$uniffi_bindgen_manifest" -- \
+        generate \
         bindings \
         --ts-dir "${ts_dir}" --cpp-dir "${cpp_dir}" \
         "${fixture_dir}/src/${fixture}.udl" \

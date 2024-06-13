@@ -5,6 +5,7 @@
  */
 use crate::{
     building::BuildArgs,
+    generate::GenerateArgs,
     repo::{CheckoutArgs, GitRepoArgs},
     AsConfig,
 };
@@ -23,8 +24,8 @@ pub(crate) enum CliCmd {
     Checkout(CheckoutArgs),
     /// Build for android, ios or testing
     Build(BuildArgs),
-    /// Generate the just the bindings
-    Bindings(BindingsArgs),
+    /// Generate code from the Rust.
+    Generate(GenerateArgs),
 }
 
 impl CliCmd {
@@ -32,10 +33,7 @@ impl CliCmd {
         match self {
             Self::Checkout(c) => AsConfig::<GitRepoArgs>::as_config(c)?.checkout(),
             Self::Build(b) => b.build(),
-            Self::Bindings(b) => {
-                b.run()?;
-                Ok(())
-            }
+            Self::Generate(g) => g.run(),
         }
     }
 }
