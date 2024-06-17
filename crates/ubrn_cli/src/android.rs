@@ -88,6 +88,19 @@ impl AndroidConfig {
     pub(crate) fn jni_libs(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         self.directory(project_root).join(&self.jni_libs)
     }
+
+    fn java_src(&self) -> String {
+        "src/main/java".to_string()
+    }
+
+    pub(crate) fn src_main_java_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.directory(project_root).join(self.java_src())
+    }
+
+    pub(crate) fn codegen_package_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.src_main_java_dir(project_root)
+            .join(self.package_name.replace('.', "/"))
+    }
 }
 
 #[derive(Args, Debug)]

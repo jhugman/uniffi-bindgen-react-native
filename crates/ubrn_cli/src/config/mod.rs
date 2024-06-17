@@ -10,11 +10,14 @@ pub(crate) use npm::PackageJson;
 
 use serde::Deserialize;
 
-use crate::{android::AndroidConfig, ios::IOsConfig, rust::CrateConfig};
+use crate::{android::AndroidConfig, ios::IOsConfig, rust::CrateConfig, workspace};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectConfig {
+    #[serde(default = "ProjectConfig::default_name")]
+    pub(crate) name: String,
+
     #[serde(rename = "crate")]
     pub(crate) crate_: CrateConfig,
 
@@ -32,7 +35,134 @@ pub(crate) struct ProjectConfig {
 }
 
 impl ProjectConfig {
+    fn default_name() -> String {
+        workspace::package_json().raw_name()
+    }
+}
+
+fn trim_react_native(name: &str) -> String {
+    name.strip_prefix("RN")
+        .unwrap_or(name)
+        .replace("ReactNative", "")
+        .replace("react-native", "")
+        .trim_matches('-')
+        .trim_matches('_')
+        .to_string()
+}
+
+impl ProjectConfig {
     pub(crate) fn project_root(&self) -> &Utf8Path {
         &self.crate_.project_root
+    }
+}
+
+impl ProjectConfig {
+    fn name(&self) -> String {
+        trim_react_native(&self.name)
+    }
+
+    fn raw_name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn name_upper_camel(&self) -> String {
+        use heck::ToUpperCamelCase;
+        self.name().to_upper_camel_case()
+    }
+
+    pub(crate) fn cpp_namespace(&self) -> String {
+        self.name_upper_camel().to_lowercase()
+    }
+
+    pub(crate) fn cpp_filename(&self) -> String {
+        use heck::ToKebabCase;
+        self.raw_name().to_kebab_case()
+    }
+
+    pub(crate) fn codegen_filename(&self) -> String {
+        format!("Native{}", self.name_upper_camel())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BindingsConfig {
+    #[serde(default = "BindingsConfig::default_cpp_dir")]
+    pub(crate) cpp: String,
+    #[serde(default = "BindingsConfig::default_ts_dir")]
+    pub(crate) ts: String,
+}
+
+impl BindingsConfig {
+    fn default_cpp_dir() -> String {
+        "cpp/generated".to_string()
+    }
+
+    fn default_ts_dir() -> String {
+        "src/generated".to_string()
+    }
+}
+
+impl Default for BindingsConfig {
+    fn default() -> Self {
+        ubrn_common::default()
+    }
+}
+
+impl BindingsConfig {
+    pub(crate) fn cpp_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.cpp)
+    }
+
+    pub(crate) fn ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.ts)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TurboModulesConfig {
+    #[serde(default = "TurboModulesConfig::default_cpp_dir")]
+    pub(crate) cpp: String,
+    #[serde(default = "TurboModulesConfig::default_ts_dir")]
+    pub(crate) ts: String,
+    #[serde(default = "TurboModulesConfig::default_spec_name", alias = "spec")]
+    pub(crate) spec_name: String,
+}
+
+impl TurboModulesConfig {
+    fn default_cpp_dir() -> String {
+        "cpp".to_string()
+    }
+
+    fn default_ts_dir() -> String {
+        let package_json = workspace::package_json();
+        package_json.codegen().js_srcs_dir.clone()
+    }
+
+    fn default_spec_name() -> String {
+        let package_json = workspace::package_json();
+        let codegen_name = &package_json.codegen().name;
+        format!("Native{}", trim_react_native(codegen_name))
+    }
+}
+
+impl Default for TurboModulesConfig {
+    fn default() -> Self {
+        ubrn_common::default()
+    }
+}
+
+impl TurboModulesConfig {
+    pub(crate) fn cpp_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.cpp)
+    }
+
+    pub(crate) fn ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.ts)
+    }
+
+    pub(crate) fn spec_name(&self) -> String {
+        self.spec_name.clone()
     }
 }

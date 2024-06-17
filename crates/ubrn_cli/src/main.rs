@@ -11,6 +11,7 @@ use config::ProjectConfig;
 mod android;
 mod building;
 mod cli;
+mod codegen;
 mod config;
 mod generate;
 mod ios;

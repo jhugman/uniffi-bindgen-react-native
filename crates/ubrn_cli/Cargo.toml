@@ -10,11 +10,11 @@ name = "uniffi-bindgen-react-native"
 
 [dependencies]
 anyhow = { workspace = true }
-askama = "0.12.1"
+askama = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
-heck = "0.5.0"
-paste = "1.0.14"
+heck = { workspace = true }
+paste = { workspace = true }
 pathdiff = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
