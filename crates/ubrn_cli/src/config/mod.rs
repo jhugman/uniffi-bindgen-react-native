@@ -5,19 +5,15 @@
  */
 mod npm;
 
-use camino::Utf8Path;
 pub(crate) use npm::PackageJson;
 
 use serde::Deserialize;
 
-use crate::{android::AndroidConfig, ios::IOsConfig, rust::CrateConfig, workspace};
+use crate::{android::AndroidConfig, ios::IOsConfig, rust::CrateConfig};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectConfig {
-    #[serde(default = "ProjectConfig::default_name")]
-    pub(crate) name: String,
-
     #[serde(rename = "crate")]
     pub(crate) crate_: CrateConfig,
 
@@ -32,22 +28,4 @@ pub(crate) struct ProjectConfig {
 
     #[serde(default, rename = "turboModule")]
     pub(crate) tm: TurboModulesConfig,
-}
-
-impl ProjectConfig {
-    fn default_name() -> String {
-        workspace::package_json().name()
-    }
-}
-
-impl ProjectConfig {
-    pub(crate) fn project_root(&self) -> &Utf8Path {
-        &self.crate_.project_root
-    }
-}
-
-impl ProjectConfig {
-    pub(crate) fn name(&self) -> String {
-        self.name.clone()
-    }
 }

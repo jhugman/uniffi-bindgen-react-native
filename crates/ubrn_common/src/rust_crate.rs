@@ -30,12 +30,16 @@ impl CrateMetadata {
     }
 
     pub fn library_path(&self, target: Option<&str>, profile: &str) -> Result<Utf8PathBuf> {
-        let ext = so_extension(target);
-        let library_name = format!("lib{}.{ext}", &self.library_name);
+        let library_name = self.library_file(target);
         Ok(match target {
             Some(t) => self.target_dir.join(t).join(profile).join(library_name),
             None => self.target_dir.join(library_name),
         })
+    }
+
+    pub fn library_file(&self, target: Option<&str>) -> String {
+        let ext = so_extension(target);
+        format!("lib{}.{ext}", &self.library_name)
     }
 
     pub fn target_dir(&self) -> &Utf8Path {
@@ -72,7 +76,8 @@ fn so_extension_from_target<'a>(target: &str) -> &'a str {
     } else if target.contains("ios") {
         "a"
     } else if target.contains("android") {
-        "so"
+        // We're using staticlib files here. cargo ndk use .so files.
+        "a"
     } else {
         unimplemented!("Building targeting only on android and ios supported right now")
     }
