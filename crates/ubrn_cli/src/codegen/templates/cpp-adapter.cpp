@@ -9,6 +9,7 @@
 
 using namespace facebook;
 
+// TODO Remove `multiply` after seeing this work on iOS and Android.
 extern "C"
 JNIEXPORT jdouble JNICALL
 {{ prefix }}_nativeMultiply(JNIEnv *env, jclass type, jdouble a, jdouble b) {

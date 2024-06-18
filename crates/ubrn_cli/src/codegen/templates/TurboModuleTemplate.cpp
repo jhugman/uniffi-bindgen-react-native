@@ -9,6 +9,8 @@
 
 namespace matrixrustsdk {
 	using namespace facebook;
+
+	// TODO Remove `multiply` after seeing this work on iOS and Android.
 	double multiply(double a, double b) {
 		return a * b;
 	}

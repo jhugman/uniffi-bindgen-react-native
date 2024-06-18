@@ -27,6 +27,7 @@ public class {{ module_class_name }} extends {{ self.config.project.tm.spec_name
     System.loadLibrary("{{ self.config.project.cpp_filename() }}");
   }
 
+  // TODO Remove `multiply` after seeing this work on iOS and Android.
   private static native double nativeMultiply(double a, double b);
   private static native boolean nativeInstallRustCrate(long rtPtr, boolean a);
   private static native boolean nativeCleanupRustCrate(long rtPtr, boolean a);

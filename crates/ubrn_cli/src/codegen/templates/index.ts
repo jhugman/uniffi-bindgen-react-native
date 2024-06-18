@@ -4,6 +4,7 @@ import installer from './{{ self.config.project.codegen_filename() }}';
 // Register the rust crate with Hermes
 installer.installRustCrate(true);
 
+// TODO Remove `multiply` after seeing this work on iOS and Android.
 export function multiply(a: number, b: number): number {
   return installer.multiply(a, b);
 }
