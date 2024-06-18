@@ -7,7 +7,7 @@ for test in "${root}"/typescript/tests/*.test.ts ; do
     cargo xtask run "${test}"
 done
 
-uniffi_bindgen_manifest="${root}/crates/ubrn_bindgen/Cargo.toml"
+uniffi_bindgen_manifest="${root}/crates/ubrn_cli/Cargo.toml"
 for fixture in $(cd "${root}/fixtures" && ls) ; do
     # This should all go in either an xtask or into our uniffi-bindgen command.
     # This builds the crate into the target dir.
@@ -23,6 +23,7 @@ for fixture in $(cd "${root}/fixtures" && ls) ; do
     # We should use the so or dylib file here but for now we can just use the UDL
     # fie.
     RUST_BACKTRACE=1 cargo run --manifest-path "$uniffi_bindgen_manifest" -- \
+        generate \
         bindings \
         --ts-dir "${ts_dir}" --cpp-dir "${cpp_dir}" \
         "${fixture_dir}/src/${fixture}.udl" \

@@ -1,0 +1,6 @@
+[general]
+dirs = ["src/codegen/templates"]
+default_syntax = "none"
+
+[[syntax]]
+name = "none"

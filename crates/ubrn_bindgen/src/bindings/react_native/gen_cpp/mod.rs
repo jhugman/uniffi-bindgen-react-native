@@ -5,8 +5,10 @@
  */
 mod filters;
 
-use super::ReactNativeConfig;
-use crate::bindings::react_native::{ComponentInterfaceExt, FfiTypeExt};
+use crate::bindings::{
+    metadata::ModuleMetadata,
+    react_native::{ComponentInterfaceExt, FfiTypeExt},
+};
 use anyhow::Result;
 use askama::Template;
 use std::borrow::Borrow;
@@ -20,7 +22,7 @@ pub(crate) struct CppBindings {
 
 pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
-    config: &ReactNativeConfig,
+    config: &ModuleMetadata,
 ) -> Result<CppBindings> {
     let hpp = HppWrapper::new(ci, config).render()?;
     let cpp = CppWrapper::new(ci, config).render()?;
@@ -32,11 +34,11 @@ pub(crate) fn generate_bindings(
 struct HppWrapper<'a> {
     ci: &'a ComponentInterface,
     #[allow(unused)]
-    config: &'a ReactNativeConfig,
+    config: &'a ModuleMetadata,
 }
 
 impl<'a> HppWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a ReactNativeConfig) -> Self {
+    fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
         Self { ci, config }
     }
 }
@@ -46,11 +48,11 @@ impl<'a> HppWrapper<'a> {
 struct CppWrapper<'a> {
     ci: &'a ComponentInterface,
     #[allow(unused)]
-    config: &'a ReactNativeConfig,
+    config: &'a ModuleMetadata,
 }
 
 impl<'a> CppWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a ReactNativeConfig) -> Self {
+    fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
         Self { ci, config }
     }
 }

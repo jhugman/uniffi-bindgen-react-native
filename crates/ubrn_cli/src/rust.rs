@@ -7,7 +7,7 @@
 use serde::Deserialize;
 
 use anyhow::{Error, Result};
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use ubrn_common::CrateMetadata;
 
 use crate::{repo::GitRepoArgs, workspace};
@@ -15,6 +15,9 @@ use crate::{repo::GitRepoArgs, workspace};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CrateConfig {
+    #[serde(default = "CrateConfig::default_project_root", skip)]
+    pub(crate) project_root: Utf8PathBuf,
+
     #[serde(default = "CrateConfig::default_manifest_path")]
     pub(crate) manifest_path: String,
     #[serde(flatten)]
@@ -22,6 +25,10 @@ pub(crate) struct CrateConfig {
 }
 
 impl CrateConfig {
+    fn default_project_root() -> Utf8PathBuf {
+        workspace::project_root().expect("Expected project root with a package.json")
+    }
+
     fn default_manifest_path() -> String {
         "Cargo.toml".to_string()
     }
@@ -29,7 +36,7 @@ impl CrateConfig {
 
 impl CrateConfig {
     pub(crate) fn directory(&self) -> Result<Utf8PathBuf> {
-        self.src.directory()
+        self.src.directory(&self.project_root)
     }
 
     pub(crate) fn manifest_path(&self) -> Result<Utf8PathBuf> {
@@ -55,10 +62,10 @@ pub(crate) struct OnDiskArgs {
 }
 
 impl RustSource {
-    pub(crate) fn directory(&self) -> Result<Utf8PathBuf> {
+    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
         Ok(match self {
-            Self::OnDisk(OnDiskArgs { src }) => workspace::project_root()?.join(src),
-            Self::GitRepo(c) => c.directory()?,
+            Self::OnDisk(OnDiskArgs { src }) => project_root.join(src),
+            Self::GitRepo(c) => c.directory(project_root)?,
         })
     }
 }
@@ -71,5 +78,23 @@ impl TryFrom<RustSource> for GitRepoArgs {
             RustSource::GitRepo(args) => Ok(args),
             _ => anyhow::bail!("Nothing to do"),
         }
+    }
+}
+
+impl TryFrom<CrateMetadata> for CrateConfig {
+    type Error = Error;
+
+    fn try_from(value: CrateMetadata) -> Result<Self> {
+        let project_root = value.project_root();
+        let manifest_path = value.manifest_path();
+        let diff = pathdiff::diff_utf8_paths(manifest_path, project_root)
+            .expect("Manifest path should be relative to the workspace root");
+        Ok(Self {
+            project_root: value.project_root().to_path_buf(),
+            manifest_path: diff.into_string(),
+            src: RustSource::OnDisk(OnDiskArgs {
+                src: ".".to_string(),
+            }),
+        })
     }
 }

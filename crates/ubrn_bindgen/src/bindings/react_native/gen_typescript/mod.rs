@@ -27,7 +27,7 @@ use uniffi_bindgen::interface::{Callable, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 use uniffi_meta::{AsType, ExternalKind};
 
-use super::ReactNativeConfig;
+use crate::bindings::metadata::ModuleMetadata;
 use crate::bindings::react_native::{ComponentInterfaceExt, FfiFunctionExt};
 
 #[derive(Default)]
@@ -38,7 +38,7 @@ pub(crate) struct TsBindings {
 
 pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
-    config: &ReactNativeConfig,
+    config: &ModuleMetadata,
 ) -> Result<TsBindings> {
     let codegen = CodegenWrapper::new(ci, config)
         .render()
@@ -55,11 +55,11 @@ pub(crate) fn generate_bindings(
 struct CodegenWrapper<'a> {
     ci: &'a ComponentInterface,
     #[allow(unused)]
-    config: &'a ReactNativeConfig,
+    config: &'a ModuleMetadata,
 }
 
 impl<'a> CodegenWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a ReactNativeConfig) -> Self {
+    fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
         Self { ci, config }
     }
 }
@@ -68,7 +68,7 @@ impl<'a> CodegenWrapper<'a> {
 #[template(syntax = "ts", escape = "none", path = "wrapper.ts")]
 struct FrontendWrapper<'a> {
     ci: &'a ComponentInterface,
-    config: &'a ReactNativeConfig,
+    config: &'a ModuleMetadata,
     type_helper_code: String,
     type_imports: BTreeMap<String, BTreeSet<Imported>>,
     exported_converters: BTreeSet<String>,
@@ -76,7 +76,7 @@ struct FrontendWrapper<'a> {
 }
 
 impl<'a> FrontendWrapper<'a> {
-    pub fn new(ci: &'a ComponentInterface, config: &'a ReactNativeConfig) -> Self {
+    pub fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
         let type_renderer = TypeRenderer::new(config, ci);
         let type_helper_code = type_renderer.render().unwrap();
         let type_imports = type_renderer.imports.into_inner();
@@ -101,7 +101,7 @@ impl<'a> FrontendWrapper<'a> {
 #[template(syntax = "ts", escape = "none", path = "Types.ts")]
 pub struct TypeRenderer<'a> {
     #[allow(unused)]
-    config: &'a ReactNativeConfig,
+    config: &'a ModuleMetadata,
     ci: &'a ComponentInterface,
     // Track included modules for the `include_once()` macro
     include_once_names: RefCell<HashSet<String>>,
@@ -115,7 +115,7 @@ pub struct TypeRenderer<'a> {
 }
 
 impl<'a> TypeRenderer<'a> {
-    fn new(config: &'a ReactNativeConfig, ci: &'a ComponentInterface) -> Self {
+    fn new(config: &'a ModuleMetadata, ci: &'a ComponentInterface) -> Self {
         Self {
             config,
             ci,

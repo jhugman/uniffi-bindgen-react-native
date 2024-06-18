@@ -1,0 +1,8 @@
+hardcoded into template.
+name_upper_camel = {{ self.config.project.name_upper_camel() }}.
+
+list of modules = [
+{%- for m in self.config.modules %}'
+{{- m.cpp_module() }}'
+{%- if !loop.last %}, {% endif -%}
+{%- endfor %}]

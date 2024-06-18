@@ -3,18 +3,15 @@ name = "ubrn_bindgen"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "ubrn_bindgen"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = { workspace = true }
-askama = "0.12.1"
+askama = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
-heck = "0.5.0"
-paste = "1.0.14"
+heck = { workspace = true }
+paste = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
 ubrn_common = { path = "../ubrn_common" }

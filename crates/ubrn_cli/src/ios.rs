@@ -7,8 +7,9 @@
 use std::process::Command;
 
 use anyhow::Result;
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
+use heck::ToUpperCamelCase;
 use serde::Deserialize;
 use ubrn_common::{rm_dir, run_cmd};
 
@@ -43,8 +44,10 @@ impl IOsConfig {
     }
 
     fn default_framework_name() -> String {
-        // TODO: derive this from package.json.
-        "RustFramework".to_string()
+        format!(
+            "{}Framework",
+            workspace::package_json().name().to_upper_camel_case()
+        )
     }
 
     fn default_cargo_extras() -> ExtraArgs {
@@ -77,8 +80,8 @@ impl Default for IOsConfig {
 }
 
 impl IOsConfig {
-    pub(crate) fn directory(&self) -> Result<Utf8PathBuf> {
-        Ok(workspace::project_root()?.join(&self.directory))
+    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
+        Ok(project_root.join(&self.directory))
     }
 }
 
@@ -103,13 +106,16 @@ pub(crate) struct IOsArgs {
 impl IOsArgs {
     pub(crate) fn build(&self) -> Result<()> {
         let config: ProjectConfig = self.config.clone().try_into()?;
+        let project_root = config.project_root();
         let crate_ = &config.crate_;
         let metadata = crate_.metadata()?;
         let rust_dir = crate_.directory()?;
         let profile = self.common_args.profile();
         let manifest_path = crate_.manifest_path()?;
 
-        let ios = config.ios;
+        let ios = &config.ios;
+        let ios_dir = ios.directory(project_root)?;
+
         let mut library_args = Vec::default();
         for target in &ios.targets {
             if self.no_sim && target.contains("sim") {
@@ -144,7 +150,7 @@ impl IOsArgs {
         }
 
         let framework_name = format!("{}.xcframework", ios.framework_name);
-        let framework_path = ios.directory()?.join(framework_name);
+        let framework_path = ios_dir.join(framework_name);
         if framework_path.exists() {
             rm_dir(&framework_path)?;
         }
@@ -156,7 +162,7 @@ impl IOsArgs {
             .arg(&framework_path)
             .args(ios.xcodebuild_extras.clone());
 
-        run_cmd(cmd.current_dir(ios.directory()?))?;
+        run_cmd(cmd.current_dir(ios_dir))?;
 
         Ok(())
     }

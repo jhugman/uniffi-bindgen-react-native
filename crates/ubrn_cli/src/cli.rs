@@ -5,8 +5,9 @@
  */
 use crate::{
     building::BuildArgs,
+    generate::GenerateArgs,
     repo::{CheckoutArgs, GitRepoArgs},
-    AsConfig,
+    workspace, AsConfig,
 };
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -23,13 +24,18 @@ pub(crate) enum CliCmd {
     Checkout(CheckoutArgs),
     /// Build for android, ios or testing
     Build(BuildArgs),
+    /// Generate code from the Rust.
+    Generate(GenerateArgs),
 }
 
 impl CliCmd {
     pub(crate) fn run(&self) -> Result<()> {
         match self {
-            Self::Checkout(c) => AsConfig::<GitRepoArgs>::as_config(c)?.checkout(),
+            Self::Checkout(c) => {
+                AsConfig::<GitRepoArgs>::as_config(c)?.checkout(&workspace::project_root()?)
+            }
             Self::Build(b) => b.build(),
+            Self::Generate(g) => g.run(),
         }
     }
 }

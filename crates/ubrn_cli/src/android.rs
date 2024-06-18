@@ -4,13 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use serde::Deserialize;
-use std::process::Command;
+use std::{fmt::Display, fs, process::Command, str::FromStr};
 
 use clap::Args;
 
-use anyhow::Result;
-use camino::Utf8PathBuf;
-use ubrn_common::{rm_dir, run_cmd};
+use anyhow::{Error, Result};
+use camino::{Utf8Path, Utf8PathBuf};
+use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
@@ -33,7 +33,7 @@ pub(crate) struct AndroidConfig {
     #[serde(default = "AndroidConfig::default_cargo_extras")]
     pub(crate) cargo_extras: ExtraArgs,
 
-    #[serde(default = "AndroidConfig::default_platform")]
+    #[serde(default = "AndroidConfig::default_platform", alias = "platform")]
     pub(crate) api_level: usize,
 
     #[allow(dead_code)]
@@ -49,8 +49,7 @@ impl Default for AndroidConfig {
 
 impl AndroidConfig {
     fn default_package_name() -> String {
-        // TODO: derive this from package.json.
-        "com.example.rust.package".to_string()
+        workspace::package_json().android_package_name()
     }
 
     fn default_cargo_extras() -> ExtraArgs {
@@ -82,12 +81,25 @@ impl AndroidConfig {
 }
 
 impl AndroidConfig {
-    fn directory(&self) -> Result<Utf8PathBuf> {
-        Ok(workspace::project_root()?.join(&self.directory))
+    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.directory)
     }
 
-    fn jni_libs(&self) -> Result<Utf8PathBuf> {
-        Ok(self.directory()?.join(&self.jni_libs))
+    pub(crate) fn jni_libs(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.directory(project_root).join(&self.jni_libs)
+    }
+
+    fn java_src(&self) -> String {
+        "src/main/java".to_string()
+    }
+
+    pub(crate) fn src_main_java_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.directory(project_root).join(self.java_src())
+    }
+
+    pub(crate) fn codegen_package_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.src_main_java_dir(project_root)
+            .join(self.package_name.replace('.', "/"))
     }
 }
 
@@ -104,26 +116,26 @@ pub(crate) struct AndroidArgs {
 impl AndroidArgs {
     pub(crate) fn build(&self) -> Result<()> {
         let config: ProjectConfig = self.config.clone().try_into()?;
+        let project_root = config.project_root();
         let crate_ = &config.crate_;
         let rust_dir = crate_.directory()?;
         let manifest_path = crate_.manifest_path()?;
 
-        let android = config.android;
+        let android = &config.android;
 
-        let jni_libs = android.jni_libs()?;
+        let jni_libs = android.jni_libs(project_root);
         rm_dir(&jni_libs)?;
 
         for target in &android.targets {
+            let target = target.parse::<Target>()?;
             let mut cmd = Command::new("cargo");
             cmd.arg("ndk")
                 .arg("--manifest-path")
                 .arg(&manifest_path)
                 .arg("--target")
-                .arg(target)
+                .arg(target.to_string())
                 .arg("--platform")
-                .arg(format!("{}", android.api_level))
-                .arg("--output-dir")
-                .arg(&jni_libs);
+                .arg(format!("{}", android.api_level));
 
             if !self.common_args.release {
                 cmd.arg("--no-strip");
@@ -136,9 +148,74 @@ impl AndroidArgs {
 
             cmd.args(android.cargo_extras.clone());
 
-            run_cmd(cmd.current_dir(&rust_dir))?
+            run_cmd(cmd.current_dir(&rust_dir))?;
+            let metadata = crate_.metadata()?;
+            let src_lib = metadata.library_path(
+                Some(target.triple()),
+                CrateMetadata::profile(self.common_args.release),
+            )?;
+            let dst_dir = jni_libs.join(target.to_string());
+            mk_dir(&dst_dir)?;
+
+            let dst_lib = dst_dir.join(metadata.library_file(Some(target.triple())));
+            fs::copy(&src_lib, &dst_lib)?;
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
+pub enum Target {
+    #[serde(rename = "armeabi-v7a")]
+    ArmeabiV7a,
+    #[default]
+    #[serde(rename = "arm64-v8a")]
+    Arm64V8a,
+    #[serde(rename = "x86")]
+    X86,
+    #[serde(rename = "x86_64")]
+    X86_64,
+}
+
+impl FromStr for Target {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            // match android style architectures
+            "armeabi-v7a" => Target::ArmeabiV7a,
+            "arm64-v8a" => Target::Arm64V8a,
+            "x86" => Target::X86,
+            "x86_64" => Target::X86_64,
+            // match rust triple architectures
+            "armv7-linux-androideabi" => Target::ArmeabiV7a,
+            "aarch64-linux-android" => Target::Arm64V8a,
+            "i686-linux-android" => Target::X86,
+            "x86_64-linux-android" => Target::X86_64,
+            _ => return Err(anyhow::anyhow!("Unsupported target: '{s}'")),
+        })
+    }
+}
+
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Target::ArmeabiV7a => "armeabi-v7a",
+            Target::Arm64V8a => "arm64-v8a",
+            Target::X86 => "x86",
+            Target::X86_64 => "x86_64",
+        })
+    }
+}
+
+impl Target {
+    pub fn triple(&self) -> &'static str {
+        match self {
+            Target::ArmeabiV7a => "armv7-linux-androideabi",
+            Target::Arm64V8a => "aarch64-linux-android",
+            Target::X86 => "i686-linux-android",
+            Target::X86_64 => "x86_64-linux-android",
+        }
     }
 }

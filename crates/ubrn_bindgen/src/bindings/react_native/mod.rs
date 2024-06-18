@@ -11,7 +11,6 @@ use std::{collections::HashMap, fs};
 use anyhow::Result;
 use camino::Utf8Path;
 use extend::ext;
-use heck::ToUpperCamelCase;
 use serde::Deserialize;
 use topological_sort::TopologicalSort;
 use ubrn_common::{fmt, run_cmd_quietly};
@@ -24,29 +23,17 @@ use uniffi_meta::Type;
 use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
 
 use super::OutputArgs;
+use crate::bindings::metadata::ModuleMetadata;
 
 #[derive(Deserialize)]
 pub(crate) struct ReactNativeConfig {
-    #[serde(default)]
-    use_codegen: bool,
-
-    #[serde(default)]
-    cpp_module: String,
-
-    #[serde(default)]
-    ffi_ts_filename: String,
+    #[serde(skip)]
+    namespace: String,
 }
 
 impl BindingsConfig for ReactNativeConfig {
     fn update_from_ci(&mut self, ci: &ComponentInterface) {
-        let ns = ci.namespace();
-        let cpp_module = format!("Native{}", ns.to_upper_camel_case());
-        self.ffi_ts_filename = if self.use_codegen {
-            cpp_module.to_string()
-        } else {
-            format!("{ns}-ffi")
-        };
-        self.cpp_module = cpp_module;
+        self.namespace = ci.namespace().to_string();
     }
 
     fn update_from_cdylib_name(&mut self, _cdylib_name: &str) {
@@ -55,6 +42,12 @@ impl BindingsConfig for ReactNativeConfig {
 
     fn update_from_dependency_configs(&mut self, _config_map: HashMap<&str, &Self>) {
         // NOOP
+    }
+}
+
+impl From<&ReactNativeConfig> for ModuleMetadata {
+    fn from(value: &ReactNativeConfig) -> Self {
+        ModuleMetadata::new(&value.namespace)
     }
 }
 
@@ -82,28 +75,25 @@ impl BindingGenerator for ReactNativeBindingGenerator {
     fn write_bindings(
         &self,
         ci: &ComponentInterface,
-        config: &Self::Config,
+        _config: &Self::Config,
         // We get the output directories from the OutputArgs
         _out_dir: &Utf8Path,
         // We will format the code all at once instead of here
         _try_format_code: bool,
     ) -> Result<()> {
-        let namespace = ci.namespace();
-        let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, config)?;
-        let codegen_file = format!("{}.ts", &config.ffi_ts_filename);
+        let module = ModuleMetadata::new(ci.namespace());
+        let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, &module)?;
 
         let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
-        let codegen_path = out_dir.join(codegen_file);
-        let frontend_path = out_dir.join(format!("{namespace}.ts"));
-
+        let codegen_path = out_dir.join(module.ts_ffi_filename());
+        let frontend_path = out_dir.join(module.ts_filename());
         fs::write(codegen_path, codegen)?;
         fs::write(frontend_path, frontend)?;
 
         let out_dir = &self.output.cpp_dir.canonicalize_utf8()?;
-        let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, config)?;
-        let cpp_path = out_dir.join(format!("{namespace}.cpp"));
-        let hpp_path = out_dir.join(format!("{namespace}.hpp"));
-
+        let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &module)?;
+        let cpp_path = out_dir.join(module.cpp_filename());
+        let hpp_path = out_dir.join(module.hpp_filename());
         fs::write(cpp_path, cpp)?;
         fs::write(hpp_path, hpp)?;
 

@@ -1,5 +1,5 @@
 {%- let namespace = ci.namespace() %}
-{%- let module_name = config.cpp_module.clone() %}
+{%- let module_name = config.cpp_module() %}
 #pragma once
 #include <jsi/jsi.h>
 #include <iostream>
