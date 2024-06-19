@@ -82,7 +82,16 @@ pub(crate) fn render_files(
 
     let project_root = config.project.project_root();
     let map = render_templates(project_root, files)?;
+    let exclude_files = config.project.exclude_files();
     for (path, contents) in map {
+        // We don't want to write files that the config file has excluded.
+        // In order to test if it is excluded, we need to get the file path
+        // relative to the project_root.
+        let rel = pathdiff::diff_utf8_paths(&path, project_root)
+            .expect("path should be relative to root");
+        if exclude_files.is_match(&rel) {
+            continue;
+        }
         let parent = path.parent().expect("Parent for path");
         mk_dir(parent)?;
         std::fs::write(path, contents)?;
@@ -307,18 +316,22 @@ mod tests {
                 ts: "src/bindings".to_string(),
             };
             let tm = TurboModulesConfig {
+                name: "MyCrateSpec".to_string(),
                 cpp: "cpp".to_string(),
                 ts: "src".to_string(),
                 spec_name: "MyRustCrate".to_string(),
             };
+            let repository = format!("https://github.com/user/{name}");
 
             Self {
                 name: name.to_string(),
+                repository,
                 crate_,
                 android,
                 ios,
                 bindings,
                 tm,
+                exclude_files: Default::default(),
             }
         }
     }

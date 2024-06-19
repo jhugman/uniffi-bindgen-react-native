@@ -6,6 +6,7 @@
 mod npm;
 
 use camino::{Utf8Path, Utf8PathBuf};
+use globset::GlobSet;
 pub(crate) use npm::PackageJson;
 
 use serde::Deserialize;
@@ -35,6 +36,11 @@ pub(crate) struct ProjectConfig {
 
     #[serde(default, rename = "turboModule")]
     pub(crate) tm: TurboModulesConfig,
+
+    /// Set of globs of file paths not to be overwritten by
+    /// the `generate` commands.
+    #[serde(default, rename = "noOverwrite")]
+    pub(crate) exclude_files: GlobSet,
 }
 
 impl ProjectConfig {
@@ -94,6 +100,10 @@ impl ProjectConfig {
 
     pub(crate) fn codegen_filename(&self) -> String {
         format!("Native{}", self.name_upper_camel())
+    }
+
+    pub(crate) fn exclude_files(&self) -> &GlobSet {
+        &self.exclude_files
     }
 }
 
