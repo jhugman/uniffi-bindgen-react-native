@@ -135,14 +135,22 @@ mod files {
 
     pub(super) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
         vec![
-            JavaModule::rc_new(config.clone()),
-            JavaPackage::rc_new(config.clone()),
+            // typescript
+            IndexTs::rc_new(config.clone()),
+            // C++
             TMHeader::rc_new(config.clone()),
             TMCpp::rc_new(config.clone()),
-            IndexTs::rc_new(config.clone()),
+            // Codegen (for installer)
             NativeCodegenTs::rc_new(config.clone()),
-            CppAdapter::rc_new(config.clone()),
+            // Android
+            JavaModule::rc_new(config.clone()),
+            JavaPackage::rc_new(config.clone()),
             CMakeLists::rc_new(config.clone()),
+            CppAdapter::rc_new(config.clone()),
+            // iOS
+            ModuleTemplateH::rc_new(config.clone()),
+            ModuleTemplateMm::rc_new(config.clone()),
+            PodspecTemplate::rc_new(config.clone()),
         ]
     }
 
@@ -225,6 +233,41 @@ mod files {
                 .android
                 .directory(project_root)
                 .join(filename)
+        }
+    }
+
+    templated_file!(ModuleTemplateH, "ModuleTemplate.h");
+    impl RenderedFile for ModuleTemplateH {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.name_upper_camel();
+            let filename = format!("{name}.h");
+            self.config
+                .project
+                .ios
+                .directory(project_root)
+                .join(filename)
+        }
+    }
+
+    templated_file!(ModuleTemplateMm, "ModuleTemplate.mm");
+    impl RenderedFile for ModuleTemplateMm {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.name_upper_camel();
+            let filename = format!("{name}.mm");
+            self.config
+                .project
+                .ios
+                .directory(project_root)
+                .join(filename)
+        }
+    }
+
+    templated_file!(PodspecTemplate, "module-template.podspec");
+    impl RenderedFile for PodspecTemplate {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.raw_name();
+            let filename = format!("{name}.podspec");
+            project_root.join(filename)
         }
     }
 }

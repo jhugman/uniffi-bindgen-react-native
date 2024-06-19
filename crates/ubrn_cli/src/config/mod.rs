@@ -18,6 +18,9 @@ pub(crate) struct ProjectConfig {
     #[serde(default = "ProjectConfig::default_name")]
     pub(crate) name: String,
 
+    #[serde(default = "ProjectConfig::default_repository")]
+    pub(crate) repository: String,
+
     #[serde(rename = "crate")]
     pub(crate) crate_: CrateConfig,
 
@@ -37,6 +40,12 @@ pub(crate) struct ProjectConfig {
 impl ProjectConfig {
     fn default_name() -> String {
         workspace::package_json().raw_name()
+    }
+
+    fn default_repository() -> String {
+        let package_json = workspace::package_json();
+        let url = &package_json.repo().url;
+        url.trim_start_matches("git+").to_string()
     }
 }
 
@@ -61,8 +70,12 @@ impl ProjectConfig {
         trim_react_native(&self.name)
     }
 
-    fn raw_name(&self) -> &str {
+    pub(crate) fn raw_name(&self) -> &str {
         &self.name
+    }
+
+    pub(crate) fn repository(&self) -> &str {
+        &self.repository
     }
 
     pub(crate) fn name_upper_camel(&self) -> String {
@@ -128,9 +141,17 @@ pub(crate) struct TurboModulesConfig {
     pub(crate) ts: String,
     #[serde(default = "TurboModulesConfig::default_spec_name", alias = "spec")]
     pub(crate) spec_name: String,
+
+    #[serde(default = "TurboModulesConfig::default_name")]
+    pub(crate) name: String,
 }
 
 impl TurboModulesConfig {
+    fn default_name() -> String {
+        let package_json = workspace::package_json();
+        package_json.codegen().name.clone()
+    }
+
     fn default_cpp_dir() -> String {
         "cpp".to_string()
     }
@@ -164,5 +185,9 @@ impl TurboModulesConfig {
 
     pub(crate) fn spec_name(&self) -> String {
         self.spec_name.clone()
+    }
+
+    pub(crate) fn name(&self) -> String {
+        self.name.clone()
     }
 }

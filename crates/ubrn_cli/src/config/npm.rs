@@ -14,6 +14,7 @@ use super::trim_react_native;
 #[allow(dead_code)]
 pub(crate) struct PackageJson {
     name: String,
+    repository: PackageJsonRepo,
     react_native: Option<String>,
     main: Option<String>,
     codegen_config: RnCodegenConfig,
@@ -36,9 +37,18 @@ impl PackageJson {
             .unwrap_or_else(|| format!("com.{}", self.name().to_upper_camel_case().to_lowercase()))
     }
 
+    pub(crate) fn repo(&self) -> &PackageJsonRepo {
+        &self.repository
+    }
+
     pub(crate) fn codegen(&self) -> &RnCodegenConfig {
         &self.codegen_config
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct PackageJsonRepo {
+    pub(crate) url: String,
 }
 
 #[derive(Deserialize)]
