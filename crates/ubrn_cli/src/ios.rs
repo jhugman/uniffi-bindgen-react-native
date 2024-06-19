@@ -61,14 +61,7 @@ impl IOsConfig {
     }
 
     fn default_targets() -> Vec<String> {
-        let args: &[&str] = &[
-            "aarch64-apple-ios",
-            "x86_64-apple-ios",
-            // xcodebuild error:
-            // Both 'ios-arm64-simulator' and 'ios-x86_64-simulator'
-            // represent two equivalent library definitions.
-            // "aarch64-apple-ios-sim",
-        ];
+        let args: &[&str] = &["aarch64-apple-ios", "aarch64-apple-ios-sim"];
         args.iter().map(|s| s.to_string()).collect()
     }
 }
@@ -80,8 +73,13 @@ impl Default for IOsConfig {
 }
 
 impl IOsConfig {
-    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
-        Ok(project_root.join(&self.directory))
+    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.directory)
+    }
+
+    pub(crate) fn framework_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        let filename = format!("{}.xcframework", self.framework_name);
+        project_root.join(filename)
     }
 }
 
@@ -114,7 +112,7 @@ impl IOsArgs {
         let manifest_path = crate_.manifest_path()?;
 
         let ios = &config.ios;
-        let ios_dir = ios.directory(project_root)?;
+        let ios_dir = ios.directory(project_root);
 
         let mut library_args = Vec::default();
         for target in &ios.targets {
@@ -149,8 +147,7 @@ impl IOsArgs {
             library_args.push(library.to_string());
         }
 
-        let framework_name = format!("{}.xcframework", ios.framework_name);
-        let framework_path = ios_dir.join(framework_name);
+        let framework_path = ios.framework_path(project_root);
         if framework_path.exists() {
             rm_dir(&framework_path)?;
         }

@@ -82,7 +82,16 @@ pub(crate) fn render_files(
 
     let project_root = config.project.project_root();
     let map = render_templates(project_root, files)?;
+    let exclude_files = config.project.exclude_files();
     for (path, contents) in map {
+        // We don't want to write files that the config file has excluded.
+        // In order to test if it is excluded, we need to get the file path
+        // relative to the project_root.
+        let rel = pathdiff::diff_utf8_paths(&path, project_root)
+            .expect("path should be relative to root");
+        if exclude_files.is_match(&rel) {
+            continue;
+        }
         let parent = path.parent().expect("Parent for path");
         mk_dir(parent)?;
         std::fs::write(path, contents)?;
@@ -135,14 +144,22 @@ mod files {
 
     pub(super) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
         vec![
-            JavaModule::rc_new(config.clone()),
-            JavaPackage::rc_new(config.clone()),
+            // typescript
+            IndexTs::rc_new(config.clone()),
+            // C++
             TMHeader::rc_new(config.clone()),
             TMCpp::rc_new(config.clone()),
-            IndexTs::rc_new(config.clone()),
+            // Codegen (for installer)
             NativeCodegenTs::rc_new(config.clone()),
-            CppAdapter::rc_new(config.clone()),
+            // Android
+            JavaModule::rc_new(config.clone()),
+            JavaPackage::rc_new(config.clone()),
             CMakeLists::rc_new(config.clone()),
+            CppAdapter::rc_new(config.clone()),
+            // iOS
+            ModuleTemplateH::rc_new(config.clone()),
+            ModuleTemplateMm::rc_new(config.clone()),
+            PodspecTemplate::rc_new(config.clone()),
         ]
     }
 
@@ -227,6 +244,41 @@ mod files {
                 .join(filename)
         }
     }
+
+    templated_file!(ModuleTemplateH, "ModuleTemplate.h");
+    impl RenderedFile for ModuleTemplateH {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.name_upper_camel();
+            let filename = format!("{name}.h");
+            self.config
+                .project
+                .ios
+                .directory(project_root)
+                .join(filename)
+        }
+    }
+
+    templated_file!(ModuleTemplateMm, "ModuleTemplate.mm");
+    impl RenderedFile for ModuleTemplateMm {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.name_upper_camel();
+            let filename = format!("{name}.mm");
+            self.config
+                .project
+                .ios
+                .directory(project_root)
+                .join(filename)
+        }
+    }
+
+    templated_file!(PodspecTemplate, "module-template.podspec");
+    impl RenderedFile for PodspecTemplate {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.raw_name();
+            let filename = format!("{name}.podspec");
+            project_root.join(filename)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -264,18 +316,22 @@ mod tests {
                 ts: "src/bindings".to_string(),
             };
             let tm = TurboModulesConfig {
+                name: "MyCrateSpec".to_string(),
                 cpp: "cpp".to_string(),
                 ts: "src".to_string(),
                 spec_name: "MyRustCrate".to_string(),
             };
+            let repository = format!("https://github.com/user/{name}");
 
             Self {
                 name: name.to_string(),
+                repository,
                 crate_,
                 android,
                 ios,
                 bindings,
                 tm,
+                exclude_files: Default::default(),
             }
         }
     }
