@@ -13,7 +13,7 @@ namespace {{ ns }} {
   // TODO Remove `multiply` after seeing this work on iOS and Android.
   double multiply(double a, double b);
 
-  uint8_t installRustCrate(jsi::Runtime &runtime, uint8_t b);
+  uint8_t installRustCrate(jsi::Runtime &runtime, std::shared_ptr<react::CallInvoker> callInvoker);
   uint8_t cleanupRustCrate(jsi::Runtime &runtime, uint8_t b);
 }
 

@@ -7,7 +7,7 @@
 #include "{{ bindings }}/{{ m.hpp_filename() }}"
 {%- endfor %}
 
-namespace matrixrustsdk {
+namespace {{ self.config.project.cpp_namespace() }} {
 	using namespace facebook;
 
 	// TODO Remove `multiply` after seeing this work on iOS and Android.
@@ -15,9 +15,9 @@ namespace matrixrustsdk {
 		return a * b;
 	}
 
-	uint8_t installRustCrate(jsi::Runtime &runtime, uint8_t b) {
+	uint8_t installRustCrate(jsi::Runtime &runtime, std::shared_ptr<react::CallInvoker> callInvoker) {
         {%- for m in self.config.modules %}
-		{{ m.cpp_module() }}::registerModule(runtime);
+		{{ m.cpp_module() }}::registerModule(runtime, callInvoker);
         {%- endfor %}
 		return false;
 	}

@@ -40,10 +40,12 @@ add_library(my_rust_lib STATIC IMPORTED)
 set_target_properties(my_rust_lib PROPERTIES IMPORTED_LOCATION ${MY_RUST_LIB})
 
 find_package(ReactAndroid REQUIRED CONFIG)
+find_package(fbjni REQUIRED CONFIG)
 find_library(LOGCAT log)
 
 target_link_libraries(
   ${CMAKE_PROJECT_NAME}
+  fbjni::fbjni
   ReactAndroid::jsi
   ReactAndroid::turbomodulejsijni
   ReactAndroid::react_nativemodule_core
