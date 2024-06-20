@@ -14,6 +14,7 @@
 #include <windows.h>
 #endif
 
+#include <ReactCommon/CallInvoker.h>
 #include <hermes/hermes.h>
 
 /// Read the contents of a file into a string.
@@ -34,7 +35,9 @@ static std::optional<std::string> readFile(const char *path) {
 }
 
 /// The signature of the function that initializes the library.
-typedef void (*RegisterNativesFN)(facebook::jsi::Runtime &rt);
+typedef void (*RegisterNativesFN)(
+    facebook::jsi::Runtime &rt,
+    std::shared_ptr<facebook::react::CallInvoker> callInvoker);
 
 #ifndef _WIN32
 /// Load the library and return the "registerNatives()" function.
@@ -84,14 +87,16 @@ static RegisterNativesFN loadRegisterNatives(const char *libraryPath) {
 
 /// Load all the libraries and call their "registerNatives()" function.
 /// \return true if all libraries were loaded successfully.
-static bool loadNativeLibraries(facebook::jsi::Runtime &rt, int argc,
-                                char **argv) {
+static bool
+loadNativeLibraries(facebook::jsi::Runtime &rt,
+                    std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+                    int argc, char **argv) {
   try {
     for (int i = 2; i < argc; i++) {
       auto func = loadRegisterNatives(argv[i]);
       if (!func)
         return false;
-      func(rt);
+      func(rt, callInvoker);
     }
   } catch (facebook::jsi::JSIException &e) {
     // Handle JSI exceptions here.
@@ -121,9 +126,11 @@ int main(int argc, char **argv) {
 
   // Create the Hermes runtime.
   auto runtime = facebook::hermes::makeHermesRuntime(runtimeConfig);
+  std::shared_ptr<facebook::react::CallInvoker> invoker =
+      std::make_shared<uniffi::testing::MyCallInvoker>(*runtime);
 
   // Register host functions.
-  if (!loadNativeLibraries(*runtime, argc, argv))
+  if (!loadNativeLibraries(*runtime, invoker, argc, argv))
     return 1;
 
   // Execute some JS.

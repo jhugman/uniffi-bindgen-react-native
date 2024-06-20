@@ -17,11 +17,12 @@
 #include <utility>
 #include <iostream>
 
-using namespace facebook;
+namespace react = facebook::react;
+namespace jsi = facebook::jsi;
 
 // Initialization into the Hermes Runtime
-extern "C" void registerNatives(jsi::Runtime &rt) {
-    {{ module_name }}::registerModule(rt);
+extern "C" void registerNatives(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker) {
+    {{ module_name }}::registerModule(rt, callInvoker);
 }
 
 {% include "RustCallStatus.cpp" %}
@@ -51,7 +52,7 @@ extern "C" {
     {%- endfor %}
 }
 
-void {{ module_name }}::registerModule(jsi::Runtime &rt) {
+void {{ module_name }}::registerModule(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker) {
     rt.global().setProperty(rt, "{{ module_name }}", {{ module_name }}::makeNativeObject(rt));
 }
 
