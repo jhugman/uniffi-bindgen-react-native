@@ -6,7 +6,10 @@
 
 #pragma once
 
+#include <ReactCommon/CallInvoker.h>
 #include <jsi/jsi.h>
 
 /// Register host functions into the given runtime.
-extern "C" void registerNatives(facebook::jsi::Runtime &rt);
+extern "C" void
+registerNatives(facebook::jsi::Runtime &rt,
+                std::shared_ptr<facebook::react::CallInvoker> callInvoker);

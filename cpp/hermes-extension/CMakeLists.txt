@@ -39,6 +39,7 @@ include_directories("${HERMES_SRC_DIR}/API")
 include_directories("${HERMES_SRC_DIR}/API/jsi")
 include_directories("${HERMES_SRC_DIR}/public")
 include_directories("../includes")
+include_directories("../stubs")
 
 # Add Hermes library directories
 link_directories("${HERMES_BUILD_DIR}/API/hermes")

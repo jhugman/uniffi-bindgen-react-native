@@ -2,10 +2,12 @@
 {%- let module_name = config.cpp_module() %}
 #pragma once
 #include <jsi/jsi.h>
+#include <ReactCommon/CallInvoker.h>
 #include <iostream>
 #include <map>
 
-using namespace facebook;
+namespace react = facebook::react;
+namespace jsi = facebook::jsi;
 
 class {{ module_name }} : public jsi::HostObject {
   protected:
@@ -19,10 +21,10 @@ class {{ module_name }} : public jsi::HostObject {
     /**
      * The entry point into the crate.
      *
-     * React Native must call `{{ module_name }}.registerModule(rt)` before using
+     * React Native must call `{{ module_name }}.registerModule(rt, callInvoker)` before using
      * the Javascript interface.
      */
-    static void registerModule(jsi::Runtime &rt);
+    static void registerModule(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker);
 
     /**
      * Some cleanup into the crate goes here.
