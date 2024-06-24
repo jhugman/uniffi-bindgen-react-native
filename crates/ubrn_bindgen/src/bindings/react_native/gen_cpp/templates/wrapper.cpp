@@ -31,8 +31,32 @@ extern "C" void registerNatives(jsi::Runtime &rt, std::shared_ptr<react::CallInv
 
 // Calling into Rust.
 extern "C" {
-    {%- for func in ci.iter_ffi_function_definitions() %}
+    {%- for definition in ci.ffi_definitions() %}
+    {%- match definition %}
+    {%- when FfiDefinition::Struct(ffi_struct) %}
+    struct {{ ffi_struct.name()|ffi_struct_name }} {
+    {%-   for field in ffi_struct.fields() %}
+      {{ field.type_().borrow()|ffi_type_name }} {{ field.name()|var_name }};
+    {%-   endfor %}
+    };
+    {%- when FfiDefinition::CallbackFunction(callback) %}
+    typedef {# space #}
+    {%-   match callback.return_type() %}
+    {%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
+    {%-     when None %}void
+    {%-   endmatch %}
+    (*{{  callback.name()|ffi_callback_name }})(
+    {%-   for arg in callback.arguments() %}
+    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name()|var_name }}{% if !loop.last %}, {% endif %}
+    {%-   endfor %}
+    {%-   if callback.has_rust_call_status_arg() -%}
+    {%      if callback.arguments().len() > 0 %}, {% endif %}RustCallStatus* rust_call_status
+    {%-   endif %}
+    );
+    {%- when FfiDefinition::Function with(func) %}
     {% call cpp::rust_fn_decl(func) %}
+    {%- else %}
+    {%- endmatch %}
     {%- endfor %}
 }
 

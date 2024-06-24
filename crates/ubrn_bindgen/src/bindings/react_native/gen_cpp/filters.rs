@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use heck::ToUpperCamelCase;
+use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::interface::FfiType;
 
 pub fn ffi_type_name_from_js(ffi_type: &FfiType) -> Result<String, askama::Error> {
@@ -14,7 +14,7 @@ pub fn ffi_type_name_to_rust(ffi_type: &FfiType) -> Result<String, askama::Error
     ffi_type_name(ffi_type)
 }
 
-fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
+pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
     Ok(match ffi_type {
         FfiType::UInt8 => "uint8_t".into(),
         FfiType::Int8 => "int8_t".into(),
@@ -29,11 +29,23 @@ fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
         FfiType::RustArcPtr(_) => "void *".into(),
         FfiType::RustBuffer(_) => "RustBuffer".into(),
         FfiType::ForeignBytes => "ForeignBytes".into(),
-        FfiType::Callback(_) => "Callback".into(),
-        FfiType::Struct(nm) => format!("Uniffi{}", nm.to_upper_camel_case()), // XXX
+        FfiType::Callback(nm) => ffi_callback_name(nm)?,
+        FfiType::Struct(nm) => ffi_struct_name(nm)?, // XXX
         FfiType::Handle => "Handle".into(),
-        FfiType::RustCallStatus => todo!(),
-        FfiType::Reference(inner) => format!("{}* _Nonnull", ffi_type_name(inner)?), // XXX
-        FfiType::VoidPointer => todo!(),
+        FfiType::RustCallStatus => "RustCallStatus".into(),
+        FfiType::Reference(inner) => ffi_type_name(inner)?, // XXX
+        FfiType::VoidPointer => "void *".into(),            // ???
     })
+}
+
+pub fn var_name(nm: &str) -> Result<String, askama::Error> {
+    Ok(nm.to_lower_camel_case())
+}
+
+pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
+    Ok(format!("Callback{}", nm.to_upper_camel_case()))
+}
+
+pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
+    Ok(format!("Struct{}", nm.to_upper_camel_case()))
 }

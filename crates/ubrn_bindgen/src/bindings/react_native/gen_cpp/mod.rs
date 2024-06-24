@@ -12,6 +12,7 @@ use crate::bindings::{
 use anyhow::Result;
 use askama::Template;
 use std::borrow::Borrow;
+use uniffi_bindgen::interface::FfiDefinition;
 use uniffi_bindgen::ComponentInterface;
 
 #[derive(Debug, Default)]
