@@ -110,7 +110,7 @@
 
 {%- macro call_async(obj_factory, callable) -%}
         await uniffiRustCallAsync({
-            rustFutureFunc: () => {
+            /*rustFutureFunc:*/ () => {
                 return nativeModule().{{ callable.ffi_func().name() }}(
                     {%- if callable.takes_self() %}
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
@@ -120,20 +120,20 @@
                     {%- endfor %}
                 );
             },
-            pollFunc: nativeModule().{{ callable.ffi_rust_future_poll(ci) }},
-            completeFunc: nativeModule().{{ callable.ffi_rust_future_complete(ci) }},
-            freeFunc: nativeModule().{{ callable.ffi_rust_future_free(ci) }},
+            /*pollFunc:*/ nativeModule().{{ callable.ffi_rust_future_poll(ci) }},
+            /*completeFunc:*/ nativeModule().{{ callable.ffi_rust_future_complete(ci) }},
+            /*freeFunc:*/ nativeModule().{{ callable.ffi_rust_future_free(ci) }},
             {%- match callable.return_type() %}
             {%- when Some(return_type) %}
-            liftFunc: {{ return_type|lift_fn }},
+            /*liftFunc:*/ {{ return_type|lift_fn }},
             {%- when None %}
             liftFunc: (_v) => {},
             {%- endmatch %}
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
-            errorHandler: {{ e|ffi_error_converter_name }}.lift
+            /*errorHandler:*/ {{ e|ffi_error_converter_name }}.lift
             {%- else %}
-            errorHandler: undefined,
+            /*errorHandler:*/ undefined,
             {% endmatch %}
         })
 {%- endmacro %}

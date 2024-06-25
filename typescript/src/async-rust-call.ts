@@ -30,27 +30,18 @@ export type UniffiRustFutureContinuationCallback = (
 // TODO: this is hacked to make it compile. Make this work.
 const uniffiContinuationHandleMap = new UniffiHandleMap<Promise<number>>();
 
-type UniffiAsyncCallParams<F, T> = {
-  rustFutureFunc: () => bigint;
+export async function uniffiRustCallAsync<F, T>(
+  rustFutureFunc: () => bigint,
   pollFunc: (
     rustFuture: bigint,
     cb: UniffiRustFutureContinuationCallback,
     handle: UniffiHandle,
-  ) => void;
-  completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F;
-  freeFunc: (rustFuture: bigint) => void;
-  liftFunc: (lower: F) => T;
-  errorHandler?: UniffiErrorHandler;
-};
-
-export async function uniffiRustCallAsync<F, T>({
-  rustFutureFunc,
-  pollFunc,
-  completeFunc,
-  freeFunc,
-  liftFunc,
-  errorHandler,
-}: UniffiAsyncCallParams<F, T>): Promise<T> {
+  ) => void,
+  completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
+  freeFunc: (rustFuture: bigint) => void,
+  liftFunc: (lower: F) => T,
+  errorHandler?: UniffiErrorHandler,
+): Promise<T> {
   // Make sure to call uniffiEnsureInitialized() since future creation doesn't have a
   // UniffiRustCallStatus param, so doesn't use makeRustCall()
   // uniffiEnsureInitialized()
