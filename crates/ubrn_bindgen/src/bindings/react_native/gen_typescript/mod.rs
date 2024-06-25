@@ -23,7 +23,7 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use uniffi_bindgen::bindings::swift::gen_swift::filters::ffi_converter_name;
-use uniffi_bindgen::interface::{Callable, Type, UniffiTrait};
+use uniffi_bindgen::interface::{Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 use uniffi_meta::{AsType, ExternalKind};
 

@@ -1,5 +1,7 @@
 {%- if self.include_once_check("CallbackInterfaceRuntime.ts") %}{%- include "CallbackInterfaceRuntime.ts" %}{%- endif %}
-{#
+{%- let callback_init = format!("uniffiCallbackInit{}", name) %}
+{%- let vtable_methods = cbi.vtable_methods() %}
+{%- let ffi_init_callback = cbi.ffi_init_callback() %}
 {%- let trait_impl=format!("UniffiCallbackInterface{}", name) %}
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
@@ -117,4 +119,3 @@ class {{ trait_impl }} {
 function {{ callback_init }}() {
     /*{{ ffi_init_callback.name() }}(&{{ trait_impl }}.vtable)*/
 }
-#}

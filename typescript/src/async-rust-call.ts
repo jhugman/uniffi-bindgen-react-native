@@ -13,6 +13,15 @@ import {
 const UNIFFI_RUST_FUTURE_POLL_READY = 0;
 const UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1;
 
+// The UniffiRustFutureContinuationCallback is generated in the {{ namespace }}-ffi.ts file,
+// when iterating over `ci.ffi_definitions()`.
+//
+// In binding generators for other languages, we would use that; however, in this binding, we've
+// separated out the runtime from the generated files.
+//
+// We check if this is the same as the generated type in the {{ namespace }}-ffi.ts file.
+// If a compile time error happens in that file, then uniffi-core has changed the way
+// it is calling callbacks and this file will need to be changed.
 export type UniffiRustFutureContinuationCallback = (
   handle: UniffiHandle,
   pollResult: number,
