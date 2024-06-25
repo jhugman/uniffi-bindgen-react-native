@@ -19,6 +19,7 @@ mod record;
 use anyhow::{Context, Result};
 use askama::Template;
 use heck::ToUpperCamelCase;
+use oracle::CodeOracle;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -90,6 +91,14 @@ impl<'a> FrontendWrapper<'a> {
             exported_converters,
             imported_converters,
         }
+    }
+
+    pub fn initialization_fns(&self) -> Vec<String> {
+        self.ci
+            .iter_types()
+            .map(|t| CodeOracle.find(t))
+            .filter_map(|ct| ct.initialization_fn())
+            .collect()
     }
 }
 

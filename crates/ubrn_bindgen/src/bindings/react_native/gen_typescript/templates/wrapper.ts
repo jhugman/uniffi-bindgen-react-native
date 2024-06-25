@@ -58,6 +58,8 @@ import {{ config.ffi_module_name() }}
 // Public interface members begin here.
 {{ type_helper_code }}
 
+{% include "InitializationTemplate.ts" %}
+
 {% if !self.exported_converters.is_empty() %}
 export default Object.freeze({
   {%- for converter in self.exported_converters.borrow() %}
