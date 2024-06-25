@@ -10,6 +10,11 @@ import {
   UniffiHandleMap,
   defaultUniffiHandle,
 } from "./handle-map";
+import {
+  CALL_ERROR,
+  CALL_UNEXPECTED_ERROR,
+  UniffiRustCallStatus,
+} from "./rust-call";
 
 const handleConverter = FfiConverterUInt64;
 
@@ -30,5 +35,45 @@ export class FfiConverterCallback<T> implements FfiConverter<UniffiHandle, T> {
   }
   allocationSize(value: T): number {
     return handleConverter.allocationSize(defaultUniffiHandle);
+  }
+  drop(handle: UniffiHandle): T {
+    return this.handleMap.remove(handle);
+  }
+}
+
+export type UniffiReferenceHolder<T> = { pointee: T };
+
+export function uniffiTraitInterfaceCall<T>(
+  callStatus: UniffiRustCallStatus,
+  makeCall: () => T,
+  writeReturn: (v: T) => void,
+  lowerString: (s: string) => ArrayBuffer,
+) {
+  try {
+    writeReturn(makeCall());
+  } catch (e: any) {
+    callStatus.code = CALL_UNEXPECTED_ERROR;
+    callStatus.errorBuf = lowerString(e.toString());
+  }
+}
+
+export function uniffiTraitInterfaceCallWithError<T, E extends Error>(
+  callStatus: UniffiRustCallStatus,
+  makeCall: () => T,
+  writeReturn: (v: T) => void,
+  errorType: new (...args: any[]) => E,
+  lowerError: (err: E) => ArrayBuffer,
+  lowerString: (s: string) => ArrayBuffer,
+): void {
+  try {
+    writeReturn(makeCall());
+  } catch (e: any) {
+    if (e instanceof errorType) {
+      callStatus.code = CALL_ERROR;
+      callStatus.errorBuf = lowerError(e);
+    } else {
+      callStatus.code = CALL_UNEXPECTED_ERROR;
+      callStatus.errorBuf = lowerString(e.toString());
+    }
   }
 }

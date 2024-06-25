@@ -200,6 +200,10 @@ v{{- field_num -}}
 {%- if func.is_async() %}async {% endif %}
 {%- endmacro -%}
 
+{%- macro await(func) %}
+{%- if func.is_async() %}await {% endif %}
+{%- endmacro -%}
+
 {%- macro throws(func) %}
 {%- if func.throws() %} /*throws*/{% endif %}
 {%- endmacro -%}
