@@ -89,3 +89,27 @@ _{{ arg.name() }}_{{ index }}
 
 
 {%- macro cpp_func_name(func) %}cpp_{{ func.name() }}{%- endmacro %}
+
+{%- macro callback_fn_decl(callback) %}
+    typedef {# space #}
+    {%-   match callback.return_type() %}
+    {%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
+    {%-     when None %}void
+    {%-   endmatch %}
+    (*{{  callback.name()|ffi_callback_name }})(
+    {%-   for arg in callback.arguments() %}
+    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name()|var_name }}{% if !loop.last %}, {% endif %}
+    {%-   endfor %}
+    {%-   if callback.has_rust_call_status_arg() -%}
+    {%      if callback.arguments().len() > 0 %}, {% endif %}RustCallStatus* rust_call_status
+    {%-   endif %}
+    );
+{%- endmacro %}
+
+{%- macro callback_struct_decl(ffi_struct) %}
+    typedef struct {{ ffi_struct.name()|ffi_struct_name }} {
+    {%- for field in ffi_struct.fields() %}
+        {{ field.type_().borrow()|ffi_type_name }} {{ field.name()|var_name }};
+    {%- endfor %}
+    } {{ ffi_struct.name()|ffi_struct_name }};
+{%- endmacro %}

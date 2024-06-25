@@ -205,7 +205,7 @@ impl ComponentInterface {
 
     fn iter_ffi_functions_js_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
         let has_async = self.has_async_fns();
-        let has_callbacks = false;
+        let has_callbacks = true;
         self.iter_ffi_function_definitions().filter(move |f| {
             let name = f.name();
             !name.contains("_rustbuffer_")

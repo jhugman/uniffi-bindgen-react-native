@@ -34,25 +34,9 @@ extern "C" {
     {%- for definition in ci.ffi_definitions() %}
     {%- match definition %}
     {%- when FfiDefinition::Struct(ffi_struct) %}
-    struct {{ ffi_struct.name()|ffi_struct_name }} {
-    {%-   for field in ffi_struct.fields() %}
-      {{ field.type_().borrow()|ffi_type_name }} {{ field.name()|var_name }};
-    {%-   endfor %}
-    };
+    {%- call cpp::callback_struct_decl(ffi_struct) %}
     {%- when FfiDefinition::CallbackFunction(callback) %}
-    typedef {# space #}
-    {%-   match callback.return_type() %}
-    {%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
-    {%-     when None %}void
-    {%-   endmatch %}
-    (*{{  callback.name()|ffi_callback_name }})(
-    {%-   for arg in callback.arguments() %}
-    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name()|var_name }}{% if !loop.last %}, {% endif %}
-    {%-   endfor %}
-    {%-   if callback.has_rust_call_status_arg() -%}
-    {%      if callback.arguments().len() > 0 %}, {% endif %}RustCallStatus* rust_call_status
-    {%-   endif %}
-    );
+    {%- call cpp::callback_fn_decl(callback) %}
     {%- when FfiDefinition::Function with(func) %}
     {% call cpp::rust_fn_decl(func) %}
     {%- else %}
@@ -62,6 +46,14 @@ extern "C" {
 
 // This calls into Rust.
 {% include "RustBufferHelper.cpp" %}
+
+{%- for def in ci.ffi_definitions() %}
+{%- match def %}
+{% when FfiDefinition::Struct(ffi_struct) %}
+{%- include "VTableStruct.cpp" %}
+{%- else %}
+{%- endmatch %}
+{%- endfor %}
 
 {{ module_name }}::{{ module_name }}(jsi::Runtime &rt) : props() {
     // Map from Javascript names to the cpp names

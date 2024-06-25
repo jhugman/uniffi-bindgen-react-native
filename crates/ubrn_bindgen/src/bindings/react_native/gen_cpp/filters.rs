@@ -43,9 +43,9 @@ pub fn var_name(nm: &str) -> Result<String, askama::Error> {
 }
 
 pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
-    Ok(format!("Callback{}", nm.to_upper_camel_case()))
+    Ok(format!("Uniffi{}", nm.to_upper_camel_case()))
 }
 
 pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
-    Ok(format!("Struct{}", nm.to_upper_camel_case()))
+    Ok(format!("Uniffi{}", nm.to_upper_camel_case()))
 }
