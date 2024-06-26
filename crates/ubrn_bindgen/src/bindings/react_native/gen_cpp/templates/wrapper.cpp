@@ -48,11 +48,17 @@ extern "C" {
 {% include "RustBufferHelper.cpp" %}
 
 {%- for def in ci.ffi_definitions() %}
-{%- match def %}
-{% when FfiDefinition::Struct(ffi_struct) %}
-{%- include "VTableStruct.cpp" %}
-{%- else %}
-{%- endmatch %}
+{%-   match def %}
+{%-     when FfiDefinition::CallbackFunction(callback) %}
+{%-       if callback.is_user_callback() %}
+{%-         include "VTableCallbackFunction.cpp" %}
+{%-       endif %}
+{%-     when FfiDefinition::Struct(ffi_struct) %}
+{%-       if ffi_struct.is_vtable() %}
+{%-         include "VTableStruct.cpp" %}
+{%-       endif %}
+{%-     else %}
+{%-   endmatch %}
 {%- endfor %}
 
 {{ module_name }}::{{ module_name }}(
@@ -112,8 +118,11 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 
 // Methods calling directly into the uniffi generated C API of the Rust crate.
 {%- for func in ci.iter_ffi_functions_js_to_rust() %}
-
 {% call cpp::rust_fn_caller(module_name, func) %}
+{%- endfor %}
+
+{%- for func in ci.iter_ffi_functions_init_callback() %}
+{% call cpp::callback_init(module_name, func) %}
 {%- endfor %}
 
 {%- import "macros.cpp" as cpp %}

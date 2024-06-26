@@ -23,6 +23,22 @@
 }
 {%- endmacro %}
 
+{%- macro callback_init(module_name, func) %}
+{%- call cpp_fn_from_js_decl(func) %} {
+    {%- let args = func.arguments() %}
+    {%- let arg = args.first().unwrap() %}
+    {{ func.name() }}(
+        uniffi_jsi::Bridging<{{ arg.type_().borrow()|ffi_type_name_from_js }}>::fromJs(
+            rt,
+            args[0],
+            callInvoker
+        )
+    );
+    return jsi::Value::undefined();
+}
+{%- endmacro %}
+
+
 {%- macro cpp_fn_from_js_decl(func) -%}
 jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count)
 {%- endmacro %}
