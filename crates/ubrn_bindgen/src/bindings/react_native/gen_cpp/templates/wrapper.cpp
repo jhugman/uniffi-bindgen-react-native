@@ -55,7 +55,10 @@ extern "C" {
 {%- endmatch %}
 {%- endfor %}
 
-{{ module_name }}::{{ module_name }}(jsi::Runtime &rt) : props() {
+{{ module_name }}::{{ module_name }}(
+    jsi::Runtime &rt,
+    std::shared_ptr<react::CallInvoker> invoker
+) : props(), callInvoker(invoker) {
     // Map from Javascript names to the cpp names
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
     {%- let name = func.name() %}
@@ -63,24 +66,21 @@ extern "C" {
         rt,
         jsi::PropNameID::forAscii(rt, "{{ name }}"),
         2,
-        {% call cpp::cpp_func_name(func) %}
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->{% call cpp::cpp_func_name(func) %}(rt, thisVal, args, count);
+        }
     );
     {%- endfor %}
 }
 
 void {{ module_name }}::registerModule(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker) {
-    rt.global().setProperty(rt, "{{ module_name }}", {{ module_name }}::makeNativeObject(rt));
+    auto tm = std::make_shared<{{ module_name }}>(rt, callInvoker);
+    auto obj = rt.global().createFromHostObject(rt, tm);
+    rt.global().setProperty(rt, "{{ module_name }}", obj);
 }
 
 void {{ module_name }}::unregisterModule(jsi::Runtime &rt) {
     // NOOP
-}
-
-jsi::Object {{ module_name }}::makeNativeObject(jsi::Runtime &rt) {
-    auto obj = std::make_shared<{{ module_name }}>(rt);
-    auto rval = rt.global().createFromHostObject(rt,obj);
-
-    return rval;
 }
 
 jsi::Value {{ module_name }}::get(jsi::Runtime& rt, const jsi::PropNameID& name) {

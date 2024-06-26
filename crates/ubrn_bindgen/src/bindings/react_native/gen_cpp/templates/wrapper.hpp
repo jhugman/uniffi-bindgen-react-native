@@ -2,9 +2,11 @@
 {%- let module_name = config.cpp_module() %}
 #pragma once
 #include <jsi/jsi.h>
-#include <ReactCommon/CallInvoker.h>
 #include <iostream>
 #include <map>
+#include <memory>
+#include <ReactCommon/CallInvoker.h>
+
 
 namespace react = facebook::react;
 namespace jsi = facebook::jsi;
@@ -13,10 +15,15 @@ class {{ module_name }} : public jsi::HostObject {
   protected:
     std::map<std::string,jsi::Value> props;
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
-    static jsi::Value {% call cpp::cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
+    jsi::Value {% call cpp::cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     {%- endfor %}
+
+    // For calling back into JS from Rust.
+    std::shared_ptr<react::CallInvoker> callInvoker;
+
   public:
-    {{ module_name }}(jsi::Runtime &rt);
+    {{ module_name }}(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker);
+    virtual ~{{ module_name }}();
 
     /**
      * The entry point into the crate.
@@ -34,10 +41,6 @@ class {{ module_name }} : public jsi::HostObject {
      * Clients should call `{{ module_name }}.unregisterModule(rt)` after final use where possible.
      */
     static void unregisterModule(jsi::Runtime &rt);
-
-    static jsi::Object makeNativeObject(jsi::Runtime &rt);
-
-    virtual ~{{ module_name }}();
 
     virtual jsi::Value get(jsi::Runtime& rt, const jsi::PropNameID& name);
     virtual void set(jsi::Runtime& rt,const jsi::PropNameID& name,const jsi::Value& value);
