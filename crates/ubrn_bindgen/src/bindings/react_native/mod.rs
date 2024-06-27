@@ -343,6 +343,17 @@ impl FfiType {
     fn is_callable(&self) -> bool {
         matches!(self, Self::Callback(_))
     }
+
+    fn is_void(&self) -> bool {
+        matches!(self, Self::VoidPointer)
+    }
+}
+
+#[ext]
+impl FfiArgument {
+    fn is_return(&self) -> bool {
+        self.name() == "uniffi_out_return"
+    }
 }
 
 #[ext]
@@ -353,6 +364,14 @@ impl FfiCallbackFunction {
 
     fn is_future_callback(&self) -> bool {
         is_future(self.name())
+    }
+
+    fn arg_return_type(&self) -> Option<FfiType> {
+        let arg = self
+            .arguments()
+            .into_iter()
+            .find(|a| a.is_return() && !a.type_().is_void());
+        arg.map(|a| a.type_())
     }
 }
 

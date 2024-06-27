@@ -17,18 +17,18 @@ template <> struct Bridging<{{ struct_name }}> {
 
     // Extract the function callbacks from the JS object
     {%- for field in ffi_struct.ffi_functions() %}
-    {%-   let field_name = field.name()|var_name %}
-    {%-   let func_name = field_name|fmt("fn_{}") %}
-    auto {{ func_name }} = obj.getPropertyAsFunction(rt, "{{ field_name }}");
+    {%-   let ts_field_name = field.name()|var_name %}
+    {%-   let func_name = ts_field_name|fmt("fn_{}") %}
+    auto {{ func_name }} = obj.getPropertyAsFunction(rt, "{{ ts_field_name }}");
     {%- endfor %}
 
     // Create the vtable from the js callbacks.
     {%- for field in ffi_struct.ffi_functions() %}
-    {%-   let field_name = field.name()|var_name %}
-    {%-   let func_name = field_name|fmt("fn_{}") %}
+    {%-   let rs_field_name = field.name() %}
+    {%-   let func_name = rs_field_name|var_name|fmt("fn_{}") %}
     {%-   let field_type = field.type_().borrow()|ffi_type_name %}
     {%-   let ns = field_type|lower|fmt("uniffi_jsi::{}") %}
-    vtable.{{ field_name }} = {{ ns }}::makeCallbackFunction(rt, callInvoker, std::move({{ func_name }}));
+    vtable.{{ rs_field_name }} = {{ ns }}::makeCallbackFunction(rt, callInvoker, {{ func_name }});
     {%- endfor %}
 
     return vtable;

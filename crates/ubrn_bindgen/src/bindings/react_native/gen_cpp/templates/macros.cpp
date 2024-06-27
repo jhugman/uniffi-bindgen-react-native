@@ -23,22 +23,6 @@
 }
 {%- endmacro %}
 
-{%- macro callback_init(module_name, func) %}
-{%- call cpp_fn_from_js_decl(func) %} {
-    {%- let args = func.arguments() %}
-    {%- let arg = args.first().unwrap() %}
-    {{ func.name() }}(
-        uniffi_jsi::Bridging<{{ arg.type_().borrow()|ffi_type_name_from_js }}>::fromJs(
-            rt,
-            args[0],
-            callInvoker
-        )
-    );
-    return jsi::Value::undefined();
-}
-{%- endmacro %}
-
-
 {%- macro cpp_fn_from_js_decl(func) -%}
 jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count)
 {%- endmacro %}
@@ -106,6 +90,24 @@ _{{ arg.name() }}_{{ index }}
 
 {%- macro cpp_func_name(func) %}cpp_{{ func.name() }}{%- endmacro %}
 
+{# CALLBACKS #}
+
+{%- macro callback_init(module_name, func) %}
+{%- call cpp_fn_from_js_decl(func) %} {
+    {%- let args = func.arguments() %}
+    {%- let arg = args.first().unwrap() %}
+    {%- let vtable_t = arg.type_().borrow()|ffi_type_name_from_js %}
+    static {{ vtable_t }} vtableInstance =
+        uniffi_jsi::Bridging<{{ vtable_t }}>::fromJs(
+            rt,
+            args[0],
+            callInvoker
+        );
+    {{ func.name() }}(&vtableInstance);
+    return jsi::Value::undefined();
+}
+{%- endmacro %}
+
 {%- macro callback_fn_decl(callback) %}
     typedef {# space #}
     {%-   match callback.return_type() %}
@@ -114,7 +116,7 @@ _{{ arg.name() }}_{{ index }}
     {%-   endmatch %}
     (*{{  callback.name()|ffi_callback_name }})(
     {%-   for arg in callback.arguments() %}
-    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name()|var_name }}{% if !loop.last %}, {% endif %}
+    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name() }}{% if !loop.last %}, {% endif %}
     {%-   endfor %}
     {%-   if callback.has_rust_call_status_arg() -%}
     {%      if callback.arguments().len() > 0 %}, {% endif %}RustCallStatus* rust_call_status
@@ -123,9 +125,10 @@ _{{ arg.name() }}_{{ index }}
 {%- endmacro %}
 
 {%- macro callback_struct_decl(ffi_struct) %}
-    typedef struct {{ ffi_struct.name()|ffi_struct_name }} {
+    {%- let struct_name = ffi_struct.name()|ffi_struct_name -%}
+    typedef struct {{ struct_name }} {
     {%- for field in ffi_struct.fields() %}
-        {{ field.type_().borrow()|ffi_type_name }} {{ field.name()|var_name }};
+        {{ field.type_().borrow()|ffi_type_name }} {{ field.name() }};
     {%- endfor %}
-    } {{ ffi_struct.name()|ffi_struct_name }};
+    } {{ struct_name }};
 {%- endmacro %}
