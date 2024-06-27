@@ -7,7 +7,10 @@ use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::interface::FfiType;
 
 pub fn ffi_type_name_from_js(ffi_type: &FfiType) -> Result<String, askama::Error> {
-    ffi_type_name(ffi_type)
+    Ok(match ffi_type {
+        FfiType::Reference(inner) => ffi_type_name_from_js(inner)?,
+        _ => ffi_type_name(ffi_type)?,
+    })
 }
 
 pub fn ffi_type_name_to_rust(ffi_type: &FfiType) -> Result<String, askama::Error> {
@@ -30,11 +33,11 @@ pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
         FfiType::RustBuffer(_) => "RustBuffer".into(),
         FfiType::ForeignBytes => "ForeignBytes".into(),
         FfiType::Callback(nm) => ffi_callback_name(nm)?,
-        FfiType::Struct(nm) => ffi_struct_name(nm)?, // XXX
+        FfiType::Struct(nm) => ffi_struct_name(nm)?,
         FfiType::Handle => "Handle".into(),
         FfiType::RustCallStatus => "RustCallStatus".into(),
-        FfiType::Reference(inner) => ffi_type_name(inner)?, // XXX
-        FfiType::VoidPointer => "void *".into(),            // ???
+        FfiType::Reference(inner) => format!("{} *", ffi_type_name(inner)?),
+        FfiType::VoidPointer => "void *".into(), // ???
     })
 }
 

@@ -7,7 +7,9 @@ mod filters;
 
 use crate::bindings::{
     metadata::ModuleMetadata,
-    react_native::{ComponentInterfaceExt, FfiCallbackFunctionExt, FfiStructExt, FfiTypeExt},
+    react_native::{
+        ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiStructExt, FfiTypeExt,
+    },
 };
 use anyhow::Result;
 use askama::Template;
