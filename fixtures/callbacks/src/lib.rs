@@ -13,6 +13,7 @@ trait ForeignGetters {
     fn get_option(&self, v: Option<String>, arg2: bool) -> Result<Option<String>, ComplexError>;
     fn get_list(&self, v: Vec<i32>, arg2: bool) -> Result<Vec<i32>, SimpleError>;
     fn get_nothing(&self, v: String) -> Result<(), SimpleError>;
+    fn set_nothing(&self);
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -56,7 +57,10 @@ impl RustGetters {
         v: bool,
         argument_two: bool,
     ) -> Result<bool, SimpleError> {
-        callback.get_bool(v, argument_two)
+        println!("In Rust! at the start of get_bool");
+        let v = callback.get_bool(v, argument_two);
+        println!("In Rust! at the end of get_bool");
+        v
     }
     fn get_string(
         &self,
@@ -94,6 +98,12 @@ impl RustGetters {
 
     fn get_nothing(&self, callback: Box<dyn ForeignGetters>, v: String) -> Result<(), SimpleError> {
         callback.get_nothing(v)
+    }
+
+    fn set_nothing(&self, callback: Box<dyn ForeignGetters>) {
+        println!("In rust: set_nothing begins");
+        callback.set_nothing();
+        println!("In rust: set_nothing ends");
     }
 }
 

@@ -66,6 +66,9 @@ namespace {{ ns }} {
         // Now we are ready to call the callback.
         // We should be using callInvoker at this point, but for now
         // we think that there are no threading issues to worry about.
+        std::cout
+                << "\tCalling cb.call() {{ callback.name() }}"
+                << std::endl;
         try {
             cb.call(rt
             {%- for arg in callback.arguments() %}
@@ -76,6 +79,10 @@ namespace {{ ns }} {
                 , uniffiCallStatus
             {%- endif %}
             );
+
+            std::cout
+                << "\tSuccess! cb.call() {{ callback.name() }}"
+                << std::endl;
 
             {% if callback.has_rust_call_status_arg() -%}
             // Now copy the result back from JS into the RustCallStatus object.
@@ -110,6 +117,7 @@ namespace {{ ns }} {
             {%- endif -%}) {
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
+        std::cout << "C++: callback {{ callback.name() }} begins" << std::endl;
         lambda(
             {%- for arg in callback.arguments() %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -120,13 +128,16 @@ namespace {{ ns }} {
             , uniffi_call_status
             {%- endif -%}
         );
+        std::cout << "C++: callback {{ callback.name() }} ends" << std::endl;
     }
 
     static {{ name }}
     makeCallbackFunction(jsi::Runtime &rt,
                      std::shared_ptr<react::CallInvoker> callInvoker,
                      jsi::Function &cb) {
-        lambda = [&rt, callInvoker, &cb](
+        std::cout << "makeCallbackFunction for {{ callback.name() }} START" << std::endl;
+        std::thread::id thisThreadId = std::this_thread::get_id();
+        lambda = [&rt, callInvoker, &cb, thisThreadId](
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -137,6 +148,11 @@ namespace {{ ns }} {
             , RustCallStatus* uniffi_call_status
             {%- endif -%}
             ) {
+                if (std::this_thread::get_id()!= thisThreadId) {
+                    std::cout << "C++: callback {{ callback.name() }} running in a different thread" << std::endl;
+                } else {
+                    std::cout << "C++: callback {{ callback.name() }} running in the same thread as initialized" << std::endl;
+                }
                 body(rt, callInvoker, cb
                     {%- for arg in callback.arguments() %}
                     {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -147,6 +163,7 @@ namespace {{ ns }} {
                     {%- endif -%}
                 );
         };
+        std::cout << "makeCallbackFunction for {{ callback.name() }} END" << std::endl;
         return callback;
     }
 } // namespace {{ ns }}

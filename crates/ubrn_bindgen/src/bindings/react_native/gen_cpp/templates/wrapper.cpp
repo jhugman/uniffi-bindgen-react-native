@@ -16,6 +16,7 @@
 #include <map>
 #include <utility>
 #include <iostream>
+#include <thread>
 
 namespace react = facebook::react;
 namespace jsi = facebook::jsi;

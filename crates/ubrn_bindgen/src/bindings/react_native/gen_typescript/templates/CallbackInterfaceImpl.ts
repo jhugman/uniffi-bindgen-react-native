@@ -16,6 +16,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             uniffiCallStatus: UniffiRustCallStatus
             {%- endif %}
         ) => {
+            console.log("JS: {{ name }}.{{ meth.name()|fn_name }}() begins!");
             const makeCall = {# space #}
             {%- call ts::async(meth) -%}
             (): {% call ts::return_type(meth) %} => {
@@ -104,6 +105,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             {%- endmatch %}
             uniffiOutReturn.pointee = uniffiForeignFuture
             {%- endif %}
+            console.log("\t{{ name }}.{{ meth.name()|fn_name }}() ends!");
         },
         {%- endfor %}
         uniffiFree: (uniffiHandle: UniffiHandle): void => {

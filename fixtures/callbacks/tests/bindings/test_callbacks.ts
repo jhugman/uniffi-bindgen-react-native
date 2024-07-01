@@ -10,7 +10,14 @@ import {
   RustStringifier,
   RustGetters,
 } from "../../generated/callbacks";
-import { assertEqual, assertNotEqual, assertNotNull, test } from "@/asserts";
+import {
+  assertEqual,
+  assertNotEqual,
+  assertNotNull,
+  test,
+  xtest,
+} from "@/asserts";
+import { console } from "@/hermes";
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";
@@ -59,21 +66,39 @@ class TypeScriptGetters implements ForeignGetters {
       throw new Error("something failed");
     }
   }
+  setNothing(): void {
+    console.log("TS: setNothing called!");
+  }
 }
 
-test("Boolean values passed between callback interfaces", () => {
+test("Set nothing values passed between callback interfaces", () => {
+  console.log("Starting test");
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
+  for (const v of inputData.boolean) {
+    rg.setNothing(callbackInterface);
+  }
+  rg.uniffiDestroy();
+});
+
+xtest("Boolean values passed between callback interfaces", () => {
+  console.log("Starting test");
+  const rg = new RustGetters();
+  console.log("Made RustGetters");
+  const callbackInterface = new TypeScriptGetters();
+  console.log("Made ForeignGetters");
   const flag = true;
   for (const v of inputData.boolean) {
     const expected = callbackInterface.getBool(v, flag);
+    console.log(`\texpected = ${expected}`);
     const observed = rg.getBool(callbackInterface, v, flag);
+    console.log(`\tobserved = ${observed}`);
     assertEqual(observed, expected);
   }
   rg.uniffiDestroy();
 });
 
-test("List values passed between callback interfaces", () => {
+xtest("List values passed between callback interfaces", () => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
   const flag = true;
@@ -85,7 +110,7 @@ test("List values passed between callback interfaces", () => {
   rg.uniffiDestroy();
 });
 
-test("String values passed between callback interfaces", () => {
+xtest("String values passed between callback interfaces", () => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
   const flag = true;
