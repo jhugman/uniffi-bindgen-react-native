@@ -13,6 +13,15 @@ import {
 const UNIFFI_RUST_FUTURE_POLL_READY = 0;
 const UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1;
 
+// The UniffiRustFutureContinuationCallback is generated in the {{ namespace }}-ffi.ts file,
+// when iterating over `ci.ffi_definitions()`.
+//
+// In binding generators for other languages, we would use that; however, in this binding, we've
+// separated out the runtime from the generated files.
+//
+// We check if this is the same as the generated type in the {{ namespace }}-ffi.ts file.
+// If a compile time error happens in that file, then uniffi-core has changed the way
+// it is calling callbacks and this file will need to be changed.
 export type UniffiRustFutureContinuationCallback = (
   handle: UniffiHandle,
   pollResult: number,
@@ -21,27 +30,18 @@ export type UniffiRustFutureContinuationCallback = (
 // TODO: this is hacked to make it compile. Make this work.
 const uniffiContinuationHandleMap = new UniffiHandleMap<Promise<number>>();
 
-type UniffiAsyncCallParams<F, T> = {
-  rustFutureFunc: () => bigint;
+export async function uniffiRustCallAsync<F, T>(
+  rustFutureFunc: () => bigint,
   pollFunc: (
     rustFuture: bigint,
     cb: UniffiRustFutureContinuationCallback,
     handle: UniffiHandle,
-  ) => void;
-  completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F;
-  freeFunc: (rustFuture: bigint) => void;
-  liftFunc: (lower: F) => T;
-  errorHandler?: UniffiErrorHandler;
-};
-
-export async function uniffiRustCallAsync<F, T>({
-  rustFutureFunc,
-  pollFunc,
-  completeFunc,
-  freeFunc,
-  liftFunc,
-  errorHandler,
-}: UniffiAsyncCallParams<F, T>): Promise<T> {
+  ) => void,
+  completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
+  freeFunc: (rustFuture: bigint) => void,
+  liftFunc: (lower: F) => T,
+  errorHandler?: UniffiErrorHandler,
+): Promise<T> {
   // Make sure to call uniffiEnsureInitialized() since future creation doesn't have a
   // UniffiRustCallStatus param, so doesn't use makeRustCall()
   // uniffiEnsureInitialized()

@@ -116,10 +116,13 @@ impl CodeOracle {
             | FfiType::Int64
             | FfiType::UInt64
             | FfiType::Float32
-            | FfiType::Float64 => format!("{}ByReference", self.ffi_type_label(ffi_type)),
+            | FfiType::Float64
+            | FfiType::RustBuffer(_) => {
+                format!("UniffiReferenceHolder<{}>", self.ffi_type_label(ffi_type))
+            }
             FfiType::RustArcPtr(_) => "PointerByReference".to_owned(),
             // JNA structs default to ByReference
-            FfiType::RustBuffer(_) | FfiType::Struct(_) => self.ffi_type_label(ffi_type),
+            FfiType::Struct(_) => self.ffi_type_label(ffi_type),
             _ => panic!("{ffi_type:?} by reference is not implemented"),
         }
     }

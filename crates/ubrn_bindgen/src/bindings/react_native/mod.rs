@@ -15,7 +15,9 @@ use serde::Deserialize;
 use topological_sort::TopologicalSort;
 use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{
-    interface::{FfiArgument, FfiFunction, FfiType, Function},
+    interface::{
+        FfiArgument, FfiCallbackFunction, FfiField, FfiFunction, FfiStruct, FfiType, Function,
+    },
     BindingGenerator, BindingsConfig, ComponentInterface,
 };
 use uniffi_meta::Type;
@@ -201,21 +203,27 @@ impl ComponentInterface {
     fn iter_ffi_functions_js_to_cpp(&self) -> impl Iterator<Item = FfiFunction> {
         self.iter_ffi_functions_js_to_cpp_and_back()
             .chain(self.iter_ffi_functions_js_to_rust())
+            .chain(self.iter_ffi_functions_init_callback())
     }
 
     fn iter_ffi_functions_js_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
         let has_async = self.has_async_fns();
-        let has_callbacks = false;
         self.iter_ffi_function_definitions().filter(move |f| {
             let name = f.name();
             !name.contains("_rustbuffer_")
                 && (has_async || !name.contains("_rust_future_"))
-                && (has_callbacks || !name.contains("_callback_vtable_"))
+                && !name.contains("_callback_vtable_")
         })
     }
 
     fn iter_ffi_functions_cpp_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
         self.iter_ffi_functions_js_to_rust()
+    }
+
+    fn iter_ffi_functions_init_callback(&self) -> impl Iterator<Item = FfiFunction> {
+        self.callback_interface_definitions()
+            .iter()
+            .map(|cb| cb.ffi_init_callback().clone())
     }
 
     /// We want to control the ordering of definitions in typescript, especially
@@ -330,5 +338,54 @@ impl FfiType {
             Self::RustBuffer(_) => true, // includes/RustBuffer.h
             _ => false,
         }
+    }
+
+    fn is_callable(&self) -> bool {
+        matches!(self, Self::Callback(_))
+    }
+
+    fn is_void(&self) -> bool {
+        matches!(self, Self::VoidPointer)
+    }
+}
+
+#[ext]
+impl FfiArgument {
+    fn is_return(&self) -> bool {
+        self.name() == "uniffi_out_return"
+    }
+}
+
+#[ext]
+impl FfiCallbackFunction {
+    fn is_user_callback(&self) -> bool {
+        !self.is_future_callback()
+    }
+
+    fn is_future_callback(&self) -> bool {
+        is_future(self.name())
+    }
+
+    fn arg_return_type(&self) -> Option<FfiType> {
+        let arg = self
+            .arguments()
+            .into_iter()
+            .find(|a| a.is_return() && !a.type_().is_void());
+        arg.map(|a| a.type_())
+    }
+}
+
+fn is_future(nm: &str) -> bool {
+    nm.starts_with("ForeignFuture") || nm.starts_with("RustFuture")
+}
+
+#[ext]
+impl FfiStruct {
+    fn is_vtable(&self) -> bool {
+        !is_future(self.name()) && self.fields().iter().any(|f| f.type_().is_callable())
+    }
+
+    fn ffi_functions(&self) -> impl Iterator<Item = &FfiField> {
+        self.fields().iter().filter(|f| f.type_().is_callable())
     }
 }

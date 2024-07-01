@@ -6,10 +6,11 @@
 import { UniffiInternalError } from "./errors";
 
 export type UniffiHandle = bigint;
-const intialHandle = BigInt("0");
+export const defaultUniffiHandle = BigInt("0");
+
 export class UniffiHandleMap<T> {
   private map = new Map<UniffiHandle, T>();
-  private currentHandle: UniffiHandle = intialHandle;
+  private currentHandle: UniffiHandle = defaultUniffiHandle;
 
   insert(value: T): UniffiHandle {
     this.map.set(this.currentHandle, value);
