@@ -32,7 +32,7 @@ namespace {{ ns }} {
     // which itself is called from the callback function which is passed to Rust.
     static void body(jsi::Runtime &rt,
                      std::shared_ptr<react::CallInvoker> callInvoker,
-                     jsi::Function &cb
+                     std::shared_ptr<jsi::Value> callbackValue
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -67,6 +67,8 @@ namespace {{ ns }} {
         // We should be using callInvoker at this point, but for now
         // we think that there are no threading issues to worry about.
         try {
+            // Getting the callback function
+            auto cb = callbackValue->asObject(rt).asFunction(rt);
             cb.call(rt
             {%- for arg in callback.arguments() %}
             {%-   let arg_nm = arg.name()|var_name|fmt("js_{}") -%}
@@ -125,8 +127,10 @@ namespace {{ ns }} {
     static {{ name }}
     makeCallbackFunction(jsi::Runtime &rt,
                      std::shared_ptr<react::CallInvoker> callInvoker,
-                     jsi::Function &cb) {
-        lambda = [&rt, callInvoker, &cb](
+                     jsi::Function &callbackFunction) {
+        std::thread::id thisThreadId = std::this_thread::get_id();
+        auto callbackValue = std::make_shared<jsi::Value>(rt, callbackFunction);
+        lambda = [&rt, callInvoker, callbackValue, thisThreadId](
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -137,7 +141,10 @@ namespace {{ ns }} {
             , RustCallStatus* uniffi_call_status
             {%- endif -%}
             ) {
-                body(rt, callInvoker, cb
+                if (std::this_thread::get_id()!= thisThreadId) {
+                    std::cout << "C++: callback {{ callback.name() }} running in a different thread" << std::endl;
+                }
+                body(rt, callInvoker, callbackValue
                     {%- for arg in callback.arguments() %}
                     {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
                     , {{ arg_nm_rs }}
