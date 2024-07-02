@@ -30,15 +30,15 @@ template <> struct Bridging<RustCallStatus> {
         statusObject.setProperty(rt, "code", code);
     }
   }
-  static void copyFromJs(jsi::Runtime &rt, const jsi::Value &jsStatus, RustCallStatus status) {
+  static void copyFromJs(jsi::Runtime &rt, const jsi::Value &jsStatus, RustCallStatus *status) {
     auto statusObject = jsStatus.asObject(rt);
     if (statusObject.hasProperty(rt, "errorBuf")) {
         auto rbuf = statusObject.getProperty(rt, "errorBuf");
-        status.error_buf = uniffi_jsi::Bridging<RustBuffer>::fromJs(rt, rbuf);
+        status->error_buf = uniffi_jsi::Bridging<RustBuffer>::fromJs(rt, rbuf);
     }
     if (statusObject.hasProperty(rt, "code")) {
         auto code = statusObject.getProperty(rt, "code");
-        status.code = uniffi_jsi::Bridging<uint8_t>::fromJs(rt, code);
+        status->code = uniffi_jsi::Bridging<uint8_t>::fromJs(rt, code);
     }
   }
 };

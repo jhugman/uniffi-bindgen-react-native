@@ -80,7 +80,7 @@ namespace {{ ns }} {
 
             {% if callback.has_rust_call_status_arg() -%}
             // Now copy the result back from JS into the RustCallStatus object.
-            uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(rt, uniffiCallStatus, *uniffi_call_status);
+            uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(rt, uniffiCallStatus, uniffi_call_status);
             {%- endif %}
 
             {% match callback.arg_return_type() -%}
@@ -94,7 +94,7 @@ namespace {{ ns }} {
                     << error.what() << std::endl;
             {%- if callback.has_rust_call_status_arg() %}
             uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(
-                rt, uniffiCallStatus, *uniffi_call_status);
+                rt, uniffiCallStatus, uniffi_call_status);
             {%- endif %}
         }
     }

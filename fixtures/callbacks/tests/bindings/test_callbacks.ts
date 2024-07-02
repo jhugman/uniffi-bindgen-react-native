@@ -9,8 +9,9 @@ import {
   SimpleException,
   RustStringifier,
   RustGetters,
+  StoredForeignStringifier,
 } from "../../generated/callbacks";
-import { assertEqual, assertNotEqual, assertNotNull, test } from "@/asserts";
+import { assertEqual, assertNull, assertThrows, fail, test } from "@/asserts";
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";
@@ -41,10 +42,10 @@ class TypeScriptGetters implements ForeignGetters {
   getOption(v: string | undefined, arg2: boolean): string | undefined {
     if (v == BAD_ARGUMENT) {
       // throw new ComplexException.ReallyBadArgument(20);
-      throw new SimpleException.BadArgument("bad argument");
+      throw new SimpleException.BadArgument(BAD_ARGUMENT);
     }
     if (v == UNEXPECTED_ERROR) {
-      throw Error("something failed");
+      throw Error(UNEXPECTED_ERROR);
     }
     return arg2 ? v?.toUpperCase() : v;
   }
@@ -53,10 +54,10 @@ class TypeScriptGetters implements ForeignGetters {
   }
   getNothing(v: string): void {
     if (v == BAD_ARGUMENT) {
-      throw new SimpleException.BadArgument("bad argument");
+      throw new SimpleException.BadArgument(BAD_ARGUMENT);
     }
     if (v == UNEXPECTED_ERROR) {
-      throw new Error("something failed");
+      throw new Error(UNEXPECTED_ERROR);
     }
   }
 }
@@ -95,4 +96,53 @@ test("String values passed between callback interfaces", () => {
     assertEqual(observed, expected);
   }
   rg.uniffiDestroy();
+});
+
+test("Optional callbacks serialized correctly", () => {
+  const rg = new RustGetters();
+  const callbackInterface = new TypeScriptGetters();
+  assertEqual(
+    rg.getStringOptionalCallback(callbackInterface, "TestString", false),
+    "TestString",
+  );
+  assertNull(rg.getStringOptionalCallback(undefined, "TestString", false));
+  rg.uniffiDestroy();
+});
+
+test("Errors are propagated correctly", () => {
+  const rg = new RustGetters();
+  const callbackInterface = new TypeScriptGetters();
+  assertThrows(SimpleException.BadArgument, () =>
+    rg.getNothing(callbackInterface, BAD_ARGUMENT),
+  );
+  assertThrows(Error, () => rg.getNothing(callbackInterface, UNEXPECTED_ERROR));
+  rg.uniffiDestroy();
+});
+
+// 2. Pass the callback in as a constructor argument, to be stored on the Object struct.
+// This is crucial if we want to configure a system at startup,
+// then use it without passing callbacks all the time.
+class StoredTypeScriptStringifier implements StoredForeignStringifier {
+  fromSimpleType(value: number): string {
+    return `typescript: ${value}`;
+  }
+  // We don't test this, but we're checking that the arg type is included in the minimal
+  // list of types used in the UDL.
+  // If this doesn't compile, then look at TypeResolver.
+  fromComplexType(values: (number | undefined)[] | undefined): string {
+    if (values) {
+      return `typescript: ${values.join(", ")}`;
+    } else {
+      return `typescript: none`;
+    }
+  }
+}
+test("A callback passed into the constructor", () => {
+  const stringifierCallback = new StoredTypeScriptStringifier();
+  const rustStringifier = new RustStringifier(stringifierCallback);
+
+  const expected = stringifierCallback.fromSimpleType(42);
+  const observed = rustStringifier.fromSimpleType(42);
+
+  assertEqual(observed, expected);
 });
