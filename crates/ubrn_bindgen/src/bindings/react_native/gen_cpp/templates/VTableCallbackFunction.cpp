@@ -1,7 +1,6 @@
 {%- let name = callback.name()|ffi_callback_name %}
-{%- let ns = name|lower|fmt("uniffi_jsi::{}") %}
 
-// Callback function: {{ name }}
+// Callback function: {{ ns }}::{{ name }}
 //
 // We have the following constraints:
 // - we need to pass a function pointer to Rust.

@@ -16,7 +16,8 @@ use topological_sort::TopologicalSort;
 use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{
     interface::{
-        FfiArgument, FfiCallbackFunction, FfiField, FfiFunction, FfiStruct, FfiType, Function,
+        FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
+        Function,
     },
     BindingGenerator, BindingsConfig, ComponentInterface,
 };
@@ -226,6 +227,13 @@ impl ComponentInterface {
             .map(|cb| cb.ffi_init_callback().clone())
     }
 
+    fn iter_ffi_structs(&self) -> impl Iterator<Item = FfiStruct> {
+        self.ffi_definitions().filter_map(|s| match s {
+            FfiDefinition::Struct(s) => Some(s),
+            _ => None,
+        })
+    }
+
     /// We want to control the ordering of definitions in typescript, especially
     /// the FfiConverters which rely on Immediately Invoked Function Expressions (IIFE),
     /// or straight up expressions.
@@ -362,6 +370,10 @@ impl FfiCallbackFunction {
         !self.is_future_callback()
     }
 
+    fn is_free_callback(&self) -> bool {
+        is_free(self.name())
+    }
+
     fn is_future_callback(&self) -> bool {
         is_future(self.name())
     }
@@ -379,6 +391,10 @@ fn is_future(nm: &str) -> bool {
     nm.starts_with("ForeignFuture") || nm.starts_with("RustFuture")
 }
 
+fn is_free(nm: &str) -> bool {
+    nm == "CallbackInterfaceFree" || nm == "ForeignFutureFree"
+}
+
 #[ext]
 impl FfiStruct {
     fn is_vtable(&self) -> bool {
@@ -387,5 +403,12 @@ impl FfiStruct {
 
     fn ffi_functions(&self) -> impl Iterator<Item = &FfiField> {
         self.fields().iter().filter(|f| f.type_().is_callable())
+    }
+}
+
+#[ext]
+impl FfiField {
+    fn is_free(&self) -> bool {
+        self.name() == "uniffi_free"
     }
 }

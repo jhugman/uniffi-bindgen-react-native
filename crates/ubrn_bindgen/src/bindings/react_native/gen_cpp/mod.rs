@@ -8,7 +8,8 @@ mod filters;
 use crate::bindings::{
     metadata::ModuleMetadata,
     react_native::{
-        ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiStructExt, FfiTypeExt,
+        ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,
+        FfiTypeExt,
     },
 };
 use anyhow::Result;

@@ -124,6 +124,38 @@ _{{ arg.name() }}_{{ index }}
     );
 {%- endmacro %}
 
+{#-
+// ns is the namespace used for the callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_impl(callback) %}
+{%- let ns = callback.name()|ffi_callback_name|lower|fmt("uniffi_jsi::{}") %}
+{%- include "VTableCallbackFunction.cpp" %}
+{%- endmacro %}
+
+{#-
+// ns is the namespace used for the free callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_free_impl(callback) %}
+{%- call callback_fn_impl(callback) %}
+{%- for st in self.ci.iter_ffi_structs() %}
+{%- let ns = st.name()|lower|fmt("uniffi_jsi::{}::freecallback") %}
+{%- include "VTableCallbackFunction.cpp" %}
+{%- endfor %}
+{%- endmacro %}
+
+{%- macro callback_fn_namespace(st, field) %}
+{%- if field.is_free() %}
+{#- // match the callback_fn_free_impl macro  #}
+{{- st.name()|lower|fmt("uniffi_jsi::{}::freecallback") -}}
+{%- else %}
+{#- // match the callback_fn_impl macro  #}
+{%- let field_type = field.type_().borrow()|ffi_type_name %}
+{{- field_type|lower|fmt("uniffi_jsi::{}")}}
+{%- endif %}
+{%- endmacro %}
+
 {%- macro callback_struct_decl(ffi_struct) %}
     {%- let struct_name = ffi_struct.name()|ffi_struct_name -%}
     typedef struct {{ struct_name }} {

@@ -26,9 +26,9 @@ template <> struct Bridging<{{ struct_name }}> {
     {%- for field in ffi_struct.ffi_functions() %}
     {%-   let rs_field_name = field.name() %}
     {%-   let func_name = rs_field_name|var_name|fmt("fn_{}") %}
-    {%-   let field_type = field.type_().borrow()|ffi_type_name %}
-    {%-   let ns = field_type|lower|fmt("uniffi_jsi::{}") %}
-    vtable.{{ rs_field_name }} = {{ ns }}::makeCallbackFunction(rt, callInvoker, {{ func_name }});
+    vtable.{{ rs_field_name }} = {# space #}
+      {%- call cpp::callback_fn_namespace(ffi_struct, field) -%}
+        ::makeCallbackFunction(rt, callInvoker, {{ func_name }});
     {%- endfor %}
 
     return vtable;

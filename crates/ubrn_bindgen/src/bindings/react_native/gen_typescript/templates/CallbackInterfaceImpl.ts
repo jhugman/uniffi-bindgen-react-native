@@ -107,10 +107,8 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
         },
         {%- endfor %}
         uniffiFree: (uniffiHandle: UniffiHandle): void => {
-            const result = {{ ffi_converter_name }}.drop(uniffiHandle);
-            if (result === undefined) {
-                console.warn("Uniffi callback interface {{ name }}: handle missing in uniffiFree")
-            }
+            // {{ name }}: this will throw a stale handle error if the handle isn't found.
+            {{ ffi_converter_name }}.drop(uniffiHandle);
         }
     },
     register: () => {

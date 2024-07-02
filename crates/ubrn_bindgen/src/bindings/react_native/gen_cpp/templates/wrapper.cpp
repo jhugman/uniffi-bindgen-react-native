@@ -52,7 +52,11 @@ extern "C" {
 {%-   match def %}
 {%-     when FfiDefinition::CallbackFunction(callback) %}
 {%-       if callback.is_user_callback() %}
-{%-         include "VTableCallbackFunction.cpp" %}
+{%-         if callback.is_free_callback() %}
+{%-           call cpp::callback_fn_free_impl(callback) %}
+{%-         else %}
+{%-           call cpp::callback_fn_impl(callback) %}
+{%-         endif %}
 {%-       endif %}
 {%-     when FfiDefinition::Struct(ffi_struct) %}
 {%-       if ffi_struct.is_vtable() %}
