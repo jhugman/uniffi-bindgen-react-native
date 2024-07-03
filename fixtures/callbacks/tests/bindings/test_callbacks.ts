@@ -11,7 +11,14 @@ import {
   RustGetters,
   StoredForeignStringifier,
 } from "../../generated/callbacks";
-import { assertEqual, assertNull, assertThrows, fail, test } from "@/asserts";
+import {
+  assertEqual,
+  assertNull,
+  assertThrows,
+  fail,
+  test,
+  xtest,
+} from "@/asserts";
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";
@@ -57,7 +64,7 @@ class TypeScriptGetters implements ForeignGetters {
       throw new SimpleException.BadArgument(BAD_ARGUMENT);
     }
     if (v == UNEXPECTED_ERROR) {
-      throw new Error(UNEXPECTED_ERROR);
+      throw new SimpleException.UnexpectedError(UNEXPECTED_ERROR);
     }
   }
 }
@@ -112,10 +119,12 @@ test("Optional callbacks serialized correctly", () => {
 test("Errors are propagated correctly", () => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
-  assertThrows(SimpleException.BadArgument, () =>
+  assertThrows("SimpleException.BadArgument", () =>
     rg.getNothing(callbackInterface, BAD_ARGUMENT),
   );
-  assertThrows(Error, () => rg.getNothing(callbackInterface, UNEXPECTED_ERROR));
+  assertThrows("SimpleException.UnexpectedError", () =>
+    rg.getNothing(callbackInterface, UNEXPECTED_ERROR),
+  );
   rg.uniffiDestroy();
 });
 

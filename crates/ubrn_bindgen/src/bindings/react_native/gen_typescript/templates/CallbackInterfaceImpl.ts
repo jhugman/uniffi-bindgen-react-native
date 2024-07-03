@@ -45,7 +45,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*callStatus:*/ uniffiCallStatus,
                 /*makeCall:*/ makeCall,
                 /*writeReturn:*/ writeReturn,
-                /*lowerString*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower
             )
             {%- when Some(error_type) %}
             {{- self.import_infra("uniffiTraitInterfaceCallWithError", "callbacks") }}
@@ -53,9 +53,9 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*callStatus:*/ uniffiCallStatus,
                 /*makeCall:*/ makeCall,
                 /*writeReturn:*/ writeReturn,
-                /*errorType:*/ {{ error_type|type_name(ci) }},
+                /*errorType:*/ "{{ error_type|type_name(ci) }}",
                 /*lowerError:*/ {{ error_type|lower_fn }},
-                /*lowerString*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower
             )
             {%- endmatch %}
             {%- else %}
