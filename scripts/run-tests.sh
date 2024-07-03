@@ -7,8 +7,36 @@ for test in "${root}"/typescript/tests/*.test.ts ; do
     cargo xtask run "${test}"
 done
 
+declare -a selected_fixtures=()
+declare -a excluded_fixtures=()
+while (( "$#" )); do
+  case "$1" in
+    '--fixture'|'-f')
+       selected_fixtures+=("$2")
+       shift 2
+       ;;
+    '--exclude'|'-x')
+       excluded_fixtures+=("$2")
+       shift 2
+       ;;
+    *)
+       echo "Unknown argument: $1"
+       exit 1
+       ;;
+  esac
+done
+
+if [ ${#selected_fixtures[@]} -eq 0 ]; then
+    fixtures=$(cd "${root}/fixtures" && ls)
+else
+    fixtures=${selected_fixtures[@]}
+fi
+
 uniffi_bindgen_manifest="${root}/crates/ubrn_cli/Cargo.toml"
-for fixture in $(cd "${root}/fixtures" && ls) ; do
+for fixture in ${fixtures} ; do
+    if [[ " ${excluded_fixtures[@]} " =~ " ${fixture} " ]]; then
+        continue
+    fi
     # This should all go in either an xtask or into our uniffi-bindgen command.
     # This builds the crate into the target dir.
     fixture_dir="${root}/fixtures/${fixture}"
