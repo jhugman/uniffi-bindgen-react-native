@@ -9,12 +9,21 @@
 // cargo xtask run ./fixtures/${fixture}/tests/bindings/test_${fixture}.ts --cpp ./fixtures/${fixture}/generated/${fixture}.cpp --crate ./fixtures/${fixture}
 
 import {
+  CoverallException,
   Coveralls,
   createNoneDict,
   createSomeDict,
   getNumAlive,
 } from "../../generated/coverall";
-import { assertEqual, assertFalse, assertTrue, test, xtest } from "@/asserts";
+import {
+  assertEqual,
+  assertFalse,
+  assertThrows,
+  assertTrue,
+  fail,
+  test,
+  xtest,
+} from "@/asserts";
 import { console } from "@/hermes";
 
 // floats should be "close enough".
@@ -105,4 +114,15 @@ test("Given 1000 objects, when they go out of scope, then they are dropped by ru
   makeCoveralls(1000);
 
   assertEqual(getNumAlive(), initial);
+});
+
+test("Catching errors", () => {
+  const coveralls = new Coveralls("Testing errors");
+  assertThrows("CoverallException.TooManyHoles", () =>
+    coveralls.maybeThrow(true),
+  );
+  assertThrows("CoverallException.TooManyHoles", () =>
+    coveralls.maybeThrowInto(true),
+  );
+  coveralls.uniffiDestroy();
 });

@@ -14,13 +14,15 @@
   "type": "module",
   "exports": {
     "./async-rust-call": "./dist/async-rust-call.js",
+    "./callbacks": "./dist/callbacks.js",
     "./errors": "./dist/errors.js",
     "./ffi-converters": "./dist/ffi-converters.js",
     "./ffi-types": "./dist/ffi-types.js",
     "./handle-map": "./dist/handle-map.js",
     "./objects": "./dist/objects.js",
     "./rust-call": "./dist/rust-call.js",
-    "./records": "./dist/records.js"
+    "./records": "./dist/records.js",
+    "./type-utils": "./dist/type-utils.js"
   },
   "bin": {
     "uniffi-bindgen-react-native": "./bin/cli.sh"

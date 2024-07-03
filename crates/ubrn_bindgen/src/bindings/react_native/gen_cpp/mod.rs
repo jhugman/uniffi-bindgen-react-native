@@ -7,11 +7,15 @@ mod filters;
 
 use crate::bindings::{
     metadata::ModuleMetadata,
-    react_native::{ComponentInterfaceExt, FfiTypeExt},
+    react_native::{
+        ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,
+        FfiTypeExt,
+    },
 };
 use anyhow::Result;
 use askama::Template;
 use std::borrow::Borrow;
+use uniffi_bindgen::interface::FfiDefinition;
 use uniffi_bindgen::ComponentInterface;
 
 #[derive(Debug, Default)]

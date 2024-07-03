@@ -2,7 +2,8 @@
 
 {%- call ts::docstring(e, 0) %}
 export class {{ type_name }} extends Error {
-    constructor(message: string) {
+    private _uniffiTypeName = "{{ type_name }}";
+    constructor(private _uniffiVariantName: string, message: string) {
         super(message);
     }
     {%- if e.is_flat() %}
@@ -19,7 +20,7 @@ export class {{ type_name }} extends Error {
 {%-   for variant in e.variants() %}
 {%-    let var_name = variant.name()|class_name(ci) %}
 class _{{ type_name }}_{{ var_name }} extends {{ type_name }} {
-    constructor(message: string) { super(message); }
+    constructor(message: string) { super("{{ var_name }}", message); }
 }
 {{ type_name }}.{{ var_name }} = _{{ type_name }}_{{ var_name }};
 {%-  endfor %}
@@ -48,20 +49,23 @@ const {{ ffi_converter_name }} = (() => {
         }
         write(value: TypeName, into: RustBuffer): void {
             {%- if e.is_flat() %}
-
+            switch ((value as any)._uniffiVariantName) {
             {%- for variant in e.variants() %}
-            if (value instanceof {{ type_name }}.{{ variant.name()|class_name(ci) }}) {
-                intConverter.write({{ loop.index0 }}, into);
-            } else
-            {%- endfor %} {
-                throw new UniffiInternalError.UnexpectedEnumCase();
+                case "{{ variant.name()|class_name(ci) }}": {
+                    intConverter.write({{ loop.index }}, into);
+                    break;
+                }
+            {%- endfor %}
+                default:{
+                    throw new UniffiInternalError.UnexpectedEnumCase();
+                }
             }
             {%- else %}
             throw new Error("Method not implemented.")
             {%- endif %}
         }
         allocationSize(value: TypeName): number {
-            throw new Error("Method not implemented.")
+            return intConverter.allocationSize(0);
         }
     }
     return new FfiConverter();

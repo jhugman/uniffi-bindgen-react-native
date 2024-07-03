@@ -89,3 +89,78 @@ _{{ arg.name() }}_{{ index }}
 
 
 {%- macro cpp_func_name(func) %}cpp_{{ func.name() }}{%- endmacro %}
+
+{# CALLBACKS #}
+
+{%- macro callback_init(module_name, func) %}
+{%- call cpp_fn_from_js_decl(func) %} {
+    {%- let args = func.arguments() %}
+    {%- let arg = args.first().unwrap() %}
+    {%- let vtable_t = arg.type_().borrow()|ffi_type_name_from_js %}
+    static {{ vtable_t }} vtableInstance =
+        uniffi_jsi::Bridging<{{ vtable_t }}>::fromJs(
+            rt,
+            args[0],
+            callInvoker
+        );
+    {{ func.name() }}(&vtableInstance);
+    return jsi::Value::undefined();
+}
+{%- endmacro %}
+
+{%- macro callback_fn_decl(callback) %}
+    typedef {# space #}
+    {%-   match callback.return_type() %}
+    {%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
+    {%-     when None %}void
+    {%-   endmatch %}
+    (*{{  callback.name()|ffi_callback_name }})(
+    {%-   for arg in callback.arguments() %}
+    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name() }}{% if !loop.last %}, {% endif %}
+    {%-   endfor %}
+    {%-   if callback.has_rust_call_status_arg() -%}
+    {%      if callback.arguments().len() > 0 %}, {% endif %}RustCallStatus* rust_call_status
+    {%-   endif %}
+    );
+{%- endmacro %}
+
+{#-
+// ns is the namespace used for the callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_impl(callback) %}
+{%- let ns = callback.name()|ffi_callback_name|lower|fmt("uniffi_jsi::{}") %}
+{%- include "VTableCallbackFunction.cpp" %}
+{%- endmacro %}
+
+{#-
+// ns is the namespace used for the free callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_free_impl(callback) %}
+{%- call callback_fn_impl(callback) %}
+{%- for st in self.ci.iter_ffi_structs() %}
+{%- let ns = st.name()|lower|fmt("uniffi_jsi::{}::freecallback") %}
+{%- include "VTableCallbackFunction.cpp" %}
+{%- endfor %}
+{%- endmacro %}
+
+{%- macro callback_fn_namespace(st, field) %}
+{%- if field.is_free() %}
+{#- // match the callback_fn_free_impl macro  #}
+{{- st.name()|lower|fmt("uniffi_jsi::{}::freecallback") -}}
+{%- else %}
+{#- // match the callback_fn_impl macro  #}
+{%- let field_type = field.type_().borrow()|ffi_type_name %}
+{{- field_type|lower|fmt("uniffi_jsi::{}")}}
+{%- endif %}
+{%- endmacro %}
+
+{%- macro callback_struct_decl(ffi_struct) %}
+    {%- let struct_name = ffi_struct.name()|ffi_struct_name -%}
+    typedef struct {{ struct_name }} {
+    {%- for field in ffi_struct.fields() %}
+        {{ field.type_().borrow()|ffi_type_name }} {{ field.name() }};
+    {%- endfor %}
+    } {{ struct_name }};
+{%- endmacro %}

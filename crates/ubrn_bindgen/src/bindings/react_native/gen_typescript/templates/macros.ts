@@ -29,7 +29,7 @@
 {%- macro to_ffi_method_call(obj_factory, func) -%}
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
-        rustCallWithError({{ e|ffi_error_converter_name }}.lift, callStatus => {
+        rustCallWithError({{ e|lift_fn }}, callStatus => {
     {%- else -%}
         rustCall(callStatus => {
     {%- endmatch %}
@@ -110,7 +110,7 @@
 
 {%- macro call_async(obj_factory, callable) -%}
         await uniffiRustCallAsync({
-            rustFutureFunc: () => {
+            /*rustFutureFunc:*/ () => {
                 return nativeModule().{{ callable.ffi_func().name() }}(
                     {%- if callable.takes_self() %}
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
@@ -120,20 +120,20 @@
                     {%- endfor %}
                 );
             },
-            pollFunc: nativeModule().{{ callable.ffi_rust_future_poll(ci) }},
-            completeFunc: nativeModule().{{ callable.ffi_rust_future_complete(ci) }},
-            freeFunc: nativeModule().{{ callable.ffi_rust_future_free(ci) }},
+            /*pollFunc:*/ nativeModule().{{ callable.ffi_rust_future_poll(ci) }},
+            /*completeFunc:*/ nativeModule().{{ callable.ffi_rust_future_complete(ci) }},
+            /*freeFunc:*/ nativeModule().{{ callable.ffi_rust_future_free(ci) }},
             {%- match callable.return_type() %}
             {%- when Some(return_type) %}
-            liftFunc: {{ return_type|lift_fn }},
+            /*liftFunc:*/ {{ return_type|lift_fn }},
             {%- when None %}
             liftFunc: (_v) => {},
             {%- endmatch %}
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
-            errorHandler: {{ e|ffi_error_converter_name }}.lift
+            /*errorHandler:*/ {{ e|ffi_error_converter_name }}.lift
             {%- else %}
-            errorHandler: undefined,
+            /*errorHandler:*/ undefined,
             {% endmatch %}
         })
 {%- endmacro %}
@@ -198,6 +198,10 @@ v{{- field_num -}}
 
 {%- macro async(func) %}
 {%- if func.is_async() %}async {% endif %}
+{%- endmacro -%}
+
+{%- macro await(func) %}
+{%- if func.is_async() %}await {% endif %}
 {%- endmacro -%}
 
 {%- macro throws(func) %}

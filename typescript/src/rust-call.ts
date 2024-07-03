@@ -6,10 +6,10 @@
 import { UniffiInternalError } from "./errors";
 import type { UnsafeMutableRawPointer } from "./objects";
 
-const CALL_SUCCESS = 0;
-const CALL_ERROR = 1;
-const CALL_UNEXPECTED_ERROR = 2;
-const CALL_CANCELLED = 3;
+export const CALL_SUCCESS = 0;
+export const CALL_ERROR = 1;
+export const CALL_UNEXPECTED_ERROR = 2;
+export const CALL_CANCELLED = 3;
 
 type StringLifter = (arrayBuffer: ArrayBuffer) => string;
 let FfiConverterString_lift: StringLifter;

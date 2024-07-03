@@ -6,16 +6,25 @@
 import { console, stringify } from "./hermes";
 
 export class AssertError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, error?: Error) {
+    super(`${message}${error ? `: ${error.message}` : ""}`);
+    if (error) {
+      this.stack = this.stack
+        ? [this.stack, "Caused by:", error.stack].join("\n")
+        : error.stack;
+    }
   }
+}
+
+export function fail(message?: string, error?: Error): never {
+  throw new AssertError(message ?? "Assertion failed", error);
 }
 
 export function assertTrue(condition: boolean, message?: string): void {
   if (condition) {
     return;
   }
-  throw new AssertError(message ?? "Expected true, was false");
+  fail(message ?? "Expected true, was false");
 }
 
 export function assertFalse(condition: boolean, message?: string): void {
@@ -79,4 +88,30 @@ export function xtest<T>(testName: string, testBlock: () => T): void {
 
 function isEqual<T>(a: T, b: T): boolean {
   return a === b || a == b || stringify(a) === stringify(b);
+}
+
+/// We can't use instanceof here: hermes does not seem to generate the right
+/// prototype chain, so we'll check the error message instead.
+export function assertThrows<T>(errorVariant: string, fn: () => T) {
+  try {
+    fn();
+    fail("No error was thrown");
+  } catch (e: any) {
+    if (e instanceof Error) {
+      // Good, success!
+      assertEqual(
+        getErrorName(e),
+        errorVariant,
+        "Error is thrown, but the wrong one",
+      );
+    } else {
+      fail(`Something else was thrown: ${e}`);
+    }
+  }
+}
+
+function getErrorName(error: Error): string {
+  const typeName = (error as any)._uniffiTypeName ?? "Error";
+  const variantName = (error as any)._uniffiVariantName ?? "unknown";
+  return `${typeName}.${variantName}`;
 }

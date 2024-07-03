@@ -19,11 +19,12 @@ mod record;
 use anyhow::{Context, Result};
 use askama::Template;
 use heck::ToUpperCamelCase;
+use oracle::CodeOracle;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use uniffi_bindgen::bindings::swift::gen_swift::filters::ffi_converter_name;
-use uniffi_bindgen::interface::{Callable, Type, UniffiTrait};
+use uniffi_bindgen::interface::{Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 use uniffi_meta::{AsType, ExternalKind};
 
@@ -90,6 +91,14 @@ impl<'a> FrontendWrapper<'a> {
             exported_converters,
             imported_converters,
         }
+    }
+
+    pub fn initialization_fns(&self) -> Vec<String> {
+        self.ci
+            .iter_types()
+            .map(|t| CodeOracle.find(t))
+            .filter_map(|ct| ct.initialization_fn())
+            .collect()
     }
 }
 

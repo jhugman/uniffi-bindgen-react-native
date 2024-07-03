@@ -60,7 +60,7 @@ impl SequenceCodeType {
 
 impl CodeType for SequenceCodeType {
     fn type_label(&self, ci: &ComponentInterface) -> String {
-        format!("{}[]", CodeOracle.find(self.inner()).type_label(ci))
+        format!("Array<{}>", CodeOracle.find(self.inner()).type_label(ci))
     }
 
     fn canonical_name(&self) -> String {

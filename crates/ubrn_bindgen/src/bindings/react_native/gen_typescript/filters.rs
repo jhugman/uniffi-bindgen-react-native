@@ -38,8 +38,8 @@ pub(super) fn ffi_error_converter_name(as_type: &impl AsType) -> Result<String, 
 
 pub(super) fn lower_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
     Ok(format!(
-        "{}.lower",
-        as_ct.as_codetype().ffi_converter_name()
+        "{ct}.lower.bind({ct})",
+        ct = as_ct.as_codetype().ffi_converter_name()
     ))
 }
 
@@ -59,7 +59,10 @@ pub(super) fn write_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error>
 }
 
 pub(super) fn lift_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
-    Ok(format!("{}.lift", as_ct.as_codetype().ffi_converter_name()))
+    Ok(format!(
+        "{ct}.lift.bind({ct})",
+        ct = as_ct.as_codetype().ffi_converter_name()
+    ))
 }
 
 pub(super) fn read_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {

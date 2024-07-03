@@ -19,6 +19,7 @@
 #include "Float64.h"
 
 #include "ForeignBytes.h"
+#include "ReferenceHolder.h"
 #include "RustBuffer.h"
 #include "UniffiString.h"
 
