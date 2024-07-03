@@ -98,10 +98,10 @@ fn so_extension_from_cfg<'a>() -> &'a str {
         "dll"
     } else if cfg!(target_os = "macos") {
         "dylib"
-    } else if cfg!(target_os = "unix") {
+    } else if cfg!(target_os = "linux") {
         "so"
-    } else {
-        unimplemented!("Building only on windows, macos and unix supported right now")
+   } else {
+        unimplemented!("Building only on windows, macos and linux supported right now")
     }
 }
 
