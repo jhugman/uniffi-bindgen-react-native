@@ -9,7 +9,9 @@ export class AssertError extends Error {
   constructor(message: string, error?: Error) {
     super(`${message}${error ? `: ${error.message}` : ""}`);
     if (error) {
-      this.stack = error.stack;
+      this.stack = this.stack
+        ? [this.stack, "Caused by:", error.stack].join("\n")
+        : error.stack;
     }
   }
 }
@@ -88,17 +90,28 @@ function isEqual<T>(a: T, b: T): boolean {
   return a === b || a == b || stringify(a) === stringify(b);
 }
 
-export function assertThrows<E extends Function, T>(errorType: E, fn: () => T) {
+/// We can't use instanceof here: hermes does not seem to generate the right
+/// prototype chain, so we'll check the error message instead.
+export function assertThrows<T>(errorVariant: string, fn: () => T) {
   try {
     fn();
     fail("No error was thrown");
   } catch (e: any) {
-    if (e instanceof errorType) {
+    if (e instanceof Error) {
       // Good, success!
-    } else if (e instanceof Error) {
-      fail("Another error was thrown", e);
+      assertEqual(
+        getErrorName(e),
+        errorVariant,
+        "Error is thrown, but the wrong one",
+      );
     } else {
-      fail("Something else was thrown");
+      fail(`Something else was thrown: ${e}`);
     }
   }
+}
+
+function getErrorName(error: Error): string {
+  const typeName = (error as any)._uniffiTypeName ?? "Error";
+  const variantName = (error as any)._uniffiVariantName ?? "unknown";
+  return `${typeName}.${variantName}`;
 }

@@ -29,7 +29,7 @@
 {%- macro to_ffi_method_call(obj_factory, func) -%}
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
-        rustCallWithError({{ e|ffi_error_converter_name }}.lift, callStatus => {
+        rustCallWithError({{ e|lift_fn }}, callStatus => {
     {%- else -%}
         rustCall(callStatus => {
     {%- endmatch %}
