@@ -7,7 +7,7 @@
 // - we need a jsi::Runtime and jsi::Function to call into JS.
 // - function pointers can't store state, so we can't use a lamda.
 //
-// For this, we store a lambda as a global, as `lambda`. The `callback` function calls
+// For this, we store a lambda as a global, as `rsLambda`. The `callback` function calls
 // the lambda, which itself calls the `body` which then calls into JS.
 //
 // We then give the `callback` function pointer to Rust which will call the lambda sometime in the
@@ -25,12 +25,11 @@ namespace {{ ns }} {
         {%- endfor %}
         {%- if callback.has_rust_call_status_arg() -%}
         , RustCallStatus*
-        {%- endif -%})> lambda = nullptr;
+        {%- endif -%})> rsLambda = nullptr;
 
     // This is the main body of the callback. It's called from the lambda,
     // which itself is called from the callback function which is passed to Rust.
     static void body(jsi::Runtime &rt,
-                     std::shared_ptr<react::CallInvoker> callInvoker,
                      std::shared_ptr<jsi::Value> callbackValue
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
@@ -111,7 +110,7 @@ namespace {{ ns }} {
             {%- endif -%}) {
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
-        lambda(
+        rsLambda(
             {%- for arg in callback.arguments() %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
             {{ arg_nm_rs }}
@@ -125,11 +124,10 @@ namespace {{ ns }} {
 
     static {{ name }}
     makeCallbackFunction(jsi::Runtime &rt,
-                     std::shared_ptr<react::CallInvoker> callInvoker,
+                     std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
                      jsi::Function &callbackFunction) {
-        std::thread::id thisThreadId = std::this_thread::get_id();
         auto callbackValue = std::make_shared<jsi::Value>(rt, callbackFunction);
-        lambda = [&rt, callInvoker, callbackValue, thisThreadId](
+        rsLambda = [&rt, callInvoker, callbackValue](
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -140,10 +138,10 @@ namespace {{ ns }} {
             , RustCallStatus* uniffi_call_status
             {%- endif -%}
             ) {
-                if (std::this_thread::get_id()!= thisThreadId) {
-                    std::cout << "C++: callback {{ callback.name() }} running in a different thread" << std::endl;
-                }
-                body(rt, callInvoker, callbackValue
+                // We immediately make a lambda which will do the work of transforming the
+                // arguments into JSI values and calling the callback.
+                uniffi_runtime::CallFunc jsLambda = [
+                    callbackValue
                     {%- for arg in callback.arguments() %}
                     {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
                     , {{ arg_nm_rs }}
@@ -151,7 +149,20 @@ namespace {{ ns }} {
                     {%- if callback.has_rust_call_status_arg() -%}
                     , uniffi_call_status
                     {%- endif -%}
-                );
+                ](jsi::Runtime &rt) mutable {
+                    body(rt, callbackValue
+                        {%- for arg in callback.arguments() %}
+                        {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
+                        , {{ arg_nm_rs }}
+                        {%- endfor %}
+                        {%- if callback.has_rust_call_status_arg() -%}
+                        , uniffi_call_status
+                        {%- endif -%}
+                    );
+                };
+                // We'll then call that lambda from the callInvoker which will
+                // look after calling it on the correct thread.
+                callInvoker->invokeSync(rt, jsLambda);
         };
         return callback;
     }
@@ -161,6 +172,6 @@ namespace {{ ns }} {
     static void cleanup() {
         // The lambda holds a reference to the the Runtime, so when this is nulled out,
         // then the pointer will no longer be left dangling.
-        lambda = nullptr;
+        rsLambda = nullptr;
     }
 } // namespace {{ ns }}
