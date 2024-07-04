@@ -68,7 +68,7 @@ extern "C" {
 
 {{ module_name }}::{{ module_name }}(
     jsi::Runtime &rt,
-    std::shared_ptr<react::CallInvoker> invoker
+    std::shared_ptr<uniffi_runtime::UniffiCallInvoker> invoker
 ) : props(), callInvoker(invoker) {
     // Map from Javascript names to the cpp names
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
@@ -85,7 +85,8 @@ extern "C" {
 }
 
 void {{ module_name }}::registerModule(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker) {
-    auto tm = std::make_shared<{{ module_name }}>(rt, callInvoker);
+    auto invoker = std::make_shared<uniffi_runtime::UniffiCallInvoker>(callInvoker);
+    auto tm = std::make_shared<{{ module_name }}>(rt, invoker);
     auto obj = rt.global().createFromHostObject(rt, tm);
     rt.global().setProperty(rt, "{{ module_name }}", obj);
 }

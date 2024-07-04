@@ -6,23 +6,24 @@
 #include <map>
 #include <memory>
 #include <ReactCommon/CallInvoker.h>
-
+#include "UniffiCallInvoker.h"
 
 namespace react = facebook::react;
 namespace jsi = facebook::jsi;
 
 class {{ module_name }} : public jsi::HostObject {
+  private:
+    // For calling back into JS from Rust.
+    std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker;
+
   protected:
     std::map<std::string,jsi::Value> props;
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
     jsi::Value {% call cpp::cpp_func_name(func) %}(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count);
     {%- endfor %}
 
-    // For calling back into JS from Rust.
-    std::shared_ptr<react::CallInvoker> callInvoker;
-
   public:
-    {{ module_name }}(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker);
+    {{ module_name }}(jsi::Runtime &rt, std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker);
     virtual ~{{ module_name }}();
 
     /**
