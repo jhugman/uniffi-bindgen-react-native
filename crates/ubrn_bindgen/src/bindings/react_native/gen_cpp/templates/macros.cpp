@@ -145,6 +145,28 @@ _{{ arg.name() }}_{{ index }}
 {%- endfor %}
 {%- endmacro %}
 
+{#-
+// ns is the namespace used for the callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_cleanup(callback) %}
+{%- let ns = callback.name()|ffi_callback_name|lower|fmt("uniffi_jsi::{}") %}
+{{- ns }}::cleanup();
+{%- endmacro %}
+
+{#-
+// ns is the namespace used for the free callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_free_cleanup(callback) %}
+{%- call callback_fn_cleanup(callback) %}
+{%- for st in self.ci.iter_ffi_structs() %}
+{%- let ns = st.name()|lower|fmt("uniffi_jsi::{}::freecallback") %}
+{{- ns }}::cleanup();
+{%- endfor %}
+{%- endmacro %}
+
+
 {%- macro callback_fn_namespace(st, field) %}
 {%- if field.is_free() %}
 {#- // match the callback_fn_free_impl macro  #}
