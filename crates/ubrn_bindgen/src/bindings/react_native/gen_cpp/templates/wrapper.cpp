@@ -116,7 +116,19 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 }
 
 {{ module_name }}::~{{ module_name }}() {
-    // NOOP
+{%- for def in ci.ffi_definitions() %}
+{%-   match def %}
+{%-     when FfiDefinition::CallbackFunction(callback) %}
+{%-       if callback.is_user_callback() %}
+{%-         if callback.is_free_callback() %}
+{%-           call cpp::callback_fn_free_cleanup(callback) %}
+{%-         else %}
+{%-           call cpp::callback_fn_cleanup(callback) %}
+{%-         endif %}
+{%-       endif %}
+{%-     else %}
+{%-   endmatch %}
+{%- endfor %}
 }
 
 {%- include "StringHelper.cpp" %}

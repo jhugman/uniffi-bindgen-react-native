@@ -155,4 +155,12 @@ namespace {{ ns }} {
         };
         return callback;
     }
+
+    // This method is called from the destructor of {{ module_name }}, which only happens
+    // when the jsi::Runtime is being destroyed.
+    static void cleanup() {
+        // The lambda holds a reference to the the Runtime, so when this is nulled out,
+        // then the pointer will no longer be left dangling.
+        lambda = nullptr;
+    }
 } // namespace {{ ns }}
