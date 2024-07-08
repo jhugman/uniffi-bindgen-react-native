@@ -5,11 +5,14 @@
  */
 namespace uniffi_jsi {
 using namespace facebook;
+using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
 template <> struct Bridging<void *> {
-  static void *fromJs(jsi::Runtime &rt, const jsi::Value &value) {
+  static void *fromJs(jsi::Runtime &rt,
+                      std::shared_ptr<CallInvoker> callInvoker,
+                      const jsi::Value &value) {
     try {
-      auto num = uniffi_jsi::Bridging<uint64_t>::fromJs(rt, value);
+      auto num = uniffi_jsi::Bridging<uint64_t>::fromJs(rt, callInvoker, value);
       return reinterpret_cast<void *>(static_cast<uintptr_t>(num));
     } catch (const std::logic_error &e) {
       throw jsi::JSError(rt, e.what());

@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Bridging.h"
+#include "UniffiCallInvoker.h"
 #include <jsi/jsi.h>
 
 template <typename T> struct ReferenceHolder {
@@ -14,17 +15,19 @@ template <typename T> struct ReferenceHolder {
 
 namespace uniffi_jsi {
 using namespace facebook;
+using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
 template <typename T> struct Bridging<ReferenceHolder<T>> {
   static jsi::Value jsNew(jsi::Runtime &rt) {
     auto holder = jsi::Object(rt);
     return holder;
   }
-  static T fromJs(jsi::Runtime &rt, const jsi::Value &value) {
+  static T fromJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker> callInvoker,
+                  const jsi::Value &value) {
     auto obj = value.asObject(rt);
     if (obj.hasProperty(rt, "pointee")) {
       auto pointee = obj.getProperty(rt, "pointee");
-      return uniffi_jsi::Bridging<T>::fromJs(rt, pointee);
+      return uniffi_jsi::Bridging<T>::fromJs(rt, callInvoker, pointee);
     }
   }
 };

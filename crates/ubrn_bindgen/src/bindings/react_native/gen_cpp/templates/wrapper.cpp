@@ -26,7 +26,6 @@ extern "C" void registerNatives(jsi::Runtime &rt, std::shared_ptr<react::CallInv
     {{ module_name }}::registerModule(rt, callInvoker);
 }
 
-{% include "RustCallStatus.cpp" %}
 {% include "Callback.cpp" %}
 {% include "Handle.cpp" %}
 

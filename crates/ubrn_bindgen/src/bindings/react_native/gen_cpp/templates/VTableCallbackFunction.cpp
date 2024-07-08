@@ -30,6 +30,7 @@ namespace {{ ns }} {
     // This is the main body of the callback. It's called from the lambda,
     // which itself is called from the callback function which is passed to Rust.
     static void body(jsi::Runtime &rt,
+                     std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
                      std::shared_ptr<jsi::Value> callbackValue
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
@@ -79,13 +80,13 @@ namespace {{ ns }} {
 
             {% if callback.has_rust_call_status_arg() -%}
             // Now copy the result back from JS into the RustCallStatus object.
-            uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(rt, uniffiCallStatus, uniffi_call_status);
+            uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(rt, callInvoker, uniffiCallStatus, uniffi_call_status);
             {%- endif %}
 
             {% match callback.arg_return_type() -%}
             {%- when Some with (arg_t) %}
             // Finally, we need to copy the return value back into the Rust pointer.
-            *rs_uniffiOutReturn = uniffi_jsi::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(rt, js_uniffiOutReturn);
+            *rs_uniffiOutReturn = uniffi_jsi::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(rt, callInvoker, js_uniffiOutReturn);
             {%- else %}
             {%- endmatch %}
         } catch (const jsi::JSError &error) {
@@ -93,7 +94,7 @@ namespace {{ ns }} {
                     << error.what() << std::endl;
             {%- if callback.has_rust_call_status_arg() %}
             uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(
-                rt, uniffiCallStatus, uniffi_call_status);
+                rt, callInvoker, uniffiCallStatus, uniffi_call_status);
             {%- endif %}
         }
     }
@@ -141,6 +142,7 @@ namespace {{ ns }} {
                 // We immediately make a lambda which will do the work of transforming the
                 // arguments into JSI values and calling the callback.
                 uniffi_runtime::CallFunc jsLambda = [
+                    callInvoker,
                     callbackValue
                     {%- for arg in callback.arguments() %}
                     {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -150,7 +152,7 @@ namespace {{ ns }} {
                     , uniffi_call_status
                     {%- endif -%}
                 ](jsi::Runtime &rt) mutable {
-                    body(rt, callbackValue
+                    body(rt, callInvoker, callbackValue
                         {%- for arg in callback.arguments() %}
                         {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
                         , {{ arg_nm_rs }}

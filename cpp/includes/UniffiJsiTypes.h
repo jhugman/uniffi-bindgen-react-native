@@ -22,6 +22,7 @@
 #include "ReferenceHolder.h"
 #include "RustBuffer.h"
 #include "UniffiCallInvoker.h"
+#include "UniffiRustCallStatus.h"
 #include "UniffiString.h"
 
 #include "RustArcPtr.h"
