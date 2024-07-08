@@ -9,6 +9,13 @@
 {%- let is_error = ci.is_name_used_as_error(name) %}
 
 {%- include "ObjectInterfaceTemplate.ts" %}
+{%- macro private_ctor() %}
+private constructor(pointer: UnsafeMutableRawPointer) {
+    super();
+    this._rustArcPtr = {{ obj_factory }}.bless(pointer);
+}
+{%- endmacro %}
+
 
 {% call ts::docstring(obj, 0) %}
 export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ protocol_name }}
@@ -27,13 +34,17 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
-    {%- call ts::ctor_decl(obj_factory, cons, 4) %}
+    {%- if !cons.is_async() %}
+    {%-   call ts::ctor_decl(obj_factory, cons, 4) %}
+    {%- else %}
+    {%- call private_ctor() %}
+
+    // Async primary constructor declared for this class.
+    {%-   call ts::method_decl("public static", obj_factory, cons, 4) %}
+    {%- endif %}
     {%- when None %}
     // No primary constructor declared for this class.
-    private constructor(pointer: UnsafeMutableRawPointer) {
-        super();
-        this._rustArcPtr = {{ obj_factory }}.bless(pointer);
-    }
+    {%- call private_ctor() %}
     {%- endmatch %}
 
     {% for cons in obj.alternate_constructors() %}

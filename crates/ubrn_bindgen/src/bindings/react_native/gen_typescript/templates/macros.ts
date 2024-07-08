@@ -76,21 +76,11 @@
 {%- macro ctor_decl(obj_factory, callable, indent) %}
 {%- call docstring(callable, indent) %}
     constructor(
-    {%- call arg_list_decl(callable) -%}) {%- call async(callable) %} {%- call throws(callable) %} {
-    {%- if callable.is_async() %}
-        const pointer =
-            {%- call call_async(obj_factory, callable) %}
-            {# The async mechanism returns an already constructed self.
-            We work around that by cloning the pointer from that object, then
-            assune the old object dies as there are no other references possible.
-            #}
-            .uniffiClonePointer()
-        {%- else %}
+    {%- call arg_list_decl(callable) -%}) {%- call throws(callable) %} {
         super();
         const pointer =
             {% call to_ffi_method_call(obj_factory, callable) %};
         this._rustArcPtr = {{ obj_factory }}.bless(pointer);
-    {%- endif %}
     }
 {%- endmacro %}
 
