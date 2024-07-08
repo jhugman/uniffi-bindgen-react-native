@@ -109,7 +109,7 @@
 {%- endmacro %}
 
 {%- macro call_async(obj_factory, callable) -%}
-        await uniffiRustCallAsync({
+        await uniffiRustCallAsync(
             /*rustFutureFunc:*/ () => {
                 return nativeModule().{{ callable.ffi_func().name() }}(
                     {%- if callable.takes_self() %}
@@ -135,7 +135,7 @@
             {%- else %}
             /*errorHandler:*/ undefined,
             {% endmatch %}
-        })
+        )
 {%- endmacro %}
 
 {%- macro arg_list_lowered(func) %}
