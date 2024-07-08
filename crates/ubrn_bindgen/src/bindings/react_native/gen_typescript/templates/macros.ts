@@ -29,17 +29,22 @@
 {%- macro to_ffi_method_call(obj_factory, func) -%}
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
-        rustCallWithError({{ e|lift_fn }}, callStatus => {
+        rustCallWithError(
+            /*liftError:*/ {{ e|lift_fn }},
+            /*caller:*/ (callStatus) => {
     {%- else -%}
-        rustCall(callStatus => {
+        rustCall(
+            /*caller:*/ (callStatus) => {
     {%- endmatch %}
-    {%- if func.return_type().is_some() %}
-        return
-    {%- endif %} nativeModule().{{ func.ffi_func().name() }}(
-        {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
-        {%- call arg_list_lowered(func) %}
-        callStatus);
-    })
+            {%- if func.return_type().is_some() %}
+                return
+            {%- endif %} nativeModule().{{ func.ffi_func().name() }}(
+                {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
+                {%- call arg_list_lowered(func) %}
+                callStatus);
+            },
+            /*liftString:*/ FfiConverterString.lift,
+    )
 {%- endmacro -%}
 
 // eg. `export function fooBar() { body }`
@@ -90,7 +95,7 @@
 {%- else %}
 {%-     match callable.return_type() -%}
 {%-         when Some with (return_type) %}
-    return {{ return_type|lift_fn }}({% call to_ffi_method_call(obj_factory, callable) %});
+    return {{ return_type|ffi_converter_name }}.lift({% call to_ffi_method_call(obj_factory, callable) %});
 {%-         when None %}
 {%-             call to_ffi_method_call(obj_factory, callable) %};
 {%-     endmatch %}
@@ -106,7 +111,7 @@
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
-                    {{ arg|lower_fn }}({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
+                    {{ arg|ffi_converter_name }}.lower({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
                     {%- endfor %}
                 );
             },
@@ -130,7 +135,7 @@
 
 {%- macro arg_list_lowered(func) %}
     {%- for arg in func.arguments() %}
-        {{ arg|lower_fn }}({{ arg.name()|var_name }}),
+        {{ arg|ffi_converter_name }}.lower({{ arg.name()|var_name }}),
     {%- endfor %}
 {%- endmacro -%}
 

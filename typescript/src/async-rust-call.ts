@@ -40,6 +40,7 @@ export async function uniffiRustCallAsync<F, T>(
   completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
+  liftString: (arrayBuffer: ArrayBuffer) => string,
   errorHandler?: UniffiErrorHandler,
 ): Promise<T> {
   // Make sure to call uniffiEnsureInitialized() since future creation doesn't have a
@@ -62,7 +63,11 @@ export async function uniffiRustCallAsync<F, T>(
     } while (pollResult != UNIFFI_RUST_FUTURE_POLL_READY);
 
     return liftFunc(
-      makeRustCall((status) => completeFunc(rustFuture, status), errorHandler),
+      makeRustCall(
+        (status) => completeFunc(rustFuture, status),
+        liftString,
+        errorHandler,
+      ),
     );
   } finally {
     freeFunc(rustFuture);
