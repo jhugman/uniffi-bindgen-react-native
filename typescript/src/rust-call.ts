@@ -19,7 +19,7 @@ export type UniffiRustCallStatus = {
   code: number;
   errorBuf?: ArrayBuffer;
 };
-export function createCallStatus(): UniffiRustCallStatus {
+export function uniffiCreateCallStatus(): UniffiRustCallStatus {
   return { code: CALL_SUCCESS };
 }
 
@@ -47,7 +47,7 @@ export function makeRustCall<T>(
   errorHandler?: UniffiErrorHandler,
 ): T {
   // uniffiEnsureInitialized()
-  const callStatus = createCallStatus();
+  const callStatus = uniffiCreateCallStatus();
   let returnedVal = caller(callStatus);
   uniffiCheckCallStatus(callStatus, liftString, errorHandler);
   return returnedVal;

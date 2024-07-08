@@ -112,13 +112,8 @@ export class Asserts {
     checkThrown(this, errorVariant, error);
   }
 
-  measure<T>(
-    fn: () => T,
-    minMs: number,
-    maxMs?: number,
-    message?: string,
-  ): T {
-    const m = message?? "Duration out of range";
+  measure<T>(fn: () => T, minMs: number, maxMs?: number, message?: string): T {
+    const m = message ?? "Duration out of range";
     const [min, max] = range(minMs, maxMs);
     const start = Date.now();
     const result = fn();

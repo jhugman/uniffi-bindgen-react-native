@@ -99,7 +99,7 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
 
 const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
     create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
-        const instance = Object.create({{ type_name }}.prototype);
+        const instance = Object.create({{ impl_class_name }}.prototype);
         instance._rustArcPtr = this.bless(pointer);
         return instance;
     },
@@ -133,51 +133,19 @@ const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
     }
 };
 
-{%- if obj.has_callback_interface() %}
+{%- if !obj.has_callback_interface() %}
+// FfiConverter for {{ type_name }}
+const {{ ffi_converter_name }} =  new FfiConverterObject({{ obj_factory }});
+{%- else %}
+{{- self.import_infra("FfiConverterObjectWithCallbacks", "objects") }}
+// FfiConverter for {{ type_name }}
+const {{ ffi_converter_name }} = new FfiConverterObjectWithCallbacks({{ obj_factory }});
+
+// Add a vtavble for the callbacks that go in {{ type_name }}.
 {%- let vtable = obj.vtable().expect("trait interface should have a vtable") %}
 {%- let cbi = obj %}
 {% include "CallbackInterfaceImpl.ts" %}
 {%- endif %}
-
-// FfiConverter for {{ type_name }}
-const {{ ffi_converter_name }} =  new FfiConverterObject({{ obj_factory }});
-{#
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = {{ type_name }}
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> {{ type_name }} {
-        return {{ impl_class_name }}(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: {{ type_name }}) -> UnsafeMutableRawPointer {
-        {%- if obj.has_callback_interface() %}
-        guard let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: handleMap.insert(obj: value))) else {
-            fatalError("Cast to UnsafeMutableRawPointer failed")
-        }
-        return ptr
-        {%- else %}
-        return value.uniffiClonePointer()
-        {%- endif %}
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> {{ type_name }} {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: {{ type_name }}, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-#}
 
 {# Objects as error #}
 {%- if is_error %}

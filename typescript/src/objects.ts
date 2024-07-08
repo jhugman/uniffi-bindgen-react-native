@@ -7,6 +7,8 @@
 import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
 import type { UniffiRustArcPtr } from "./rust-call";
+import { UniffiHandle, UniffiHandleMap } from "./handle-map";
+import { type StructuralEquality } from "./type-utils";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.
@@ -82,4 +84,27 @@ export class FfiConverterObject<T>
   }
 }
 
-export type FfiConverterObjectWithCallbacks<T> = FfiConverterObject<T>;
+/// An FfiConverter for objects with callbacks.
+const handleSafe: StructuralEquality<UniffiHandle, UnsafeMutableRawPointer> =
+  true;
+
+export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
+  constructor(
+    factory: UniffiObjectFactory<T>,
+    private handleMap: UniffiHandleMap<T> = new UniffiHandleMap<T>(),
+  ) {
+    super(factory);
+  }
+
+  lower(value: T): UnsafeMutableRawPointer {
+    return this.handleMap.insert(value);
+  }
+
+  lift(value: UnsafeMutableRawPointer): T {
+    return this.handleMap.get(value);
+  }
+
+  drop(handle: UniffiHandle): T {
+    return this.handleMap.remove(handle);
+  }
+}

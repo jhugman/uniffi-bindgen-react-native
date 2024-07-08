@@ -20,11 +20,16 @@ interface NativeModuleInterface {
 const getter: () => NativeModuleInterface = () => (globalThis as any).{{ config.cpp_module() }};
 export default getter;
 
+{%- macro exported(def) %}
+{%- if def.is_exported() -%}export {# space #}
+{%- endif %}
+{%- endmacro %}
+
 // Structs and function types for calling back into Typescript from Rust.
 {%- for def in ci.ffi_definitions() %}
 {%- match def %}
 {%- when FfiDefinition::CallbackFunction(callback) %}
-type {{ callback.name()|ffi_callback_name }} = (
+{% call exported(callback) %}type {{ callback.name()|ffi_callback_name }} = (
 {%-   for arg in callback.arguments() %}
 {{- arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_type_name }}{% if !loop.last %}, {% endif %}
 {%-   endfor %}
@@ -36,7 +41,7 @@ type {{ callback.name()|ffi_callback_name }} = (
 {%-     when None %}void
 {%-   endmatch %};
 {%- when FfiDefinition::Struct(ffi_struct) %}
-export type {{ ffi_struct.name()|ffi_struct_name }} = {
+{% call exported(ffi_struct) %}type {{ ffi_struct.name()|ffi_struct_name }} = {
   {%- for field in ffi_struct.fields() %}
   {{ field.name()|var_name }}: {{ field.type_().borrow()|ffi_type_name }};
   {%- endfor %}

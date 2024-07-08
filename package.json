@@ -14,6 +14,7 @@
   "type": "module",
   "exports": {
     "./async-rust-call": "./dist/async-rust-call.js",
+    "./async-callbacks": "./dist/async-callbacks.js",
     "./callbacks": "./dist/callbacks.js",
     "./errors": "./dist/errors.js",
     "./ffi-converters": "./dist/ffi-converters.js",

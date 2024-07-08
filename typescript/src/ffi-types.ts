@@ -21,6 +21,10 @@ export class RustBuffer {
     return new RustBuffer(buf);
   }
 
+  static empty(): RustBuffer {
+    return this.withCapacity(0);
+  }
+
   static fromArrayBuffer(buf: ArrayBuffer) {
     return new RustBuffer(buf);
   }
