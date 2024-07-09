@@ -37,12 +37,12 @@ impl CodeOracle {
 
     /// Get the idiomatic Typescript rendering of a function name.
     pub(crate) fn fn_name(&self, nm: &str) -> String {
-        nm.to_string().to_lower_camel_case()
+        rewrite_keywords(nm.to_string().to_lower_camel_case())
     }
 
     /// Get the idiomatic Typescript rendering of a variable name.
     pub(crate) fn var_name(&self, nm: &str) -> String {
-        nm.to_string().to_lower_camel_case()
+        rewrite_keywords(nm.to_string().to_lower_camel_case())
     }
 
     /// Get the idiomatic Typescript rendering of an individual enum variant.
@@ -281,5 +281,67 @@ pub(crate) trait CodeType: std::fmt::Debug {
     /// Function to run at startup
     fn initialization_fn(&self) -> Option<String> {
         None
+    }
+}
+
+// Note: all keywords are lowercase, so we only need to rewrite identifiers that
+// could be all lowercase; i.e. we shouldn't need to re-write upper camel case
+// or screaming snake case.
+fn rewrite_keywords(nm: String) -> String {
+    // Keywords from https://github.com/microsoft/TypeScript/issues/2536#issuecomment-87194347
+    let keywords = HashSet::<_>::from([
+        // Reserved words in typescript
+        "break",
+        "case",
+        "catch",
+        "class",
+        "const",
+        "continue",
+        "debugger",
+        "default",
+        "delete",
+        "do",
+        "else",
+        "enum",
+        "export",
+        "extends",
+        "false",
+        "finally",
+        "for",
+        "function",
+        "if",
+        "import",
+        "in",
+        "instanceof",
+        "new",
+        "null",
+        "return",
+        "super",
+        "switch",
+        "this",
+        "throw",
+        "true",
+        "try",
+        "typeof",
+        "var",
+        "void",
+        "while",
+        "with",
+        // Strict Mode reserved words in typescript
+        "as",
+        "implements",
+        "interface",
+        "let",
+        "package",
+        "private",
+        "protected",
+        "public",
+        "static",
+        "yield",
+    ]);
+    if keywords.contains(nm.as_str()) {
+        format!("{}_", nm)
+    } else {
+        nm
     }
 }
