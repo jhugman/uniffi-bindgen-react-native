@@ -14,28 +14,31 @@ template <> struct Bridging<{{ struct_name }}> {
     }
 
     // Get the object from the jsi::Value
-    auto obj = jsValue.getObject(rt);
+    auto jsObject = jsValue.getObject(rt);
 
     // Create the vtable struct
-    {{ struct_name }} vtable;
-
-    // Extract the function callbacks from the JS object
-    {%- for field in ffi_struct.ffi_functions() %}
-    {%-   let ts_field_name = field.name()|var_name %}
-    {%-   let func_name = ts_field_name|fmt("fn_{}") %}
-    auto {{ func_name }} = obj.getPropertyAsFunction(rt, "{{ ts_field_name }}");
-    {%- endfor %}
+    {{ struct_name }} rsObject;
 
     // Create the vtable from the js callbacks.
-    {%- for field in ffi_struct.ffi_functions() %}
+    {%- for field in ffi_struct.fields() %}
     {%-   let rs_field_name = field.name() %}
-    {%-   let func_name = rs_field_name|var_name|fmt("fn_{}") %}
-    vtable.{{ rs_field_name }} = {# space #}
-      {%- call cpp::callback_fn_namespace(ffi_struct, field) -%}
-        ::makeCallbackFunction(rt, callInvoker, {{ func_name }});
+    {%-   let ts_field_name = field.name()|var_name %}
+    {%-   if field.type_().is_callable() %}
+    rsObject.{{ rs_field_name }} = {# space #}
+    {%-     call cpp::callback_fn_namespace(ffi_struct, field) -%}
+        ::makeCallbackFunction(
+          rt, callInvoker, jsObject.getProperty(rt, "{{ ts_field_name }}")
+        );
+    {%-   else %}
+    rsObject.{{ rs_field_name }} = {# space -#}
+      uniffi_jsi::Bridging<{{ field.type_().borrow()|ffi_type_name_from_js }}>::fromJs(
+        rt, callInvoker,
+        jsObject.getProperty(rt, "{{ ts_field_name }}")
+      );
+    {%-   endif %}
     {%- endfor %}
 
-    return vtable;
+    return rsObject;
   }
 };
 

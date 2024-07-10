@@ -24,7 +24,8 @@ template <> struct Bridging<int32_t> {
     }
   }
 
-  static jsi::Value toJs(jsi::Runtime &rt, int32_t value) {
+  static jsi::Value toJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
+                         int32_t value) {
     auto v = static_cast<double>(value);
     return jsi::Value(rt, v);
   }

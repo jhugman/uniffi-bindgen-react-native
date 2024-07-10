@@ -400,7 +400,7 @@ impl FfiCallbackFunction {
             || !name.starts_with("CallbackInterface")
     }
 
-    fn is_user_callback(&self) -> bool {
+    fn is_rust_calling_js(&self) -> bool {
         !self.is_future_callback() || self.name() == "RustFutureContinuationCallback"
     }
 

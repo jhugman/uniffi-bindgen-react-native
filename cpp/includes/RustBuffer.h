@@ -41,7 +41,8 @@ template <> struct Bridging<RustBuffer> {
     }
   }
 
-  static jsi::Value toJs(jsi::Runtime &rt, RustBuffer buf) {
+  static jsi::Value toJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
+                         RustBuffer buf) {
     // We need to make a copy of the bytes from Rust's memory space into
     // Javascripts memory space. We need to do this because the two languages
     // manages memory very differently: a garbage collector needs to track all

@@ -23,7 +23,8 @@ template <> struct Bridging<double> {
     }
   }
 
-  static jsi::Value toJs(jsi::Runtime &rt, double value) {
+  static jsi::Value toJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
+                         double value) {
     return jsi::Value(rt, value);
   }
 };

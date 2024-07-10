@@ -23,7 +23,8 @@ template <> struct Bridging<int64_t> {
     }
   }
 
-  static jsi::Value toJs(jsi::Runtime &rt, int64_t value) {
+  static jsi::Value toJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
+                         int64_t value) {
     auto v = jsi::BigInt::fromInt64(rt, value);
     return jsi::Value(rt, v);
   }
