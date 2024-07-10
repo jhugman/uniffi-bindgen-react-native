@@ -11,14 +11,7 @@ import {
   RustGetters,
   StoredForeignStringifier,
 } from "../../generated/callbacks";
-import {
-  assertEqual,
-  assertNull,
-  assertThrows,
-  fail,
-  test,
-  xtest,
-} from "@/asserts";
+import { test } from "@/asserts";
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";
@@ -69,60 +62,60 @@ class TypeScriptGetters implements ForeignGetters {
   }
 }
 
-test("Boolean values passed between callback interfaces", () => {
+test("Boolean values passed between callback interfaces", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
   const flag = true;
   for (const v of inputData.boolean) {
     const expected = callbackInterface.getBool(v, flag);
     const observed = rg.getBool(callbackInterface, v, flag);
-    assertEqual(observed, expected);
+    t.assertEqual(observed, expected);
   }
   rg.uniffiDestroy();
 });
 
-test("List values passed between callback interfaces", () => {
+test("List values passed between callback interfaces", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
   const flag = true;
   for (const v of inputData.string) {
     const expected = callbackInterface.getString(v, flag);
     const observed = rg.getString(callbackInterface, v, flag);
-    assertEqual(observed, expected);
+    t.assertEqual(observed, expected);
   }
   rg.uniffiDestroy();
 });
 
-test("String values passed between callback interfaces", () => {
+test("String values passed between callback interfaces", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
   const flag = true;
   for (const v of inputData.listInt) {
     const expected = callbackInterface.getList(v, flag);
     const observed = rg.getList(callbackInterface, v, flag);
-    assertEqual(observed, expected);
+    t.assertEqual(observed, expected);
   }
   rg.uniffiDestroy();
 });
 
-test("Optional callbacks serialized correctly", () => {
+test("Optional callbacks serialized correctly", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
-  assertEqual(
+  t.assertEqual(
     rg.getStringOptionalCallback(callbackInterface, "TestString", false),
     "TestString",
   );
-  assertNull(rg.getStringOptionalCallback(undefined, "TestString", false));
+  t.assertNull(rg.getStringOptionalCallback(undefined, "TestString", false));
   rg.uniffiDestroy();
 });
 
-test("Errors are propagated correctly", () => {
+test("Errors are propagated correctly", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
-  assertThrows("SimpleException.BadArgument", () =>
+  t.assertThrows("SimpleException.BadArgument", () =>
     rg.getNothing(callbackInterface, BAD_ARGUMENT),
   );
-  assertThrows("SimpleException.UnexpectedError", () =>
+  t.assertThrows("SimpleException.UnexpectedError", () =>
     rg.getNothing(callbackInterface, UNEXPECTED_ERROR),
   );
   rg.uniffiDestroy();
@@ -146,12 +139,12 @@ class StoredTypeScriptStringifier implements StoredForeignStringifier {
     }
   }
 }
-test("A callback passed into the constructor", () => {
+test("A callback passed into the constructor", (t) => {
   const stringifierCallback = new StoredTypeScriptStringifier();
   const rustStringifier = new RustStringifier(stringifierCallback);
 
   const expected = stringifierCallback.fromSimpleType(42);
   const observed = rustStringifier.fromSimpleType(42);
 
-  assertEqual(observed, expected);
+  t.assertEqual(observed, expected);
 });
