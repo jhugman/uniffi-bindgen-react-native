@@ -37,7 +37,11 @@ impl CodeOracle {
 
     /// Get the idiomatic Typescript rendering of a function name.
     pub(crate) fn fn_name(&self, nm: &str) -> String {
-        rewrite_keywords(nm.to_string().to_lower_camel_case())
+        if nm == "new" {
+            "create".to_string()
+        } else {
+            rewrite_keywords(nm.to_string().to_lower_camel_case())
+        }
     }
 
     /// Get the idiomatic Typescript rendering of a variable name.
