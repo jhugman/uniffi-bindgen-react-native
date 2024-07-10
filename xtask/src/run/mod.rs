@@ -4,18 +4,17 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod cpp_bindings;
+mod generate_bindings;
 mod rust_crate;
 mod typescript;
 
 use anyhow::{Ok, Result};
 use camino::Utf8PathBuf;
 use clap::Args;
+use generate_bindings::GenerateBindingsArg;
 use ubrn_common::CrateMetadata;
 
-use crate::{
-    bootstrap::{Bootstrap, TestRunnerCmd},
-    util::build_root,
-};
+use crate::bootstrap::{Bootstrap, TestRunnerCmd};
 
 use self::{cpp_bindings::CppBindingArg, rust_crate::CrateArg, typescript::EntryArg};
 
@@ -29,8 +28,11 @@ pub(crate) struct RunCmd {
     #[command(flatten)]
     crate_: Option<CrateArg>,
 
-    #[command(flatten)]
-    cpp_binding: Option<CppBindingArg>,
+    #[clap(long = "cpp", conflicts_with_all = ["ts_dir", "cpp_dir"])]
+    cpp_binding: Option<Utf8PathBuf>,
+
+    #[clap(flatten)]
+    generate_bindings: Option<GenerateBindingsArg>,
 
     /// The Javascript or Typescript file.
     #[command(flatten)]
@@ -58,31 +60,29 @@ impl RunCmd {
             (CrateMetadata::profile(false), None)
         };
 
-        match (&info, &self.cpp_binding) {
-            (Some(crate_), Some(cpp)) => {
+        match (&info, &self.cpp_binding, &self.generate_bindings) {
+            (Some(crate_), Some(cpp), _) => {
                 let target_dir = crate_.target_dir();
                 let lib_name = crate_.library_name();
+                let cpp = CppBindingArg::with_file(cpp.clone());
                 let so_file = cpp.compile_with_crate(clean, target_dir, lib_name)?;
                 Ok(Some(so_file))
             }
-            (None, Some(cpp)) => {
+            (None, Some(cpp), _) => {
+                let cpp = CppBindingArg::with_file(cpp.clone());
                 let so_file = cpp.compile_without_crate(clean)?;
                 Ok(Some(so_file))
             }
-            #[allow(unreachable_code)]
-            #[allow(unused)]
-            (Some(crate_), None) => {
+            (Some(crate_), None, Some(bindings)) => {
                 let crate_lib = crate_.library_path(None, release)?;
                 let target_dir = crate_.target_dir();
-                let lib_name = crate_lib.as_str();
-                unimplemented!("Not yet able to generate cpp and js from a crate");
-
-                let cpp_file = build_root()?.join(lib_name).join("extension.cpp");
-                let cpp = CppBindingArg::new(cpp_file);
+                let lib_name = crate_.library_name();
+                let cpp_files = bindings.generate(&crate_lib)?;
+                let cpp = CppBindingArg::with_files(&cpp_files);
                 let so_file = cpp.compile_with_crate(clean, target_dir, lib_name)?;
                 Ok(Some(so_file))
             }
-            (_, _) => Ok(None),
+            (_, _, _) => Ok(None),
         }
     }
 }
