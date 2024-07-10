@@ -34,7 +34,7 @@ pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
         FfiType::ForeignBytes => "ForeignBytes".into(),
         FfiType::Callback(nm) => ffi_callback_name(nm)?,
         FfiType::Struct(nm) => ffi_struct_name(nm)?,
-        FfiType::Handle => "Handle".into(),
+        FfiType::Handle => "/*handle*/ uint64_t".into(),
         FfiType::RustCallStatus => "RustCallStatus".into(),
         FfiType::Reference(inner) => format!("{} *", ffi_type_name(inner)?),
         FfiType::VoidPointer => "void *".into(), // ???

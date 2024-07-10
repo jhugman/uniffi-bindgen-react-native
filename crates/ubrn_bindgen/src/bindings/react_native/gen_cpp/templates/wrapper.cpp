@@ -26,9 +26,6 @@ extern "C" void registerNatives(jsi::Runtime &rt, std::shared_ptr<react::CallInv
     {{ module_name }}::registerModule(rt, callInvoker);
 }
 
-{% include "Callback.cpp" %}
-{% include "Handle.cpp" %}
-
 // Calling into Rust.
 extern "C" {
     {%- for definition in ci.ffi_definitions() %}
@@ -64,6 +61,8 @@ extern "C" {
 {%-     else %}
 {%-   endmatch %}
 {%- endfor %}
+
+{% include "Future.cpp" %}
 
 {{ module_name }}::{{ module_name }}(
     jsi::Runtime &rt,

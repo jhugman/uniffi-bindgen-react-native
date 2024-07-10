@@ -122,13 +122,13 @@
             {%- when Some(return_type) %}
             /*liftFunc:*/ {{ return_type|lift_fn }},
             {%- when None %}
-            liftFunc: (_v) => {},
+            /*liftFunc:*/ (_v) => {},
             {%- endmatch %}
+            /*liftString:*/ FfiConverterString.lift,
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
             /*errorHandler:*/ {{ e|ffi_error_converter_name }}.lift
             {%- else %}
-            /*errorHandler:*/ undefined,
             {% endmatch %}
         )
 {%- endmacro %}

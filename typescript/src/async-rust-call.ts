@@ -27,41 +27,51 @@ export type UniffiRustFutureContinuationCallback = (
   pollResult: number,
 ) => void;
 
-// TODO: this is hacked to make it compile. Make this work.
-const uniffiContinuationHandleMap = new UniffiHandleMap<Promise<number>>();
+type PollFunc = (
+  rustFuture: bigint,
+  cb: UniffiRustFutureContinuationCallback,
+  handle: UniffiHandle,
+) => void;
 
+/**
+ * This method calls an asynchronous method on the Rust side.
+ *
+ * It manages the impedence mismatch between JS promises and Rust futures.
+ *
+ * @param rustFutureFunc calls the Rust client side code. Uniffi machinery gives back
+ *  a handle to the Rust future.
+ * @param pollFunc is then called periodically. This sends a JS callback, and the RustFuture handle
+ *  to Rust. In practice, this poll is implemented as a Promise, which the callback resolves.
+ * @param completeFunc once the Rust future polls as complete, the completeFunc is called to get
+ *  the result and any errors that were encountered.
+ * @param freeFunc is finally called with the Rust future handle to drop the now complete Rust
+ *  future.
+ */
 export async function uniffiRustCallAsync<F, T>(
   rustFutureFunc: () => bigint,
-  pollFunc: (
-    rustFuture: bigint,
-    cb: UniffiRustFutureContinuationCallback,
-    handle: UniffiHandle,
-  ) => void,
+  pollFunc: PollFunc,
   completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
   liftString: (arrayBuffer: ArrayBuffer) => string,
   errorHandler?: UniffiErrorHandler,
 ): Promise<T> {
-  // Make sure to call uniffiEnsureInitialized() since future creation doesn't have a
-  // UniffiRustCallStatus param, so doesn't use makeRustCall()
-  // uniffiEnsureInitialized()
+  // This actually calls into the client rust method.
   const rustFuture = rustFutureFunc();
 
+  // We now poll the Rust future until it's ready.
+  // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
     let pollResult: number | undefined;
     do {
-      // TODO this is to make it compile.
-      pollResult = UNIFFI_RUST_FUTURE_POLL_READY;
-      // pollResult = await withUnsafeContinuation(continuation => {
-      //     pollFunc(
-      //         rustFuture,
-      //         uniffiFutureContinuationCallback,
-      //         uniffiContinuationHandleMap.insert(continuation)
-      //     )
-      // })
+      // Calling pollFunc with a callback that resolves the promise that pollRust
+      // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
+      pollResult = await pollRust((handle) => {
+        pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
+      });
     } while (pollResult != UNIFFI_RUST_FUTURE_POLL_READY);
 
+    // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
       makeRustCall(
         (status) => completeFunc(rustFuture, status),
@@ -74,13 +84,26 @@ export async function uniffiRustCallAsync<F, T>(
   }
 }
 
-// Callback handlers for an async calls.  These are invoked by Rust when the future is ready.  They
-// lift the return value or error and resume the suspended function.
+// The resolver handle map contains the resolvers from each of the pollRust promises.
+type PromiseResolver<T> = (value: T) => void;
+const UNIFFI_RUST_FUTURE_RESOLVER_MAP = new UniffiHandleMap<
+  PromiseResolver<number>
+>();
+
+// pollRust makes a new promise, stores the resolver in the resolver map,
+// then calls the pollFunc with the handle.
+function pollRust(pollFunc: (handle: UniffiHandle) => void): Promise<number> {
+  return new Promise<number>((resolve) => {
+    const handle = UNIFFI_RUST_FUTURE_RESOLVER_MAP.insert(resolve);
+    pollFunc(handle);
+  });
+}
+
+// Rust calls this callback, which resolves the promise returned by pollRust.
 const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   handle: UniffiHandle,
   pollResult: number,
 ) => {
-  const continuation = uniffiContinuationHandleMap.remove(handle);
-  // TODO: make this work.
-  // continuation.resume(pollResult)
+  const resolve = UNIFFI_RUST_FUTURE_RESOLVER_MAP.remove(handle);
+  resolve(pollResult);
 };

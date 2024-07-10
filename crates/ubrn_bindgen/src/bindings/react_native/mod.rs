@@ -367,7 +367,7 @@ impl FfiArgument {
 #[ext]
 impl FfiCallbackFunction {
     fn is_user_callback(&self) -> bool {
-        !self.is_future_callback()
+        !self.is_future_callback() || self.name() == "RustFutureContinuationCallback"
     }
 
     fn is_free_callback(&self) -> bool {
