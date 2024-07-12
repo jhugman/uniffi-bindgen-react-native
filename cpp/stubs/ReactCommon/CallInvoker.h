@@ -59,25 +59,3 @@ public:
   virtual ~NativeMethodCallInvoker() {}
 };
 } // namespace facebook::react
-
-namespace uniffi::testing {
-class MyCallInvoker : public facebook::react::CallInvoker {
-private:
-  facebook::jsi::Runtime &runtime_;
-
-public:
-  MyCallInvoker(facebook::jsi::Runtime &runtime) : runtime_(runtime) {}
-
-  void invokeAsync(facebook::react::CallFunc &&func) noexcept override {
-    // Implement this method with your own logic
-    // You can use runtime_ here
-  }
-
-  void invokeSync(facebook::react::CallFunc &&func) override {
-    // Implement this method with your own logic
-    // You can use runtime_ here
-  }
-
-  ~MyCallInvoker() override {}
-};
-} // namespace uniffi::testing

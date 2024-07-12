@@ -101,6 +101,44 @@ export class Asserts {
   }
 }
 
+// Additional methods for running async tests.
+export class AsyncAsserts extends Asserts {
+  protected timerPromise: Promise<void>;
+  private timerResolve: (value: unknown) => void;
+  constructor(testName: string, timeout: number) {
+    super();
+    let timerId = setTimeout(() => {
+      this.fail(`Test '${testName}' timed out`);
+    }, timeout) as unknown as string | number;
+    let timerResolve: (value: unknown) => void;
+    this.timerPromise = new Promise((resolve, reject) => {
+      timerResolve = resolve;
+    }).then(() => {
+      clearTimeout(timerId);
+    });
+
+    this.timerResolve = timerResolve!;
+  }
+
+  async assertThrowsAsync<T>(
+    errorVariant: string,
+    fn: () => Promise<T>,
+  ): Promise<void> {
+    let error: any | undefined;
+    try {
+      await fn();
+    } catch (e: any) {
+      error = e;
+    }
+    checkThrown(this, errorVariant, error);
+    return Promise.resolve();
+  }
+
+  end() {
+    this.timerResolve(0);
+  }
+}
+
 // For running the tests themselves.
 export function test<T>(testName: string, testBlock: (t: Asserts) => T): T {
   try {
@@ -111,6 +149,33 @@ export function test<T>(testName: string, testBlock: (t: Asserts) => T): T {
   }
 }
 
-export function xtest<T>(testName: string, testBlock: () => T): void {
+export function xtest<T>(
+  testName: string,
+  testBlock?: (t?: Asserts) => T,
+): void {
   console.log(`Skipping: ${testName}`);
+}
+
+export async function xasyncTest<T>(
+  testName: string,
+  testBlock: (t: AsyncAsserts) => Promise<T>,
+  timeout: number = 1000,
+): Promise<T | void> {
+  Promise.resolve(xtest(testName));
+}
+
+export async function asyncTest<T>(
+  testName: string,
+  testBlock: (t: AsyncAsserts) => Promise<T>,
+  timeout: number = 1000,
+): Promise<T> {
+  try {
+    let asserts = new AsyncAsserts(testName, timeout);
+    let v = await testBlock(asserts);
+    (await (asserts as any).timerPromise) as Promise<void>;
+    return v;
+  } catch (e) {
+    console.error(testName, e);
+    throw e;
+  }
 }

@@ -8,12 +8,19 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <thread>
 #ifndef _WIN32
 #include <dlfcn.h>
 #else
 #include <windows.h>
 #endif
 
+/// The JS library that implements the setTimeout and setImmediate.
+static const char *s_jslib =
+#include "timers.js.inc"
+    ;
+
+#include "MyCallInvoker.h"
 #include <ReactCommon/CallInvoker.h>
 #include <hermes/hermes.h>
 
@@ -106,6 +113,14 @@ loadNativeLibraries(facebook::jsi::Runtime &rt,
   return true;
 }
 
+static double currentTimeMillis() {
+  auto now = std::chrono::steady_clock::now();
+  return (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+             now.time_since_epoch())
+      .count();
+}
+
+namespace jsi = facebook::jsi;
 int main(int argc, char **argv) {
   // If no argument is provided, print usage and exit.
   if (argc < 2) {
@@ -121,24 +136,69 @@ int main(int argc, char **argv) {
     return 1;
 
   // You can Customize the runtime config here.
-  auto runtimeConfig =
-      hermes::vm::RuntimeConfig::Builder().withIntl(false).build();
+  auto runtimeConfig = ::hermes::vm::RuntimeConfig::Builder()
+                           .withIntl(false)
+                           .withMicrotaskQueue(true)
+                           .build();
 
   // Create the Hermes runtime.
   auto runtime = facebook::hermes::makeHermesRuntime(runtimeConfig);
-  std::shared_ptr<facebook::react::CallInvoker> invoker =
-      std::make_shared<uniffi::testing::MyCallInvoker>(*runtime);
+  auto invoker = std::make_shared<uniffi::testing::MyCallInvoker>(*runtime);
+
+  invoker->invokeAsync([](jsi::Runtime &rt) {
+    std::cout << "-- Starting the hermes event loop" << std::endl;
+  });
 
   // Register host functions.
   if (!loadNativeLibraries(*runtime, invoker, argc, argv))
     return 1;
 
-  // Execute some JS.
   int status = 0;
   try {
+    // Register event loop functions and obtain the runMicroTask() helper
+    // function.
+    jsi::Object helpers =
+        runtime
+            ->evaluateJavaScript(std::make_unique<jsi::StringBuffer>(s_jslib),
+                                 "timers.js.inc")
+            .asObject(*runtime);
+    // `peek()` returns the time of the next pending task, or -1 if there is not
+    // one.
+    auto peekMacroTask = helpers.getPropertyAsFunction(*runtime, "peek");
+    // `run(now: number)` looks for the next pending task and runs it.
+    // `now` is the current time in milliseconds.
+    // If no task is ready, the returns immediately.
+    auto runMacroTask = helpers.getPropertyAsFunction(*runtime, "run");
+
+    // There are no pending tasks, but we want to initialize the event loop
+    // current time.
+    runMacroTask.call(*runtime, currentTimeMillis());
+
+    // Now we're ready to run the JS file.
     runtime->evaluateJavaScript(
-        std::make_unique<facebook::jsi::StringBuffer>(std::move(*optCode)),
-        jsPath);
+        std::make_unique<jsi::StringBuffer>(std::move(*optCode)), jsPath);
+    invoker->drainTasks(*runtime);
+    runtime->drainMicrotasks();
+
+    // This is the event loop. Loop while there are pending tasks.
+    // Note that to use invokeAsync() you'll want to use setTimeout() to get
+    // into this loop.
+    double nextTimeMs;
+    while ((nextTimeMs = peekMacroTask.call(*runtime).getNumber()) >= 0) {
+      // If we have to, sleep until the next task is ready.
+      double duration = nextTimeMs - currentTimeMillis();
+      if (duration > 0) {
+        invoker->waitForTaskOrTimeout(duration);
+      }
+
+      // Run ready tasks that came in from invoker.invokeAsync();
+      invoker->drainTasks(*runtime);
+      runtime->drainMicrotasks();
+
+      // Then run the next timer task.
+      runMacroTask.call(*runtime, currentTimeMillis());
+      runtime->drainMicrotasks();
+    }
   } catch (facebook::jsi::JSError &e) {
     // Handle JS exceptions here.
     std::cerr << "JS Exception: " << e.getStack() << std::endl;
