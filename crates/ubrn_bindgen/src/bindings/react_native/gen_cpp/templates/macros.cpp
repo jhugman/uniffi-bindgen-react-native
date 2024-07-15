@@ -80,7 +80,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 {%- endmacro %}
 
 {%- macro arg_from_js(arg, index) -%}
-uniffi_jsi::Bridging<{{ arg.type_().borrow()|ffi_type_name_from_js }}>::fromJs(rt, args[{{ index }}])
+uniffi_jsi::Bridging<{{ arg.type_().borrow()|ffi_type_name_from_js }}>::fromJs(rt, callInvoker, args[{{ index }}])
 {%- endmacro %}
 
 {%- macro arg_name_from_js(arg, index) -%}
@@ -100,8 +100,8 @@ _{{ arg.name() }}_{{ index }}
     static {{ vtable_t }} vtableInstance =
         uniffi_jsi::Bridging<{{ vtable_t }}>::fromJs(
             rt,
-            args[0],
-            callInvoker
+            callInvoker,
+            args[0]
         );
     {{ func.name() }}(&vtableInstance);
     return jsi::Value::undefined();

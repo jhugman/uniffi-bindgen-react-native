@@ -7,6 +7,7 @@
 
 #include "Bridging.h"
 #include "ForeignBytes.h"
+#include "UniffiCallInvoker.h"
 #include <jsi/jsi.h>
 
 struct RustBuffer {
@@ -21,9 +22,11 @@ RustBuffer rustbuffer_from_bytes(const ForeignBytes &bytes);
 
 namespace uniffi_jsi {
 using namespace facebook;
+using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
 template <> struct Bridging<RustBuffer> {
-  static RustBuffer fromJs(jsi::Runtime &rt, const jsi::Value &value) {
+  static RustBuffer fromJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
+                           const jsi::Value &value) {
     try {
       auto bytes = uniffi_jsi::Bridging<ForeignBytes>::fromJs(rt, value);
       // This buffer is constructed from foreign bytes. Rust scaffolding copies

@@ -1,9 +1,13 @@
 {%- let struct_name = ffi_struct.name()|ffi_struct_name %}
 namespace uniffi_jsi {
 using namespace facebook;
+using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
 template <> struct Bridging<{{ struct_name }}> {
-  static {{ struct_name }} fromJs(jsi::Runtime &rt, const jsi::Value &jsValue, std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker) {
+  static {{ struct_name }} fromJs(jsi::Runtime &rt,
+    std::shared_ptr<CallInvoker> callInvoker,
+    const jsi::Value &jsValue
+  ) {
     // Check if the input is an object
     if (!jsValue.isObject()) {
       throw jsi::JSError(rt, "Expected an object for {{ struct_name }}");

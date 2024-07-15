@@ -12,10 +12,8 @@ export const CALL_UNEXPECTED_ERROR = 2;
 export const CALL_CANCELLED = 3;
 
 type StringLifter = (arrayBuffer: ArrayBuffer) => string;
-let FfiConverterString_lift: StringLifter;
-export function initializeWithStringLifter(sr: StringLifter) {
-  FfiConverterString_lift = sr;
-}
+const emptyStringLifter = (arrayBuffer: ArrayBuffer) =>
+  "An error occurred decoding a string";
 
 export type UniffiRustCallStatus = {
   code: number;
@@ -28,30 +26,36 @@ export function createCallStatus(): UniffiRustCallStatus {
 export type UniffiErrorHandler = (buffer: ArrayBuffer) => Error;
 type RustCaller<T> = (status: UniffiRustCallStatus) => T;
 
-export function rustCall<T>(caller: RustCaller<T>): T {
-  return makeRustCall(caller);
+export function rustCall<T>(
+  caller: RustCaller<T>,
+  liftString: StringLifter = emptyStringLifter,
+): T {
+  return makeRustCall(caller, liftString);
 }
 
 export function rustCallWithError<T>(
   errorHandler: UniffiErrorHandler,
   caller: RustCaller<T>,
+  liftString: StringLifter = emptyStringLifter,
 ): T {
-  return makeRustCall(caller, errorHandler);
+  return makeRustCall(caller, liftString, errorHandler);
 }
 
 export function makeRustCall<T>(
   caller: RustCaller<T>,
+  liftString: StringLifter,
   errorHandler?: UniffiErrorHandler,
 ): T {
   // uniffiEnsureInitialized()
   const callStatus = createCallStatus();
   let returnedVal = caller(callStatus);
-  uniffiCheckCallStatus(callStatus, errorHandler);
+  uniffiCheckCallStatus(callStatus, liftString, errorHandler);
   return returnedVal;
 }
 
 function uniffiCheckCallStatus(
   callStatus: UniffiRustCallStatus,
+  liftString: StringLifter,
   errorHandler?: UniffiErrorHandler,
 ) {
   switch (callStatus.code) {
@@ -74,7 +78,7 @@ function uniffiCheckCallStatus(
       if (callStatus.errorBuf) {
         if (callStatus.errorBuf.byteLength > 0) {
           throw new UniffiInternalError.RustPanic(
-            FfiConverterString_lift(callStatus.errorBuf),
+            liftString(callStatus.errorBuf),
           );
         }
       }

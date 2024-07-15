@@ -6,13 +6,16 @@
 #pragma once
 
 #include "Bridging.h"
+#include "UniffiCallInvoker.h"
 #include <jsi/jsi.h>
 
 namespace uniffi_jsi {
 using namespace facebook;
+using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
 template <> struct Bridging<uint64_t> {
-  static uint64_t fromJs(jsi::Runtime &rt, const jsi::Value &value) {
+  static uint64_t fromJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
+                         const jsi::Value &value) {
     try {
       return value.getBigInt(rt).asUint64(rt);
     } catch (const std::logic_error &e) {

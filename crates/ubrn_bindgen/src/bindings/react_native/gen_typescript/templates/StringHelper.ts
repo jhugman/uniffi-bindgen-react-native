@@ -39,6 +39,4 @@ const FfiConverterString = (() => {
 
     return new FFIConverter();
 })();
-{{- self.import_infra("initializeWithStringLifter", "rust-call") }}
-initializeWithStringLifter(FfiConverterString.lift);
 {% endif %}
