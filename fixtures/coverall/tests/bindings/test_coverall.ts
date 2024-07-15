@@ -15,82 +15,70 @@ import {
   createSomeDict,
   getNumAlive,
 } from "../../generated/coverall";
-import {
-  assertEqual,
-  assertFalse,
-  assertThrows,
-  assertTrue,
-  fail,
-  test,
-  xtest,
-} from "@/asserts";
+import { test } from "@/asserts";
 import { console } from "@/hermes";
 
 // floats should be "close enough".
 const almostEquals = (this_: number, that: number): boolean =>
   Math.abs(this_ - that) < 0.000001;
 
-test("test create_some_dict() with default values", () => {
+test("test create_some_dict() with default values", (t) => {
   const d = createSomeDict();
-  assertEqual(d.text, "text");
-  assertEqual(d.maybeText, "maybe_text");
+  t.assertEqual(d.text, "text");
+  t.assertEqual(d.maybeText, "maybe_text");
   // Hermes doesn't support string --> ArrayBuffer
-  // assertEqual(d.someBytes.contentEquals("some_bytes".toByteArray(Charsets.UTF_8)))
-  // assertEqual(d.maybeSomeBytes.contentEquals("maybe_some_bytes".toByteArray(Charsets.UTF_8)))
-  assertTrue(d.aBool);
-  assertEqual(d.maybeABool, false);
-  assertEqual(d.unsigned8, 1);
-  assertEqual(d.maybeUnsigned8, 2);
-  assertEqual(d.unsigned16, 3);
-  assertEqual(d.maybeUnsigned16, 4);
-  // Test failing: observed: 18446744073709551616
-  // assertEqual(d.unsigned64, BigInt("18446744073709551615"))
-  assertEqual(d.maybeUnsigned64, BigInt("0"));
-  assertEqual(d.signed8, 8);
-  assertEqual(d.maybeSigned8, 0);
-  // Test failing: observed: 9223372036854775808
-  // assertEqual(d.signed64, BigInt("9223372036854775807"))
-  assertEqual(d.maybeSigned64, BigInt("0"));
+  // t.assertEqual(d.someBytes.contentEquals("some_bytes".toByteArray(Charsets.UTF_8)))
+  // t.assertEqual(d.maybeSomeBytes.contentEquals("maybe_some_bytes".toByteArray(Charsets.UTF_8)))
+  t.assertTrue(d.aBool);
+  t.assertEqual(d.maybeABool, false);
+  t.assertEqual(d.unsigned8, 1);
+  t.assertEqual(d.maybeUnsigned8, 2);
+  t.assertEqual(d.unsigned16, 3);
+  t.assertEqual(d.maybeUnsigned16, 4);
+  t.assertEqual(d.unsigned64, BigInt("0x10000000000000000"));
+  t.assertEqual(d.maybeUnsigned64, BigInt("0"));
+  t.assertEqual(d.signed8, 8);
+  t.assertEqual(d.maybeSigned8, 0);
+  t.assertEqual(d.signed64, BigInt("0x8000000000000000"));
+  t.assertEqual(d.maybeSigned64, BigInt("0"));
 
-  assertEqual(d.float32, 1.2345, undefined, almostEquals);
-  assertEqual(d.maybeFloat32!, 22.0 / 7.0, undefined, almostEquals);
-  assertEqual(d.float64, 0, undefined, almostEquals);
-  assertEqual(d.maybeFloat64!, 1.0, undefined, almostEquals);
+  t.assertEqual(d.float32, 1.2345, undefined, almostEquals);
+  t.assertEqual(d.maybeFloat32!, 22.0 / 7.0, undefined, almostEquals);
+  t.assertEqual(d.float64, 0, undefined, almostEquals);
+  t.assertEqual(d.maybeFloat64!, 1.0, undefined, almostEquals);
 
-  assertEqual(d.coveralls!.getName(), "some_dict");
+  t.assertEqual(d.coveralls!.getName(), "some_dict");
 });
 
-test("test create_none_dict() with default values", () => {
+test("test create_none_dict() with default values", (t) => {
   const d = createNoneDict();
-  assertEqual(d.text, "text");
-  assertEqual(d.maybeText, undefined);
+  t.assertEqual(d.text, "text");
+  t.assertEqual(d.maybeText, undefined);
   // Hermes doesn't support string --> ArrayBuffer
-  // assertEqual(d.someBytes.contentEquals("some_bytes".toByteArray(Charsets.UTF_8)))
-  // assertEqual(d.maybeSomeBytes.contentEquals("maybe_some_bytes".toByteArray(Charsets.UTF_8)))
-  assertTrue(d.aBool);
-  assertEqual(d.maybeABool, undefined);
-  assertEqual(d.unsigned8, 1);
-  assertEqual(d.maybeUnsigned8, undefined);
-  assertEqual(d.unsigned16, 3);
-  assertEqual(d.maybeUnsigned16, undefined);
-  // Test failing: observed: 18446744073709551616
-  // assertEqual(d.unsigned64, BigInt("18446744073709551615"))
-  assertEqual(d.maybeUnsigned64, undefined);
-  assertEqual(d.signed8, 8);
-  assertEqual(d.maybeSigned8, undefined);
-  // Test failing: observed: 9223372036854775808
-  // assertEqual(d.signed64, BigInt("9223372036854775807"))
-  assertEqual(d.maybeSigned64, undefined);
+  // t.assertEqual(d.someBytes.contentEquals("some_bytes".toByteArray(Charsets.UTF_8)))
+  // t.assertEqual(d.maybeSomeBytes.contentEquals("maybe_some_bytes".toByteArray(Charsets.UTF_8)))
+  t.assertTrue(d.aBool);
+  t.assertEqual(d.maybeABool, undefined);
+  t.assertEqual(d.unsigned8, 1);
+  t.assertEqual(d.maybeUnsigned8, undefined);
+  t.assertEqual(d.unsigned16, 3);
+  t.assertEqual(d.maybeUnsigned16, undefined);
+  t.assertEqual(d.unsigned64, BigInt("0x10000000000000000"));
+  t.assertEqual(d.maybeUnsigned64, undefined);
+  t.assertEqual(d.signed8, 8);
+  t.assertEqual(d.maybeSigned8, undefined);
+  t.assertEqual(d.signed64, BigInt("0x8000000000000000"));
+  t.assertEqual(d.maybeSigned64, undefined);
 
-  assertEqual(d.float32, 1.2345, undefined, almostEquals);
-  assertEqual(d.maybeFloat32, undefined);
-  assertEqual(d.float64, 0, undefined, almostEquals);
-  assertEqual(d.maybeFloat64, undefined);
+  t.assertEqual(d.float32, 1.2345, undefined, almostEquals);
+  t.assertEqual(d.maybeFloat32, undefined);
+  t.assertEqual(d.float64, 0, undefined, almostEquals);
+  t.assertEqual(d.maybeFloat64, undefined);
 
-  assertEqual(d.coveralls, undefined);
+  t.assertEqual(d.coveralls, undefined);
 });
 
-test("Given 1000 objects, when they go out of scope, then they are dropped by rust", () => {
+test("Given 1000 objects, when they go out of scope, then they are dropped by rust", (t) => {
   // The GC test; we should have 1000 alive by the end of the loop.
   //
   // Later on, nearer the end of the script, we'll test again, when the cleaner
@@ -113,15 +101,15 @@ test("Given 1000 objects, when they go out of scope, then they are dropped by ru
   // the garbage objects have been collected, and the Rust counter parts have been dropped.
   makeCoveralls(1000);
 
-  assertEqual(getNumAlive(), initial);
+  t.assertEqual(getNumAlive(), initial);
 });
 
-test("Catching errors", () => {
+test("Catching errors", (t) => {
   const coveralls = new Coveralls("Testing errors");
-  assertThrows("CoverallException.TooManyHoles", () =>
+  t.assertThrows("CoverallException.TooManyHoles", () =>
     coveralls.maybeThrow(true),
   );
-  assertThrows("CoverallException.TooManyHoles", () =>
+  t.assertThrows("CoverallException.TooManyHoles", () =>
     coveralls.maybeThrowInto(true),
   );
   coveralls.uniffiDestroy();
