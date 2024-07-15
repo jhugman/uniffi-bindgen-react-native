@@ -10,7 +10,7 @@ pub(crate) mod react_native;
 use std::str::FromStr;
 
 use anyhow::Result;
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use clap::{command, Args};
 use ubrn_common::mk_dir;
 
@@ -24,6 +24,20 @@ pub struct BindingsArgs {
     source: SourceArgs,
     #[command(flatten)]
     output: OutputArgs,
+}
+
+impl BindingsArgs {
+    pub fn new(source: SourceArgs, output: OutputArgs) -> Self {
+        Self { source, output }
+    }
+
+    pub fn ts_dir(&self) -> &Utf8Path {
+        &self.output.ts_dir
+    }
+
+    pub fn cpp_dir(&self) -> &Utf8Path {
+        &self.output.cpp_dir
+    }
 }
 
 #[derive(Args, Clone, Debug)]
@@ -41,7 +55,17 @@ pub struct OutputArgs {
     cpp_dir: Utf8PathBuf,
 }
 
-#[derive(Args, Clone, Debug)]
+impl OutputArgs {
+    pub fn new(ts_dir: &Utf8Path, cpp_dir: &Utf8Path, no_format: bool) -> Self {
+        Self {
+            ts_dir: ts_dir.to_owned(),
+            cpp_dir: cpp_dir.to_owned(),
+            no_format,
+        }
+    }
+}
+
+#[derive(Args, Clone, Debug, Default)]
 pub struct SourceArgs {
     /// The path to a dynamic library to attempt to extract the definitions from
     /// and extend the component interface with.
@@ -64,6 +88,16 @@ pub struct SourceArgs {
 
     /// A UDL file or library file
     source: Utf8PathBuf,
+}
+
+impl SourceArgs {
+    pub fn library(file: &Utf8PathBuf) -> Self {
+        Self {
+            library_mode: true,
+            source: file.clone(),
+            ..Default::default()
+        }
+    }
 }
 
 impl BindingsArgs {

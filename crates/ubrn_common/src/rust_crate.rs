@@ -33,7 +33,7 @@ impl CrateMetadata {
         let library_name = self.library_file(target);
         Ok(match target {
             Some(t) => self.target_dir.join(t).join(profile).join(library_name),
-            None => self.target_dir.join(library_name),
+            None => self.target_dir.join(profile).join(library_name),
         })
     }
 
@@ -100,7 +100,7 @@ fn so_extension_from_cfg<'a>() -> &'a str {
         "dylib"
     } else if cfg!(target_os = "linux") {
         "so"
-   } else {
+    } else {
         unimplemented!("Building only on windows, macos and linux supported right now")
     }
 }
@@ -142,11 +142,13 @@ impl TryFrom<Utf8PathBuf> for CrateMetadata {
 }
 
 fn guess_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> String {
-    find_library_name(metadata, manifest_path).unwrap_or_else(|| {
-        find_package_name(metadata, manifest_path)
-            .expect("Neither a [[package]] `name` or a [[lib]] `name` were found in the manifest")
-            .replace('-', "_")
-    })
+    find_library_name(metadata, manifest_path)
+        .unwrap_or_else(|| {
+            find_package_name(metadata, manifest_path).expect(
+                "Neither a [[package]] `name` or a [[lib]] `name` were found in the manifest",
+            )
+        })
+        .replace('-', "_")
 }
 
 fn find_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<String> {
