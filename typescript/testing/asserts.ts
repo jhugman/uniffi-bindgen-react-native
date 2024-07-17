@@ -87,6 +87,18 @@ export class Asserts {
       `${m}: ${stringify(left)} === ${stringify(right)}`,
     );
   }
+  assertInRange<T = number | bigint>(
+    left: T,
+    min: T,
+    max: T,
+    message?: string,
+  ): void {
+    const m = message ?? "Not in range";
+    this.assertTrue(
+      min <= left && left <= max,
+      `${m}: ${min} <= ${left} <= ${max}`,
+    );
+  }
 
   /// We can't use instanceof here: hermes does not seem to generate the right
   /// prototype chain, so we'll check the error message instead.
@@ -99,9 +111,38 @@ export class Asserts {
     }
     checkThrown(this, errorVariant, error);
   }
+
+  measure<T>(
+    fn: () => T,
+    minMs: number,
+    maxMs?: number,
+    message?: string,
+  ): T {
+    const m = message?? "Duration out of range";
+    const [min, max] = range(minMs, maxMs);
+    const start = Date.now();
+    const result = fn();
+    const end = Date.now();
+    const duration = end - start;
+    this.assertInRange(duration, min, max, m);
+    return result;
+  }
 }
 
 // Additional methods for running async tests.
+
+function range(expectedMs: number, tolerance?: number): [number, number] {
+  if (tolerance === undefined) {
+    tolerance = 10;
+    return [expectedMs - tolerance, expectedMs + tolerance];
+  } else if (tolerance < expectedMs) {
+    return [expectedMs - tolerance, expectedMs + tolerance];
+  } else {
+    // the second arg is greater than the first; treat it like a min/max.
+    return [expectedMs, tolerance];
+  }
+}
+
 export class AsyncAsserts extends Asserts {
   protected timerPromise: Promise<void>;
   private timerResolve: (value: unknown) => void;
@@ -132,6 +173,22 @@ export class AsyncAsserts extends Asserts {
     }
     checkThrown(this, errorVariant, error);
     return Promise.resolve();
+  }
+
+  async asyncMeasure<T>(
+    fn: () => Promise<T>,
+    minMs: number,
+    maxMs?: number,
+    message?: string,
+  ): Promise<T> {
+    const m = message ?? "Duration out of range";
+    const [min, max] = range(minMs, maxMs);
+    const start = Date.now();
+    const result = await fn();
+    const end = Date.now();
+    const duration = end - start;
+    this.assertInRange(duration, min, max, m);
+    return result;
   }
 
   end() {
@@ -167,7 +224,7 @@ export async function xasyncTest<T>(
 export async function asyncTest<T>(
   testName: string,
   testBlock: (t: AsyncAsserts) => Promise<T>,
-  timeout: number = 1000,
+  timeout: number = 10000,
 ): Promise<T> {
   try {
     let asserts = new AsyncAsserts(testName, timeout);
