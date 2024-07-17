@@ -165,7 +165,7 @@ namespace {{ ns }} {
                 };
                 // We'll then call that lambda from the callInvoker which will
                 // look after calling it on the correct thread.
-                callInvoker->invokeSync(rt, jsLambda);
+                callInvoker->invokeBlocking(rt, jsLambda);
         };
         return callback;
     }

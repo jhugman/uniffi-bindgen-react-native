@@ -17,10 +17,22 @@ using CallFunc = std::function<void(jsi::Runtime &)>;
 /**
  * A wrapper class to invoke a callback function on the JS thread.
  *
- * The is intended to have two methods: `invokeSync(func)` and
- * `invokeAsync(func)`, one for invoking a callback that should return on the
- * same thread it was invoked upon, and the other for invoking the callback and
- * returning a promise.
+ * The is intended to have two methods:
+ *
+ * 1. `invokeBlocking`, which will wait until the JS thread is available,
+ *    call the callback function, and then return.
+ * 2. `invokeNonBlocking`, which will schedule the callback function to be
+ * called when the JS thread is available, but not wait for it to complete.
+ *
+ * Conceptually, the `invokeNonBlocking` method should be more useful than it
+ * actually is, however: the generated C++ cannot easily tell if the callback
+ * function is synchronous or not.
+ *
+ * Other optimizations might also be available to use the `invokeNonBlocking`
+ * method (e.g. `void` returns), were it not for the error cases.
+ *
+ * Until we can tell if the callback is async, we always use `invokeBlocking`,
+ * and leave `invokeNonBlocking` unimplemented.
  */
 class UniffiCallInvoker {
 private:
@@ -40,16 +52,17 @@ public:
    * Otherwise, the callback is invoked on the JS thread, and this thread blocks
    * until it completes.
    */
-  void invokeSync(jsi::Runtime &rt, CallFunc &func) {
+  void invokeBlocking(jsi::Runtime &rt, CallFunc &func) {
     if (std::this_thread::get_id() == threadId_) {
       func(rt);
     } else {
       std::promise<void> promise;
       auto future = promise.get_future();
-      callInvoker_->invokeAsync([&rt, &func, &promise]() {
+      react::CallFunc wrapper = [&func, &promise](jsi::Runtime &rt) {
         func(rt);
         promise.set_value();
-      });
+      };
+      callInvoker_->invokeAsync(std::move(wrapper));
       future.wait();
     }
   }
