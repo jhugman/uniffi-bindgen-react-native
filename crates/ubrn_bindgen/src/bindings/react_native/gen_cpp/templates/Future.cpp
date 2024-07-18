@@ -9,11 +9,10 @@ template <> struct Bridging<UniffiRustFutureContinuationCallback> {
     const jsi::Value &value
   ) {
     try {
-      auto fn = value.asObject(rt).asFunction(rt);
       static auto callback = uniffi_jsi::uniffirustfuturecontinuationcallback::makeCallbackFunction(
         rt,
         callInvoker,
-        fn
+        value
       );
       return callback;
     } catch (const std::logic_error &e) {

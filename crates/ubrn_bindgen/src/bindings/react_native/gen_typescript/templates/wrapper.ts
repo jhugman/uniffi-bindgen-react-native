@@ -2,8 +2,10 @@
 // Trust me, you don't want to mess with it!
 
 import nativeModule, {
-  {%- for def in ci.ffi_definitions() %}
+  {%- for def in ci.iter_ffi_definitions_exported_by_ts() %}
   {%- match def %}
+  {%- when FfiDefinition::CallbackFunction(ffi_func) %}
+  type {{ ffi_func.name()|ffi_callback_name }},
   {%- when FfiDefinition::Struct(ffi_struct) %}
   type {{ ffi_struct.name()|ffi_struct_name }},
   {%- else %}

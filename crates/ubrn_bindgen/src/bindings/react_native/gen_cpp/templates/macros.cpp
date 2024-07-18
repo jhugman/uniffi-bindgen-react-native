@@ -28,6 +28,10 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 {%- endmacro %}
 
 {%- macro cpp_fn_rust_caller_body(func) %}
+{%- call cpp_fn_rust_caller_body_with_func_name(func, func.name()) %}
+{%- endmacro %}
+
+{%- macro cpp_fn_rust_caller_body_with_func_name(func, func_name) %}
         {%- if func.has_rust_call_status_arg() %}
         RustCallStatus status = { 0 };
         {%- endif %}
@@ -42,7 +46,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
         {#- Now call into Rust #}
         {% if func.return_type().is_some() -%}
         auto value = {# space #}
-        {%- endif %}{{ func.name() }}(
+        {%- endif %}{{ func_name }}(
             {%- for arg in func.arguments() %}
             {%    if arg.type_().requires_argument_cleanup() %}
             {%-     call arg_name_from_js(arg, loop.index0) %}
@@ -67,13 +71,13 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 
         {#- Now copy the call status into JS. #}
         {%- if func.has_rust_call_status_arg() %}
-        uniffi_jsi::Bridging<RustCallStatus>::copyIntoJs(rt, status, args[count - 1]);
+        uniffi_jsi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
         {%- endif %}
 
         {# Finally, lift the result value from C into JS. #}
         {%- match func.return_type() %}
         {%- when Some with (return_type) %}
-        return uniffi_jsi::Bridging<{{ return_type.borrow()|ffi_type_name_from_js }}>::toJs(rt, value);
+        return uniffi_jsi::Bridging<{{ return_type.borrow()|ffi_type_name_from_js }}>::toJs(rt, callInvoker, value);
         {%- when None %}
         return jsi::Value::undefined();
         {%- endmatch %}
@@ -138,7 +142,6 @@ _{{ arg.name() }}_{{ index }}
 // It should match the value rendered by the callback_fn_namespace macro.
 #}
 {%- macro callback_fn_free_impl(callback) %}
-{%- call callback_fn_impl(callback) %}
 {%- for st in self.ci.iter_ffi_structs() %}
 {%- let ns = st.name()|lower|fmt("uniffi_jsi::{}::freecallback") %}
 {%- include "VTableCallbackFunction.cpp" %}
@@ -159,7 +162,6 @@ _{{ arg.name() }}_{{ index }}
 // It should match the value rendered by the callback_fn_namespace macro.
 #}
 {%- macro callback_fn_free_cleanup(callback) %}
-{%- call callback_fn_cleanup(callback) %}
 {%- for st in self.ci.iter_ffi_structs() %}
 {%- let ns = st.name()|lower|fmt("uniffi_jsi::{}::freecallback") %}
 {{- ns }}::cleanup();

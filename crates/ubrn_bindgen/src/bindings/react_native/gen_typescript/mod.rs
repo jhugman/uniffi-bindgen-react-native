@@ -29,7 +29,9 @@ use uniffi_bindgen::ComponentInterface;
 use uniffi_meta::{AsType, ExternalKind};
 
 use crate::bindings::metadata::ModuleMetadata;
-use crate::bindings::react_native::{ComponentInterfaceExt, FfiFunctionExt};
+use crate::bindings::react_native::{
+    ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt,
+};
 
 #[derive(Default)]
 pub(crate) struct TsBindings {

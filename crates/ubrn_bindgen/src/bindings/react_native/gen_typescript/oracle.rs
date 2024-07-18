@@ -92,19 +92,21 @@ impl CodeOracle {
     /// This is used to:
     ///   - Set a default return value for error results
     ///   - Set a default for structs, which JNA sometimes requires
-    #[allow(unused)]
     pub(crate) fn ffi_default_value(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
-            FfiType::UInt8 | FfiType::Int8 => "0.toByte()".to_owned(),
-            FfiType::UInt16 | FfiType::Int16 => "0.toShort()".to_owned(),
-            FfiType::UInt32 | FfiType::Int32 => "0".to_owned(),
-            FfiType::UInt64 | FfiType::Int64 => "0.toLong()".to_owned(),
-            FfiType::Float32 => "0.0f".to_owned(),
+            FfiType::UInt8
+            | FfiType::Int8
+            | FfiType::UInt16
+            | FfiType::Int16
+            | FfiType::UInt32
+            | FfiType::Int32 => "0".to_owned(),
+            FfiType::UInt64 | FfiType::Int64 => "0n".to_owned(),
             FfiType::Float64 => "0.0".to_owned(),
-            FfiType::RustArcPtr(_) => "Pointer.NULL".to_owned(),
-            FfiType::RustBuffer(_) => "RustBuffer.ByValue()".to_owned(),
+            FfiType::Float32 => "0.0".to_owned(),
+            FfiType::RustArcPtr(_) => "null".to_owned(),
+            FfiType::RustBuffer(_) => "/*empty*/ new ArrayBuffer(0)".to_owned(),
             FfiType::Callback(_) => "null".to_owned(),
-            FfiType::RustCallStatus => "UniffiRustCallStatus.ByValue()".to_owned(),
+            FfiType::RustCallStatus => "uniffiCreateCallStatus()".to_owned(),
             _ => unimplemented!("ffi_default_value: {ffi_type:?}"),
         }
     }
@@ -124,9 +126,14 @@ impl CodeOracle {
             | FfiType::RustBuffer(_) => {
                 format!("UniffiReferenceHolder<{}>", self.ffi_type_label(ffi_type))
             }
+            FfiType::Struct(nm) if nm.starts_with("VTableCallbackInterface") => {
+                self.ffi_type_label(ffi_type)
+            }
+            FfiType::Struct(_) => {
+                format!("UniffiReferenceHolder<{}>", self.ffi_type_label(ffi_type))
+            }
             FfiType::RustArcPtr(_) => "PointerByReference".to_owned(),
             // JNA structs default to ByReference
-            FfiType::Struct(_) => self.ffi_type_label(ffi_type),
             _ => panic!("{ffi_type:?} by reference is not implemented"),
         }
     }

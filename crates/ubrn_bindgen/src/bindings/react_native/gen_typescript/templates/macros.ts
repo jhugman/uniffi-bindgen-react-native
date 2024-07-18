@@ -71,9 +71,16 @@
 {%- endmacro %}
 
 {%- macro return_type(callable) %}
+    {%- if callable.is_async() %}Promise<{% call raw_return_type(callable) %}>
+    {%- else %}
+    {%- call raw_return_type(callable) %}
+    {%- endif %}
+{%- endmacro %}
+
+{%- macro raw_return_type(callable) %}
     {%- match callable.return_type() %}
-    {%-  when Some with (return_type) %}{% if callable.is_async() %}Promise<{{ return_type|type_name(ci) }}>{% else %}{{ return_type|type_name(ci) }}{% endif %}
-    {%-  when None %}{% if callable.is_async() %}Promise<void>{% else %}void{% endif %}
+    {%-  when Some with (return_type) %}{{ return_type|type_name(ci) }}
+    {%-  when None %}void
     {%- endmatch %}
 {%- endmacro %}
 
@@ -104,6 +111,7 @@
 {%- endmacro %}
 
 {%- macro call_async(obj_factory, callable) -%}
+{{- self.import_infra("uniffiRustCallAsync", "async-rust-call") -}}
         await uniffiRustCallAsync(
             /*rustFutureFunc:*/ () => {
                 return nativeModule().{{ callable.ffi_func().name() }}(
@@ -127,7 +135,7 @@
             /*liftString:*/ FfiConverterString.lift,
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
-            /*errorHandler:*/ {{ e|ffi_error_converter_name }}.lift
+            /*errorHandler:*/ {{ e|lift_fn }}
             {%- else %}
             {% endmatch %}
         )

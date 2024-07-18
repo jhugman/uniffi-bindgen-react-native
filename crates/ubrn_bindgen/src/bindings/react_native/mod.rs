@@ -225,6 +225,13 @@ impl ComponentInterface {
         self.callback_interface_definitions()
             .iter()
             .map(|cb| cb.ffi_init_callback().clone())
+            .chain(self.object_definitions().iter().filter_map(|obj| {
+                if obj.has_callback_interface() {
+                    Some(obj.ffi_init_callback().clone())
+                } else {
+                    None
+                }
+            }))
     }
 
     fn iter_ffi_structs(&self) -> impl Iterator<Item = FfiStruct> {
@@ -232,6 +239,10 @@ impl ComponentInterface {
             FfiDefinition::Struct(s) => Some(s),
             _ => None,
         })
+    }
+
+    fn iter_ffi_definitions_exported_by_ts(&self) -> impl Iterator<Item = FfiDefinition> {
+        self.ffi_definitions().filter(|d| d.is_exported())
     }
 
     /// We want to control the ordering of definitions in typescript, especially
@@ -334,7 +345,19 @@ fn store_with_name(types: &mut HashMap<String, Type>, type_: &Type) -> String {
 #[ext]
 impl FfiFunction {
     fn is_internal(&self) -> bool {
-        self.name().contains("ffi__")
+        let name = self.name();
+        name.contains("ffi__") && name.contains("_internal_")
+    }
+}
+
+#[ext]
+impl FfiDefinition {
+    fn is_exported(&self) -> bool {
+        match self {
+            Self::Function(_) => false,
+            Self::CallbackFunction(cb) => cb.is_exported(),
+            Self::Struct(s) => s.is_exported(),
+        }
     }
 }
 
@@ -366,7 +389,18 @@ impl FfiArgument {
 
 #[ext]
 impl FfiCallbackFunction {
-    fn is_user_callback(&self) -> bool {
+    fn is_exported(&self) -> bool {
+        let name = self.name();
+        [
+            "RustFutureContinuationCallback",
+            "CallbackInterfaceFree",
+            "ForeignFutureFree",
+        ]
+        .contains(&name)
+            || !name.starts_with("CallbackInterface")
+    }
+
+    fn is_rust_calling_js(&self) -> bool {
         !self.is_future_callback() || self.name() == "RustFutureContinuationCallback"
     }
 
@@ -397,8 +431,12 @@ fn is_free(nm: &str) -> bool {
 
 #[ext]
 impl FfiStruct {
+    fn is_exported(&self) -> bool {
+        self.is_vtable() || self.name() == "ForeignFuture"
+    }
+
     fn is_vtable(&self) -> bool {
-        !is_future(self.name()) && self.fields().iter().any(|f| f.type_().is_callable())
+        self.fields().iter().any(|f| f.type_().is_callable())
     }
 
     fn ffi_functions(&self) -> impl Iterator<Item = &FfiField> {
@@ -409,6 +447,6 @@ impl FfiStruct {
 #[ext]
 impl FfiField {
     fn is_free(&self) -> bool {
-        self.name() == "uniffi_free"
+        matches!(self.type_(), FfiType::Callback(s) if is_free(&s))
     }
 }

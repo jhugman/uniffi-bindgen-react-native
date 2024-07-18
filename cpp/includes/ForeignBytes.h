@@ -36,7 +36,8 @@ template <> struct Bridging<ForeignBytes> {
     }
   }
 
-  static jsi::Value toJs(jsi::Runtime &rt, ForeignBytes value) {
+  static jsi::Value toJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
+                         ForeignBytes value) {
     throw jsi::JSError(rt, "Unreachable ForeignBytes.toJs");
   }
 };

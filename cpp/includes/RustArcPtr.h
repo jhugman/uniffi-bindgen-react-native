@@ -19,9 +19,11 @@ template <> struct Bridging<void *> {
     }
   }
 
-  static jsi::Value toJs(jsi::Runtime &rt, void *value) {
+  static jsi::Value toJs(jsi::Runtime &rt,
+                         std::shared_ptr<CallInvoker> callInvoker,
+                         void *value) {
     auto num = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(value));
-    return uniffi_jsi::Bridging<uint64_t>::toJs(rt, num);
+    return uniffi_jsi::Bridging<uint64_t>::toJs(rt, callInvoker, num);
   }
 };
 } // namespace uniffi_jsi

@@ -16,7 +16,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             uniffiCallStatus: UniffiRustCallStatus
             {%- endif %}
         ) => {
-            const makeCall = {# space #}
+            const uniffiMakeCall = {# space #}
             {%- call ts::async(meth) -%}
             (): {% call ts::return_type(meth) %} => {
                 const uniffiObj = {{ ffi_converter_name }}.lift(uniffiHandle);
@@ -25,7 +25,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 }
                 return {% call ts::await(meth) %}uniffiObj.{{ meth.name()|fn_name }}(
                     {%- for arg in meth.arguments() %}
-                    {{ arg|lift_fn }}({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
+                    {{ arg|ffi_converter_name }}.lift({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
                     {%- endfor %}
                 )
             }
@@ -33,9 +33,9 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
 
             {% match meth.return_type() %}
             {%- when Some(t) %}
-            const writeReturn = (obj: any) => { uniffiOutReturn.pointee = {{ t|lower_fn }}(obj) };
+            const uniffiWriteReturn = (obj: any) => { uniffiOutReturn.pointee = {{ t|lower_fn }}(obj) };
             {%- when None %}
-            const writeReturn = (obj: any) => {};
+            const uniffiWriteReturn = (obj: any) => {};
             {%- endmatch %}
 
             {%- match meth.throws_type() %}
@@ -43,16 +43,16 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             {{- self.import_infra("uniffiTraitInterfaceCall", "callbacks") }}
             uniffiTraitInterfaceCall(
                 /*callStatus:*/ uniffiCallStatus,
-                /*makeCall:*/ makeCall,
-                /*writeReturn:*/ writeReturn,
+                /*makeCall:*/ uniffiMakeCall,
+                /*writeReturn:*/ uniffiWriteReturn,
                 /*lowerString:*/ FfiConverterString.lower
             )
             {%- when Some(error_type) %}
             {{- self.import_infra("uniffiTraitInterfaceCallWithError", "callbacks") }}
             uniffiTraitInterfaceCallWithError(
                 /*callStatus:*/ uniffiCallStatus,
-                /*makeCall:*/ makeCall,
-                /*writeReturn:*/ writeReturn,
+                /*makeCall:*/ uniffiMakeCall,
+                /*writeReturn:*/ uniffiWriteReturn,
                 /*errorType:*/ "{{ error_type|type_name(ci) }}",
                 /*lowerError:*/ {{ error_type|lower_fn }},
                 /*lowerString:*/ FfiConverterString.lower
@@ -60,46 +60,51 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             {%- endmatch %}
             {%- else %}
 
-            let uniffiHandleSuccess = { (returnValue: {% call ts::return_type(meth) %}) in
+            const uniffiHandleSuccess = (returnValue: {% call ts::raw_return_type(meth) %}) => {
                 uniffiFutureCallback(
                     uniffiCallbackData,
-                    {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }}(
+                    /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{
                         {%- match meth.return_type() %}
                         {%- when Some(return_type) %}
-                        /*returnValue:*/ {{ return_type|lower_fn }}(returnValue),
+                        returnValue: {{ return_type|ffi_converter_name }}.lower(returnValue),
                         {%- when None %}
                         {%- endmatch %}
-                        /*callStatus:*/ new UniffiRustCallStatus()
-                    )
-                )
-            }
-            let uniffiHandleError = { (statusCode, errorBuf) in
+                        callStatus: uniffiCreateCallStatus()
+                    }
+                );
+            };
+            const uniffiHandleError = (code: number, errorBuf: ArrayBuffer) => {
                 uniffiFutureCallback(
                     uniffiCallbackData,
-                    {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }}(
+                    /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{
                         {%- match meth.return_type().map(FfiType::from) %}
                         {%- when Some(return_type) %}
-                        /*returnValue:*/ {{ return_type|ffi_default_value }},
+                        returnValue: {{ return_type|ffi_default_value }},
                         {%- when None %}
                         {%- endmatch %}
-                        /*callStatus:*/ { statusCode, errorBuf: errorBuf }
-                    )
-                )
-            }
+                        callStatus: { code, errorBuf }
+                    }
+                );
+            };
 
             {%- match meth.throws_type() %}
             {%- when None %}
+            {{- self.import_infra("uniffiTraitInterfaceCallAsync", "async-callbacks") }}
             let uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
-                /*makeCall:*/ makeCall,
-                /*handleSuccess:*/ uniffiHandleSuccess,
-                /*handleError:*/ uniffiHandleError
-            )
-            {%- when Some(error_type) %}
-            let uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
-                /*makeCall:*/ makeCall,
+                /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*lowerError:*/ {{ error_type|lower_fn }}
+                /*lowerString:*/ FfiConverterString.lower
+            )
+            {%- when Some(error_type) %}
+            {{- self.import_infra("uniffiTraitInterfaceCallAsyncWithError", "async-callbacks") }}
+            let uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
+                /*makeCall:*/ uniffiMakeCall,
+                /*handleSuccess:*/ uniffiHandleSuccess,
+                /*handleError:*/ uniffiHandleError,
+                /*errorType:*/ "{{ error_type|type_name(ci) }}",
+                /*lowerError:*/ {{ error_type|lower_fn }},
+                /*lowerString:*/ FfiConverterString.lower
             )
             {%- endmatch %}
             uniffiOutReturn.pointee = uniffiForeignFuture

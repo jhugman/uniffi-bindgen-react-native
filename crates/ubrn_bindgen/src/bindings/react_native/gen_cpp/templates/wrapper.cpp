@@ -47,17 +47,22 @@ extern "C" {
 {%- for def in ci.ffi_definitions() %}
 {%-   match def %}
 {%-     when FfiDefinition::CallbackFunction(callback) %}
-{%-       if callback.is_user_callback() %}
+{%-       if callback.is_rust_calling_js() %}
 {%-         if callback.is_free_callback() %}
+    // Implementation of free callback function {{ callback.name() }}
+{%-           call cpp::callback_fn_impl(callback) %}
 {%-           call cpp::callback_fn_free_impl(callback) %}
 {%-         else %}
+    // Implementation of callback function calling from Rust to JS {{ callback.name() }}
 {%-           call cpp::callback_fn_impl(callback) %}
 {%-         endif %}
+{%-       else %}
+    // Implementation of callback function calling from JS to Rust {{ callback.name() }},
+    // passed from Rust to JS as part of async callbacks.
+{%-         include "ForeignFuture.cpp" %}
 {%-       endif %}
 {%-     when FfiDefinition::Struct(ffi_struct) %}
-{%-       if ffi_struct.is_vtable() %}
-{%-         include "VTableStruct.cpp" %}
-{%-       endif %}
+{%-       include "VTableStruct.cpp" %}
 {%-     else %}
 {%-   endmatch %}
 {%- endfor %}
@@ -74,7 +79,7 @@ extern "C" {
     props["{{ name }}"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "{{ name }}"),
-        2,
+        {{ func.arguments().len() }},
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->{% call cpp::cpp_func_name(func) %}(rt, thisVal, args, count);
         }
@@ -118,11 +123,14 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 {%- for def in ci.ffi_definitions() %}
 {%-   match def %}
 {%-     when FfiDefinition::CallbackFunction(callback) %}
-{%-       if callback.is_user_callback() %}
+{%-       if callback.is_rust_calling_js() %}
 {%-         if callback.is_free_callback() %}
-{%-           call cpp::callback_fn_free_cleanup(callback) %}
+    // Cleanup for "free" callback function {{ callback.name() }}
+{%            call cpp::callback_fn_cleanup(callback) %}
+{%            call cpp::callback_fn_free_cleanup(callback) %}
 {%-         else %}
-{%-           call cpp::callback_fn_cleanup(callback) %}
+    // Cleanup for callback function {{ callback.name() }}
+{%            call cpp::callback_fn_cleanup(callback) %}
 {%-         endif %}
 {%-       endif %}
 {%-     else %}

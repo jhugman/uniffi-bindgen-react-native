@@ -52,7 +52,7 @@ namespace {{ ns }} {
         // In the typescript we use a dummy object we called a ReferenceHolder.
         auto {{ arg_nm }} = uniffi_jsi::Bridging<ReferenceHolder<{{ arg_t }}>>::jsNew(rt);
         {%-   else %}
-        auto {{ arg_nm }} = uniffi_jsi::Bridging<{{ arg_t }}>::toJs(rt, {{ arg_nm_rs }});
+        auto {{ arg_nm }} = uniffi_jsi::Bridging<{{ arg_t }}>::toJs(rt, callInvoker, {{ arg_nm_rs }});
         {%-   endif %}
         {%- endfor %}
 
@@ -126,7 +126,8 @@ namespace {{ ns }} {
     static {{ name }}
     makeCallbackFunction(jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
-                     jsi::Function &callbackFunction) {
+                     const jsi::Value &value) {
+        auto callbackFunction = value.asObject(rt).asFunction(rt);
         auto callbackValue = std::make_shared<jsi::Value>(rt, callbackFunction);
         rsLambda = [&rt, callInvoker, callbackValue](
             {%- for arg in callback.arguments() %}
@@ -164,7 +165,7 @@ namespace {{ ns }} {
                 };
                 // We'll then call that lambda from the callInvoker which will
                 // look after calling it on the correct thread.
-                callInvoker->invokeSync(rt, jsLambda);
+                callInvoker->invokeBlocking(rt, jsLambda);
         };
         return callback;
     }
