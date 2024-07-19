@@ -42,7 +42,10 @@ extern "C" {
 }
 
 // This calls into Rust.
+
+{% include "BridgingHelper.cpp" %}
 {% include "RustBufferHelper.cpp" %}
+{% include "RustCallStatusHelper.cpp" %}
 
 {%- for def in ci.ffi_definitions() %}
 {%-   match def %}

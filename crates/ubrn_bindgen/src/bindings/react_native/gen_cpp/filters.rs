@@ -4,13 +4,45 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
-use uniffi_bindgen::interface::FfiType;
+use uniffi_bindgen::{interface::FfiType, ComponentInterface};
+
+use crate::bindings::react_native::{ComponentInterfaceExt, FfiTypeExt};
 
 pub fn ffi_type_name_from_js(ffi_type: &FfiType) -> Result<String, askama::Error> {
     Ok(match ffi_type {
         FfiType::Reference(inner) => ffi_type_name_from_js(inner)?,
         _ => ffi_type_name(ffi_type)?,
     })
+}
+
+pub fn cpp_namespace(ffi_type: &FfiType, ci: &ComponentInterface) -> Result<String, askama::Error> {
+    Ok(ffi_type.cpp_namespace(ci))
+}
+
+pub fn bridging_namespace(
+    ffi_type: &FfiType,
+    ci: &ComponentInterface,
+) -> Result<String, askama::Error> {
+    // Bridging types are only in the uniffi_jsi namespace (`ci.cpp_namespace_includes()`)
+    // or the generated namespace. Most of the time, `ffi_type.cpp_namespace()` does
+    // the right thing, except in the case of Callbacks and Structs.
+    Ok(match ffi_type {
+        FfiType::RustBuffer(_)
+        | FfiType::RustCallStatus
+        | FfiType::Callback(_)
+        | FfiType::Struct(_) => ci.cpp_namespace(),
+        FfiType::Reference(inner) => bridging_namespace(inner, ci)?,
+        _ => ffi_type.cpp_namespace(ci),
+    })
+}
+
+pub fn bridging_class(
+    ffi_type: &FfiType,
+    ci: &ComponentInterface,
+) -> Result<String, askama::Error> {
+    let ns = bridging_namespace(ffi_type, ci)?;
+    let type_name = ffi_type_name_from_js(ffi_type)?;
+    Ok(format!("{ns}::Bridging<{type_name}>"))
 }
 
 pub fn ffi_type_name_to_rust(ffi_type: &FfiType) -> Result<String, askama::Error> {

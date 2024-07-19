@@ -1,5 +1,6 @@
 {%- let cb_name = callback.name()|ffi_callback_name %}
-namespace uniffi_jsi {
+namespace {{ ci.cpp_namespace() }} {
+using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
 template <> struct Bridging<{{ cb_name }}> {
   static jsi::Value toJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker> callInvoker, {{ cb_name}} rsCallback) {
@@ -31,4 +32,4 @@ template <> struct Bridging<{{ cb_name }}> {
     {%- call cpp::cpp_fn_rust_caller_body_with_func_name(callback, "func") %}
   }
 };
-} // namespace uniffi_jsi
+} // namespace {{ ci.cpp_namespace() }}
