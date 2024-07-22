@@ -58,7 +58,16 @@ public:
     } else {
       std::promise<void> promise;
       auto future = promise.get_future();
-      react::CallFunc wrapper = [&func, &promise](jsi::Runtime &rt) {
+      // The runtime argument was added to CallFunc in
+      // https://github.com/facebook/react-native/pull/43375
+      //
+      // Once that is released, there will be a deprecation period.
+      //
+      // Any time during the deprecation period, we can switch `&rt`
+      // from being a captured variable to being an argument, i.e.
+      // commenting out one line, and uncommenting the other.
+      std::function<void()> wrapper = [&func, &promise, &rt]() {
+        // react::CallFunc wrapper = [&func, &promise](jsi::Runtime &rt) {
         func(rt);
         promise.set_value();
       };
