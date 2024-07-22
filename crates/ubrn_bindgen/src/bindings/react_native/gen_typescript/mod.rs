@@ -210,7 +210,7 @@ impl<'a> TypeRenderer<'a> {
                         self.import_ext(&name, &namespace);
                     }
                 }
-                let converters = format!("uniffi{}Converters", namespace.to_upper_camel_case());
+                let converters = format!("uniffi{}Module", namespace.to_upper_camel_case());
                 let src = format!("./{namespace}");
                 let ffi_converter_name = ffi_converter_name(external)
                     .expect("FfiConverter for External type will always exist");
