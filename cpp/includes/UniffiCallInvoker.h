@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 #pragma once
+#include <jsi/jsi.h>
 #include <ReactCommon/CallInvoker.h>
 #include <future>
 #include <memory>
@@ -12,7 +13,7 @@
 namespace uniffi_runtime {
 namespace jsi = facebook::jsi;
 namespace react = facebook::react;
-using CallFunc = std::function<void(jsi::Runtime &)>;
+using UniffiCallFunc = std::function<void(jsi::Runtime &)>;
 
 /**
  * A wrapper class to invoke a callback function on the JS thread.
@@ -52,7 +53,7 @@ public:
    * Otherwise, the callback is invoked on the JS thread, and this thread blocks
    * until it completes.
    */
-  void invokeBlocking(jsi::Runtime &rt, CallFunc &func) {
+  void invokeBlocking(jsi::Runtime &rt, UniffiCallFunc &func) {
     if (std::this_thread::get_id() == threadId_) {
       func(rt);
     } else {

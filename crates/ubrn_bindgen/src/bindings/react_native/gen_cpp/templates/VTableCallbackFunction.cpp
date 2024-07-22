@@ -142,7 +142,7 @@ namespace {{ ns }} {
             ) {
                 // We immediately make a lambda which will do the work of transforming the
                 // arguments into JSI values and calling the callback.
-                uniffi_runtime::CallFunc jsLambda = [
+                uniffi_runtime::UniffiCallFunc jsLambda = [
                     callInvoker,
                     callbackValue
                     {%- for arg in callback.arguments() %}
