@@ -29,6 +29,9 @@ template <typename T> struct Bridging<ReferenceHolder<T>> {
       auto pointee = obj.getProperty(rt, "pointee");
       return uniffi_jsi::Bridging<T>::fromJs(rt, callInvoker, pointee);
     }
+    throw jsi::JSError(rt,
+                       "Expected ReferenceHolder to have a pointee property. "
+                       "This is likely a bug in uniffi-bindgen-react-native");
   }
 };
 

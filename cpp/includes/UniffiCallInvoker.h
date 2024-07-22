@@ -4,9 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 #pragma once
-#include <jsi/jsi.h>
 #include <ReactCommon/CallInvoker.h>
 #include <future>
+#include <jsi/jsi.h>
 #include <memory>
 #include <thread>
 
