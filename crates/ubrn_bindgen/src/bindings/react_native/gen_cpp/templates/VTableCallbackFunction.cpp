@@ -50,16 +50,16 @@ namespace {{ ns }} {
         {%-   if arg.is_return() %}
         // … but we need to take extra care for the return value.
         // In the typescript we use a dummy object we called a ReferenceHolder.
-        auto {{ arg_nm }} = uniffi_jsi::Bridging<ReferenceHolder<{{ arg_t }}>>::jsNew(rt);
+        auto {{ arg_nm }} = {{ ci.cpp_namespace_includes() }}::Bridging<ReferenceHolder<{{ arg_t }}>>::jsNew(rt);
         {%-   else %}
-        auto {{ arg_nm }} = uniffi_jsi::Bridging<{{ arg_t }}>::toJs(rt, callInvoker, {{ arg_nm_rs }});
+        auto {{ arg_nm }} = {{ arg.type_().borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, {{ arg_nm_rs }});
         {%-   endif %}
         {%- endfor %}
 
         {% if callback.has_rust_call_status_arg() -%}
         // The RustCallStatus is another very simple JS object which will
         // report errors back to Rust.
-        auto uniffiCallStatus = uniffi_jsi::Bridging<RustCallStatus>::jsSuccess(rt);
+        auto uniffiCallStatus = {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::jsSuccess(rt);
         {%- endif %}
 
         // Now we are ready to call the callback.
@@ -80,20 +80,20 @@ namespace {{ ns }} {
 
             {% if callback.has_rust_call_status_arg() -%}
             // Now copy the result back from JS into the RustCallStatus object.
-            uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(rt, callInvoker, uniffiCallStatus, uniffi_call_status);
+            {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::copyFromJs(rt, callInvoker, uniffiCallStatus, uniffi_call_status);
             {%- endif %}
 
             {% match callback.arg_return_type() -%}
             {%- when Some with (arg_t) %}
             // Finally, we need to copy the return value back into the Rust pointer.
-            *rs_uniffiOutReturn = uniffi_jsi::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(rt, callInvoker, js_uniffiOutReturn);
+            *rs_uniffiOutReturn = {{ arg_t|bridging_namespace(ci) }}::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(rt, callInvoker, js_uniffiOutReturn);
             {%- else %}
             {%- endmatch %}
         } catch (const jsi::JSError &error) {
             std::cout << "Error in callback {{ name }}: "
                     << error.what() << std::endl;
             {%- if callback.has_rust_call_status_arg() %}
-            uniffi_jsi::Bridging<RustCallStatus>::copyFromJs(
+            {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::copyFromJs(
                 rt, callInvoker, uniffiCallStatus, uniffi_call_status);
             {%- endif %}
         }
@@ -142,7 +142,7 @@ namespace {{ ns }} {
             ) {
                 // We immediately make a lambda which will do the work of transforming the
                 // arguments into JSI values and calling the callback.
-                uniffi_runtime::CallFunc jsLambda = [
+                uniffi_runtime::UniffiCallFunc jsLambda = [
                     callInvoker,
                     callbackValue
                     {%- for arg in callback.arguments() %}

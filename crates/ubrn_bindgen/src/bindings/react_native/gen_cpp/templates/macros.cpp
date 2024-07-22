@@ -65,26 +65,26 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
         {#- Now the call is done, we can cleanup all arguments that need it. #}
         {%- for arg in func.arguments() %}
         {%-   if arg.type_().requires_argument_cleanup() %}
-        uniffi_jsi::Bridging<{{ arg.type_().borrow()|ffi_type_name_from_js }}>::argument_cleanup(rt, {% call arg_name_from_js(arg, loop.index0) %});
+        {{ arg.type_().borrow()|bridging_class(ci) }}::argument_cleanup(rt, {% call arg_name_from_js(arg, loop.index0) %});
         {%-   endif %}
         {%- endfor %}
 
         {#- Now copy the call status into JS. #}
         {%- if func.has_rust_call_status_arg() %}
-        uniffi_jsi::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
+        {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::copyIntoJs(rt, callInvoker, status, args[count - 1]);
         {%- endif %}
 
         {# Finally, lift the result value from C into JS. #}
         {%- match func.return_type() %}
         {%- when Some with (return_type) %}
-        return uniffi_jsi::Bridging<{{ return_type.borrow()|ffi_type_name_from_js }}>::toJs(rt, callInvoker, value);
+        return {{ return_type.borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, value);
         {%- when None %}
         return jsi::Value::undefined();
         {%- endmatch %}
 {%- endmacro %}
 
 {%- macro arg_from_js(arg, index) -%}
-uniffi_jsi::Bridging<{{ arg.type_().borrow()|ffi_type_name_from_js }}>::fromJs(rt, callInvoker, args[{{ index }}])
+{{ arg.type_().borrow()|bridging_class(ci) }}::fromJs(rt, callInvoker, args[{{ index }}])
 {%- endmacro %}
 
 {%- macro arg_name_from_js(arg, index) -%}
@@ -100,9 +100,8 @@ _{{ arg.name() }}_{{ index }}
 {%- call cpp_fn_from_js_decl(func) %} {
     {%- let args = func.arguments() %}
     {%- let arg = args.first().unwrap() %}
-    {%- let vtable_t = arg.type_().borrow()|ffi_type_name_from_js %}
-    static {{ vtable_t }} vtableInstance =
-        uniffi_jsi::Bridging<{{ vtable_t }}>::fromJs(
+    static {{ arg.type_().borrow()|ffi_type_name_from_js }} vtableInstance =
+        {{ arg.type_().borrow()|bridging_class(ci) }}::fromJs(
             rt,
             callInvoker,
             args[0]
@@ -133,7 +132,7 @@ _{{ arg.name() }}_{{ index }}
 // It should match the value rendered by the callback_fn_namespace macro.
 #}
 {%- macro callback_fn_impl(callback) %}
-{%- let ns = callback.name()|ffi_callback_name|lower|fmt("uniffi_jsi::{}") %}
+{%- let ns = callback.cpp_namespace(ci) %}
 {%- include "VTableCallbackFunction.cpp" %}
 {%- endmacro %}
 
@@ -143,7 +142,7 @@ _{{ arg.name() }}_{{ index }}
 #}
 {%- macro callback_fn_free_impl(callback) %}
 {%- for st in self.ci.iter_ffi_structs() %}
-{%- let ns = st.name()|lower|fmt("uniffi_jsi::{}::freecallback") %}
+{%- let ns = st.cpp_namespace_free(ci) %}
 {%- include "VTableCallbackFunction.cpp" %}
 {%- endfor %}
 {%- endmacro %}
@@ -153,7 +152,7 @@ _{{ arg.name() }}_{{ index }}
 // It should match the value rendered by the callback_fn_namespace macro.
 #}
 {%- macro callback_fn_cleanup(callback) %}
-{%- let ns = callback.name()|ffi_callback_name|lower|fmt("uniffi_jsi::{}") %}
+{%- let ns = callback.cpp_namespace(ci) %}
 {{- ns }}::cleanup();
 {%- endmacro %}
 
@@ -163,7 +162,7 @@ _{{ arg.name() }}_{{ index }}
 #}
 {%- macro callback_fn_free_cleanup(callback) %}
 {%- for st in self.ci.iter_ffi_structs() %}
-{%- let ns = st.name()|lower|fmt("uniffi_jsi::{}::freecallback") %}
+{%- let ns = st.cpp_namespace_free(ci) %}
 {{- ns }}::cleanup();
 {%- endfor %}
 {%- endmacro %}
@@ -172,11 +171,10 @@ _{{ arg.name() }}_{{ index }}
 {%- macro callback_fn_namespace(st, field) %}
 {%- if field.is_free() %}
 {#- // match the callback_fn_free_impl macro  #}
-{{- st.name()|lower|fmt("uniffi_jsi::{}::freecallback") -}}
+{{- st.cpp_namespace_free(ci) -}}
 {%- else %}
 {#- // match the callback_fn_impl macro  #}
-{%- let field_type = field.type_().borrow()|ffi_type_name %}
-{{- field_type|lower|fmt("uniffi_jsi::{}")}}
+{{- field.type_().borrow().cpp_namespace(ci) }}
 {%- endif %}
 {%- endmacro %}
 

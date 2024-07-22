@@ -13,12 +13,6 @@ struct ForeignBytes {
   uint8_t *data;
 };
 
-// This isn't needed if the bytes have been used to _make_ a RustBuffer.
-void foreign_bytes_free(ForeignBytes *fb) {
-  fb->data = nullptr;
-  delete fb;
-}
-
 namespace uniffi_jsi {
 using namespace facebook;
 

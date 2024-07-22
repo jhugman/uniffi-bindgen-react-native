@@ -1,5 +1,5 @@
 {%- let struct_name = ffi_struct.name()|ffi_struct_name %}
-namespace uniffi_jsi {
+namespace {{ ci.cpp_namespace() }} {
 using namespace facebook;
 using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
@@ -31,7 +31,7 @@ template <> struct Bridging<{{ struct_name }}> {
         );
     {%-   else %}
     rsObject.{{ rs_field_name }} = {# space -#}
-      uniffi_jsi::Bridging<{{ field.type_().borrow()|ffi_type_name_from_js }}>::fromJs(
+      {{ field.type_().borrow()|bridging_class(ci) }}::fromJs(
         rt, callInvoker,
         jsObject.getProperty(rt, "{{ ts_field_name }}")
       );
@@ -42,4 +42,4 @@ template <> struct Bridging<{{ struct_name }}> {
   }
 };
 
-} // namespace uniffi_jsi
+} // namespace {{ ci.cpp_namespace() }}

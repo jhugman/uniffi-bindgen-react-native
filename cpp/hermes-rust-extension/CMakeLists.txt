@@ -56,5 +56,6 @@ link_directories("${HERMES_BUILD_DIR}/jsi")
 link_libraries(jsi)
 link_directories("${RUST_TARGET_DIR}")
 
+add_definitions(-DUNIFFI_ENABLE_TEST_HOOKS)
 add_library(${HERMES_EXTENSION_NAME} SHARED ${HERMES_EXTENSION_CPP})
 target_link_libraries(${HERMES_EXTENSION_NAME} ${RUST_LIB_NAME})

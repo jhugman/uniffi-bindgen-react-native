@@ -10,7 +10,6 @@
 
 #include "{{ namespace }}.hpp"
 
-#include "registerNatives.h"
 #include "UniffiJsiTypes.h"
 #include <stdexcept>
 #include <map>
@@ -21,10 +20,13 @@
 namespace react = facebook::react;
 namespace jsi = facebook::jsi;
 
+#ifdef UNIFFI_ENABLE_TEST_HOOKS
 // Initialization into the Hermes Runtime
+#include "registerNatives.h"
 extern "C" void registerNatives(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker) {
     {{ module_name }}::registerModule(rt, callInvoker);
 }
+#endif
 
 // Calling into Rust.
 extern "C" {
@@ -42,7 +44,10 @@ extern "C" {
 }
 
 // This calls into Rust.
+
+{% include "BridgingHelper.cpp" %}
 {% include "RustBufferHelper.cpp" %}
+{% include "RustCallStatusHelper.cpp" %}
 
 {%- for def in ci.ffi_definitions() %}
 {%-   match def %}

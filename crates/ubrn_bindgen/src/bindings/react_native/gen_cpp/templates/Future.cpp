@@ -1,4 +1,6 @@
-namespace uniffi_jsi {
+{%- let ns = ci.cpp_namespace() %}
+{%- let cb_type = FfiType::Callback("RustFutureContinuationCallback".to_string()) %}
+namespace {{ ns }} {
 using namespace facebook;
 using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
@@ -9,7 +11,7 @@ template <> struct Bridging<UniffiRustFutureContinuationCallback> {
     const jsi::Value &value
   ) {
     try {
-      static auto callback = uniffi_jsi::uniffirustfuturecontinuationcallback::makeCallbackFunction(
+      static auto callback = {{ cb_type.borrow()|cpp_namespace(ci) }}::makeCallbackFunction(
         rt,
         callInvoker,
         value
@@ -21,4 +23,4 @@ template <> struct Bridging<UniffiRustFutureContinuationCallback> {
   }
 };
 
-} // namespace uniffi_jsi
+} // namespace {{ ns }}

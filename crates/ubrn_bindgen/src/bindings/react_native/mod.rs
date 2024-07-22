@@ -11,6 +11,7 @@ use std::{collections::HashMap, fs};
 use anyhow::Result;
 use camino::Utf8Path;
 use extend::ext;
+use heck::{ToLowerCamelCase, ToSnakeCase};
 use serde::Deserialize;
 use topological_sort::TopologicalSort;
 use ubrn_common::{fmt, run_cmd_quietly};
@@ -245,6 +246,14 @@ impl ComponentInterface {
         self.ffi_definitions().filter(|d| d.is_exported())
     }
 
+    fn cpp_namespace(&self) -> String {
+        format!("uniffi::{}", self.namespace().to_snake_case())
+    }
+
+    fn cpp_namespace_includes(&self) -> String {
+        "uniffi_jsi".to_string()
+    }
+
     /// We want to control the ordering of definitions in typescript, especially
     /// the FfiConverters which rely on Immediately Invoked Function Expressions (IIFE),
     /// or straight up expressions.
@@ -378,6 +387,37 @@ impl FfiType {
     fn is_void(&self) -> bool {
         matches!(self, Self::VoidPointer)
     }
+
+    fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
+        match self {
+            Self::Int8
+            | Self::Int16
+            | Self::Int32
+            | Self::Int64
+            | Self::UInt8
+            | Self::UInt16
+            | Self::UInt32
+            | Self::UInt64
+            | Self::Float32
+            | Self::Float64
+            | Self::Handle
+            | Self::RustCallStatus
+            | Self::RustArcPtr(_)
+            | Self::RustBuffer(_)
+            | Self::VoidPointer => ci.cpp_namespace_includes(),
+            Self::Callback(name) => format!(
+                "{}::cb::{}",
+                ci.cpp_namespace(),
+                name.to_lower_camel_case().to_lowercase()
+            ),
+            Self::Struct(name) => format!(
+                "{}::st::{}",
+                ci.cpp_namespace(),
+                name.to_lower_camel_case().to_lowercase()
+            ),
+            _ => ci.cpp_namespace(),
+        }
+    }
 }
 
 #[ext]
@@ -389,6 +429,11 @@ impl FfiArgument {
 
 #[ext]
 impl FfiCallbackFunction {
+    fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
+        let ffi_type = FfiType::Callback(self.name().to_string());
+        ffi_type.cpp_namespace(ci)
+    }
+
     fn is_exported(&self) -> bool {
         let name = self.name();
         [
@@ -431,6 +476,19 @@ fn is_free(nm: &str) -> bool {
 
 #[ext]
 impl FfiStruct {
+    fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
+        let ffi_type = FfiType::Struct(self.name().to_string());
+        ffi_type.cpp_namespace(ci)
+    }
+
+    fn cpp_namespace_free(&self, ci: &ComponentInterface) -> String {
+        format!(
+            "{}::{}::free",
+            self.cpp_namespace(ci),
+            self.name().to_lower_camel_case().to_lowercase()
+        )
+    }
+
     fn is_exported(&self) -> bool {
         self.is_vtable() || self.name() == "ForeignFuture"
     }
