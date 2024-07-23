@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import {
+import myModule, {
   ComplexException,
   ForeignGetters,
   SimpleException,
@@ -12,6 +12,10 @@ import {
   StoredForeignStringifier,
 } from "../../generated/callbacks";
 import { test } from "@/asserts";
+
+// Initialize the callbacks for the module.
+// This will be hidden in the installation process.
+myModule.initialize();
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";

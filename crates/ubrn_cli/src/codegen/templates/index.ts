@@ -16,3 +16,12 @@ export function multiply(a: number, b: number): number {
 {%- for m in self.config.modules %}
 export * from './{{ bindings }}/{{ m.ts() }}';
 {%- endfor %}
+
+// Initialize the generated bindings: mostly checksums, but also callbacks.
+{%- for m in self.config.modules %}
+import {{ m.ts() }}_ from './{{ bindings }}/{{ m.ts() }}';
+{%- endfor %}
+{% for m in self.config.modules %}
+{{ m.ts() }}_.initialize();
+{%- endfor %}
+{# space #}

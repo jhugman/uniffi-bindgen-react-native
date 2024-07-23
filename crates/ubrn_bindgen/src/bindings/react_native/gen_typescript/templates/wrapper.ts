@@ -38,7 +38,7 @@ const {
 {%-   for converter in converters %}
         {{- converter }},
 {%-   endfor %}
-} = {{ entry.0.1 }};
+} = {{ entry.0.1 }}.converters;
 {%- endfor %}
 
 {%- call ts::docstring_value(ci.namespace_docstring(), 0) %}
@@ -62,10 +62,12 @@ import {{ config.ffi_module_name() }}
 
 {% include "InitializationTemplate.ts" %}
 
-{% if !self.exported_converters.is_empty() %}
 export default Object.freeze({
+  initialize: uniffiEnsureInitialized,
+  {%- if !self.exported_converters.is_empty() %}
+  converters: {
   {%- for converter in self.exported_converters.borrow() %}
-  {{ converter }},
+    {{ converter }},
   {%- endfor %}
+  }{% endif %}
 });
-{% endif %}

@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-import {
+import myModule, {
   alwaysReady,
   asStringUsingTrait,
   asyncNewMegaphone,
@@ -32,6 +32,10 @@ import {
 } from "../../generated/futures";
 import { asyncTest, xasyncTest } from "@/asserts";
 import { console } from "@/hermes";
+
+// Initialize the callbacks for the module.
+// This will be hidden in the installation process.
+myModule.initialize();
 
 asyncTest("alwaysReady", async (t) => {
   const result = await alwaysReady();
