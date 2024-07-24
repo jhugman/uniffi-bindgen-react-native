@@ -16,7 +16,7 @@ include_directories(
     {{ tm_dir }}
     {{ bindings_dir }}
 
-    ../node_modules/uniffi-bindgen-react-native/cpp/includes
+    $$(shell node -p "require.resolve('uniffi-bindgen-react-native/objects')" | sed 's/\/dist.*//')/cpp/includes
 )
 
 add_library(
