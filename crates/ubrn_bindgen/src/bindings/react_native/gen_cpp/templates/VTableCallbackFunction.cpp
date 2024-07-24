@@ -81,12 +81,20 @@ namespace {{ ns }} {
             {% if callback.has_rust_call_status_arg() -%}
             // Now copy the result back from JS into the RustCallStatus object.
             {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::copyFromJs(rt, callInvoker, uniffiCallStatus, uniffi_call_status);
+
+            if (uniffi_call_status->code != UNIFFI_CALL_STATUS_OK) {
+                // The JS callback finished abnormally, so we cannot retrieve the return value.
+                return;
+            }
             {%- endif %}
 
             {% match callback.arg_return_type() -%}
             {%- when Some with (arg_t) %}
             // Finally, we need to copy the return value back into the Rust pointer.
-            *rs_uniffiOutReturn = {{ arg_t|bridging_namespace(ci) }}::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(rt, callInvoker, js_uniffiOutReturn);
+            *rs_uniffiOutReturn =
+                {{ arg_t|bridging_namespace(ci) }}::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(
+                    rt, callInvoker, js_uniffiOutReturn
+                );
             {%- else %}
             {%- endmatch %}
         } catch (const jsi::JSError &error) {

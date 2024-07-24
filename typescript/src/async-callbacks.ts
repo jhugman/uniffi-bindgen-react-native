@@ -13,6 +13,7 @@ import {
 
 const UNIFFI_FOREIGN_FUTURE_HANDLE_MAP = new UniffiHandleMap<Promise<any>>();
 
+const notExpectedError = (err: any) => false;
 function emptyLowerError<E>(e: E): ArrayBuffer {
   throw new Error("Unreachable");
 }
@@ -34,7 +35,7 @@ export function uniffiTraitInterfaceCallAsync<T>(
     makeCall,
     handleSuccess,
     handleError,
-    "Unreachable error",
+    notExpectedError,
     emptyLowerError,
     lowerString,
   );
@@ -44,13 +45,13 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
   makeCall: () => Promise<T>,
   handleSuccess: (value: T) => void,
   handleError: (callStatus: /*i8*/ number, errorBuffer: ArrayBuffer) => void,
-  errorType: string,
+  isErrorType: (error: any) => boolean,
   lowerError: (error: E) => ArrayBuffer,
   lowerString: (str: string) => ArrayBuffer,
 ): UniffiForeignFuture {
   const promise = makeCall().then(handleSuccess, (error: any) => {
     let message = error.message ? error.message : error.toString();
-    if (error._uniffiTypeName === errorType && error instanceof Error) {
+    if (isErrorType(error)) {
       try {
         handleError(CALL_ERROR, lowerError(error as E));
         return;

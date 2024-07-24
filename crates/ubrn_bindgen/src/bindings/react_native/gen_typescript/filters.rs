@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use super::oracle::{AsCodeType, CodeOracle};
-use heck::ToUpperCamelCase;
 pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
     backend::{filters::UniFFIError, Literal, Type},
@@ -17,6 +16,13 @@ pub(super) fn type_name(
     ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
     Ok(as_ct.as_codetype().type_label(ci))
+}
+
+pub(super) fn decl_type_name(
+    as_ct: &impl AsCodeType,
+    ci: &ComponentInterface,
+) -> Result<String, askama::Error> {
+    Ok(as_ct.as_codetype().decl_type_label(ci))
 }
 
 pub(super) fn canonical_name(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
@@ -160,12 +166,6 @@ pub fn arg_name(nm: &str) -> Result<String, askama::Error> {
 /// Get a String representing the name used for an individual enum variant.
 pub fn variant_name(v: &Variant) -> Result<String, askama::Error> {
     Ok(CodeOracle.enum_variant_name(v.name()))
-}
-
-#[allow(unused)]
-pub fn error_variant_name(v: &Variant) -> Result<String, askama::Error> {
-    let name = v.name().to_string().to_upper_camel_case();
-    Ok(CodeOracle.convert_error_suffix(&name))
 }
 
 /// Get the idiomatic Typescript rendering of an FFI callback function name

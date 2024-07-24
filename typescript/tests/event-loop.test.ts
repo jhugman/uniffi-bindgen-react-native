@@ -12,9 +12,12 @@ asyncTest("Dummy test that should end properly", async (t) => {
 // asyncTest("Top level empty test that should error out", async (t) => {});
 
 asyncTest("assertThrowsAsync catches errors", async (t) => {
-  await t.assertThrowsAsync("Error.unknown", async () => {
-    throw new Error();
-  });
+  await t.assertThrowsAsync(
+    () => true,
+    async () => {
+      throw new Error();
+    },
+  );
   t.end();
 });
 

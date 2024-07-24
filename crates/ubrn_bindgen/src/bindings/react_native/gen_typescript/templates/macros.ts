@@ -29,6 +29,7 @@
 {%- macro to_ffi_method_call(obj_factory, func) -%}
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
+        {{- self.import_infra("rustCallWithError", "rust-call") }}
         rustCallWithError(
             /*liftError:*/ {{ e|lift_fn }},
             /*caller:*/ (callStatus) => {

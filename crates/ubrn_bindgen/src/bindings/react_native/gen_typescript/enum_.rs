@@ -20,7 +20,21 @@ impl EnumCodeType {
 
 impl CodeType for EnumCodeType {
     fn type_label(&self, ci: &ComponentInterface) -> String {
-        CodeOracle.class_name(ci, &self.id)
+        let nm = CodeOracle.class_name(ci, &self.id);
+        if ci.is_name_used_as_error(&self.id) {
+            format!("{}Type", rewrite_error_name(&nm))
+        } else {
+            nm
+        }
+    }
+
+    fn decl_type_label(&self, ci: &ComponentInterface) -> String {
+        let nm = CodeOracle.class_name(ci, &self.id);
+        if ci.is_name_used_as_error(&self.id) {
+            rewrite_error_name(&nm).to_string()
+        } else {
+            nm
+        }
     }
 
     fn canonical_name(&self) -> String {
@@ -37,5 +51,13 @@ impl CodeType for EnumCodeType {
         } else {
             unreachable!();
         }
+    }
+}
+
+fn rewrite_error_name(nm: &str) -> &str {
+    if nm == "Error" {
+        "Exception"
+    } else {
+        nm
     }
 }

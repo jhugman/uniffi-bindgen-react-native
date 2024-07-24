@@ -9,11 +9,18 @@
 // cargo xtask run ./fixtures/${fixture}/tests/bindings/test_${fixture}.ts --cpp ./fixtures/${fixture}/generated/${fixture}.cpp --crate ./fixtures/${fixture}
 
 import {
-  CoverallException,
+  CoverallError,
+  ComplexError,
   Coveralls,
   createNoneDict,
   createSomeDict,
   getNumAlive,
+  RootError,
+  throwRootError,
+  getRootError,
+  OtherError,
+  getComplexError,
+  getErrorDict,
 } from "../../generated/coverall";
 import { test } from "@/asserts";
 import { console } from "@/hermes";
@@ -104,13 +111,58 @@ test("Given 1000 objects, when they go out of scope, then they are dropped by ru
   t.assertEqual(getNumAlive(), initial);
 });
 
-test("Catching errors", (t) => {
-  const coveralls = new Coveralls("Testing errors");
-  t.assertThrows("CoverallException.TooManyHoles", () =>
+test("Simple Errors", (t) => {
+  const coveralls = new Coveralls("Testing simple errors");
+  // should not throw an error.
+  coveralls.maybeThrow(false);
+
+  // Do the long hand way of catching errors.
+  try {
+    coveralls.maybeThrow(false);
+    t.fail("An error should've been thrown");
+  } catch (e: any) {
+    // OK
+  }
+  // Now the short hand.
+  t.assertThrows(CoverallError.TooManyHoles.instanceOf, () =>
     coveralls.maybeThrow(true),
   );
-  t.assertThrows("CoverallException.TooManyHoles", () =>
+  t.assertThrows(CoverallError.TooManyHoles.instanceOf, () =>
     coveralls.maybeThrowInto(true),
   );
+  coveralls.uniffiDestroy();
+});
+
+test("Complex errors", (t) => {
+  const coveralls = new Coveralls("Testing complex errors");
+  // No errors to throw with 0.
+  t.assertTrue(coveralls.maybeThrowComplex(0));
+
+  t.assertThrows(ComplexError.OsError.instanceOf, () => {
+    coveralls.maybeThrowComplex(1);
+  });
+  coveralls.uniffiDestroy();
+});
+
+test("Error Values", (t) => {
+  const coveralls = new Coveralls("Testing error values");
+  t.assertThrows(RootError.Complex.instanceOf, () => {
+    throwRootError();
+  });
+  t.assertThrows(
+    (e) => ComplexError.instanceOf(e.error),
+    () => {
+      throwRootError();
+    },
+  );
+
+  const e = getRootError();
+  t.assertTrue(RootError.Other.instanceOf(e));
+  t.assertEqual(e.error, OtherError.UNEXPECTED);
+
+  const ce = getComplexError(undefined);
+  t.assertTrue(ComplexError.PermissionDenied.instanceOf(ce));
+  t.assertNull(getErrorDict(undefined).complexError);
+
   coveralls.uniffiDestroy();
 });
