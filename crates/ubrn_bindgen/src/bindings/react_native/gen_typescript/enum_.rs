@@ -31,7 +31,7 @@ impl CodeType for EnumCodeType {
     fn decl_type_label(&self, ci: &ComponentInterface) -> String {
         let nm = CodeOracle.class_name(ci, &self.id);
         if ci.is_name_used_as_error(&self.id) {
-            rewrite_error_name(&nm)
+            rewrite_error_name(&nm).to_string()
         } else {
             nm
         }
@@ -54,9 +54,10 @@ impl CodeType for EnumCodeType {
     }
 }
 
-fn rewrite_error_name(nm: &str) -> String {
-    match nm.strip_suffix("Error") {
-        None => nm.to_string(),
-        Some(stripped) => format!("{stripped}Exception"),
+fn rewrite_error_name(nm: &str) -> &str {
+    if nm == "Error" {
+        "Exception"
+    } else {
+        nm
     }
 }

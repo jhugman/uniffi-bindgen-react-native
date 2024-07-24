@@ -18,10 +18,10 @@ import myModule, {
   getSayAfterUdlTraits,
   greet,
   Megaphone,
-  MyException,
+  MyError,
   newMegaphone,
   newMyRecord,
-  ParserException,
+  ParserError,
   sayAfter,
   sayAfterWithTokio,
   SharedResourceOptionsFactory,
@@ -166,7 +166,7 @@ class TsAsyncParser implements AsyncParser {
       throw new Error("force-panic");
     }
     if (value == "force-unexpected-exception") {
-      throw new ParserException.UnexpectedError();
+      throw new ParserError.UnexpectedError();
     }
     const v = this.parseInt(value);
     await this.doDelay(delayMs);
@@ -191,7 +191,7 @@ class TsAsyncParser implements AsyncParser {
   private parseInt(value: string): number {
     const num = Number.parseInt(value);
     if (Number.isNaN(num)) {
-      throw new ParserException.NotAnInt();
+      throw new ParserError.NotAnInt();
     }
     return num;
   }
@@ -230,11 +230,11 @@ asyncTest("Async callbacks with errors", async (t) => {
   }
 
   await t.assertThrowsAsync(
-    ParserException.NotAnInt.instanceOf,
+    ParserError.NotAnInt.instanceOf,
     async () => await tryFromStringUsingTrait(traitObj, 1, "fourty-two"),
   );
   await t.assertThrowsAsync(
-    ParserException.UnexpectedError.instanceOf,
+    ParserError.UnexpectedError.instanceOf,
     async () =>
       await tryFromStringUsingTrait(traitObj, 1, "force-unexpected-exception"),
   );
@@ -332,7 +332,7 @@ asyncTest("fallible method… which doesn't throw, part II", async (t) => {
 asyncTest("fallible function… which does throw", async (t) => {
   await t.asyncMeasure(
     async () =>
-      await t.assertThrowsAsync(MyException.Foo.instanceOf, async () =>
+      await t.assertThrowsAsync(MyError.Foo.instanceOf, async () =>
         fallibleMe(true),
       ),
     0,
@@ -342,7 +342,7 @@ asyncTest("fallible function… which does throw", async (t) => {
 });
 
 asyncTest("fallible method… which does throw", async (t) => {
-  await t.assertThrowsAsync(MyException.Foo.instanceOf, async () =>
+  await t.assertThrowsAsync(MyError.Foo.instanceOf, async () =>
     fallibleStruct(true),
   );
   t.end();
@@ -352,7 +352,7 @@ asyncTest("fallible method… which does throw, part II", async (t) => {
   const megaphone = newMegaphone();
   await t.asyncMeasure(
     async () =>
-      await t.assertThrowsAsync(MyException.Foo.instanceOf, async () =>
+      await t.assertThrowsAsync(MyError.Foo.instanceOf, async () =>
         megaphone.fallibleMe(true),
       ),
     0,

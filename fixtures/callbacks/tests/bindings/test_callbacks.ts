@@ -4,9 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import myModule, {
-  ComplexException,
+  ComplexError,
   ForeignGetters,
-  SimpleException,
+  SimpleError,
   RustStringifier,
   RustGetters,
   StoredForeignStringifier,
@@ -46,7 +46,7 @@ class TypeScriptGetters implements ForeignGetters {
   }
   getOption(v: string | undefined, arg2: boolean): string | undefined {
     if (v == BAD_ARGUMENT) {
-      throw new ComplexException.ReallyBadArgument(20);
+      throw new ComplexError.ReallyBadArgument(20);
     }
     if (v == UNEXPECTED_ERROR) {
       throw Error(SOMETHING_FAILED);
@@ -58,7 +58,7 @@ class TypeScriptGetters implements ForeignGetters {
   }
   getNothing(v: string): void {
     if (v == BAD_ARGUMENT) {
-      throw new SimpleException.BadArgument(BAD_ARGUMENT);
+      throw new SimpleError.BadArgument(BAD_ARGUMENT);
     }
     if (v == UNEXPECTED_ERROR) {
       throw Error(SOMETHING_FAILED);
@@ -116,10 +116,10 @@ test("Optional callbacks serialized correctly", (t) => {
 test("Flat errors are propagated correctly", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
-  t.assertThrows(SimpleException.BadArgument.instanceOf, () =>
+  t.assertThrows(SimpleError.BadArgument.instanceOf, () =>
     rg.getNothing(callbackInterface, BAD_ARGUMENT),
   );
-  t.assertThrows(SimpleException.UnexpectedError.instanceOf, () =>
+  t.assertThrows(SimpleError.UnexpectedError.instanceOf, () =>
     rg.getNothing(callbackInterface, UNEXPECTED_ERROR),
   );
   rg.uniffiDestroy();
@@ -130,7 +130,7 @@ test("Non-flat errors are propagated correctly", (t) => {
   const callbackInterface = new TypeScriptGetters();
   t.assertThrows(
     (err) => {
-      const isError = ComplexException.ReallyBadArgument.instanceOf(err);
+      const isError = ComplexError.ReallyBadArgument.instanceOf(err);
       if (isError) {
         // set in TypesSriptGetters.getOption
         t.assertEqual(err.code, 20);
@@ -141,8 +141,7 @@ test("Non-flat errors are propagated correctly", (t) => {
   );
   t.assertThrows(
     (err) => {
-      const isError =
-        ComplexException.UnexpectedErrorWithReason.instanceOf(err);
+      const isError = ComplexError.UnexpectedErrorWithReason.instanceOf(err);
       if (isError) {
         t.assertEqual(err.reason, `Error: ${SOMETHING_FAILED}`);
       }

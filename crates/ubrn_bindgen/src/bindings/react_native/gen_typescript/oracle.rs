@@ -24,13 +24,6 @@ impl CodeOracle {
         nm.to_string().to_upper_camel_case()
     }
 
-    pub(crate) fn convert_error_suffix(&self, nm: &str) -> String {
-        match nm.strip_suffix("Error") {
-            None => nm.to_string(),
-            Some(stripped) => format!("{stripped}Exception"),
-        }
-    }
-
     /// Get the idiomatic Typescript rendering of a function name.
     pub(crate) fn fn_name(&self, nm: &str) -> String {
         if nm == "new" {

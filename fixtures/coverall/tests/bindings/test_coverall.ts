@@ -9,13 +9,13 @@
 // cargo xtask run ./fixtures/${fixture}/tests/bindings/test_${fixture}.ts --cpp ./fixtures/${fixture}/generated/${fixture}.cpp --crate ./fixtures/${fixture}
 
 import {
-  CoverallException,
-  ComplexException,
+  CoverallError,
+  ComplexError,
   Coveralls,
   createNoneDict,
   createSomeDict,
   getNumAlive,
-  RootException,
+  RootError,
   throwRootError,
   getRootError,
   OtherError,
@@ -124,10 +124,10 @@ test("Simple Errors", (t) => {
     // OK
   }
   // Now the short hand.
-  t.assertThrows(CoverallException.TooManyHoles.instanceOf, () =>
+  t.assertThrows(CoverallError.TooManyHoles.instanceOf, () =>
     coveralls.maybeThrow(true),
   );
-  t.assertThrows(CoverallException.TooManyHoles.instanceOf, () =>
+  t.assertThrows(CoverallError.TooManyHoles.instanceOf, () =>
     coveralls.maybeThrowInto(true),
   );
   coveralls.uniffiDestroy();
@@ -138,7 +138,7 @@ test("Complex errors", (t) => {
   // No errors to throw with 0.
   t.assertTrue(coveralls.maybeThrowComplex(0));
 
-  t.assertThrows(ComplexException.OsError.instanceOf, () => {
+  t.assertThrows(ComplexError.OsError.instanceOf, () => {
     coveralls.maybeThrowComplex(1);
   });
   coveralls.uniffiDestroy();
@@ -146,22 +146,22 @@ test("Complex errors", (t) => {
 
 test("Error Values", (t) => {
   const coveralls = new Coveralls("Testing error values");
-  t.assertThrows(RootException.Complex.instanceOf, () => {
+  t.assertThrows(RootError.Complex.instanceOf, () => {
     throwRootError();
   });
   t.assertThrows(
-    (e) => ComplexException.instanceOf(e.error),
+    (e) => ComplexError.instanceOf(e.error),
     () => {
       throwRootError();
     },
   );
 
   const e = getRootError();
-  t.assertTrue(RootException.Other.instanceOf(e));
+  t.assertTrue(RootError.Other.instanceOf(e));
   t.assertEqual(e.error, OtherError.UNEXPECTED);
 
   const ce = getComplexError(undefined);
-  t.assertTrue(ComplexException.PermissionDenied.instanceOf(ce));
+  t.assertTrue(ComplexError.PermissionDenied.instanceOf(ce));
   t.assertNull(getErrorDict(undefined).complexError);
 
   coveralls.uniffiDestroy();
