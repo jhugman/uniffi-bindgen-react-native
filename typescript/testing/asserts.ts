@@ -20,16 +20,24 @@ function isEqual<T>(a: T, b: T): boolean {
   return a === b || a == b || stringify(a) === stringify(b);
 }
 
-function checkThrown(t: Asserts, errorVariant: string, e: any | undefined) {
+function checkThrown(
+  t: Asserts,
+  errorVariant: (err: any) => boolean,
+  e: any | undefined,
+) {
   if (e === undefined) {
     t.fail("No error was thrown");
   } else if (e instanceof Error) {
     // Good, success!
-    t.assertEqual(
-      getErrorName(e),
-      errorVariant,
-      "Error is thrown, but the wrong one",
-    );
+    if (typeof errorVariant === "string") {
+      t.assertEqual(
+        getErrorName(e),
+        errorVariant,
+        "Error is thrown, but the wrong one",
+      );
+    } else {
+      t.assertTrue(errorVariant(e), `Error is thrown, but the wrong one: ${e}`);
+    }
   } else {
     t.fail(`Something else was thrown: ${e}`);
   }
@@ -102,7 +110,7 @@ export class Asserts {
 
   /// We can't use instanceof here: hermes does not seem to generate the right
   /// prototype chain, so we'll check the error message instead.
-  assertThrows<T>(errorVariant: string, fn: () => T): void {
+  assertThrows<T>(errorVariant: (err: any) => boolean, fn: () => T): void {
     let error: any | undefined;
     try {
       fn();
@@ -157,7 +165,7 @@ export class AsyncAsserts extends Asserts {
   }
 
   async assertThrowsAsync<T>(
-    errorVariant: string,
+    errorVariant: (err: any) => boolean,
     fn: () => Promise<T>,
   ): Promise<void> {
     let error: any | undefined;
@@ -203,7 +211,7 @@ export function test<T>(testName: string, testBlock: (t: Asserts) => T): T {
 
 export function xtest<T>(
   testName: string,
-  testBlock?: (t?: Asserts) => T,
+  testBlock?: (t: Asserts) => T,
 ): void {
   console.log(`Skipping: ${testName}`);
 }

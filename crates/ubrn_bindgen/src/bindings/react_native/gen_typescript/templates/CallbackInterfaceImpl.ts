@@ -53,7 +53,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*callStatus:*/ uniffiCallStatus,
                 /*makeCall:*/ uniffiMakeCall,
                 /*writeReturn:*/ uniffiWriteReturn,
-                /*errorType:*/ "{{ error_type|type_name(ci) }}",
+                /*isErrorType:*/ {{ error_type|decl_type_name(ci) }}.instanceOf,
                 /*lowerError:*/ {{ error_type|lower_fn }},
                 /*lowerString:*/ FfiConverterString.lower
             )
@@ -102,7 +102,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*errorType:*/ "{{ error_type|type_name(ci) }}",
+                /*isErrorType:*/ {{ error_type|decl_type_name(ci) }}.instanceOf,
                 /*lowerError:*/ {{ error_type|lower_fn }},
                 /*lowerString:*/ FfiConverterString.lower
             )

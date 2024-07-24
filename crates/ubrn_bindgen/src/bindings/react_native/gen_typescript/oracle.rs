@@ -20,12 +20,8 @@ impl CodeOracle {
     }
 
     /// Get the idiomatic Typescript rendering of a class name (for enums, records, errors, etc).
-    pub(crate) fn class_name(&self, ci: &ComponentInterface, nm: &str) -> String {
-        let name = nm.to_string().to_upper_camel_case();
-        // fixup errors.
-        ci.is_name_used_as_error(nm)
-            .then(|| self.convert_error_suffix(&name))
-            .unwrap_or(name)
+    pub(crate) fn class_name(&self, _ci: &ComponentInterface, nm: &str) -> String {
+        nm.to_string().to_upper_camel_case()
     }
 
     pub(crate) fn convert_error_suffix(&self, nm: &str) -> String {
@@ -243,6 +239,14 @@ pub(crate) trait CodeType: std::fmt::Debug {
     /// The language specific label used to reference this type. This will be used in
     /// method signatures and property declarations.
     fn type_label(&self, ci: &ComponentInterface) -> String;
+
+    /// The container type for this type. Most of the time, this is the samne as the type_label.
+    /// However, just occassionally the typescript type is different.
+    /// e.g. errors are instantiated with `new MyError.Foo()`, but have typescript type of
+    /// `MyErrorType`.
+    fn decl_type_label(&self, ci: &ComponentInterface) -> String {
+        self.type_label(ci)
+    }
 
     /// A representation of this type label that can be used as part of another
     /// identifier. e.g. `read_foo()`, or `FooInternals`.

@@ -19,6 +19,7 @@ myModule.initialize();
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";
+const SOMETHING_FAILED = "something-failed";
 const inputData = {
   boolean: [true, false],
   listInt: [
@@ -45,11 +46,10 @@ class TypeScriptGetters implements ForeignGetters {
   }
   getOption(v: string | undefined, arg2: boolean): string | undefined {
     if (v == BAD_ARGUMENT) {
-      // throw new ComplexException.ReallyBadArgument(20);
-      throw new SimpleException.BadArgument(BAD_ARGUMENT);
+      throw new ComplexException.ReallyBadArgument(20);
     }
     if (v == UNEXPECTED_ERROR) {
-      throw Error(UNEXPECTED_ERROR);
+      throw Error(SOMETHING_FAILED);
     }
     return arg2 ? v?.toUpperCase() : v;
   }
@@ -61,7 +61,7 @@ class TypeScriptGetters implements ForeignGetters {
       throw new SimpleException.BadArgument(BAD_ARGUMENT);
     }
     if (v == UNEXPECTED_ERROR) {
-      throw new SimpleException.UnexpectedError(UNEXPECTED_ERROR);
+      throw Error(SOMETHING_FAILED);
     }
   }
 }
@@ -113,14 +113,42 @@ test("Optional callbacks serialized correctly", (t) => {
   rg.uniffiDestroy();
 });
 
-test("Errors are propagated correctly", (t) => {
+test("Flat errors are propagated correctly", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
-  t.assertThrows("SimpleException.BadArgument", () =>
+  t.assertThrows(SimpleException.BadArgument.instanceOf, () =>
     rg.getNothing(callbackInterface, BAD_ARGUMENT),
   );
-  t.assertThrows("SimpleException.UnexpectedError", () =>
+  t.assertThrows(SimpleException.UnexpectedError.instanceOf, () =>
     rg.getNothing(callbackInterface, UNEXPECTED_ERROR),
+  );
+  rg.uniffiDestroy();
+});
+
+test("Non-flat errors are propagated correctly", (t) => {
+  const rg = new RustGetters();
+  const callbackInterface = new TypeScriptGetters();
+  t.assertThrows(
+    (err) => {
+      const isError = ComplexException.ReallyBadArgument.instanceOf(err);
+      if (isError) {
+        // set in TypesSriptGetters.getOption
+        t.assertEqual(err.code, 20);
+      }
+      return isError;
+    },
+    () => rg.getOption(callbackInterface, BAD_ARGUMENT, true),
+  );
+  t.assertThrows(
+    (err) => {
+      const isError =
+        ComplexException.UnexpectedErrorWithReason.instanceOf(err);
+      if (isError) {
+        t.assertEqual(err.reason, `Error: ${SOMETHING_FAILED}`);
+      }
+      return isError;
+    },
+    () => rg.getOption(callbackInterface, UNEXPECTED_ERROR, true),
   );
   rg.uniffiDestroy();
 });

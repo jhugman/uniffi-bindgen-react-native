@@ -61,7 +61,7 @@ export function uniffiTraitInterfaceCallWithError<T, E extends Error>(
   callStatus: UniffiRustCallStatus,
   makeCall: () => T,
   writeReturn: (v: T) => void,
-  errorType: string,
+  isErrorType: (e: any) => boolean,
   lowerError: (err: E) => ArrayBuffer,
   lowerString: (s: string) => ArrayBuffer,
 ): void {
@@ -70,8 +70,7 @@ export function uniffiTraitInterfaceCallWithError<T, E extends Error>(
   } catch (e: any) {
     // Hermes' prototype chain seems buggy, so we need to make our
     // own arrangements
-    const errorTypeName = (e as any)._uniffiTypeName as string | undefined;
-    if (e instanceof Error && errorTypeName === errorType) {
+    if (isErrorType(e)) {
       callStatus.code = CALL_ERROR;
       callStatus.errorBuf = lowerError(e as E);
     } else {

@@ -19,6 +19,13 @@ pub(super) fn type_name(
     Ok(as_ct.as_codetype().type_label(ci))
 }
 
+pub(super) fn decl_type_name(
+    as_ct: &impl AsCodeType,
+    ci: &ComponentInterface,
+) -> Result<String, askama::Error> {
+    Ok(as_ct.as_codetype().decl_type_label(ci))
+}
+
 pub(super) fn canonical_name(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
     Ok(as_ct.as_codetype().canonical_name())
 }
