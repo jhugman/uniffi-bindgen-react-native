@@ -11,12 +11,23 @@ project({{ self.config.project.cpp_filename() }})
 set (CMAKE_VERBOSE_MAKEFILE ON)
 set (CMAKE_CXX_STANDARD 17)
 
+# Resolve the path to the uniffi-bindgen-react-native package
+execute_process(
+    COMMAND node -p "require.resolve('uniffi-bindgen-react-native')"
+    OUTPUT_VARIABLE UNIFFI_BINDGEN_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+string(REGEX
+  REPLACE "/typescript/src/index\\.ts$" ""
+  UNIFFI_BINDGEN_PATH ${UNIFFI_BINDGEN_PATH}
+)
+
 # Specifies a path to native header files.
 include_directories(
     {{ tm_dir }}
     {{ bindings_dir }}
 
-    $$(shell node -p "require.resolve('uniffi-bindgen-react-native/objects')" | sed 's/\/dist.*//')/cpp/includes
+    ${UNIFFI_BINDGEN_PATH}/cpp/includes
 )
 
 add_library(

@@ -3,12 +3,8 @@
     "target": "es2022",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
     "module": "commonjs",                                /* Specify what module code is generated. */
     "paths": {                                           /* Specify a set of entries that re-map imports to additional lookup locations. */
-      "uniffi-bindgen-react-native/*": ["./typescript/src/*"],
       "@/*": ["./typescript/testing/*"],
     },
-    "outDir": "./dist",
-    "declaration": true,
-    "declarationDir": "./dist",
     "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
     "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
     "strict": true,                                      /* Enable all strict type-checking options. */

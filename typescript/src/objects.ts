@@ -7,7 +7,7 @@
 import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
 import type { UniffiRustArcPtr } from "./rust-call";
-import { UniffiHandle, UniffiHandleMap } from "./handle-map";
+import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
 import { type StructuralEquality } from "./type-utils";
 
 /**
