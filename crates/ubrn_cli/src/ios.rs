@@ -98,12 +98,12 @@ pub(crate) struct IOsArgs {
     no_sim: bool,
 
     #[clap(flatten)]
-    common_args: CommonBuildArgs,
+    pub(crate) common_args: CommonBuildArgs,
 }
 
 impl IOsArgs {
-    pub(crate) fn build(&self) -> Result<()> {
-        let config: ProjectConfig = self.config.clone().try_into()?;
+    pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
+        let config = self.project_config()?;
         let project_root = config.project_root();
         let crate_ = &config.crate_;
         let metadata = crate_.metadata()?;
@@ -114,7 +114,8 @@ impl IOsArgs {
         let ios = &config.ios;
         let ios_dir = ios.directory(project_root);
 
-        let mut library_args = Vec::default();
+        let mut library_args = Vec::new();
+        let mut target_files = Vec::new();
         for target in &ios.targets {
             if self.no_sim && target.contains("sim") {
                 continue;
@@ -145,6 +146,7 @@ impl IOsArgs {
             // :eyes: single dash arg.
             library_args.push("-library".to_string());
             library_args.push(library.to_string());
+            target_files.push(library);
         }
 
         let framework_path = ios.framework_path(project_root);
@@ -161,6 +163,10 @@ impl IOsArgs {
 
         run_cmd(cmd.current_dir(ios_dir))?;
 
-        Ok(())
+        Ok(target_files)
+    }
+
+    pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
+        self.config.clone().try_into()
     }
 }

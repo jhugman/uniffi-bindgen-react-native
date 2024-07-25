@@ -110,12 +110,12 @@ pub(crate) struct AndroidArgs {
     config: Utf8PathBuf,
 
     #[clap(flatten)]
-    common_args: CommonBuildArgs,
+    pub(crate) common_args: CommonBuildArgs,
 }
 
 impl AndroidArgs {
-    pub(crate) fn build(&self) -> Result<()> {
-        let config: ProjectConfig = self.config.clone().try_into()?;
+    pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
+        let config: ProjectConfig = self.project_config()?;
         let project_root = config.project_root();
         let crate_ = &config.crate_;
         let rust_dir = crate_.directory()?;
@@ -126,6 +126,7 @@ impl AndroidArgs {
         let jni_libs = android.jni_libs(project_root);
         rm_dir(&jni_libs)?;
 
+        let mut target_files: Vec<_> = Vec::new();
         for target in &android.targets {
             let target = target.parse::<Target>()?;
             let mut cmd = Command::new("cargo");
@@ -159,9 +160,15 @@ impl AndroidArgs {
 
             let dst_lib = dst_dir.join(metadata.library_file(Some(target.triple())));
             fs::copy(&src_lib, &dst_lib)?;
+
+            target_files.push(src_lib);
         }
 
-        Ok(())
+        Ok(target_files)
+    }
+
+    pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
+        self.config.clone().try_into()
     }
 }
 

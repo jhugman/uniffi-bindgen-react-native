@@ -22,9 +22,11 @@ pub(crate) struct CliArgs {
 pub(crate) enum CliCmd {
     /// Checkout a given Github repo into `rust_modules`
     Checkout(CheckoutArgs),
-    /// Build for android, ios or testing
+    /// Build (and optionally generate code) for Android or iOS
     Build(BuildArgs),
-    /// Generate code from the Rust.
+    /// Generate bindings or the turbo-module glue code from the Rust.
+    ///
+    /// These steps are already performed when building with `--and-generate`.
     Generate(GenerateArgs),
 }
 
