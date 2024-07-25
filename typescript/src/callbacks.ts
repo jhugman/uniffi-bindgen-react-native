@@ -6,14 +6,14 @@
 import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
 import {
-  UniffiHandle,
+  type UniffiHandle,
   UniffiHandleMap,
   defaultUniffiHandle,
 } from "./handle-map";
 import {
   CALL_ERROR,
   CALL_UNEXPECTED_ERROR,
-  UniffiRustCallStatus,
+  type UniffiRustCallStatus,
 } from "./rust-call";
 
 const handleConverter = FfiConverterUInt64;
