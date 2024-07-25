@@ -14,8 +14,8 @@
   "type": "module",
   "main": "./typescript/src/index.ts",
   "bin": {
-    "ubrn": "./bin/cli.sh",
-    "uniffi-bindgen-react-native": "./bin/cli.sh"
+    "ubrn": "./bin/cli",
+    "uniffi-bindgen-react-native": "./bin/cli"
   },
   "scripts": {
     "build": "tsc",
