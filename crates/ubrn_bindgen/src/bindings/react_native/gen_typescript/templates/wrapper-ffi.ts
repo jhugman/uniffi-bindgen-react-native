@@ -1,7 +1,9 @@
-import { type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback } from 'uniffi-bindgen-react-native/async-rust-call';
-import { type StructuralEquality as UniffiStructuralEquality } from 'uniffi-bindgen-react-native/type-utils';
-import { type UniffiRustCallStatus } from 'uniffi-bindgen-react-native/rust-call';
-import { type UniffiReferenceHolder } from 'uniffi-bindgen-react-native/callbacks';
+import {
+  type StructuralEquality as UniffiStructuralEquality,
+  type UniffiReferenceHolder,
+  type UniffiRustCallStatus,
+  type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
+ } from 'uniffi-bindgen-react-native';
 
 interface NativeModuleInterface {
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}

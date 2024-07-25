@@ -162,17 +162,17 @@ impl<'a> TypeRenderer<'a> {
     // ```
     //
     // Returns an empty string so that it can be used inside an askama `{{ }}` block.
-    fn import_infra(&self, what: &str, from: &str) -> &str {
+    fn import_infra(&self, what: &str, _from: &str) -> &str {
         self.add_import(
             Imported::JSType(what.to_owned()),
-            &format!("uniffi-bindgen-react-native/{from}"),
+            "uniffi-bindgen-react-native",
         )
     }
 
-    fn import_infra_type(&self, what: &str, from: &str) -> &str {
+    fn import_infra_type(&self, what: &str, _from: &str) -> &str {
         self.add_import(
             Imported::TSType(what.to_owned()),
-            &format!("uniffi-bindgen-react-native/{from}"),
+            "uniffi-bindgen-react-native",
         )
     }
 
