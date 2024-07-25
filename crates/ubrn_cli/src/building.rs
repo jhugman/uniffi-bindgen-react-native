@@ -4,12 +4,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use camino::Utf8PathBuf;
 use clap::{Args, Subcommand};
 use serde::Deserialize;
+use ubrn_bindgen::{BindingsArgs, OutputArgs, SourceArgs};
 use ubrn_common::CrateMetadata;
 
-use crate::{android::AndroidArgs, ios::IOsArgs};
+use crate::{android::AndroidArgs, config::ProjectConfig, ios::IOsArgs};
 
 #[derive(Args, Debug)]
 pub(crate) struct BuildArgs {
@@ -19,22 +21,79 @@ pub(crate) struct BuildArgs {
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum BuildCmd {
+    /// Build the crate for use on an Android device or emulator
     Android(AndroidArgs),
+    /// Build the crate for use on an iOS device or simulator
     Ios(IOsArgs),
 }
 
 impl BuildArgs {
     pub(crate) fn build(&self) -> Result<()> {
-        self.cmd.build()
+        let lib_file = self.cmd.build()?;
+        if self.and_generate() {
+            self.generate(lib_file)?;
+        }
+
+        Ok(())
+    }
+
+    fn generate(&self, lib_file: Utf8PathBuf) -> Result<()> {
+        let project = self.cmd.project_config()?;
+        let root = project.project_root();
+        let pwd = ubrn_common::pwd()?;
+        let modules = {
+            let dir = project.crate_.directory()?;
+            ubrn_common::cd(&dir)?;
+            let ts_dir = root.join(&project.bindings.ts);
+            let cpp_dir = root.join(&project.bindings.cpp);
+            let bindings = BindingsArgs::new(
+                SourceArgs::library(&lib_file),
+                OutputArgs::new(&ts_dir, &cpp_dir, false),
+            );
+
+            bindings.run()?
+        };
+        ubrn_common::cd(&pwd)?;
+
+        let rust_crate = project.crate_.metadata()?;
+        crate::codegen::render_files(project, rust_crate, modules)?;
+        Ok(())
+    }
+
+    fn and_generate(&self) -> bool {
+        self.cmd.and_generate()
     }
 }
 
 impl BuildCmd {
-    pub(crate) fn build(&self) -> Result<()> {
+    pub(crate) fn build(&self) -> Result<Utf8PathBuf> {
+        let files = match self {
+            Self::Android(a) => a.build()?,
+            Self::Ios(a) => a.build()?,
+        };
+
+        files
+            .first()
+            .cloned()
+            .ok_or_else(|| anyhow!("No targets were specified"))
+    }
+
+    pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
         match self {
-            Self::Android(a) => a.build(),
-            Self::Ios(a) => a.build(),
+            Self::Android(a) => a.project_config(),
+            Self::Ios(a) => a.project_config(),
         }
+    }
+
+    fn common_args(&self) -> &CommonBuildArgs {
+        match self {
+            Self::Android(a) => &a.common_args,
+            Self::Ios(a) => &a.common_args,
+        }
+    }
+
+    pub(crate) fn and_generate(&self) -> bool {
+        self.common_args().and_generate
     }
 }
 
@@ -43,6 +102,10 @@ pub(crate) struct CommonBuildArgs {
     /// Build a release build
     #[clap(long, short, default_value = "false")]
     pub(crate) release: bool,
+
+    /// Optionally generate the bindings and turbo-module code for the crate
+    #[clap(long = "and-generate", short = 'g')]
+    pub(crate) and_generate: bool,
 }
 
 impl CommonBuildArgs {

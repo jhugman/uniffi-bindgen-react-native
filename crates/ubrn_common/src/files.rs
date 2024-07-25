@@ -60,6 +60,11 @@ pub fn pwd() -> Result<Utf8PathBuf> {
     Ok(Utf8PathBuf::try_from(path)?)
 }
 
+pub fn cd(dir: &Utf8Path) -> Result<()> {
+    std::env::set_current_dir(dir)?;
+    Ok(())
+}
+
 pub fn rm_dir<P: AsRef<Utf8Path>>(dir: P) -> Result<()> {
     if dir.as_ref().exists() {
         fs::remove_dir_all(dir.as_ref())?;
