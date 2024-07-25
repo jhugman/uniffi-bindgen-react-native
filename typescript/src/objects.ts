@@ -53,6 +53,7 @@ export interface UniffiObjectFactory<T> {
   pointer(obj: T): UnsafeMutableRawPointer;
   clonePointer(obj: T): UnsafeMutableRawPointer;
   freePointer(pointer: UnsafeMutableRawPointer): void;
+  isConcreteType(obj: any): obj is T;
 }
 
 const pointerConverter: FfiConverter<any, UnsafeMutableRawPointer> =
@@ -71,7 +72,11 @@ export class FfiConverterObject<T>
     return this.factory.create(value);
   }
   lower(value: T): UnsafeMutableRawPointer {
-    return this.factory.clonePointer(value);
+    if (this.factory.isConcreteType(value)) {
+      return this.factory.clonePointer(value);
+    } else {
+      throw new Error("Cannot lower this object to a pointer");
+    }
   }
   read(from: RustBuffer): T {
     return this.lift(pointerConverter.read(from));

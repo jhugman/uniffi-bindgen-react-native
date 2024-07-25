@@ -7,7 +7,7 @@ use super::oracle::{AsCodeType, CodeOracle};
 pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
     backend::{filters::UniFFIError, Literal, Type},
-    interface::{AsType, Enum, FfiType, Object, Variant},
+    interface::{AsType, Enum, FfiType, Variant},
     ComponentInterface,
 };
 
@@ -100,14 +100,6 @@ fn int_literal(t: &Option<Type>, base10: String) -> Result<String, askama::Error
             "Enum hasn't defined a repr".to_string(),
         ))))
     }
-}
-
-/// Get the idiomatic Python rendering of an individual enum variant.
-pub fn object_names(
-    obj: &Object,
-    ci: &ComponentInterface,
-) -> Result<(String, String), askama::Error> {
-    Ok(CodeOracle.object_names(ci, obj))
 }
 
 pub fn variant_discr_literal(
