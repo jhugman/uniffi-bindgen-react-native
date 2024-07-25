@@ -17,4 +17,4 @@ fi
 
 manifest_path="${root_dir}/crates/ubrn_cli/Cargo.toml"
 
-cargo run --manifest-path "${manifest_path}" -- "$@"
+cargo run --quiet --manifest-path "${manifest_path}" -- "$@"
