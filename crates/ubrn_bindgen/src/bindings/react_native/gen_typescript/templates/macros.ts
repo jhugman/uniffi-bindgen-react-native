@@ -93,7 +93,7 @@
         super();
         const pointer =
             {% call to_ffi_method_call(obj_factory, callable) %};
-        this._rustArcPtr = {{ obj_factory }}.bless(pointer);
+        this.__rustArcPtr = {{ obj_factory }}.bless(pointer);
     }
 {%- endmacro %}
 

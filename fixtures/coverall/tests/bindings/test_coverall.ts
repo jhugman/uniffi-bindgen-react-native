@@ -11,6 +11,7 @@
 import {
   CoverallError,
   ComplexError,
+  CoverallsInterface,
   Coveralls,
   createNoneDict,
   createSomeDict,
@@ -21,6 +22,10 @@ import {
   OtherError,
   getComplexError,
   getErrorDict,
+  EmptyStruct,
+  Patch,
+  Repair,
+  PatchInterface,
 } from "../../generated/coverall";
 import { test } from "@/asserts";
 import { console } from "@/hermes";
@@ -165,4 +170,82 @@ test("Error Values", (t) => {
   t.assertNull(getErrorDict(undefined).complexError);
 
   coveralls.uniffiDestroy();
+});
+
+test("Dummy coveralls implement the Coveralls interface", (t) => {
+  // We're testing only whether this is compilable.
+  class DummyCoveralls implements CoverallsInterface {
+    addPatch(patch: PatchInterface): void {
+      throw new Error("Method not implemented.");
+    }
+    addRepair(repair: Repair): void {
+      throw new Error("Method not implemented.");
+    }
+    cloneMe(): CoverallsInterface {
+      throw new Error("Method not implemented.");
+    }
+    falliblePanic(message: string): void {
+      throw new Error("Method not implemented.");
+    }
+    getDict(key: string, value: bigint): Map<string, bigint> {
+      throw new Error("Method not implemented.");
+    }
+    getDict2(key: string, value: bigint): Map<string, bigint> {
+      throw new Error("Method not implemented.");
+    }
+    getDict3(key: number, value: bigint): Map<number, bigint> {
+      throw new Error("Method not implemented.");
+    }
+    getName(): string {
+      throw new Error("Method not implemented.");
+    }
+    getOther(): CoverallsInterface | undefined {
+      throw new Error("Method not implemented.");
+    }
+    getRepairs(): Array<Repair> {
+      throw new Error("Method not implemented.");
+    }
+    getStatus(status: string): string {
+      throw new Error("Method not implemented.");
+    }
+    maybeThrow(shouldThrow: boolean): boolean {
+      throw new Error("Method not implemented.");
+    }
+    maybeThrowComplex(input: number): boolean {
+      throw new Error("Method not implemented.");
+    }
+    maybeThrowInto(shouldThrow: boolean): boolean {
+      throw new Error("Method not implemented.");
+    }
+    panic(message: string): void {
+      throw new Error("Method not implemented.");
+    }
+    reverse(value: ArrayBuffer): ArrayBuffer {
+      throw new Error("Method not implemented.");
+    }
+    setAndGetEmptyStruct(emptyStruct: EmptyStruct): EmptyStruct {
+      throw new Error("Method not implemented.");
+    }
+    strongCount(): bigint {
+      throw new Error("Method not implemented.");
+    }
+    takeOther(other: CoverallsInterface | undefined): void {
+      throw new Error("Method not implemented.");
+    }
+    takeOtherFallible(): void {
+      throw new Error("Method not implemented.");
+    }
+    takeOtherPanic(message: string): void {
+      throw new Error("Method not implemented.");
+    }
+  }
+
+  // reimplementing the CoverallsInterface interface.
+  const dummyCoveralls = new DummyCoveralls();
+  t.assertFalse(Coveralls.instanceOf(dummyCoveralls));
+
+  // subclassing the Coveralls object.
+  class ExtendedCoveralls extends Coveralls {}
+  const extendedCoveralls = new ExtendedCoveralls("Extended coveralls");
+  t.assertTrue(Coveralls.instanceOf(extendedCoveralls));
 });

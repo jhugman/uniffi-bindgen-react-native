@@ -6,7 +6,7 @@
 use heck::{ToLowerCamelCase, ToShoutySnakeCase, ToUpperCamelCase};
 use uniffi_bindgen::{
     backend::{Literal, Type},
-    interface::{AsType, FfiType, Object},
+    interface::{AsType, FfiType},
     ComponentInterface,
 };
 
@@ -152,24 +152,6 @@ impl CodeOracle {
             FfiType::Struct(name) => self.ffi_struct_name(name),
             FfiType::Reference(inner) => self.ffi_type_label_by_reference(inner),
             FfiType::VoidPointer => "/*pointer*/ bigint".to_string(),
-        }
-    }
-
-    /// Get the name of the interface and class name for an object.
-    ///
-    /// If we support callback interfaces, the interface name is the object name, and the class name is derived from that.
-    /// Otherwise, the class name is the object name and the interface name is derived from that.
-    ///
-    /// This split determines what types `FfiConverter.lower()` inputs.  If we support callback
-    /// interfaces, `lower` must lower anything that implements the interface.  If not, then lower
-    /// only lowers the concrete class.
-    pub(crate) fn object_names(&self, ci: &ComponentInterface, obj: &Object) -> (String, String) {
-        let class_name = self.class_name(ci, obj.name());
-        if obj.has_callback_interface() {
-            let impl_name = format!("{class_name}Impl");
-            (class_name, impl_name)
-        } else {
-            (format!("{class_name}Interface"), class_name)
         }
     }
 }

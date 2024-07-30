@@ -2,8 +2,9 @@
 {%- include "ObjectRuntime.ts" %}
 {%- endif %}
 {%- let obj = ci|get_object_definition(name) %}
-{%- let (protocol_name, impl_class_name) = obj|object_names(ci) %}
-{%- let obj_factory = format!("uniffiType{}ObjectFactory", type_name) %}
+{%- let protocol_name = obj|type_name(ci) %}
+{%- let impl_class_name = obj|decl_type_name(ci) %}
+{%- let obj_factory = format!("uniffiType{}ObjectFactory", impl_class_name) %}
 {%- let methods = obj.methods() %}
 
 {%- let is_error = ci.is_name_used_as_error(name) %}
@@ -12,7 +13,7 @@
 {%- macro private_ctor() %}
 private constructor(pointer: UnsafeMutableRawPointer) {
     super();
-    this._rustArcPtr = {{ obj_factory }}.bless(pointer);
+    this.__rustArcPtr = {{ obj_factory }}.bless(pointer);
 }
 {%- endmacro %}
 
@@ -30,7 +31,8 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
     {%- endfor %}
     {%- if is_error %}, Error{% endif %} {
 
-    private _rustArcPtr: UniffiRustArcPtr;
+    private __uniffiTypeName = "{{ impl_class_name }}";
+    private __rustArcPtr: UniffiRustArcPtr;
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
@@ -55,12 +57,16 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
     {%- call ts::method_decl("public", obj_factory, meth, 4) %}
     {% endfor %}
 
+    static instanceOf(obj: any): obj is typeof {{ impl_class_name }} {
+        return {{ obj_factory }}.isConcreteType(obj);
+    }
+
     // AbstractUniffiObject
     uniffiDestroy(): void {
-        if ((this as any)._rustArcPtr) {
+        if ((this as any).__rustArcPtr) {
             const pointer = {{ obj_factory }}.pointer(this);
-            this._rustArcPtr.d(pointer);
-            delete (this as any)._rustArcPtr;
+            this.__rustArcPtr.d(pointer);
+            delete (this as any).__rustArcPtr;
         }
     }
 
@@ -97,10 +103,10 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
 
 }
 
-const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
+const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
         const instance = Object.create({{ impl_class_name }}.prototype);
-        instance._rustArcPtr = this.bless(pointer);
+        instance.__rustArcPtr = this.bless(pointer);
         return instance;
     },
 
@@ -110,7 +116,7 @@ const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
     },
 
     pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
-        const ptr = (obj as any)._rustArcPtr;
+        const ptr = (obj as any).__rustArcPtr;
         if (ptr === undefined) {
             throw new UniffiInternalError.UnexpectedNullPointer();
         }
@@ -130,7 +136,11 @@ const {{ obj_factory }}: UniffiObjectFactory<{{type_name}}> = {
             /*caller:*/ (callStatus) => nativeModule().{{ obj.ffi_object_free().name() }}(pointer, callStatus),
             /*liftString:*/ FfiConverterString.lift
         );
-    }
+    },
+
+    isConcreteType(obj: any): obj is {{ type_name }} {
+        return obj.__rustArcPtr && obj.__uniffiTypeName === "{{ impl_class_name }}";
+    },
 };
 
 {%- if !obj.has_callback_interface() %}
