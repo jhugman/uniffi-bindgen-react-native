@@ -13,6 +13,7 @@
 {%- macro private_ctor() %}
 private constructor(pointer: UnsafeMutableRawPointer) {
     super();
+    this.__rustPointer = pointer;
     this.__rustArcPtr = {{ obj_factory }}.bless(pointer);
 }
 {%- endmacro %}
@@ -33,6 +34,7 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
 
     private __uniffiTypeName = "{{ impl_class_name }}";
     private __rustArcPtr: UniffiRustArcPtr;
+    private __rustPointer: UnsafeMutableRawPointer;
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
@@ -65,7 +67,8 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
     uniffiDestroy(): void {
         if ((this as any).__rustArcPtr) {
             const pointer = {{ obj_factory }}.pointer(this);
-            this.__rustArcPtr.d(pointer);
+            {{ obj_factory }}.freePointer(pointer);
+            this.__rustArcPtr.markDestroyed();
             delete (this as any).__rustArcPtr;
         }
     }
@@ -106,21 +109,24 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
 const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
         const instance = Object.create({{ impl_class_name }}.prototype);
+        instance.__rustPointer = pointer;
         instance.__rustArcPtr = this.bless(pointer);
         return instance;
     },
 
     bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
-        const d = this.freePointer;
-        return { p, d };
+        return rustCall(
+            /*caller:*/ (status) =>
+                nativeModule().{{ obj.ffi_function_bless_pointer().name() }}(p, status),
+            /*liftString:*/ FfiConverterString.lift
+        );
     },
 
     pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
-        const ptr = (obj as any).__rustArcPtr;
-        if (ptr === undefined) {
+        if ((obj as any).__rustArcPtr === undefined) {
             throw new UniffiInternalError.UnexpectedNullPointer();
         }
-        return ptr.p;
+        return (obj as any).__rustPointer;
     },
 
     clonePointer(obj: {{ type_name }}): UnsafeMutableRawPointer {

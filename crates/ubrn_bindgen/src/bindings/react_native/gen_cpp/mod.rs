@@ -9,7 +9,7 @@ use crate::bindings::{
     metadata::ModuleMetadata,
     react_native::{
         ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,
-        FfiTypeExt,
+        FfiTypeExt, ObjectExt,
     },
 };
 use anyhow::Result;

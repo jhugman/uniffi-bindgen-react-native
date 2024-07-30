@@ -30,7 +30,7 @@ use uniffi_meta::{AsType, ExternalKind};
 
 use crate::bindings::metadata::ModuleMetadata;
 use crate::bindings::react_native::{
-    ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt,
+    ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
 };
 
 #[derive(Default)]

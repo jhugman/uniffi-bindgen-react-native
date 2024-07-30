@@ -144,6 +144,7 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 }
 
 {%- include "StringHelper.cpp" %}
+{%- include "ObjectHelper.cpp" %}
 
 // Methods calling directly into the uniffi generated C API of the Rust crate.
 {%- for func in ci.iter_ffi_functions_js_to_rust() %}

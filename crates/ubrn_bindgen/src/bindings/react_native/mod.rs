@@ -18,7 +18,7 @@ use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{
     interface::{
         FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
-        Function,
+        Function, Method, Object,
     },
     BindingGenerator, BindingsConfig, ComponentInterface,
 };
@@ -206,6 +206,7 @@ impl ComponentInterface {
         self.iter_ffi_functions_js_to_cpp_and_back()
             .chain(self.iter_ffi_functions_js_to_rust())
             .chain(self.iter_ffi_functions_init_callback())
+            .chain(self.iter_ffi_function_bless_pointer())
     }
 
     fn iter_ffi_functions_js_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
@@ -233,6 +234,12 @@ impl ComponentInterface {
                     None
                 }
             }))
+    }
+
+    fn iter_ffi_function_bless_pointer(&self) -> impl Iterator<Item = FfiFunction> {
+        self.object_definitions()
+            .iter()
+            .map(|o| o.ffi_function_bless_pointer())
     }
 
     fn iter_ffi_structs(&self) -> impl Iterator<Item = FfiStruct> {
@@ -349,6 +356,31 @@ fn store_with_name(types: &mut HashMap<String, Type>, type_: &Type) -> String {
     let name = format!("{type_:?}");
     types.entry(name.clone()).or_insert_with(|| type_.clone());
     name
+}
+
+#[ext]
+impl Object {
+    fn ffi_function_bless_pointer(&self) -> FfiFunction {
+        let meta = uniffi_meta::MethodMetadata {
+            module_path: "internal".to_string(),
+            self_name: self.name().to_string(),
+            name: "ffi__bless_pointer".to_owned(),
+            is_async: false,
+            inputs: Default::default(),
+            return_type: None,
+            throws: None,
+            checksum: None,
+            docstring: None,
+            takes_self_by_arc: false,
+        };
+        let func: Method = meta.into();
+        let mut ffi = func.ffi_func().clone();
+        ffi.init(
+            Some(FfiType::RustArcPtr(String::from(""))),
+            vec![FfiArgument::new("pointer", FfiType::UInt64)],
+        );
+        ffi
+    }
 }
 
 #[ext]
