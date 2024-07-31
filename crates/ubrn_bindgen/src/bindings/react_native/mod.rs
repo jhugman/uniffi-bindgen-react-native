@@ -18,7 +18,7 @@ use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{
     interface::{
         FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
-        Function, Method, Object,
+        Function, Method, Object, UniffiTrait,
     },
     BindingGenerator, BindingsConfig, ComponentInterface,
 };
@@ -360,6 +360,21 @@ fn store_with_name(types: &mut HashMap<String, Type>, type_: &Type) -> String {
 
 #[ext]
 impl Object {
+    fn is_uniffi_trait(t: &UniffiTrait, nm: &str) -> bool {
+        match t {
+            UniffiTrait::Debug { .. } => nm == "Debug",
+            UniffiTrait::Display { .. } => nm == "Display",
+            UniffiTrait::Eq { .. } => nm == "Eq",
+            UniffiTrait::Hash { .. } => nm == "Hash",
+        }
+    }
+
+    fn has_uniffi_trait(&self, nm: &str) -> bool {
+        self.uniffi_traits()
+            .iter()
+            .any(|t| Self::is_uniffi_trait(t, nm))
+    }
+
     fn ffi_function_bless_pointer(&self) -> FfiFunction {
         let meta = uniffi_meta::MethodMetadata {
             module_path: "internal".to_string(),
