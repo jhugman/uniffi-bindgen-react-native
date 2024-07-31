@@ -13,9 +13,8 @@ import {
   Enumeration,
   EnumerationAvecDonnees,
   Optionneur,
-  DictionnaireFactory,
+  Dictionnaire,
   OptionneurDictionnaire,
-  OptionneurDictionnaireFactory,
   Retourneur,
   Stringifier,
   copieCarte,
@@ -39,7 +38,7 @@ test("Round trip a list of enum", (t) => {
 });
 
 test("Round trip an object literal, without strings", (t) => {
-  const input = DictionnaireFactory.create({
+  const input: Dictionnaire = Dictionnaire.create({
     un: Enumeration.Deux,
     deux: true,
     petitNombre: 0,
@@ -152,9 +151,8 @@ test("Using an object to roundtrip primitives", (t) => {
 
 test("Testing defaulting properties in record types", (t) => {
   const rt = new Retourneur();
-  const defaulted: OptionneurDictionnaire =
-    OptionneurDictionnaireFactory.create({});
-  const explicit = OptionneurDictionnaireFactory.create({
+  const defaulted: OptionneurDictionnaire = OptionneurDictionnaire.create({});
+  const explicit = OptionneurDictionnaire.create({
     i8Var: -8,
     u8Var: 8,
     i16Var: -16,
@@ -173,7 +171,7 @@ test("Testing defaulting properties in record types", (t) => {
   });
   t.assertEqual(explicit, defaulted);
 
-  const actualDefaults = OptionneurDictionnaireFactory.defaults();
+  const actualDefaults = OptionneurDictionnaire.defaults();
   t.assertEqual(defaulted, actualDefaults);
 
   affirmAllerRetour(
