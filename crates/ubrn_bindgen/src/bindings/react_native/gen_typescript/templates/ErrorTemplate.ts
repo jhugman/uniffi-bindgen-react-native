@@ -1,5 +1,4 @@
 {{- self.import_infra("UniffiError", "errors") }}
-{%- let decl_type_name = e|decl_type_name(ci) %}
 {%- let instance_of = "instanceOf" %}
 {%- let flat = e.is_flat() %}
 {%- if flat %}

@@ -24,7 +24,7 @@ import myModule, {
   ParserError,
   sayAfter,
   sayAfterWithTokio,
-  SharedResourceOptionsFactory,
+  SharedResourceOptions,
   sleep,
   tryDelayUsingTrait,
   tryFromStringUsingTrait,
@@ -363,19 +363,19 @@ asyncTest("fallible method… which does throw, part II", async (t) => {
 
 asyncTest("a future that uses a lock and that is not cancelled", async (t) => {
   await useSharedResource(
-    SharedResourceOptionsFactory.create({
+    SharedResourceOptions.create({
       releaseAfterMs: 100,
       timeoutMs: 1000,
     }),
   );
   await useSharedResource(
-    SharedResourceOptionsFactory.create({ releaseAfterMs: 0, timeoutMs: 1000 }),
+    SharedResourceOptions.create({ releaseAfterMs: 0, timeoutMs: 1000 }),
   );
   t.end();
 });
 
 asyncTest("a future that uses a lock and that is cancelled", async (t) => {
-  const options = SharedResourceOptionsFactory.create({
+  const options = SharedResourceOptions.create({
     releaseAfterMs: 100,
     timeoutMs: 1000,
   });
@@ -388,7 +388,7 @@ asyncTest("a future that uses a lock and that is cancelled", async (t) => {
   // Try accessing the shared resource again.  The initial task should release the shared resource
   // before the timeout expires.
   await useSharedResource(
-    SharedResourceOptionsFactory.create({ releaseAfterMs: 0, timeoutMs: 1000 }),
+    SharedResourceOptions.create({ releaseAfterMs: 0, timeoutMs: 1000 }),
   );
   t.end();
 });

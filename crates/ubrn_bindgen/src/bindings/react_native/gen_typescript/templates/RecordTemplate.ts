@@ -14,7 +14,7 @@ export type {{ type_name }} = {
 /**
  * Generated factory for {@link {{ type_name }}} record objects.
  */
-export const {{ type_name }}Factory = (() => {
+export const {{ decl_type_name }} = (() => {
     const defaults = () => ({
         {%- for field in rec.fields() %}
         {%- match field.default_value() %}
@@ -25,14 +25,21 @@ export const {{ type_name }}Factory = (() => {
         {%- endmatch -%}
         {%- endfor %}
     });
+    const create = (() => {
+        return uniffiCreateRecord<{{ type_name }}, ReturnType<typeof defaults>>(defaults);
+    })();
     return Object.freeze({
         /**
          * Create a frozen instance of {@link {{ type_name }}}, with defaults specified
          * in Rust, in the {@link {{ ci.namespace() }}} crate.
          */
-        create: (() => {
-            return uniffiCreateRecord<{{ type_name }}, ReturnType<typeof defaults>>(defaults);
-        })(),
+        create,
+
+        /**
+         * Create a frozen instance of {@link {{ type_name }}}, with defaults specified
+         * in Rust, in the {@link {{ ci.namespace() }}} crate.
+         */
+        new: create,
 
         /**
          * Defaults specified in the {@link {{ ci.namespace() }}} crate.
