@@ -108,7 +108,33 @@ pub fn variant_discr_literal(
     ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
     let literal = e.variant_discr(*index).expect("invalid index");
-    Ok(Type::Int32.as_codetype().literal(&literal, ci))
+    let ts_literal = Type::Int32.as_codetype().literal(&literal, ci);
+    Ok(match literal {
+        Literal::String(_) => ts_literal,
+        Literal::UInt(_, _, typ) | Literal::Int(_, _, typ)
+            if !matches!(&typ, &Type::Int64 | &Type::UInt64) =>
+        {
+            ts_literal
+        }
+        // Discriminant do not travel across the FFI, so we don't have to maintain bit
+        // parity here: we can do things for the convenience of the ts developer.
+        // Here, we cast a BigInt down to a number iff the number is representable by the number.
+        Literal::UInt(n, _, _) => {
+            if n < (u32::MAX as u64) {
+                format!("{n}")
+            } else {
+                format!("\"{n}\"")
+            }
+        }
+        Literal::Int(n, _, _) => {
+            if (i32::MIN as i64) < n && n < (i32::MAX as i64) {
+                format!("{n}")
+            } else {
+                format!("\"{n}\"")
+            }
+        }
+        _ => format!("\"{ts_literal}\""),
+    })
 }
 
 pub fn ffi_type_name_for_cpp(type_: &FfiType, is_internal: &bool) -> Result<String, askama::Error> {

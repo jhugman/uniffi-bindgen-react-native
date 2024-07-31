@@ -183,7 +183,7 @@ test("Error Values", (t) => {
 
   const e = getRootError();
   t.assertTrue(RootError.Other.instanceOf(e));
-  t.assertEqual(e.error, OtherError.UNEXPECTED);
+  t.assertEqual(e.error, OtherError.Unexpected);
 
   const ce = getComplexError(undefined);
   t.assertTrue(ComplexError.PermissionDenied.instanceOf(ce));

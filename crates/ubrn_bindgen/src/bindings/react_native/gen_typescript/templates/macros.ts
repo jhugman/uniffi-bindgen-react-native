@@ -1,3 +1,5 @@
+import { decl_type_name } from "./EnumTemplate"
+
 {#
     // Template to defining types. This may endup using codegen,
     // but may not.
@@ -169,28 +171,40 @@
 // Field lists as used in ts declarations of Records and Enums.
 // Note the var_name and type_name filters.
 -#}
-{% macro field_list_decl(item, has_nameless_fields) %}
+{%- macro field_list_decl(item, has_nameless_fields) %}
     {%- for field in item.fields() -%}
-        {%- call docstring(field, 8) %}
-        {%- if has_nameless_fields %}
-        {{- field|type_name(ci) -}}
-        {%- if !loop.last -%}, {%- endif -%}
-        {%- else -%}
-        {{ field.name()|var_name }}: {{ field|type_name(ci) -}}
-        {%- match field.default_value() %}
-            {%- when Some with(literal) %} = {{ literal|render_literal(field, ci) }}
-            {%- else %}
-        {%- endmatch -%}
-        {% if !loop.last %}, {% endif %}
-        {%- endif -%}
+    {%-   call docstring(field, 8) %}
+    {%-   if has_nameless_fields -%}
+    v{{ loop.index0 }}: {# space #}
+    {{-     field|type_name(ci) }}
+    {%-   else %}
+    {{-     field.name()|var_name }}: {{ field|type_name(ci) -}}
+    {%-     match field.default_value() %}
+    {%-       when Some with(literal) %} = {{ literal|render_literal(field, ci) }}
+    {%-       else %}
+    {%-     endmatch -%}
+    {%-   endif %}
+    {%-   if !loop.last %}, {% endif %}
     {%- endfor %}
 {%- endmacro %}
 
-{% macro field_name(field, field_num) %}
+{%- macro field_list(item, has_nameless_fields) %}
+{%- for field in item.fields() %}
+{%-   if has_nameless_fields -%}
+        v{{ loop.index0 }}
+{%-   else %}
+{{-     field.name()|var_name }}
+{%-   endif %}
+{%-   if !loop.last %}, {% endif %}
+{%- endfor %}
+{%- endmacro %}
+
+
+{% macro field_name(inner, field, field_num) %}
 {%- if field.name().is_empty() -%}
-v{{- field_num -}}
+{{- inner }}[{{ field_num }}]
 {%- else -%}
-{{ field.name()|var_name }}
+{{- inner }}.{{ field.name()|var_name }}
 {%- endif -%}
 {%- endmacro %}
 
@@ -227,4 +241,10 @@ v{{- field_num -}}
 
 {%- macro docstring(defn, indent_spaces) %}
 {%- call docstring_value(defn.docstring(), indent_spaces) %}
+{%- endmacro %}
+
+{%- macro type_omit_instanceof(type_name, decl_type_name) %}
+export type {{ type_name }} = InstanceType<
+    typeof {{ decl_type_name }}[keyof Omit<typeof {{ decl_type_name }}, 'instanceOf'>]
+>;
 {%- endmacro %}
