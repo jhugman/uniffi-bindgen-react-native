@@ -65,9 +65,8 @@ export const {{ decl_type_name }} = (() => {
 })();
 
 // Union type for {{ type_name }} error type.
-export type {{ type_name }} = InstanceType<
-    typeof {{ decl_type_name }}[keyof Omit<typeof {{ decl_type_name }}, '{{ instance_of }}'>]
->;
+{% call ts::docstring(e, 0) %}
+{% call ts::type_omit_instanceof(type_name, decl_type_name) %}
 
 const {{ ffi_converter_name }} = (() => {
     const intConverter = FfiConverterInt32;

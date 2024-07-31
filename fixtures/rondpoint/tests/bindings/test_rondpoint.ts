@@ -11,8 +11,7 @@
 import { Asserts, test } from "@/asserts";
 import {
   Enumeration,
-  type EnumerationAvecDonnees,
-  EnumerationAvecDonneesKind,
+  EnumerationAvecDonnees,
   Optionneur,
   DictionnaireFactory,
   OptionneurDictionnaire,
@@ -28,20 +27,20 @@ import {
 import { numberToString } from "@/simulated";
 
 test("Round trip a single enum", (t) => {
-  const input = Enumeration.DEUX;
+  const input = Enumeration.Deux;
   const output = copieEnumeration(input);
   t.assertEqual(input, output);
 });
 
 test("Round trip a list of enum", (t) => {
-  const input = [Enumeration.UN, Enumeration.DEUX];
+  const input = [Enumeration.Un, Enumeration.Deux];
   const output = copieEnumerations(input);
   t.assertEqual(input, output);
 });
 
 test("Round trip an object literal, without strings", (t) => {
   const input = DictionnaireFactory.create({
-    un: Enumeration.DEUX,
+    un: Enumeration.Deux,
     deux: true,
     petitNombre: 0,
     grosNombre: BigInt("123456789"),
@@ -52,15 +51,9 @@ test("Round trip an object literal, without strings", (t) => {
 
 test("Round trip a map<string, *> of strings to enums with values", (t) => {
   const input = new Map<string, EnumerationAvecDonnees>([
-    ["0", { kind: EnumerationAvecDonneesKind.ZERO }],
-    ["1", { kind: EnumerationAvecDonneesKind.UN, value: { premier: 1 } }],
-    [
-      "2",
-      {
-        kind: EnumerationAvecDonneesKind.DEUX,
-        value: { premier: 2, second: "deux" },
-      },
-    ],
+    ["0", new EnumerationAvecDonnees.Zero()],
+    ["1", new EnumerationAvecDonnees.Un({ premier: 1 })],
+    ["2", new EnumerationAvecDonnees.Deux({ premier: 2, second: "deux" })],
   ]);
   const output = copieCarte(input);
   t.assertEqual(input, output);
@@ -100,7 +93,7 @@ const inputData = {
   u64: [BigInt("0"), BigInt("0xffffffffffffffff")],
   f32: [3.5, 27, -113.75, 0.0078125, 0.5, 0, -1],
   f64: [Number.MIN_VALUE, Number.MAX_VALUE],
-  enums: [Enumeration.UN, Enumeration.DEUX, Enumeration.TROIS],
+  enums: [Enumeration.Un, Enumeration.Deux, Enumeration.Trois],
   string: [
     "",
     "abc",
@@ -175,7 +168,7 @@ test("Testing defaulting properties in record types", (t) => {
     booleanVar: true,
     stringVar: "default",
     listVar: [],
-    enumerationVar: Enumeration.DEUX,
+    enumerationVar: Enumeration.Deux,
     dictionnaireVar: undefined,
   });
   t.assertEqual(explicit, defaulted);
@@ -313,7 +306,7 @@ test("Default arguments are defaulting", (t) => {
   t.assertEqual(op.sinonF64(), 42.1);
 
   // enums
-  t.assertEqual(op.sinonEnum(), Enumeration.TROIS);
+  t.assertEqual(op.sinonEnum(), Enumeration.Trois);
 
   op.uniffiDestroy();
 });

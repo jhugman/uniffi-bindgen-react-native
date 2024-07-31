@@ -1,0 +1,5 @@
+namespace enum_types {};
+enum Animal {
+  "Dog",
+  "Cat"
+};

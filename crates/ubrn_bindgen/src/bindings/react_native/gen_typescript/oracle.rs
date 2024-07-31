@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use heck::{ToLowerCamelCase, ToShoutySnakeCase, ToUpperCamelCase};
+use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::{
     backend::{Literal, Type},
     interface::{AsType, FfiType},
@@ -40,7 +40,7 @@ impl CodeOracle {
 
     /// Get the idiomatic Typescript rendering of an individual enum variant.
     pub(crate) fn enum_variant_name(&self, nm: &str) -> String {
-        nm.to_string().to_shouty_snake_case()
+        nm.to_string().to_upper_camel_case()
     }
 
     /// Get the idiomatic Typescript rendering of an FFI callback function name
