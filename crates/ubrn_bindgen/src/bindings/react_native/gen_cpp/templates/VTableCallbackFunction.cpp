@@ -117,6 +117,19 @@ namespace {{ ns }} {
             {%- if callback.has_rust_call_status_arg() -%}
             , RustCallStatus* uniffi_call_status
             {%- endif -%}) {
+        // If the runtime has shutdown, then there is no point in trying to
+        // call into Javascript. BUT how do we tell if the runtime has shutdown?
+        //
+        // Answer: the module destructor calls into callback `cleanup` method,
+        // which nulls out the rsLamda.
+        //
+        // If rsLamda is null, then there is no runtime to call into.
+        if (rsLambda == nullptr) {
+            // This only occurs when destructors are calling into Rust free/drop,
+            // which causes the JS callback to be dropped.
+            return;
+        }
+
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
         rsLambda(

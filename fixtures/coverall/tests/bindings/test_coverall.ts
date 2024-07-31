@@ -90,6 +90,26 @@ test("test create_none_dict() with default values", (t) => {
   t.assertEqual(d.coveralls, undefined);
 });
 
+test("Given a rust object, when it is destroyed, it cannot be re-used", (t) => {
+  const name = "To be destroyed";
+  const c = new Coveralls(name);
+
+  // check it works first.
+  t.assertEqual(name, c.getName());
+
+  // then destroy it.
+  c.uniffiDestroy();
+
+  // now check it doesn't work.
+  t.assertThrows(
+    () => true,
+    () => c.getName(),
+  );
+
+  // …destroy again, just to show it's idempotent.
+  c.uniffiDestroy();
+});
+
 test("Given 1000 objects, when they go out of scope, then they are dropped by rust", (t) => {
   // The GC test; we should have 1000 alive by the end of the loop.
   //
@@ -248,4 +268,10 @@ test("Dummy coveralls implement the Coveralls interface", (t) => {
   class ExtendedCoveralls extends Coveralls {}
   const extendedCoveralls = new ExtendedCoveralls("Extended coveralls");
   t.assertTrue(Coveralls.instanceOf(extendedCoveralls));
+});
+
+// This is the last test, so we can test a graceful shutdown.
+test("Given a rust object, if not destroyed, it's ok", (t) => {
+  const name = "To be destroyed by GC";
+  const c = new Coveralls(name);
 });

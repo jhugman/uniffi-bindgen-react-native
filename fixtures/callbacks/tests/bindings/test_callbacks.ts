@@ -170,6 +170,7 @@ class StoredTypeScriptStringifier implements StoredForeignStringifier {
     }
   }
 }
+
 test("A callback passed into the constructor", (t) => {
   const stringifierCallback = new StoredTypeScriptStringifier();
   const rustStringifier = new RustStringifier(stringifierCallback);
@@ -178,4 +179,15 @@ test("A callback passed into the constructor", (t) => {
   const observed = rustStringifier.fromSimpleType(42);
 
   t.assertEqual(observed, expected);
+
+  rustStringifier.uniffiDestroy();
+});
+
+test("A callback passed into the constructor is not destroyed", (t) => {
+  const stringifierCallback = new StoredTypeScriptStringifier();
+  const rustStringifier = new RustStringifier(stringifierCallback);
+
+  // The destructor calls into the Rust, which calls back into Javascript.
+  // If the jsi::Runtime has been destroyed already, then this will cause a
+  // crash at the end of the run. This should be prevented.
 });

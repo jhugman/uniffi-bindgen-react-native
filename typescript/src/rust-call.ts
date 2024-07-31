@@ -98,8 +98,5 @@ function uniffiCheckCallStatus(
 export type UniffiRustArcPtrDestructor = (pointer: bigint) => void;
 
 export type UniffiRustArcPtr = {
-  // pointer
-  p: UnsafeMutableRawPointer;
-  // destructor
-  d: UniffiRustArcPtrDestructor;
+  markDestroyed(): void;
 };

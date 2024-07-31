@@ -1,6 +1,7 @@
 import {
   type StructuralEquality as UniffiStructuralEquality,
   type UniffiReferenceHolder,
+  type UniffiRustArcPtr,
   type UniffiRustCallStatus,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
  } from 'uniffi-bindgen-react-native';
