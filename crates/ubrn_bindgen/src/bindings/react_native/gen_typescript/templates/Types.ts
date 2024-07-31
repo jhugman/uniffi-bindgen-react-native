@@ -72,9 +72,7 @@
 {%- when Type::CallbackInterface { name, module_path } %}
 {%- include "CallbackInterfaceTemplate.ts" %}
 {%- when Type::Custom { name, module_path, builtin } %}
-{#
-    {%- include "CustomType.ts" %}
-#}
+{%- include "CustomTypeTemplate.ts" %}
 {%- when Type::Enum { name, module_path } %}
 {%- let e = ci.get_enum_definition(name).unwrap() %}
 {%- if ci.is_name_used_as_error(name) %}

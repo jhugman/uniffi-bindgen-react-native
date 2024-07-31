@@ -280,6 +280,9 @@ impl ComponentInterface {
                         add_edge(&mut graph, &mut types, type_, &Type::String);
                     }
                 }
+                Type::Custom { builtin, .. } => {
+                    add_edge(&mut graph, &mut types, type_, builtin.as_ref());
+                }
                 Type::Optional { inner_type } => {
                     add_edge(&mut graph, &mut types, type_, &Type::Boolean);
                     add_edge(&mut graph, &mut types, type_, inner_type.as_ref());

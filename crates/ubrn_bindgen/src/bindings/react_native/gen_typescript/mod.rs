@@ -186,6 +186,10 @@ impl<'a> TypeRenderer<'a> {
         )
     }
 
+    fn import_custom(&self, what: &str, from: &str) -> &str {
+        self.add_import(Imported::JSType(what.to_owned()), from)
+    }
+
     fn import_ext(&self, what: &str, from: &str) -> &str {
         self.add_import(Imported::JSType(what.to_owned()), &format!("./{from}"))
     }
