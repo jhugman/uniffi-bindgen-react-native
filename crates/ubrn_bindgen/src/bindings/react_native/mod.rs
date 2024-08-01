@@ -20,7 +20,7 @@ use uniffi_bindgen::{
         FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
         Function, Method, Object, UniffiTrait,
     },
-    BindingGenerator, BindingsConfig, ComponentInterface,
+    BindingGenerator, Component, ComponentInterface, GenerationSettings,
 };
 use uniffi_meta::Type;
 
@@ -30,28 +30,11 @@ use super::OutputArgs;
 use crate::bindings::metadata::ModuleMetadata;
 
 #[derive(Deserialize)]
-pub(crate) struct ReactNativeConfig {
-    #[serde(skip)]
-    namespace: String,
-}
+pub(crate) struct ReactNativeConfig {}
 
-impl BindingsConfig for ReactNativeConfig {
-    fn update_from_ci(&mut self, ci: &ComponentInterface) {
-        self.namespace = ci.namespace().to_string();
-    }
-
-    fn update_from_cdylib_name(&mut self, _cdylib_name: &str) {
-        // NOOP
-    }
-
-    fn update_from_dependency_configs(&mut self, _config_map: HashMap<&str, &Self>) {
-        // NOOP
-    }
-}
-
-impl From<&ReactNativeConfig> for ModuleMetadata {
-    fn from(value: &ReactNativeConfig) -> Self {
-        ModuleMetadata::new(&value.namespace)
+impl ReactNativeConfig {
+    fn new() -> Self {
+        Self {}
     }
 }
 
@@ -65,10 +48,8 @@ impl ReactNativeBindingGenerator {
     }
 
     pub(crate) fn format_code(&self) -> Result<()> {
-        if !self.output.no_format {
-            format_ts(&self.output.ts_dir.canonicalize_utf8()?)?;
-            format_cpp(&self.output.cpp_dir.canonicalize_utf8()?)?;
-        }
+        format_ts(&self.output.ts_dir.canonicalize_utf8()?)?;
+        format_cpp(&self.output.cpp_dir.canonicalize_utf8()?)?;
         Ok(())
     }
 }
@@ -76,39 +57,45 @@ impl ReactNativeBindingGenerator {
 impl BindingGenerator for ReactNativeBindingGenerator {
     type Config = ReactNativeConfig;
 
-    fn write_bindings(
+    fn new_config(&self, _root_toml: &toml::value::Value) -> Result<Self::Config> {
+        Ok(ReactNativeConfig::new())
+    }
+
+    fn update_component_configs(
         &self,
-        ci: &ComponentInterface,
-        _config: &Self::Config,
-        // We get the output directories from the OutputArgs
-        _out_dir: &Utf8Path,
-        // We will format the code all at once instead of here
-        _try_format_code: bool,
+        _settings: &uniffi_bindgen::GenerationSettings,
+        _components: &mut Vec<uniffi_bindgen::Component<Self::Config>>,
     ) -> Result<()> {
-        let module = ModuleMetadata::new(ci.namespace());
-        let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, &module)?;
-
-        let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
-        let codegen_path = out_dir.join(module.ts_ffi_filename());
-        let frontend_path = out_dir.join(module.ts_filename());
-        fs::write(codegen_path, codegen)?;
-        fs::write(frontend_path, frontend)?;
-
-        let out_dir = &self.output.cpp_dir.canonicalize_utf8()?;
-        let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &module)?;
-        let cpp_path = out_dir.join(module.cpp_filename());
-        let hpp_path = out_dir.join(module.hpp_filename());
-        fs::write(cpp_path, cpp)?;
-        fs::write(hpp_path, hpp)?;
-
+        // NOOP
         Ok(())
     }
 
-    fn check_library_path(
+    fn write_bindings(
         &self,
-        _library_path: &Utf8Path,
-        _cdylib_name: Option<&str>,
+        settings: &GenerationSettings,
+        components: &[Component<Self::Config>],
     ) -> Result<()> {
+        for component in components {
+            let ci = &component.ci;
+            let module: ModuleMetadata = component.into();
+            let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, &module)?;
+
+            let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
+            let codegen_path = out_dir.join(module.ts_ffi_filename());
+            let frontend_path = out_dir.join(module.ts_filename());
+            fs::write(codegen_path, codegen)?;
+            fs::write(frontend_path, frontend)?;
+
+            let out_dir = &self.output.cpp_dir.canonicalize_utf8()?;
+            let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &module)?;
+            let cpp_path = out_dir.join(module.cpp_filename());
+            let hpp_path = out_dir.join(module.hpp_filename());
+            fs::write(cpp_path, cpp)?;
+            fs::write(hpp_path, hpp)?;
+        }
+        if settings.try_format_code {
+            self.format_code()?;
+        }
         Ok(())
     }
 }

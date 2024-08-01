@@ -51,12 +51,11 @@ impl<'a> HppWrapper<'a> {
 #[template(syntax = "cpp", escape = "none", path = "wrapper.cpp")]
 struct CppWrapper<'a> {
     ci: &'a ComponentInterface,
-    #[allow(unused)]
-    config: &'a ModuleMetadata,
+    module: &'a ModuleMetadata,
 }
 
 impl<'a> CppWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
-        Self { ci, config }
+    fn new(ci: &'a ComponentInterface, module: &'a ModuleMetadata) -> Self {
+        Self { ci, module }
     }
 }

@@ -114,16 +114,16 @@ impl BindingsArgs {
         let try_format_code = !out.no_format;
 
         let configs: Vec<ModuleMetadata> = if input.library_mode {
-            uniffi_bindgen::library_mode::generate_external_bindings(
-                &generator,
+            uniffi_bindgen::library_mode::generate_bindings(
                 &input.source,
                 input.crate_name.clone(),
+                &generator,
                 input.config.as_deref(),
                 &dummy_dir,
                 try_format_code,
             )?
             .iter()
-            .map(|s| (&s.config).into())
+            .map(|s| s.into())
             .collect()
         } else {
             uniffi_bindgen::generate_external_bindings(
@@ -137,10 +137,6 @@ impl BindingsArgs {
             )?;
             Default::default()
         };
-
-        if try_format_code {
-            let _ = generator.format_code();
-        }
 
         Ok(configs)
     }

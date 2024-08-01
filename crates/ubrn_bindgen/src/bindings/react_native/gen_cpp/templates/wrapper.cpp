@@ -1,5 +1,5 @@
 {%- let namespace = ci.namespace() %}
-{%- let module_name = config.cpp_module() %}
+{%- let module_name = module.cpp_module() %}
 #ifndef UNIFFI_EXPORT
 #if defined(_WIN32) || defined(_WIN64)
 #define UNIFFI_EXPORT __declspec(dllexport)
@@ -8,7 +8,7 @@
 #endif
 #endif
 
-#include "{{ namespace }}.hpp"
+#include "{{ module.hpp_filename() }}"
 
 #include "UniffiJsiTypes.h"
 #include <stdexcept>
