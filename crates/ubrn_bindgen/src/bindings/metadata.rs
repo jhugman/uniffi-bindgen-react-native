@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use heck::ToUpperCamelCase;
+use uniffi_bindgen::Component;
 
 #[derive(Default)]
 pub struct ModuleMetadata {
@@ -43,5 +44,12 @@ impl ModuleMetadata {
 
     pub fn ts_ffi_filename(&self) -> String {
         format!("{}.ts", self.ts_ffi())
+    }
+}
+
+impl<T> From<&Component<T>> for ModuleMetadata {
+    fn from(value: &Component<T>) -> Self {
+        let namespace = value.ci.namespace().to_string();
+        Self { namespace }
     }
 }
