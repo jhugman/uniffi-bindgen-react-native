@@ -12,7 +12,7 @@ import nativeModule, {
   {%- else %}
   {%- endmatch %}
   {%- endfor %}
-} from "./{{ config.ts_ffi() }}";
+} from "./{{ module.ts_ffi() }}";
 
 {%- for entry in self.type_imports.borrow() %}
 {%-   let file = entry.0 %}
@@ -45,15 +45,6 @@ const {
 {%- call ts::docstring_value(ci.namespace_docstring(), 0) %}
 
 {%- import "macros.ts" as ts %}
-
-{#
-// Depending on the consumer's build setup, the low-level FFI code
-// might be in a separate module, or it might be compiled inline into
-// this module. This is a bit of light hackery to work with both.
-#if canImport({{ config.ffi_module_name() }})
-import {{ config.ffi_module_name() }}
-#endif
-#}
 
 {% include "Helpers.ts" %}
 {% include "HandleMap.ts" %}

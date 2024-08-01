@@ -16,6 +16,9 @@ pub(crate) struct GenerateBindingsArg {
     /// Directory for the generated C++ to put in.
     #[clap(long, requires = "ts_dir")]
     pub(crate) cpp_dir: Option<Utf8PathBuf>,
+    /// Optional uniffi.toml location
+    #[clap(long, requires = "ts_dir")]
+    pub(crate) toml: Option<Utf8PathBuf>,
 }
 
 impl GenerateBindingsArg {
@@ -27,9 +30,14 @@ impl GenerateBindingsArg {
         self.cpp_dir.clone().unwrap()
     }
 
+    fn uniffi_toml(&self) -> Option<Utf8PathBuf> {
+        self.toml.clone()
+    }
+
     pub(crate) fn generate(&self, library: &Utf8PathBuf) -> Result<Vec<Utf8PathBuf>> {
         let output = OutputArgs::new(&self.ts_dir(), &self.cpp_dir(), false);
-        let source = SourceArgs::library(library);
+        let toml = self.uniffi_toml().filter(|file| file.exists());
+        let source = SourceArgs::library(library).with_config(toml);
         let bindings = BindingsArgs::new(source, output);
         let modules = bindings.run()?;
         let cpp_dir = bindings.cpp_dir();

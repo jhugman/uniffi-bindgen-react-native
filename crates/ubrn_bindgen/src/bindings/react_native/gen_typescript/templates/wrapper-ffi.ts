@@ -15,12 +15,12 @@ interface NativeModuleInterface {
   {%- endfor %}
 }
 
-// Casting globalThis to any allows us to look for `{{ config.cpp_module() }}`
+// Casting globalThis to any allows us to look for `{{ module.cpp_module() }}`
 // if it was added via JSI.
 //
-// We use a getter here rather than simply `globalThis.{{ config.cpp_module() }}` so that
+// We use a getter here rather than simply `globalThis.{{ module.cpp_module() }}` so that
 // if/when the startup sequence isn't just so, an empty value isn't inadvertantly cached.
-const getter: () => NativeModuleInterface = () => (globalThis as any).{{ config.cpp_module() }};
+const getter: () => NativeModuleInterface = () => (globalThis as any).{{ module.cpp_module() }};
 export default getter;
 
 {%- macro exported(def) %}
