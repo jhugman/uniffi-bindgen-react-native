@@ -3,41 +3,15 @@
 {%- let flat = e.is_flat() %}
 {%- if flat %}
 // Flat error type: {{ decl_type_name }}
-{%- else %}
-// Error type: {{ decl_type_name }}
-{%- endif %}
 {%- call ts::docstring(e, 0) %}
 export const {{ decl_type_name }} = (() => {
     {%- for variant in e.variants() %}
     {%-   call ts::docstring(variant, 4) %}
     {%-   let variant_name = variant.name()|class_name(ci) %}
     class {{ variant_name }} extends UniffiError {
-        constructor(
-            {%- if flat %}message: string
-            {%- else %}
-            {%-   for field in variant.fields() %}
-            public readonly {{ field.name()|var_name }}: {{ field|type_name(ci) }}
-            {%-     match field.default_value() %}
-            {%-       when Some with(literal) %} = {{ literal|render_literal(field, ci) }}
-            {%-     else %}
-            {%-     endmatch -%}
-            {%-     if !loop.last %}, {% endif %}
-            {%-   endfor %}
-            {%- endif -%}
-        ) {
-            super("{{ decl_type_name }}", "{{ variant_name }}", {{ loop.index }}
-                {%- if flat %}, message
-                {%- endif %});
+        constructor(message: string) {
+            super("{{ type_name }}", "{{ variant_name }}", {{ loop.index }}, message);
         }
-
-        {%- if !flat %}
-        toString(): string {
-            return ["{{ decl_type_name }}.{{ variant_name }}:"
-            {%-   for field in variant.fields() %}, {# space #}
-            `{{ field.name()|var_name }}=${this.{{ field.name()|var_name }}}`
-            {%-   endfor %}].join(" ");
-        }
-        {%- endif -%}
 
         static {{ instance_of }}(e: any): e is {{ variant_name }} {
             return (
@@ -127,3 +101,9 @@ const {{ ffi_converter_name }} = (() => {
     }
     return new FfiConverter();
 })();
+{%- else %}
+// Error type: {{ decl_type_name }}
+{% let superclass = "UniffiError" %}
+{% let is_error = true %}
+{%- include "TaggedEnumTemplate.ts" %}
+{%- endif %}

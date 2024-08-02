@@ -22,7 +22,7 @@ impl CodeType for EnumCodeType {
     fn type_label(&self, ci: &ComponentInterface) -> String {
         let nm = CodeOracle.class_name(ci, &self.id);
         if ci.is_name_used_as_error(&self.id) {
-            format!("{}Type", rewrite_error_name(&nm))
+            rewrite_error_name(&nm).to_string()
         } else {
             nm
         }
