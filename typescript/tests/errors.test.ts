@@ -18,6 +18,26 @@ class UniffiError extends Error {
     super(message);
   }
 
+  get description(): string {
+    return `${this.__typename}.${this.__variant}`;
+  }
+
+  toString(): string {
+    if (this.message !== undefined) {
+      return `${this.__typename}.${this.__variant}: ${this.message}`;
+    } else {
+      return `${this.__typename}.${this.__variant}`;
+    }
+  }
+
+  toDebugString(): string {
+    if (this.message !== undefined) {
+      return `${this.__typename}.${this.__variant}: ${this.message}`;
+    } else {
+      return `${this.__typename}.${this.__variant}`;
+    }
+  }
+
   static instanceOf(err: any): err is UniffiError {
     return err instanceof Error && (err as any).__typename !== undefined;
   }
@@ -73,11 +93,18 @@ test("Vanilla instanceof tests", (t) => {
   t.assertFalse(err instanceof MyError.ThisException, `err is ThisException`);
 });
 
+class MyClass {}
+
+test("Vanilla instanceof tests with plain old classes", (t) => {
+  const obj = new MyClass();
+  t.assertTrue(obj instanceof MyClass, `obj is MyClass`);
+});
+
 test("Vanilla instanceof tests with constructors", (t) => {
   const err = new MyError.ThisException();
   t.assertTrue(err instanceof Error, `err is Error`);
 
-  // If this every fails, then hermes now supports instanceof checks
+  // If this ever fails, then hermes now supports instanceof checks
   // for subclasses. This opens up the possiblility of simplifying the
   // generated error classes, and error handling logic.
   //
@@ -120,11 +147,80 @@ test("Higher order type tests", (t) => {
     return e instanceof type;
   }
 
-  // If this every fails, then hermes now supports instanceof checks
+  // If this ever fails, then hermes now supports instanceof checks
   // for subclasses. This opens up the possiblility of simplifying the
   // generated error classes, and error handling logic.
   //
   // At that point, we need to: raise a github issue to track that work,
   // and then flip the test to assertTrue.
   t.assertFalse(checkType(err, myType), `checkType`);
+});
+
+test("Subclasses of Error cannot declare methods", (t) => {
+  const err = new UniffiError(
+    "MyError",
+    "ThisException",
+    "This is the message",
+  );
+  t.assertEqual(err.toString(), "Error: This is the message");
+
+  // If this ever fails, then hermes now supports toString() method overrides on
+  // Error subclasses. This opens up the possiblility of adding extra methods
+  // — like toDebugString().
+  //
+  // At that point, we need to: raise a github issue to track that work,
+  // and then flip the test to assertEquals.
+  // Currently the toString() method is not overridden:
+  t.assertNull(err.toDebugString, "toDebugString is null");
+  t.assertThrows(
+    (e) => true,
+    () =>
+      t.assertEqual(
+        err.toDebugString(),
+        "ComplexError.ThisException: This is the message",
+      ),
+  );
+});
+
+test("Subclasses of Error cannot declare calculated properties", (t) => {
+  const err = new UniffiError(
+    "MyError",
+    "ThisException",
+    "This is the message",
+  );
+  t.assertEqual(err.toString(), "Error: This is the message");
+
+  // If this ever fails, then hermes now supports toString() method overrides on
+  // Error subclasses. This opens up the possiblility of adding extra methods
+  // — like toDebugString().
+  //
+  // At that point, we need to: raise a github issue to track that work,
+  // and then flip the test to assertEquals.
+  // Currently the toString() method is not overridden:
+  t.assertNull(err.description, "property is null");
+  t.assertNotEqual(
+    err.description,
+    "ComplexError.ThisException: This is the message",
+  );
+});
+
+test("Subclasses of Error cannot overide toString()", (t) => {
+  const err = new UniffiError(
+    "MyError",
+    "ThisException",
+    "This is the message",
+  );
+
+  // If this ever fails, then hermes now supports toString() method overrides on
+  // Error subclasses. This opens up the possiblility of simplifying the
+  // generated error classes, and error handling logic.
+  //
+  // At that point, we need to: raise a github issue to track that work,
+  // and then flip the test to assertEquals.
+  // Currently the toString() method is not overridden:
+  t.assertNotEqual(
+    err.toString(),
+    "ComplexError.ThisException: This is the message",
+  );
+  t.assertEqual(err.toString(), "Error: This is the message");
 });

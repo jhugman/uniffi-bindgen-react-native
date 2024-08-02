@@ -16,12 +16,86 @@ export class UniffiError extends Error {
     private readonly __variant: number,
     message?: string,
   ) {
-    super(message);
+    // We append the error type and variant to the message because we cannot override `toString()`—
+    // in errors.test.ts, we see that the overridden `toString()` method is not called.
+    super(UniffiError.createMessage(__uniffiTypeName, __variantName, message));
+  }
+
+  // Current implementations of hermes errors do not repect instance methods or calculated properties.
+  toString(): string {
+    return UniffiError.createMessage(
+      this.__uniffiTypeName,
+      this.__variantName,
+      this.message,
+    );
   }
 
   static instanceOf(err: any): err is UniffiError {
     return err instanceof Error && (err as any).__uniffiTypeName !== undefined;
   }
+
+  private static createMessage(
+    typeName: string,
+    variantName: string,
+    message: string | undefined,
+  ): string {
+    if (message) {
+      return `${typeName}.${variantName}: ${message}`;
+    } else {
+      return `${typeName}.${variantName}`;
+    }
+  }
+}
+
+export class UniffiThrownObject<T> extends Error {
+  private static __baseTypeName = "UniffiThrownObject";
+  private readonly __baseTypeName: string = UniffiThrownObject.__baseTypeName;
+  constructor(
+    private readonly __uniffiTypeName: string,
+    public readonly data: T,
+    message?: string,
+  ) {
+    // We append the error type and variant to the message because we cannot override `toString()`—
+    // in errors.test.ts, we see that the overridden `toString()` method is not called.
+    super(UniffiThrownObject.createMessage(__uniffiTypeName, data, message));
+  }
+
+  // Current implementations of hermes errors do not repect instance methods or calculated properties.
+  toString(): string {
+    return UniffiThrownObject.createMessage(
+      this.__uniffiTypeName,
+      this.data,
+      this.message,
+    );
+  }
+
+  static instanceOf(err: any): err is UniffiThrownObject<unknown> {
+    return (
+      !!err &&
+      err.__baseTypeName === UniffiThrownObject.__baseTypeName &&
+      err instanceof Error
+    );
+  }
+
+  private static createMessage<T>(
+    typeName: string,
+    obj: any,
+    message: string | undefined,
+  ): string {
+    return [typeName, stringRepresentation(obj), message]
+      .filter((s) => !!s)
+      .join(": ");
+  }
+}
+
+function stringRepresentation(obj: any): string | undefined {
+  if (obj.hasOwnProperty("toString") && typeof obj.toString === "function") {
+    return obj.toString();
+  }
+  if (typeof obj.toDebugString === "function") {
+    return obj.toDebugString();
+  }
+  return undefined;
 }
 
 export const UniffiInternalError = (() => {

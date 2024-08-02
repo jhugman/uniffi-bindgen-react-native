@@ -32,8 +32,9 @@ import { decl_type_name } from "./EnumTemplate"
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
         {{- self.import_infra("rustCallWithError", "rust-call") }}
+        {%- let error_converter = e|ffi_error_converter_name %}
         rustCallWithError(
-            /*liftError:*/ {{ e|lift_fn }},
+            /*liftError:*/ {{ error_converter }}.lift.bind({{ error_converter }}),
             /*caller:*/ (callStatus) => {
     {%- else -%}
         rustCall(
@@ -139,7 +140,8 @@ import { decl_type_name } from "./EnumTemplate"
             /*liftString:*/ FfiConverterString.lift,
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
-            /*errorHandler:*/ {{ e|lift_fn }}
+            {%- let error_converter = e|ffi_error_converter_name %}
+            /*errorHandler:*/ {{ error_converter }}.lift.bind({{ error_converter }})
             {%- else %}
             {% endmatch %}
         )
