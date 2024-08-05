@@ -119,6 +119,7 @@ macro_rules! templated_file {
             #[derive(askama::Template)]
             #[template(path = $filename, escape = "none")]
             pub(crate) struct $T {
+                #[allow(dead_code)]
                 config: Rc<TemplateConfig>
             }
 
@@ -154,6 +155,7 @@ mod files {
             // Android
             JavaModule::rc_new(config.clone()),
             JavaPackage::rc_new(config.clone()),
+            BuildGradle::rc_new(config.clone()),
             CMakeLists::rc_new(config.clone()),
             CppAdapter::rc_new(config.clone()),
             // iOS
@@ -185,6 +187,18 @@ mod files {
                 .project
                 .android
                 .codegen_package_dir(project_root)
+                .join(filename)
+        }
+    }
+
+    templated_file!(BuildGradle, "build.gradle");
+    impl RenderedFile for BuildGradle {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let filename = "build.gradle";
+            self.config
+                .project
+                .android
+                .directory(project_root)
                 .join(filename)
         }
     }

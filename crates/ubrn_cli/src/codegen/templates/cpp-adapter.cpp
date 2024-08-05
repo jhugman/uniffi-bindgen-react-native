@@ -3,7 +3,7 @@
 #include <jsi/jsi.h>
 #include <ReactCommon/CallInvokerHolder.h>
 #include "{{ self.config.project.cpp_filename() }}.h"
-{%- let package_name = self.config.project.android.package_name.replace(".", "_") %}
+{%- let package_name = self.config.project.android.package_name().replace(".", "_") %}
 {%- let name = self.config.project.name_upper_camel() %}
 {%- let module_class_name = name|fmt("{}Module") %}
 {%- let prefix = "Java_{}_{}"|format(package_name, module_class_name) %}
