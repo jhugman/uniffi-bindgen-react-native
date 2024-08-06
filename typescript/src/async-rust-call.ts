@@ -42,6 +42,7 @@ type PollFunc = (
  *  a handle to the Rust future.
  * @param pollFunc is then called periodically. This sends a JS callback, and the RustFuture handle
  *  to Rust. In practice, this poll is implemented as a Promise, which the callback resolves.
+ * @param cancelFunc is currently unexposed to client code.
  * @param completeFunc once the Rust future polls as complete, the completeFunc is called to get
  *  the result and any errors that were encountered.
  * @param freeFunc is finally called with the Rust future handle to drop the now complete Rust
@@ -50,6 +51,7 @@ type PollFunc = (
 export async function uniffiRustCallAsync<F, T>(
   rustFutureFunc: () => bigint,
   pollFunc: PollFunc,
+  cancelFunc: (rustFuture: bigint) => void,
   completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
@@ -79,6 +81,9 @@ export async function uniffiRustCallAsync<F, T>(
         errorHandler,
       ),
     );
+
+    // #RUST_TASK_CANCELLATION: the unused `cancelFunc` function should be exposed
+    // to client code in order for clients to be able to cancel the running Rust task.
   } finally {
     freeFunc(rustFuture);
   }
@@ -107,3 +112,7 @@ const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   const resolve = UNIFFI_RUST_FUTURE_RESOLVER_MAP.remove(handle);
   resolve(pollResult);
 };
+
+export function uniffiRustFutureHandleCount(): number {
+  return UNIFFI_RUST_FUTURE_RESOLVER_MAP.size;
+}

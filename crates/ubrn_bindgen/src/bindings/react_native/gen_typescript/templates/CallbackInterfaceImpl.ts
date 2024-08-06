@@ -19,13 +19,10 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             const uniffiMakeCall = {# space #}
             {%- call ts::async(meth) -%}
             (): {% call ts::return_type(meth) %} => {
-                const uniffiObj = {{ ffi_converter_name }}.lift(uniffiHandle);
-                if (uniffiObj === undefined) {
-                    throw new UniffiInternalError.UnexpectedStaleHandle()
-                }
-                return {% call ts::await(meth) %}uniffiObj.{{ meth.name()|fn_name }}(
+                const jsCallback = {{ ffi_converter_name }}.lift(uniffiHandle);
+                return {% call ts::await(meth) %}jsCallback.{{ meth.name()|fn_name }}(
                     {%- for arg in meth.arguments() %}
-                    {{ arg|ffi_converter_name }}.lift({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
+                    {{ arg|ffi_converter_name }}.lift({{ arg.name()|var_name }}){% if !loop.last %}, {% endif %}
                     {%- endfor %}
                 )
             }

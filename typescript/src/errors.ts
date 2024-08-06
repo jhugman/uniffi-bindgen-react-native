@@ -39,10 +39,11 @@ export class UniffiError extends Error {
     variantName: string,
     message: string | undefined,
   ): string {
+    const prefix = `${typeName}.${variantName}`;
     if (message) {
-      return `${typeName}.${variantName}: ${message}`;
+      return `${prefix}: ${message}`;
     } else {
-      return `${typeName}.${variantName}`;
+      return prefix;
     }
   }
 }

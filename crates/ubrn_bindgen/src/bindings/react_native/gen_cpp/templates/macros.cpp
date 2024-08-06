@@ -33,7 +33,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 
 {%- macro cpp_fn_rust_caller_body_with_func_name(func, func_name) %}
         {%- if func.has_rust_call_status_arg() %}
-        RustCallStatus status = { 0 };
+        RustCallStatus status = {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::rustSuccess(rt);
         {%- endif %}
 
         {#- Before the call, make variables out of the args that will need cleanup after the call. #}

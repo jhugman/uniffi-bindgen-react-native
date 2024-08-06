@@ -129,6 +129,7 @@ import { decl_type_name } from "./EnumTemplate"
                 );
             },
             /*pollFunc:*/ nativeModule().{{ callable.ffi_rust_future_poll(ci) }},
+            /*cancelFunc:*/ nativeModule().{{ callable.ffi_rust_future_cancel(ci) }},
             /*completeFunc:*/ nativeModule().{{ callable.ffi_rust_future_complete(ci) }},
             /*freeFunc:*/ nativeModule().{{ callable.ffi_rust_future_free(ci) }},
             {%- match callable.return_type() %}
