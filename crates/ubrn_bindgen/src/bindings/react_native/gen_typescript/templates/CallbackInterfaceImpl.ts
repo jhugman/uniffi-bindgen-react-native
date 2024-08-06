@@ -1,4 +1,9 @@
-{%- if self.include_once_check("CallbackInterfaceRuntime.ts") %}{%- include "CallbackInterfaceRuntime.ts" %}{%- endif %}
+{{- self.import_infra_type("UniffiHandle", "handle-map") }}
+{{- self.import_infra_type("UniffiReferenceHolder", "callbacks") }}
+{{- self.import_infra("uniffiCreateCallStatus", "rust-call")}}
+{{- self.import_infra_type("UniffiRustCallStatus", "rust-call")}}
+{{- self.import_infra("RustBuffer", "ffi-types")}}
+
 {%- let vtable_methods = cbi.vtable_methods() %}
 {%- let trait_impl = format!("uniffiCallbackInterface{}", name) %}
 

@@ -43,10 +43,6 @@ const {
 {%- call ts::docstring_value(ci.namespace_docstring(), 0) %}
 
 {%- import "macros.ts" as ts %}
-
-{% include "Helpers.ts" %}
-{% include "HandleMap.ts" %}
-
 // Public interface members begin here.
 {{ type_helper_code }}
 

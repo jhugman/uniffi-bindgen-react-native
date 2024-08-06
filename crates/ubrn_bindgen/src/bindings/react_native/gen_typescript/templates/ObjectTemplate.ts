@@ -1,6 +1,10 @@
-{%- if self.include_once_check("ObjectRuntime.ts") %}
-{%- include "ObjectRuntime.ts" %}
-{%- endif %}
+{{- self.import_infra("AbstractUniffiObject", "objects") -}}
+{{- self.import_infra_type("UnsafeMutableRawPointer", "objects") -}}
+{{- self.import_infra("FfiConverterObject", "objects") -}}
+{{- self.import_infra_type("UniffiObjectFactory", "objects") -}}
+{{- self.import_infra_type("FfiConverter", "ffi-converters") -}}
+{{- self.import_infra_type("UniffiRustArcPtr", "rust-call") }}
+
 {%- let obj = ci|get_object_definition(name) %}
 {%- let protocol_name = obj|type_name(ci) %}
 {%- let impl_class_name = obj|decl_type_name(ci) %}

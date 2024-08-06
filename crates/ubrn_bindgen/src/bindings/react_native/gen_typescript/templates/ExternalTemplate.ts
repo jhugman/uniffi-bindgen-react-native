@@ -1,2 +1,2 @@
-/* EXTERNAL TYPE {{ type_name }} module_path = {{ module_path }} namespace = {{ namespace }} */
-{{- self.import_external_type(type_) -}}
+{# Generate an import statement for the given type. #}
+{{- self.import_external_type(type_) }}

@@ -25,54 +25,58 @@
 {%- match type_ %}
 
 {%- when Type::Boolean %}
-{%- include "BooleanHelper.ts" %}
+{{- self.import_infra("FfiConverterBool", "ffi-converters") }}
 
 {%- when Type::String %}
 {%- include "StringHelper.ts" %}
 
 {%- when Type::Bytes %}
-{%- include "DataHelper.ts" %}
+{{- self.import_infra("FfiConverterArrayBuffer", "ffi-converters") }}
 
 {%- when Type::Int8 %}
-{%- include "Int8Helper.ts" %}
+{{- self.import_infra("FfiConverterInt8", "ffi-converters") }}
 
 {%- when Type::Int16 %}
-{%- include "Int16Helper.ts" %}
+{{- self.import_infra("FfiConverterInt16", "ffi-converters") }}
 
 {%- when Type::Int32 %}
-{%- include "Int32Helper.ts" %}
+{{- self.import_infra("FfiConverterInt32", "ffi-converters") }}
 
 {%- when Type::Int64 %}
-{%- include "Int64Helper.ts" %}
+{{- self.import_infra("FfiConverterInt64", "ffi-converters") }}
 
 {%- when Type::UInt8 %}
-{%- include "UInt8Helper.ts" %}
+{{- self.import_infra("FfiConverterUInt8", "ffi-converters") }}
 
 {%- when Type::UInt16 %}
-{%- include "UInt16Helper.ts" %}
+{{- self.import_infra("FfiConverterUInt16", "ffi-converters") }}
 
 {%- when Type::UInt32 %}
-{%- include "UInt32Helper.ts" %}
+{{- self.import_infra("FfiConverterUInt32", "ffi-converters") }}
 
 {%- when Type::UInt64 %}
-{%- include "UInt64Helper.ts" %}
+{{- self.import_infra("FfiConverterUInt64", "ffi-converters") }}
 
 {%- when Type::Float32 %}
-{%- include "Float32Helper.ts" %}
+{{- self.import_infra("FfiConverterFloat32", "ffi-converters") }}
 
 {%- when Type::Float64 %}
-{%- include "Float64Helper.ts" %}
+{{- self.import_infra("FfiConverterFloat64", "ffi-converters") }}
 
 {%- when Type::Timestamp %}
-{%- include "TimestampHelper.ts" %}
+{{- self.import_infra("FfiConverterTimestamp", "ffi-converters") -}}
+{{- self.import_infra_type("UniffiTimestamp", "ffi-converters") -}}
 
 {%- when Type::Duration %}
-{%- include "DurationHelper.ts" %}
+{{- self.import_infra("FfiConverterDuration", "ffi-converters") -}}
+{{- self.import_infra_type("UniffiDuration", "ffi-converters") -}}
 
 {%- when Type::CallbackInterface { name, module_path } %}
 {%- include "CallbackInterfaceTemplate.ts" %}
+
 {%- when Type::Custom { name, module_path, builtin } %}
 {%- include "CustomTypeTemplate.ts" %}
+
 {%- when Type::Enum { name, module_path } %}
 {%- let e = ci.get_enum_definition(name).unwrap() %}
 {%- if ci.is_name_used_as_error(name) %}

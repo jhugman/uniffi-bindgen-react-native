@@ -1,5 +1,5 @@
-{% include "RustBufferTemplate.ts" %}
-{{ self.import_infra("uniffiCreateRecord", "records") }}
+{{- self.import_infra("RustBuffer", "ffi-types") }}
+{{- self.import_infra("uniffiCreateRecord", "records") }}
 
 {%- let rec = ci|get_record_definition(name) %}
 {%- call ts::docstring(rec, 0) %}
@@ -50,6 +50,7 @@ export const {{ decl_type_name }} = (() => {
 
 const {{ ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};
+    {{- self.import_infra("AbstractFfiConverterArrayBuffer", "ffi-converters") }}
     class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             return {
