@@ -93,6 +93,10 @@ impl AndroidConfig {
         "src/main/java".to_string()
     }
 
+    pub(crate) fn package_name(&self) -> String {
+        self.package_name.clone()
+    }
+
     pub(crate) fn src_main_java_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         self.directory(project_root).join(self.java_src())
     }
