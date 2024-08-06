@@ -18,6 +18,8 @@ use std::borrow::Borrow;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;
 
+type Config = crate::bindings::react_native::uniffi_toml::CppConfig;
+
 #[derive(Debug, Default)]
 pub(crate) struct CppBindings {
     pub(crate) hpp: String,
@@ -26,10 +28,11 @@ pub(crate) struct CppBindings {
 
 pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
-    config: &ModuleMetadata,
+    config: &Config,
+    module: &ModuleMetadata,
 ) -> Result<CppBindings> {
-    let hpp = HppWrapper::new(ci, config).render()?;
-    let cpp = CppWrapper::new(ci, config).render()?;
+    let hpp = HppWrapper::new(ci, config, module).render()?;
+    let cpp = CppWrapper::new(ci, config, module).render()?;
     Ok(CppBindings { hpp, cpp })
 }
 
@@ -38,12 +41,13 @@ pub(crate) fn generate_bindings(
 struct HppWrapper<'a> {
     ci: &'a ComponentInterface,
     #[allow(unused)]
-    config: &'a ModuleMetadata,
+    config: &'a Config,
+    module: &'a ModuleMetadata,
 }
 
 impl<'a> HppWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
-        Self { ci, config }
+    fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
+        Self { ci, config, module }
     }
 }
 
@@ -51,11 +55,13 @@ impl<'a> HppWrapper<'a> {
 #[template(syntax = "cpp", escape = "none", path = "wrapper.cpp")]
 struct CppWrapper<'a> {
     ci: &'a ComponentInterface,
+    #[allow(unused)]
+    config: &'a Config,
     module: &'a ModuleMetadata,
 }
 
 impl<'a> CppWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, module: &'a ModuleMetadata) -> Self {
-        Self { ci, module }
+    fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
+        Self { ci, config, module }
     }
 }

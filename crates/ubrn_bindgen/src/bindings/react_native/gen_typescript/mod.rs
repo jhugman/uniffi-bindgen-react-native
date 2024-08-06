@@ -39,14 +39,17 @@ pub(crate) struct TsBindings {
     pub(crate) frontend: String,
 }
 
+type Config = crate::bindings::react_native::uniffi_toml::TsConfig;
+
 pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
-    config: &ModuleMetadata,
+    config: &Config,
+    module: &ModuleMetadata,
 ) -> Result<TsBindings> {
-    let codegen = CodegenWrapper::new(ci, config)
+    let codegen = CodegenWrapper::new(ci, config, module)
         .render()
         .context("generating codegen bindings failed")?;
-    let frontend = FrontendWrapper::new(ci, config)
+    let frontend = FrontendWrapper::new(ci, config, module)
         .render()
         .context("generating frontend javascript failed")?;
 
@@ -58,12 +61,13 @@ pub(crate) fn generate_bindings(
 struct CodegenWrapper<'a> {
     ci: &'a ComponentInterface,
     #[allow(unused)]
-    config: &'a ModuleMetadata,
+    config: &'a Config,
+    module: &'a ModuleMetadata,
 }
 
 impl<'a> CodegenWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
-        Self { ci, config }
+    fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
+        Self { ci, config, module }
     }
 }
 
@@ -71,7 +75,9 @@ impl<'a> CodegenWrapper<'a> {
 #[template(syntax = "ts", escape = "none", path = "wrapper.ts")]
 struct FrontendWrapper<'a> {
     ci: &'a ComponentInterface,
-    config: &'a ModuleMetadata,
+    module: &'a ModuleMetadata,
+    #[allow(unused)]
+    config: &'a Config,
     type_helper_code: String,
     type_imports: BTreeMap<String, BTreeSet<Imported>>,
     exported_converters: BTreeSet<String>,
@@ -79,13 +85,14 @@ struct FrontendWrapper<'a> {
 }
 
 impl<'a> FrontendWrapper<'a> {
-    pub fn new(ci: &'a ComponentInterface, config: &'a ModuleMetadata) -> Self {
-        let type_renderer = TypeRenderer::new(config, ci);
+    pub fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
+        let type_renderer = TypeRenderer::new(ci, config, module);
         let type_helper_code = type_renderer.render().unwrap();
         let type_imports = type_renderer.imports.into_inner();
         let exported_converters = type_renderer.exported_converters.into_inner();
         let imported_converters = type_renderer.imported_converters.into_inner();
         Self {
+            module,
             config,
             ci,
             type_helper_code,
@@ -111,9 +118,11 @@ impl<'a> FrontendWrapper<'a> {
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "Types.ts")]
 pub struct TypeRenderer<'a> {
-    #[allow(unused)]
-    config: &'a ModuleMetadata,
     ci: &'a ComponentInterface,
+    #[allow(unused)]
+    config: &'a Config,
+    #[allow(unused)]
+    module: &'a ModuleMetadata,
     // Track included modules for the `include_once()` macro
     include_once_names: RefCell<HashSet<String>>,
     // Track imports added with the `add_import()` macro
@@ -126,10 +135,11 @@ pub struct TypeRenderer<'a> {
 }
 
 impl<'a> TypeRenderer<'a> {
-    fn new(config: &'a ModuleMetadata, ci: &'a ComponentInterface) -> Self {
+    fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
         Self {
-            config,
             ci,
+            config,
+            module,
             include_once_names: RefCell::new(HashSet::new()),
             imports: RefCell::new(Default::default()),
             exported_converters: RefCell::new(Default::default()),
@@ -174,6 +184,10 @@ impl<'a> TypeRenderer<'a> {
             Imported::TSType(what.to_owned()),
             "uniffi-bindgen-react-native",
         )
+    }
+
+    fn import_custom(&self, what: &str, from: &str) -> &str {
+        self.add_import(Imported::JSType(what.to_owned()), from)
     }
 
     fn import_ext(&self, what: &str, from: &str) -> &str {

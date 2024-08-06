@@ -44,10 +44,16 @@ impl BuildArgs {
         let modules = {
             let dir = project.crate_.directory()?;
             ubrn_common::cd(&dir)?;
-            let ts_dir = root.join(&project.bindings.ts);
-            let cpp_dir = root.join(&project.bindings.cpp);
+            let ts_dir = project.bindings.ts_path(root);
+            let cpp_dir = project.bindings.cpp_path(root);
+            let config = project.bindings.uniffi_toml_path(root);
+            if let Some(ref file) = config {
+                if !file.exists() {
+                    anyhow::bail!("uniffi.toml file {:?} does not exist. Either delete the uniffiToml property or supply a file", file)
+                }
+            }
             let bindings = BindingsArgs::new(
-                SourceArgs::library(&lib_file),
+                SourceArgs::library(&lib_file).with_config(config),
                 OutputArgs::new(&ts_dir, &cpp_dir, false),
             );
 

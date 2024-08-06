@@ -5,6 +5,7 @@
  */
 mod gen_cpp;
 mod gen_typescript;
+mod uniffi_toml;
 
 use std::{collections::HashMap, fs};
 
@@ -12,7 +13,6 @@ use anyhow::Result;
 use camino::Utf8Path;
 use extend::ext;
 use heck::{ToLowerCamelCase, ToSnakeCase};
-use serde::Deserialize;
 use topological_sort::TopologicalSort;
 use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{
@@ -23,20 +23,12 @@ use uniffi_bindgen::{
     BindingGenerator, Component, ComponentInterface, GenerationSettings,
 };
 use uniffi_meta::Type;
+use uniffi_toml::ReactNativeConfig;
 
 use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
 
 use super::OutputArgs;
 use crate::bindings::metadata::ModuleMetadata;
-
-#[derive(Deserialize)]
-pub(crate) struct ReactNativeConfig {}
-
-impl ReactNativeConfig {
-    fn new() -> Self {
-        Self {}
-    }
-}
 
 pub(crate) struct ReactNativeBindingGenerator {
     output: OutputArgs,
@@ -57,14 +49,17 @@ impl ReactNativeBindingGenerator {
 impl BindingGenerator for ReactNativeBindingGenerator {
     type Config = ReactNativeConfig;
 
-    fn new_config(&self, _root_toml: &toml::value::Value) -> Result<Self::Config> {
-        Ok(ReactNativeConfig::new())
+    fn new_config(&self, root_toml: &toml::value::Value) -> Result<Self::Config> {
+        Ok(match root_toml.get("bindings") {
+            Some(v) => v.clone().try_into()?,
+            None => Default::default(),
+        })
     }
 
     fn update_component_configs(
         &self,
-        _settings: &uniffi_bindgen::GenerationSettings,
-        _components: &mut Vec<uniffi_bindgen::Component<Self::Config>>,
+        _settings: &GenerationSettings,
+        _components: &mut Vec<Component<Self::Config>>,
     ) -> Result<()> {
         // NOOP
         Ok(())
@@ -78,7 +73,9 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         for component in components {
             let ci = &component.ci;
             let module: ModuleMetadata = component.into();
-            let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(ci, &module)?;
+            let config = &component.config;
+            let TsBindings { codegen, frontend } =
+                gen_typescript::generate_bindings(ci, &config.typescript, &module)?;
 
             let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
             let codegen_path = out_dir.join(module.ts_ffi_filename());
@@ -87,7 +84,7 @@ impl BindingGenerator for ReactNativeBindingGenerator {
             fs::write(frontend_path, frontend)?;
 
             let out_dir = &self.output.cpp_dir.canonicalize_utf8()?;
-            let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &module)?;
+            let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &config.cpp, &module)?;
             let cpp_path = out_dir.join(module.cpp_filename());
             let hpp_path = out_dir.join(module.hpp_filename());
             fs::write(cpp_path, cpp)?;
@@ -282,6 +279,9 @@ impl ComponentInterface {
                     if self.is_name_used_as_error(name) {
                         add_edge(&mut graph, &mut types, type_, &Type::String);
                     }
+                }
+                Type::Custom { builtin, .. } => {
+                    add_edge(&mut graph, &mut types, type_, builtin.as_ref());
                 }
                 Type::Optional { inner_type } => {
                     add_edge(&mut graph, &mut types, type_, &Type::Boolean);

@@ -98,6 +98,16 @@ impl SourceArgs {
             ..Default::default()
         }
     }
+
+    pub fn with_config(self, config: Option<Utf8PathBuf>) -> Self {
+        Self {
+            config,
+            library_mode: self.library_mode,
+            source: self.source,
+            lib_file: self.lib_file,
+            crate_name: self.crate_name,
+        }
+    }
 }
 
 impl BindingsArgs {

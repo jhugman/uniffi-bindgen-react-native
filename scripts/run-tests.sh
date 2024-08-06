@@ -42,7 +42,7 @@ for fixture in ${fixtures} ; do
     # This builds the crate into the target dir.
     fixture_dir="${root}/fixtures/${fixture}"
     test_file="${fixture_dir}/tests/bindings/test_${fixture//-/_}.ts"
-
+    config_file="${fixture_dir}/uniffi.toml"
     out_dir="${fixture_dir}/generated"
     rm -Rf "${out_dir}" 2>/dev/null
 
@@ -56,6 +56,7 @@ for fixture in ${fixtures} ; do
         --no-cargo \
         --cpp-dir "${cpp_dir}" \
         --ts-dir "${ts_dir}" \
+        --toml "${config_file}" \
         --crate "${fixture_dir}" \
         "${test_file}"
     echo

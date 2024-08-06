@@ -1,0 +1,65 @@
+[bindings.typescript.customTypes.Url]
+# Modules that need to be imported
+imports = [ [ "Url", "../src/converters" ] ]
+# Expressions to convert between strings and URLs.
+# The `{}` is substituted for the value.
+intoCustom = "new Url({})"
+fromCustom = "{}.toString()"
+
+[bindings.typescript.customTypes.TimeIntervalMs]
+# Name of the type in the Typescript code
+typeName = "Date"
+# Expressions to convert between i64 and Date
+intoCustom = 'new Date(Number({}))'
+fromCustom = "BigInt({}.getTime())"
+
+[bindings.typescript.customTypes.TimeIntervalSecDbl]
+# Name of the type in the Typescript code
+typeName = "Date"
+# Modules that need to be imported
+imports = [
+    ["dateToSeconds", "../src/converters"],
+    ["secondsToDate", "../src/converters"],
+]
+# Functions to convert between f64 and TimeIntervalSecDbl as a Date
+intoCustom = "secondsToDate({})"
+fromCustom = "dateToSeconds({})"
+
+[bindings.typescript.customTypes.TimeIntervalSecFlt]
+# Name of the type in the Typescript code
+typeName = "Date"
+# Modules that need to be imported
+imports = [
+    ["dateToSeconds", "../src/converters"],
+    ["secondsToDate", "../src/converters"],
+]
+# Functions to convert between f64 and TimeIntervalSecFlt, as a Date
+intoCustom = "secondsToDate({})"
+fromCustom = "dateToSeconds({})"
+
+[bindings.typescript.customTypes.EnumWrapper]
+typeName = "string"
+# An expression to get from the custom (a string), to the underlying enum.
+fromCustom = "{}.indexOf('A') >= 0 ? new MyEnum.A({}) : new MyEnum.B({})"
+# An expression to get from the underlying enum to the custom string.
+# It has to be an expression, so we use an immediately executing anonymous function.
+intoCustom = """((v: MyEnum) => {
+    switch (v.tag) {
+        case MyEnum_Tags.A:
+            return v.data[0];
+        case MyEnum_Tags.B:
+            return v.data[0];
+    }
+})({})
+"""
+
+
+
+# [bindings.typescript.customTypes.TimeIntervalSecFlt]
+# # Name of the type in the Swift code
+# typeName = "Date"
+# # Modules that need to be imported
+# imports = ["Foundation"]
+# # Functions to convert between f32 and TimeIntervalSecFlt
+# intoCustom = "Date(timeIntervalSince1970: TimeInterval({}))"
+# fromCustom = "Float({}.timeIntervalSince1970)"

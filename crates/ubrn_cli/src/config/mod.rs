@@ -114,6 +114,9 @@ pub(crate) struct BindingsConfig {
     pub(crate) cpp: String,
     #[serde(default = "BindingsConfig::default_ts_dir")]
     pub(crate) ts: String,
+
+    #[serde(default)]
+    pub(crate) uniffi_toml: Option<String>,
 }
 
 impl BindingsConfig {
@@ -139,6 +142,10 @@ impl BindingsConfig {
 
     pub(crate) fn ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         project_root.join(&self.ts)
+    }
+
+    pub(crate) fn uniffi_toml_path(&self, project_root: &Utf8Path) -> Option<Utf8PathBuf> {
+        self.uniffi_toml.as_ref().map(|f| project_root.join(f))
     }
 }
 
