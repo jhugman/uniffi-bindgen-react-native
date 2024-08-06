@@ -10,16 +10,20 @@ class Console {
     print(...args);
   }
 
+  info(...args: any): void {
+    print("--", ...args);
+  }
+
   error(...args: any): void {
-    print(...args);
+    print("❌", ...args);
   }
 
   warn(...args: any): void {
-    print(...args);
+    print("⚠️", ...args);
   }
 
   debug(...args: any): void {
-    print(...args.map(stringify));
+    print("🤓", ...args.map(stringify));
   }
 }
 

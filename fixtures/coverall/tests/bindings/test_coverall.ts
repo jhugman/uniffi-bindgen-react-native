@@ -175,7 +175,7 @@ test("Error Values", (t) => {
     throwRootError();
   });
   t.assertThrows(
-    (e) => ComplexError.instanceOf(e.error),
+    (e) => ComplexError.instanceOf(e.data.error),
     () => {
       throwRootError();
     },
@@ -183,7 +183,7 @@ test("Error Values", (t) => {
 
   const e = getRootError();
   t.assertTrue(RootError.Other.instanceOf(e));
-  t.assertEqual(e.error, OtherError.Unexpected);
+  t.assertEqual(e.data.error, OtherError.Unexpected);
 
   const ce = getComplexError(undefined);
   t.assertTrue(ComplexError.PermissionDenied.instanceOf(ce));

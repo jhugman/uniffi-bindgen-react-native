@@ -19,14 +19,11 @@ private constructor(pointer: UnsafeMutableRawPointer) {
 {%- endmacro %}
 
 {% call ts::docstring(obj, 0) %}
-export class {{ impl_class_name }} extends {# space #}
-    {%- if is_error %}Error
-    {%- else %}AbstractUniffiObject
-    {%- endif %} implements {{ protocol_name }} {
+export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ protocol_name }} {
 
-    private __uniffiTypeName = "{{ impl_class_name }}";
-    private __rustArcPtr: UniffiRustArcPtr;
-    private __rustPointer: UnsafeMutableRawPointer;
+    private readonly __uniffiTypeName = "{{ impl_class_name }}";
+    private readonly __rustArcPtr: UniffiRustArcPtr;
+    private readonly __rustPointer: UnsafeMutableRawPointer;
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
@@ -50,20 +47,6 @@ export class {{ impl_class_name }} extends {# space #}
     {% for meth in obj.methods() -%}
     {%- call ts::method_decl("public", obj_factory, meth, 4) %}
     {% endfor %}
-
-    static instanceOf(obj: any): obj is typeof {{ impl_class_name }} {
-        return {{ obj_factory }}.isConcreteType(obj);
-    }
-
-    // AbstractUniffiObject
-    uniffiDestroy(): void {
-        if ((this as any).__rustArcPtr) {
-            const pointer = {{ obj_factory }}.pointer(this);
-            {{ obj_factory }}.freePointer(pointer);
-            this.__rustArcPtr.markDestroyed();
-            delete (this as any).__rustArcPtr;
-        }
-    }
 
     {%- for tm in obj.uniffi_traits() %}
     {%      match tm %}
@@ -121,6 +104,30 @@ export class {{ impl_class_name }} extends {# space #}
     {%-    endmatch %}
     {%- endfor %}
 
+    // AbstractUniffiObject
+    uniffiDestroy(): void {
+        if ((this as any).__rustArcPtr) {
+            const pointer = {{ obj_factory }}.pointer(this);
+            {{ obj_factory }}.freePointer(pointer);
+            this.__rustArcPtr.markDestroyed();
+            delete (this as any).__rustArcPtr;
+        }
+    }
+
+    static instanceOf(obj: any): obj is {{ impl_class_name }} {
+        return {{ obj_factory }}.isConcreteType(obj);
+    }
+
+    {% if is_error %}
+    {{- self.import_infra("UniffiThrownObject", "objects") }}
+    static hasInner(obj: any): obj is UniffiThrownObject<{{ impl_class_name }}> {
+        return UniffiThrownObject.instanceOf(obj) && {{ impl_class_name }}.instanceOf(obj.data);
+    }
+
+    static getInner(err: UniffiThrownObject<{{ impl_class_name }}>): {{ impl_class_name }} {
+        return err.data;
+    }
+    {%- endif %}
 }
 
 const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
@@ -128,6 +135,7 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
         const instance = Object.create({{ impl_class_name }}.prototype);
         instance.__rustPointer = pointer;
         instance.__rustArcPtr = this.bless(pointer);
+        instance.__uniffiTypeName = "{{ impl_class_name }}";
         return instance;
     },
 
@@ -180,27 +188,13 @@ const {{ ffi_converter_name }} = new FfiConverterObjectWithCallbacks({{ obj_fact
 {% include "CallbackInterfaceImpl.ts" %}
 {%- endif %}
 
-{# Objects as error #}
+{#- Objects as error #}
 {%- if is_error %}
-{# Due to some mismatches in the ffi converter mechanisms, errors are a RustBuffer holding a pointer #}
-public struct {{ ffi_converter_name }}__as_error: AbstractFfiConverterArrayBuffer {
-    public static func lift(_ buf: ArrayBuffer) throws -> {{ type_name }} {
-        var reader = createReader(data: Data(rustBuffer: buf))
-        return try {{ ffi_converter_name }}.read(from: &reader)
-    }
-
-    public static func lower(_ value: {{ type_name }}) -> RustBuffer {
-        fatalError("not implemented")
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> {{ type_name }} {
-        fatalError("not implemented")
-    }
-
-    public static func write(_ value: {{ type_name }}, into buf: inout [UInt8]) {
-        fatalError("not implemented")
-    }
-}
+{%- let ffi_error_converter_name = type_|ffi_error_converter_name %}
+{{- self.import_infra("FfiConverterObjectAsError", "objects") }}
+// FfiConverter for {{ type_name }} as an error.
+const {{ ffi_error_converter_name }} = new FfiConverterObjectAsError("{{ decl_type_name }}", {{ ffi_converter_name }});
+{{- self.export_converter(ffi_error_converter_name) -}}
 {%- endif %}
 
 {{- self.export_converter(ffi_converter_name) -}}

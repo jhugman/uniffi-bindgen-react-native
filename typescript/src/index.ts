@@ -9,6 +9,7 @@
 export * from "./async-callbacks";
 export * from "./async-rust-call";
 export * from "./callbacks";
+export * from "./enums";
 export * from "./errors";
 export * from "./ffi-converters";
 export * from "./ffi-types";

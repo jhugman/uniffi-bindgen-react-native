@@ -4,11 +4,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
+import {
+  AbstractFfiConverterArrayBuffer,
+  type FfiConverter,
+  FfiConverterUInt64,
+} from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
 import type { UniffiRustArcPtr } from "./rust-call";
 import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
 import { type StructuralEquality } from "./type-utils";
+import { UniffiInternalError, UniffiThrownObject } from "./errors";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.
@@ -111,5 +116,28 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
 
   drop(handle: UniffiHandle): T {
     return this.handleMap.remove(handle);
+  }
+}
+
+/// Due to some mismatches in the ffi converter mechanisms, errors are a RustBuffer holding a pointer
+export class FfiConverterObjectAsError<
+  T,
+> extends AbstractFfiConverterArrayBuffer<UniffiThrownObject<T>> {
+  constructor(
+    private typeName: string,
+    private innerConverter: FfiConverter<UnsafeMutableRawPointer, T>,
+  ) {
+    super();
+  }
+  read(from: RustBuffer): UniffiThrownObject<T> {
+    const obj = this.innerConverter.read(from);
+    return new UniffiThrownObject(this.typeName, obj);
+  }
+  write(value: UniffiThrownObject<T>, into: RustBuffer): void {
+    const obj = value.data;
+    this.innerConverter.write(obj, into);
+  }
+  allocationSize(value: UniffiThrownObject<T>): number {
+    return this.innerConverter.allocationSize(value.data);
   }
 }

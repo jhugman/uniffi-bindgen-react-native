@@ -46,7 +46,7 @@ class TypeScriptGetters implements ForeignGetters {
   }
   getOption(v: string | undefined, arg2: boolean): string | undefined {
     if (v == BAD_ARGUMENT) {
-      throw new ComplexError.ReallyBadArgument(20);
+      throw new ComplexError.ReallyBadArgument({ code: 20 });
     }
     if (v == UNEXPECTED_ERROR) {
       throw Error(SOMETHING_FAILED);
@@ -133,7 +133,7 @@ test("Non-flat errors are propagated correctly", (t) => {
       const isError = ComplexError.ReallyBadArgument.instanceOf(err);
       if (isError) {
         // set in TypesSriptGetters.getOption
-        t.assertEqual(err.code, 20);
+        t.assertEqual(err.data.code, 20);
       }
       return isError;
     },
@@ -143,7 +143,7 @@ test("Non-flat errors are propagated correctly", (t) => {
     (err) => {
       const isError = ComplexError.UnexpectedErrorWithReason.instanceOf(err);
       if (isError) {
-        t.assertEqual(err.reason, `Error: ${SOMETHING_FAILED}`);
+        t.assertEqual(err.data.reason, `Error: ${SOMETHING_FAILED}`);
       }
       return isError;
     },

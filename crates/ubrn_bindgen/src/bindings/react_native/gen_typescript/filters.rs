@@ -33,7 +33,6 @@ pub(super) fn ffi_converter_name(as_ct: &impl AsCodeType) -> Result<String, aska
     Ok(as_ct.as_codetype().ffi_converter_name())
 }
 
-#[allow(unused)]
 pub(super) fn ffi_error_converter_name(as_type: &impl AsType) -> Result<String, askama::Error> {
     // special handling for types used as errors.
     let mut name = ffi_converter_name(as_type)?;
