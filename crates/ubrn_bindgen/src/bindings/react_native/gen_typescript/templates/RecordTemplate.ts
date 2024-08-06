@@ -54,20 +54,20 @@ const {{ ffi_converter_name }} = (() => {
         read(from: RustBuffer): TypeName {
             return {
             {%- for field in rec.fields() %}
-                {{ field.name()|arg_name }}: {{ field|read_fn }}(from)
+                {{ field.name()|arg_name }}: {{ field|ffi_converter_name }}.read(from)
                 {%- if !loop.last %}, {% endif %}
             {%- endfor %}
             };
         }
         write(value: TypeName, into: RustBuffer): void {
             {%- for field in rec.fields() %}
-            {{ field|write_fn }}(value.{{ field.name()|var_name }}, into);
+            {{ field|ffi_converter_name }}.write(value.{{ field.name()|var_name }}, into);
             {%- endfor %}
         }
         allocationSize(value: TypeName): number {
             {%- if rec.has_fields() %}
             return {% for field in rec.fields() -%}
-                {{ field|allocation_size_fn }}(value.{{ field.name()|var_name }})
+                {{ field|ffi_converter_name }}.allocationSize(value.{{ field.name()|var_name }})
             {%- if !loop.last %} + {% else %};{% endif %}
             {% endfor %}
             {%- else %}

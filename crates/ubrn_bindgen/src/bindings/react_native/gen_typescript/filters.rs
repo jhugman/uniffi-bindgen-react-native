@@ -6,7 +6,7 @@
 use super::oracle::{AsCodeType, CodeOracle};
 pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
-    backend::{filters::UniFFIError, Literal, Type},
+    backend::{Literal, Type},
     interface::{AsType, Enum, FfiType, Variant},
     ComponentInterface,
 };
@@ -49,30 +49,11 @@ pub(super) fn lower_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error>
     ))
 }
 
-#[allow(unused)]
-pub(super) fn allocation_size_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
-    Ok(format!(
-        "{}.allocationSize",
-        as_ct.as_codetype().ffi_converter_name()
-    ))
-}
-
-pub(super) fn write_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
-    Ok(format!(
-        "{}.write",
-        as_ct.as_codetype().ffi_converter_name()
-    ))
-}
-
 pub(super) fn lift_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
     Ok(format!(
         "{ct}.lift.bind({ct})",
         ct = as_ct.as_codetype().ffi_converter_name()
     ))
-}
-
-pub(super) fn read_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
-    Ok(format!("{}.read", as_ct.as_codetype().ffi_converter_name()))
 }
 
 pub fn render_literal(
@@ -81,24 +62,6 @@ pub fn render_literal(
     ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
     Ok(as_ct.as_codetype().literal(literal, ci))
-}
-
-// Get the idiomatic Typescript rendering of an integer.
-#[allow(unused)]
-fn int_literal(t: &Option<Type>, base10: String) -> Result<String, askama::Error> {
-    if let Some(t) = t {
-        match t {
-            Type::Int8 | Type::Int16 | Type::Int32 | Type::Int64 => Ok(base10),
-            Type::UInt8 | Type::UInt16 | Type::UInt32 | Type::UInt64 => Ok(base10 + "u"),
-            _ => Err(askama::Error::Custom(Box::new(UniFFIError::new(
-                "Only ints are supported.".to_string(),
-            )))),
-        }
-    } else {
-        Err(askama::Error::Custom(Box::new(UniFFIError::new(
-            "Enum hasn't defined a repr".to_string(),
-        ))))
-    }
 }
 
 pub fn variant_discr_literal(
@@ -144,17 +107,10 @@ pub fn ffi_type_name_for_cpp(type_: &FfiType, is_internal: &bool) -> Result<Stri
     })
 }
 
-#[allow(unused)]
 pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_type_label(ffi_type))
 }
 
-#[allow(unused)]
-pub fn ffi_type_name_for_ffi_struct(type_: &FfiType) -> Result<String, askama::Error> {
-    Ok(CodeOracle.ffi_type_label_for_ffi_struct(type_))
-}
-
-#[allow(unused)]
 pub fn ffi_default_value(type_: &FfiType) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_default_value(type_))
 }
@@ -186,13 +142,11 @@ pub fn variant_name(v: &Variant) -> Result<String, askama::Error> {
 }
 
 /// Get the idiomatic Typescript rendering of an FFI callback function name
-#[allow(unused)]
 pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_callback_name(nm))
 }
 
 /// Get the idiomatic Typescript rendering of an FFI struct name
-#[allow(unused)]
 pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_struct_name(nm))
 }

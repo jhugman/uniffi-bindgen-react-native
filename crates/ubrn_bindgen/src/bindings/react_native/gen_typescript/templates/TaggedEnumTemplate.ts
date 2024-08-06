@@ -123,12 +123,12 @@ const {{ ffi_converter_name }} = (() => {
             {%-   if !variant.fields().is_empty() %}
             {%-     if !variant.has_nameless_fields() %}{
             {%-     for field in variant.fields() %}
-            {{-       field.name()|var_name }}: {{ field|read_fn }}(from)
+            {{-       field.name()|var_name }}: {{ field|ffi_converter_name }}.read(from)
             {%-       if !loop.last -%}, {% endif %}
             {%-     endfor %} }
             {%-     else %}
             {%-       for field in variant.fields() %}
-            {{-         field|read_fn }}(from)
+            {{-         field|ffi_converter_name }}.read(from)
             {%-         if !loop.last -%}, {% endif %}
             {%-       endfor %}
             {%-     endif %}
@@ -145,7 +145,7 @@ const {{ ffi_converter_name }} = (() => {
                     {%- if !variant.fields().is_empty() %}
                     const inner = value.inner;
                     {%-   for field in variant.fields() %}
-                    {{ field|write_fn }}({% call ts::field_name("inner", field, loop.index0) %}, into);
+                    {{ field|ffi_converter_name }}.write({% call ts::field_name("inner", field, loop.index0) %}, into);
                     {%-   endfor %}
                     {%- endif %}
                     return;
@@ -164,7 +164,7 @@ const {{ ffi_converter_name }} = (() => {
                     const inner = value.inner;
                     let size = ordinalConverter.allocationSize({{ loop.index }});
                     {%- for field in variant.fields() %}
-                    size += {{ field|allocation_size_fn }}({% call ts::field_name("inner", field, loop.index0) %});
+                    size += {{ field|ffi_converter_name }}.allocationSize({% call ts::field_name("inner", field, loop.index0) %});
                     {%- endfor %}
                     return size;
                     {%- else %}
