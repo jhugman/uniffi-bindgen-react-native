@@ -33,4 +33,8 @@ export class UniffiHandleMap<T> {
     this.map.delete(handle);
     return obj;
   }
+
+  get size(): number {
+    return this.map.size;
+  }
 }

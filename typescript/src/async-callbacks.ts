@@ -59,20 +59,36 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
         message = `Error handling error "${e}", originally: "${message}"`;
       }
     }
+    // This is the catch all:
+    // 1. if there was an unexpected error causing a rejection
+    // 2. if there was an unexpected error in the handleError function.
     handleError(CALL_UNEXPECTED_ERROR, lowerString(message));
   });
-  // let handle = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.insert(promise);
+  const handle = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.insert(promise);
   return /* UniffiForeignFuture */ {
-    handle: defaultUniffiHandle,
+    handle,
     free: uniffiForeignFutureFree,
   };
 }
 
 function uniffiForeignFutureFree(handle: UniffiHandle) {
-  // UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.remove(handle);
+  const promise = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.remove(handle);
+  // #JS_TASK_CANCELLATION
+  //
+  // This would be where the request from Rust to cancel a JS task would come out.
+  // Check if the promise has been settled, and if not, cancel it.
+  //
+  // In the future, we might use an AbortController here, but hermes doesn't implement it yet.
+  //
+  // We would need to:
+  //   - figure out a way of passing the abortController signal to the JS callback.
+  //   - storing a holder with the promise and the abortController in this map.
+  //   - call the abortController in this method.
+  //
+  // abortController.abort();
 }
 
-// // For testing
-// public func uniffiForeignFutureHandleCount{{ ci.namespace()|class_name(ci) }}() -> Int {
-//     UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.count
-// }
+// For testing
+export function uniffiForeignFutureHandleCount(): number {
+  return UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.size;
+}

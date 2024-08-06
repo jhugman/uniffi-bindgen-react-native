@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
-import type { UnsafeMutableRawPointer } from "./objects";
 
 export const CALL_SUCCESS = 0;
 export const CALL_ERROR = 1;
@@ -86,6 +85,18 @@ function uniffiCheckCallStatus(
     }
 
     case CALL_CANCELLED:
+      // #RUST_TASK_CANCELLATION:
+      //
+      // This error code is expected when a Rust Future is cancelled or aborted, either
+      // from the foreign side, or from within Rust itself.
+      //
+      // It's expected that this would be encountered when the `completeFunc` is called
+      // from `uniffiRustCallAsync`.
+      //
+      // Currently, there is no generated API of cancelling a promise from JS.
+      //
+      // As of uniffi-rs v0.28.0, call cancellation is only checked for in the Swift bindings,
+      // and has a similar Unimplemeneted error.
       throw new UniffiInternalError.Unimplemented(
         "Cancellation not supported yet",
       );
