@@ -44,121 +44,85 @@ export abstract class AbstractFfiConverterArrayBuffer<TsType>
   abstract allocationSize(value: TsType): number;
 }
 
-type NumberTypedArray =
-  | Int8Array
-  | Uint8Array
-  | Int16Array
-  | Uint16Array
-  | Int32Array
-  | Uint32Array
-  | Float32Array
-  | Float64Array;
-type BigIntTypeArray = BigInt64Array | BigUint64Array;
-type TypedArray = NumberTypedArray | BigIntTypeArray;
-
-type TypedArrayConstructor<T extends TypedArray> = new (
-  buffer: ArrayBuffer,
-) => T;
 type NumberType = number | bigint;
 class FfiConverterNumber<
   T extends NumberType,
-  ArrayType extends TypedArray,
 > extends FfiConverterPrimitive<T> {
-  private constructor(
-    private viewConstructor: TypedArrayConstructor<ArrayType>,
+  constructor(
+    private reader: (view: DataView) => T,
+    private writer: (view: DataView, value: T) => void,
     private byteSize: number,
-    private numberConverter?: (v: any) => T,
   ) {
     super();
-    this.viewConstructor = viewConstructor;
-    this.byteSize = byteSize;
   }
-  static create<T extends NumberTypedArray>(
-    viewConstructor: TypedArrayConstructor<T>,
-    byteSize: number,
-  ): FfiConverterNumber<number, T> {
-    return new FfiConverterNumber<number, T>(viewConstructor, byteSize);
+  read(from: RustBuffer): T {
+    return from.readWithView(this.byteSize, this.reader);
   }
-  static create64<T extends BigIntTypeArray>(
-    viewConstructor: TypedArrayConstructor<T>,
-    byteSize: number,
-  ): FfiConverterNumber<bigint, T> {
-    return new FfiConverterNumber<bigint, T>(viewConstructor, byteSize, (v) =>
-      BigInt(v),
+  write(value: T, into: RustBuffer): void {
+    return into.writeWithView(this.byteSize, (view) =>
+      this.writer(view, value),
     );
   }
-
-  protected reverse(buf: ArrayBuffer): ArrayBuffer {
-    return new Uint8Array(buf).reverse().buffer;
-  }
-
-  read(from: RustBuffer): T {
-    return from.read(this.byteSize, (slice) => {
-      const view = new this.viewConstructor(this.reverse(slice));
-      const raw = view.at(0);
-      return this.numberConverter
-        ? this.numberConverter(raw)
-        : (raw as T | undefined);
-    });
-  }
-
-  write(value: T, into: RustBuffer): void {
-    into.write(this.byteSize, () => {
-      const slice = new ArrayBuffer(this.byteSize);
-      const view = new this.viewConstructor(slice);
-      view[0] = value;
-      return this.reverse(slice);
-    });
-  }
-
   allocationSize(value: T): number {
     return this.byteSize;
   }
 }
 
+const littleEndian = false;
+
 // Ints
-export const FfiConverterInt8 = FfiConverterNumber.create(
-  Int8Array,
+export const FfiConverterInt8 = new FfiConverterNumber(
+  (view: DataView) => view.getInt8(0),
+  (view: DataView, value: number) => view.setInt8(0, value),
   Int8Array.BYTES_PER_ELEMENT,
 );
-export const FfiConverterInt16 = FfiConverterNumber.create(
-  Int16Array,
+export const FfiConverterInt16 = new FfiConverterNumber(
+  (view: DataView) => view.getInt16(0, littleEndian),
+  (view: DataView, value: number) => view.setInt16(0, value, littleEndian),
   Int16Array.BYTES_PER_ELEMENT,
 );
-export const FfiConverterInt32 = FfiConverterNumber.create(
-  Int32Array,
+export const FfiConverterInt32 = new FfiConverterNumber(
+  (view: DataView) => view.getInt32(0, littleEndian),
+  (view: DataView, value: number) => view.setInt32(0, value, littleEndian),
   Int32Array.BYTES_PER_ELEMENT,
 );
-export const FfiConverterInt64 = FfiConverterNumber.create64(
-  BigInt64Array,
+export const FfiConverterInt64 = new FfiConverterNumber(
+  (view: DataView) => view.getBigInt64(0, littleEndian),
+  (view: DataView, value: bigint) => view.setBigInt64(0, value, littleEndian),
   BigInt64Array.BYTES_PER_ELEMENT,
 );
 
 // Floats
-export const FfiConverterFloat32 = FfiConverterNumber.create(
-  Float32Array,
+export const FfiConverterFloat32 = new FfiConverterNumber(
+  (view: DataView) => view.getFloat32(0, littleEndian),
+  (view: DataView, value: number) => view.setFloat32(0, value, littleEndian),
   Float32Array.BYTES_PER_ELEMENT,
 );
-export const FfiConverterFloat64 = FfiConverterNumber.create(
-  Float64Array,
+export const FfiConverterFloat64 = new FfiConverterNumber(
+  (view: DataView) => view.getFloat64(0, littleEndian),
+  (view: DataView, value: number) => view.setFloat64(0, value, littleEndian),
   Float64Array.BYTES_PER_ELEMENT,
 );
 
 // UInts
-export const FfiConverterUInt8 = FfiConverterNumber.create(
-  Uint8Array,
+export const FfiConverterUInt8 = new FfiConverterNumber(
+  (view: DataView) => view.getUint8(0),
+  (view: DataView, value: number) => view.setUint8(0, value),
   Uint8Array.BYTES_PER_ELEMENT,
 );
-export const FfiConverterUInt16 = FfiConverterNumber.create(
-  Uint16Array,
+export const FfiConverterUInt16 = new FfiConverterNumber(
+  (view: DataView) => view.getUint16(0, littleEndian),
+  (view: DataView, value: number) => view.setUint16(0, value, littleEndian),
   Uint16Array.BYTES_PER_ELEMENT,
 );
-export const FfiConverterUInt32 = FfiConverterNumber.create(
-  Uint32Array,
+export const FfiConverterUInt32 = new FfiConverterNumber(
+  (view: DataView) => view.getUint32(0, littleEndian),
+  (view: DataView, value: number) => view.setUint32(0, value, littleEndian),
   Uint32Array.BYTES_PER_ELEMENT,
 );
-export const FfiConverterUInt64 = FfiConverterNumber.create64(
-  BigUint64Array,
+export const FfiConverterUInt64 = new FfiConverterNumber(
+  (view: DataView) => view.getBigUint64(0, littleEndian),
+  (view: DataView, value: bigint) => view.setBigUint64(0, value, littleEndian),
   BigUint64Array.BYTES_PER_ELEMENT,
 );
 
@@ -362,12 +326,12 @@ export const FfiConverterArrayBuffer = (() => {
   class FFIConverter extends FfiConverterPrimitive<ArrayBuffer> {
     read(from: RustBuffer): ArrayBuffer {
       const length = lengthConverter.read(from);
-      return from.read(length, (buffer) => buffer);
+      return from.readBytes(length);
     }
     write(value: ArrayBuffer, into: RustBuffer): void {
       const length = value.byteLength;
       lengthConverter.write(length, into);
-      into.write(length, () => value);
+      into.writeBytes(value);
     }
     allocationSize(value: ArrayBuffer): number {
       return lengthConverter.allocationSize(0) + value.byteLength;

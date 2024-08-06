@@ -24,13 +24,14 @@ const FfiConverterString = (() => {
         }
         read(from: RustBuffer): TypeName {
             const length = lengthConverter.read(from);
-            return from.read(length, arrayBufferToString);
+            const bytes = from.readBytes(length);
+            return arrayBufferToString(bytes);
         }
         write(value: TypeName, into: RustBuffer): void {
             const buffer = stringToArrayBuffer(value);
             const numBytes = buffer.byteLength;
             lengthConverter.write(numBytes, into);
-            into.write(numBytes, () => stringToArrayBuffer(value));
+            into.writeBytes(buffer);
         }
         allocationSize(value: TypeName): number {
             return lengthConverter.allocationSize(0) + stringByteLength(value);

@@ -33,28 +33,39 @@ export class RustBuffer {
     return this.arrayBuffer.byteLength;
   }
 
-  read<T>(numBytes: number, reader: (buffer: ArrayBuffer) => T | undefined): T {
+  readBytes(numBytes: number): ArrayBuffer {
     const start = this.readOffset;
     const end = this.checkOverflow(start, numBytes);
-    const value = reader(this.arrayBuffer.slice(start, end));
+    const value = this.arrayBuffer.slice(start, end);
+    this.readOffset = end;
+    return value;
+  }
+
+  writeBytes(buffer: ArrayBuffer) {
+    const start = this.writeOffset;
+    const end = this.checkOverflow(start, buffer.byteLength);
+
+    const src = new Uint8Array(buffer);
+    const dest = new Uint8Array(this.arrayBuffer, start);
+    dest.set(src);
+
+    this.writeOffset = end;
+  }
+
+  readWithView<T>(numBytes: number, reader: (view: DataView) => T): T {
+    const start = this.readOffset;
+    const end = this.checkOverflow(start, numBytes);
+    const view = new DataView(this.arrayBuffer, start, numBytes);
+    const value = reader(view);
     this.readOffset = end;
     return value as T;
   }
 
-  write(numBytes: number, writer: () => ArrayBuffer) {
+  writeWithView(numBytes: number, writer: (view: DataView) => void) {
     const start = this.writeOffset;
     const end = this.checkOverflow(start, numBytes);
-
-    const slice = writer();
-    if (numBytes !== slice.byteLength) {
-      throw new UniffiInternalError.IncompleteData();
-    }
-
-    // copy slice into the original arraybuffer.
-    const src = new Uint8Array(slice);
-    const dest = new Uint8Array(this.arrayBuffer, start);
-    dest.set(src);
-
+    const view = new DataView(this.arrayBuffer, start, numBytes);
+    writer(view);
     this.writeOffset = end;
   }
 

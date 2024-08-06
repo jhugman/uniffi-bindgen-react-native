@@ -38,20 +38,22 @@ test("test create_some_dict() with default values", (t) => {
   const d = createSomeDict();
   t.assertEqual(d.text, "text");
   t.assertEqual(d.maybeText, "maybe_text");
-  // Hermes doesn't support string --> ArrayBuffer
-  // t.assertEqual(d.someBytes.contentEquals("some_bytes".toByteArray(Charsets.UTF_8)))
-  // t.assertEqual(d.maybeSomeBytes.contentEquals("maybe_some_bytes".toByteArray(Charsets.UTF_8)))
+  // Hermes doesn't support string --> ArrayBuffer, so we just check the length.
+  // The string is all alphanumeric, so the length is the same in chars as they are in bytes.
+  // This is not the case for all strings, however.
+  t.assertEqual(d.someBytes.byteLength, "some_bytes".length);
+  t.assertEqual(d.maybeSomeBytes?.byteLength, "maybe_some_bytes".length);
   t.assertTrue(d.aBool);
   t.assertEqual(d.maybeABool, false);
   t.assertEqual(d.unsigned8, 1);
   t.assertEqual(d.maybeUnsigned8, 2);
   t.assertEqual(d.unsigned16, 3);
   t.assertEqual(d.maybeUnsigned16, 4);
-  t.assertEqual(d.unsigned64, BigInt("0x10000000000000000"));
+  t.assertEqual(d.unsigned64, BigInt("0xffffffffffffffff"));
   t.assertEqual(d.maybeUnsigned64, BigInt("0"));
   t.assertEqual(d.signed8, 8);
   t.assertEqual(d.maybeSigned8, 0);
-  t.assertEqual(d.signed64, BigInt("0x8000000000000000"));
+  t.assertEqual(d.signed64, BigInt("0x7fffffffffffffff"));
   t.assertEqual(d.maybeSigned64, BigInt("0"));
 
   t.assertEqual(d.float32, 1.2345, undefined, almostEquals);
@@ -66,20 +68,22 @@ test("test create_none_dict() with default values", (t) => {
   const d = createNoneDict();
   t.assertEqual(d.text, "text");
   t.assertEqual(d.maybeText, undefined);
-  // Hermes doesn't support string --> ArrayBuffer
-  // t.assertEqual(d.someBytes.contentEquals("some_bytes".toByteArray(Charsets.UTF_8)))
-  // t.assertEqual(d.maybeSomeBytes.contentEquals("maybe_some_bytes".toByteArray(Charsets.UTF_8)))
+  // Hermes doesn't support string --> ArrayBuffer, so we just check the length.
+  // The string is all alphanumeric, so the length is the same in chars as they are in bytes.
+  // This is not the case for all strings, however.
+  t.assertEqual(d.someBytes.byteLength, "some_bytes".length);
+  t.assertEqual(d.maybeSomeBytes, undefined);
   t.assertTrue(d.aBool);
   t.assertEqual(d.maybeABool, undefined);
   t.assertEqual(d.unsigned8, 1);
   t.assertEqual(d.maybeUnsigned8, undefined);
   t.assertEqual(d.unsigned16, 3);
   t.assertEqual(d.maybeUnsigned16, undefined);
-  t.assertEqual(d.unsigned64, BigInt("0x10000000000000000"));
+  t.assertEqual(d.unsigned64, BigInt("0xffffffffffffffff"));
   t.assertEqual(d.maybeUnsigned64, undefined);
   t.assertEqual(d.signed8, 8);
   t.assertEqual(d.maybeSigned8, undefined);
-  t.assertEqual(d.signed64, BigInt("0x8000000000000000"));
+  t.assertEqual(d.signed64, BigInt("0x7fffffffffffffff"));
   t.assertEqual(d.maybeSigned64, undefined);
 
   t.assertEqual(d.float32, 1.2345, undefined, almostEquals);
