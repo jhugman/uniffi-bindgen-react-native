@@ -328,6 +328,7 @@ mod tests {
             let bindings = BindingsConfig {
                 cpp: "cpp/bindings".to_string(),
                 ts: "src/bindings".to_string(),
+                uniffi_toml: Default::default(),
             };
             let tm = TurboModulesConfig {
                 name: "MyCrateSpec".to_string(),

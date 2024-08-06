@@ -8,7 +8,7 @@
 // cargo run --manifest-path ./crates/uniffi-bindgen-react-native/Cargo.toml -- bindings ./fixtures/${fixture}/src/${fixture}.udl --cpp-dir ./fixtures/${fixture}/generated --ts-dir ./fixtures/${fixture}/generated
 // cargo xtask run ./fixtures/${fixture}/tests/bindings/test_${fixture}.ts --cpp ./fixtures/${fixture}/generated/${fixture}.cpp --crate ./fixtures/${fixture}
 
-import {
+import coverall, {
   CoverallError,
   ComplexError,
   CoverallsInterface,
@@ -26,6 +26,7 @@ import {
   Patch,
   Repair,
   PatchInterface,
+  Color,
 } from "../../generated/coverall";
 import { test } from "@/asserts";
 import { console } from "@/hermes";
@@ -62,6 +63,8 @@ test("test create_some_dict() with default values", (t) => {
   t.assertEqual(d.maybeFloat64!, 1.0, undefined, almostEquals);
 
   t.assertEqual(d.coveralls!.getName(), "some_dict");
+
+  (d.coveralls! as Coveralls).uniffiDestroy();
 });
 
 test("test create_none_dict() with default values", (t) => {
@@ -92,6 +95,68 @@ test("test create_none_dict() with default values", (t) => {
   t.assertEqual(d.maybeFloat64, undefined);
 
   t.assertEqual(d.coveralls, undefined);
+});
+
+test("arc", (t) => {
+  const coveralls = new Coveralls("test_arcs");
+  t.assertEqual(getNumAlive(), BigInt("1"));
+  // One ref held by the foreign-language code, one created for this method call.
+  t.assertEqual(coveralls.strongCount(), BigInt("2"));
+  t.assertNull(coveralls.getOther());
+  coveralls.takeOther(coveralls);
+  // Should now be a new strong ref, held by the object's reference to itself.
+  t.assertEqual(coveralls.strongCount(), BigInt("3"));
+  // But the same number of instances.
+  t.assertEqual(getNumAlive(), BigInt("1"));
+  // Careful, this makes a new Kotlin object which must be separately destroyed.
+
+  // Get another, but it's the same Rust object.
+  ((other: CoverallsInterface) => {
+    t.assertEqual(other.getName(), "test_arcs");
+    (other as Coveralls).uniffiDestroy();
+  })(coveralls.getOther()!);
+  t.assertEqual(getNumAlive(), BigInt("1"));
+
+  t.assertThrows(CoverallError.TooManyHoles.instanceOf, () =>
+    coveralls.takeOtherFallible(),
+  );
+  t.assertThrows(
+    (err) => true,
+    () => coveralls.takeOtherPanic("expected panic: with an arc!"),
+  );
+  t.assertThrows(
+    (err) => true,
+    () => coveralls.falliblePanic("Expected panic in a fallible function!"),
+  );
+  coveralls.takeOther(undefined);
+  t.assertEqual(coveralls.strongCount(), BigInt("2"));
+
+  coveralls.uniffiDestroy();
+  t.assertEqual(getNumAlive(), BigInt("0"));
+});
+
+test("Return objects", (t) => {
+  const coveralls = new Coveralls("test_return_objects");
+  t.assertEqual(getNumAlive(), BigInt("1"));
+  t.assertEqual(coveralls.strongCount(), BigInt("2"));
+
+  ((c2: CoverallsInterface) => {
+    t.assertEqual(c2.getName(), coveralls.getName());
+    t.assertEqual(getNumAlive(), BigInt("2"));
+    t.assertEqual(c2.strongCount(), BigInt("2"));
+
+    coveralls.takeOther(c2);
+    // same number alive but `c2` has an additional ref count.
+    t.assertEqual(getNumAlive(), BigInt("2"));
+    t.assertEqual(coveralls.strongCount(), BigInt("2"));
+    t.assertEqual(c2.strongCount(), BigInt("3"));
+    (c2 as Coveralls).uniffiDestroy();
+  })(coveralls.cloneMe());
+
+  t.assertEqual(getNumAlive(), BigInt("2"));
+  coveralls.uniffiDestroy();
+
+  t.assertEqual(getNumAlive(), BigInt("0"));
 });
 
 test("Given a rust object, when it is destroyed, it cannot be re-used", (t) => {
@@ -193,6 +258,16 @@ test("Error Values", (t) => {
   t.assertTrue(ComplexError.PermissionDenied.instanceOf(ce));
   t.assertNull(getErrorDict(undefined).complexError);
 
+  coveralls.uniffiDestroy();
+});
+
+test("Interfaces in dicts", (t) => {
+  const coveralls = new Coveralls("Testing interfaces in dicts");
+  coveralls.addPatch(new Patch(Color.Red));
+  coveralls.addRepair(
+    Repair.new({ when: new Date(), patch: new Patch(Color.Blue) }),
+  );
+  t.assertEqual(coveralls.getRepairs().length, 2);
   coveralls.uniffiDestroy();
 });
 
