@@ -52,14 +52,3 @@ intoCustom = """((v: MyEnum) => {
     }
 })({})
 """
-
-
-
-# [bindings.typescript.customTypes.TimeIntervalSecFlt]
-# # Name of the type in the Swift code
-# typeName = "Date"
-# # Modules that need to be imported
-# imports = ["Foundation"]
-# # Functions to convert between f32 and TimeIntervalSecFlt
-# intoCustom = "Date(timeIntervalSince1970: TimeInterval({}))"
-# fromCustom = "Float({}.timeIntervalSince1970)"
