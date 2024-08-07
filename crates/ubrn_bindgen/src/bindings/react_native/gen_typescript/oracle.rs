@@ -219,33 +219,6 @@ pub(crate) trait CodeType: std::fmt::Debug {
         format!("FfiConverter{}", self.canonical_name())
     }
 
-    // XXX - the below should be removed and replace with the ffi_converter_name reference in the template.
-    /// An expression for lowering a value into something we can pass over the FFI.
-    fn lower(&self) -> String {
-        format!("{}.lower", self.ffi_converter_name())
-    }
-
-    /// An expression for writing a value into a byte buffer.
-    fn write(&self) -> String {
-        format!("{}.write", self.ffi_converter_name())
-    }
-
-    /// An expression for lifting a value from something we received over the FFI.
-    fn lift(&self) -> String {
-        format!("{}.lift", self.ffi_converter_name())
-    }
-
-    /// An expression for reading a value from a byte buffer.
-    fn read(&self) -> String {
-        format!("{}.read", self.ffi_converter_name())
-    }
-
-    /// A list of imports that are needed if this type is in use.
-    /// Classes are imported exactly once.
-    fn imports(&self) -> Option<Vec<String>> {
-        None
-    }
-
     /// Function to run at startup
     fn initialization_fn(&self) -> Option<String> {
         None
