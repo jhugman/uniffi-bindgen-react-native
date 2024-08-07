@@ -56,11 +56,7 @@ impl ProjectConfig {
 }
 
 fn trim_react_native(name: &str) -> String {
-    name.strip_prefix("RN")
-        .unwrap_or(name)
-        .replace("ReactNative", "")
-        .replace("react-native", "")
-        .trim_matches('-')
+    name.trim_matches('-')
         .trim_matches('_')
         .to_string()
 }
@@ -181,7 +177,7 @@ impl TurboModulesConfig {
     fn default_spec_name() -> String {
         let package_json = workspace::package_json();
         let codegen_name = &package_json.codegen().name;
-        format!("Native{}", trim_react_native(codegen_name))
+        trim_react_native(codegen_name)
     }
 }
 
