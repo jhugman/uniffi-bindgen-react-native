@@ -17,10 +17,6 @@
     "ubrn": "./bin/cli",
     "uniffi-bindgen-react-native": "./bin/cli"
   },
-  "scripts": {
-    "build": "tsc",
-    "prepare": "yarn build"
-  },
   "devDependencies": {
     "metro": "^0.80.8",
     "metro-core": "^0.80.8",
