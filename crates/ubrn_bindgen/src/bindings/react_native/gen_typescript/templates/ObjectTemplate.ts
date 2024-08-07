@@ -1,4 +1,4 @@
-{{- self.import_infra("AbstractUniffiObject", "objects") -}}
+{{- self.import_infra("UniffiAbstractObject", "objects") -}}
 {{- self.import_infra_type("UnsafeMutableRawPointer", "objects") -}}
 {{- self.import_infra("FfiConverterObject", "objects") -}}
 {{- self.import_infra_type("UniffiObjectFactory", "objects") -}}
@@ -23,7 +23,7 @@ private constructor(pointer: UnsafeMutableRawPointer) {
 {%- endmacro %}
 
 {% call ts::docstring(obj, 0) %}
-export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ protocol_name }} {
+export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ protocol_name }} {
 
     private readonly __uniffiTypeName = "{{ impl_class_name }}";
     private readonly __rustArcPtr: UniffiRustArcPtr;
@@ -108,7 +108,9 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
     {%-    endmatch %}
     {%- endfor %}
 
-    // AbstractUniffiObject
+    /**
+     * {@inheritDoc uniffi-bindgen-react-native#UniffiAbstractObject.uniffiDestroy}
+     */
     uniffiDestroy(): void {
         if ((this as any).__rustArcPtr) {
             const pointer = {{ obj_factory }}.pointer(this);

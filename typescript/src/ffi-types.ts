@@ -77,5 +77,3 @@ export class RustBuffer {
     return end;
   }
 }
-
-export type ForeignBytes = ArrayBuffer;

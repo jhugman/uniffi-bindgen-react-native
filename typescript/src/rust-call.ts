@@ -45,7 +45,6 @@ export function makeRustCall<T>(
   liftString: StringLifter,
   errorHandler?: UniffiErrorHandler,
 ): T {
-  // uniffiEnsureInitialized()
   const callStatus = uniffiCreateCallStatus();
   let returnedVal = caller(callStatus);
   uniffiCheckCallStatus(callStatus, liftString, errorHandler);
@@ -106,8 +105,15 @@ function uniffiCheckCallStatus(
   }
 }
 
-export type UniffiRustArcPtrDestructor = (pointer: bigint) => void;
-
+/**
+ * A member of any object, backed by a C++ DestructibleObject (@see RustArcPtr.h).
+ *
+ * The object has a destructor lambda.
+ */
 export type UniffiRustArcPtr = {
+  /**
+   * Called by the `object.uniffiDestroy()` to disable the
+   * action of the C++ destructor.
+   */
   markDestroyed(): void;
 };

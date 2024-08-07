@@ -4,11 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call";
-import {
-  type UniffiHandle,
-  UniffiHandleMap,
-  defaultUniffiHandle,
-} from "./handle-map";
+import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
 
 const UNIFFI_FOREIGN_FUTURE_HANDLE_MAP = new UniffiHandleMap<Promise<any>>();
 
