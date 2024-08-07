@@ -46,9 +46,9 @@ fromCustom = "{}.indexOf('A') >= 0 ? new MyEnum.A({}) : new MyEnum.B({})"
 intoCustom = """((v: MyEnum) => {
     switch (v.tag) {
         case MyEnum_Tags.A:
-            return v.data[0];
+            return v.inner[0];
         case MyEnum_Tags.B:
-            return v.data[0];
+            return v.inner[0];
     }
 })({})
 """

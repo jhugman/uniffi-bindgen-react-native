@@ -54,7 +54,7 @@ test("Roundtripping enums with values", (t) => {
         return;
       case AnimalAssociatedType_Tags.Dog:
         if (AnimalAssociatedType.Dog.instanceOf(right)) {
-          t.assertEqual(left.data[0].record(), right.data[0].record());
+          t.assertEqual(left.inner[0].record(), right.inner[0].record());
         } else {
           t.fail(`${right} is not a Dog`);
         }
@@ -83,7 +83,7 @@ test("Roundtripping enums with name values", (t) => {
         return;
       case AnimalNamedAssociatedType_Tags.Dog:
         if (AnimalNamedAssociatedType.Dog.instanceOf(right)) {
-          t.assertEqual(left.data.value.record(), right.data.value.record());
+          t.assertEqual(left.inner.value.record(), right.inner.value.record());
         } else {
           t.fail(`${right} is not a Dog`);
         }

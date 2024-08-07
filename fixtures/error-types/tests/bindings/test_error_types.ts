@@ -82,7 +82,7 @@ test("oopsEnum 2", (t) => {
   t.assertThrows(
     (error) => {
       if (Exception.IntValue.instanceOf(error)) {
-        t.assertEqual(error.data.value, 2);
+        t.assertEqual(error.inner.value, 2);
         // assert(String(describing: error) == "IntValue(value: 2)")
         // assert(String(reflecting: error) == "error_types.Error.IntValue(value: 2)")
         // assert(error.localizedDescription == "error_types.Error.IntValue(value: 2)")
@@ -99,9 +99,9 @@ test("oopsEnum 3", (t) => {
     (error) => {
       if (Exception.FlatInnerError.instanceOf(error)) {
         t.assertEqual(error.toString(), "Error: Exception.FlatInnerError");
-        t.assertTrue(FlatInner.CaseA.instanceOf(error.data.error));
+        t.assertTrue(FlatInner.CaseA.instanceOf(error.inner.error));
         t.assertEqual(
-          error.data.error.toString(),
+          error.inner.error.toString(),
           "Error: FlatInner.CaseA: inner",
         );
         // assert(String(describing: e) == "FlatInnerError(error: error_types.FlatInner.CaseA(message: \"inner\"))")
@@ -160,7 +160,7 @@ test("oopsTuple 0 - throws enum variants containing tuples", (t) => {
     (error) => {
       t.assertEqual("Error: TupleError.Oops", error.toString());
       if (TupleError.Oops.instanceOf(error)) {
-        t.assertEqual("oops", error.data[0]);
+        t.assertEqual("oops", error.inner[0]);
         return true;
       }
       return false;
@@ -174,7 +174,7 @@ test("oopsTuple 1  - throws enum variants containing tuples", (t) => {
     (error) => {
       t.assertEqual("Error: TupleError.Value", error.toString());
       if (TupleError.Value.instanceOf(error)) {
-        t.assertEqual(1, error.data[0]);
+        t.assertEqual(1, error.inner[0]);
         return true;
       }
       return false;
