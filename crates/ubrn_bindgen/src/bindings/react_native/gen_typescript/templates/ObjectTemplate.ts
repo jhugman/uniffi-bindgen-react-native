@@ -121,11 +121,11 @@ export class {{ impl_class_name }} extends AbstractUniffiObject implements {{ pr
     {% if is_error %}
     {{- self.import_infra("UniffiThrownObject", "objects") }}
     static hasInner(obj: any): obj is UniffiThrownObject<{{ impl_class_name }}> {
-        return UniffiThrownObject.instanceOf(obj) && {{ impl_class_name }}.instanceOf(obj.data);
+        return UniffiThrownObject.instanceOf(obj) && {{ impl_class_name }}.instanceOf(obj.inner);
     }
 
     static getInner(err: UniffiThrownObject<{{ impl_class_name }}>): {{ impl_class_name }} {
-        return err.data;
+        return err.inner;
     }
     {%- endif %}
 }

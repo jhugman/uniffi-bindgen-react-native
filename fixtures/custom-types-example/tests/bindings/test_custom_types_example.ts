@@ -62,13 +62,13 @@ test("Rust EnumWrapper structs --> via MyEnum --> string", (t) => {
     const enumValue = unwapEnumWrapper(s);
     switch (enumValue.tag) {
       case MyEnum_Tags.A: {
-        const value = enumValue.data[0];
+        const value = enumValue.inner[0];
         t.assertEqual(value, s);
         t.assertTrue(value.indexOf("A") >= 0);
         break;
       }
       case MyEnum_Tags.B: {
-        const value = enumValue.data[0];
+        const value = enumValue.inner[0];
         t.assertEqual(value, s);
         t.assertFalse(value.indexOf("A") >= 0);
         break;

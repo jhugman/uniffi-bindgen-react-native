@@ -31,26 +31,26 @@ export const {{ decl_type_name }} = (() => {
     {%-     endfor %}]
     {%-   endif %};
     {%- endif %}
-    type {{ variant_interface }} = { tag: {{ variant_tag }} {%- if has_fields %}; data: Readonly<{{ variant_data }}> {%- endif %}};
+    type {{ variant_interface }} = { tag: {{ variant_tag }} {%- if has_fields %}; inner: Readonly<{{ variant_data }}> {%- endif %}};
 
     {% call ts::docstring(variant, 4) %}
     class {{ variant_name }} extends {{ superclass }} implements {{ variant_interface }} {
         readonly tag = {{ variant_tag }};
         {%- if has_fields %}
-        readonly data: Readonly<{{ variant_data }}>;
+        readonly inner: Readonly<{{ variant_data }}>;
         {%-   if !is_tuple %}
-        constructor(data: { {% call ts::field_list_decl(variant, false) %} }) {
+        constructor(inner: { {% call ts::field_list_decl(variant, false) %} }) {
             super("{{ type_name }}", "{{ variant_name }}", {{ loop.index }});
-            this.data = Object.freeze(data);
+            this.inner = Object.freeze(inner);
         }
 
-        static new(data: { {% call ts::field_list_decl(variant, false) %} }): {{ variant_name }} {
-            return new {{ variant_name }}(data);
+        static new(inner: { {% call ts::field_list_decl(variant, false) %} }): {{ variant_name }} {
+            return new {{ variant_name }}(inner);
         }
         {%-   else %}
         constructor({%- call ts::field_list_decl(variant, true) -%}) {
             super("{{ type_name }}", "{{ variant_name }}", {{ loop.index }});
-            this.data = Object.freeze([{%- call ts::field_list(variant, true) -%}]);
+            this.inner = Object.freeze([{%- call ts::field_list(variant, true) -%}]);
         }
 
         static new({%- call ts::field_list_decl(variant, true) -%}): {{ variant_name }} {
@@ -78,7 +78,7 @@ export const {{ decl_type_name }} = (() => {
         }
 
         static getInner(obj: {{ variant_name }}): Readonly<{{ variant_data }}> {
-            return obj.data;
+            return obj.inner;
         }
         {%- else %}
         static hasInner(obj: any): obj is {{ variant_name }} {
@@ -143,7 +143,7 @@ const {{ ffi_converter_name }} = (() => {
                 case {{ kind_type_name }}.{{ variant|variant_name }}: {
                     ordinalConverter.write({{ loop.index }}, into);
                     {%- if !variant.fields().is_empty() %}
-                    const inner = value.data;
+                    const inner = value.inner;
                     {%-   for field in variant.fields() %}
                     {{ field|write_fn }}({% call ts::field_name("inner", field, loop.index0) %}, into);
                     {%-   endfor %}
@@ -161,7 +161,7 @@ const {{ ffi_converter_name }} = (() => {
                 {%- for variant in e.variants() %}
                 case {{ kind_type_name }}.{{ variant|variant_name }}: {
                     {%- if !variant.fields().is_empty() %}
-                    const inner = value.data;
+                    const inner = value.inner;
                     let size = ordinalConverter.allocationSize({{ loop.index }});
                     {%- for field in variant.fields() %}
                     size += {{ field|allocation_size_fn }}({% call ts::field_name("inner", field, loop.index0) %});

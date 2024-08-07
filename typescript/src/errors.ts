@@ -53,19 +53,19 @@ export class UniffiThrownObject<T> extends Error {
   private readonly __baseTypeName: string = UniffiThrownObject.__baseTypeName;
   constructor(
     private readonly __uniffiTypeName: string,
-    public readonly data: T,
+    public readonly inner: T,
     message?: string,
   ) {
     // We append the error type and variant to the message because we cannot override `toString()`—
     // in errors.test.ts, we see that the overridden `toString()` method is not called.
-    super(UniffiThrownObject.createMessage(__uniffiTypeName, data, message));
+    super(UniffiThrownObject.createMessage(__uniffiTypeName, inner, message));
   }
 
   // Current implementations of hermes errors do not repect instance methods or calculated properties.
   toString(): string {
     return UniffiThrownObject.createMessage(
       this.__uniffiTypeName,
-      this.data,
+      this.inner,
       this.message,
     );
   }

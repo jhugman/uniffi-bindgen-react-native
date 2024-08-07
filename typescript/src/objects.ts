@@ -134,10 +134,10 @@ export class FfiConverterObjectAsError<
     return new UniffiThrownObject(this.typeName, obj);
   }
   write(value: UniffiThrownObject<T>, into: RustBuffer): void {
-    const obj = value.data;
+    const obj = value.inner;
     this.innerConverter.write(obj, into);
   }
   allocationSize(value: UniffiThrownObject<T>): number {
-    return this.innerConverter.allocationSize(value.data);
+    return this.innerConverter.allocationSize(value.inner);
   }
 }
