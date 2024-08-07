@@ -46,8 +46,6 @@ const {
 // Public interface members begin here.
 {{ type_helper_code }}
 
-{% include "InitializationTemplate.ts" %}
-
 export default Object.freeze({
   initialize: uniffiEnsureInitialized,
   {%- if !self.exported_converters.is_empty() %}

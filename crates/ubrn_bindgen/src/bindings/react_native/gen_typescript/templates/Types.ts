@@ -106,3 +106,5 @@
 {%- else %}
 {%- endmatch %}
 {%- endfor %}
+
+{% include "InitializationTemplate.ts" %}

@@ -101,14 +101,6 @@ impl<'a> FrontendWrapper<'a> {
             imported_converters,
         }
     }
-
-    pub fn initialization_fns(&self) -> Vec<String> {
-        self.ci
-            .iter_types()
-            .map(|t| CodeOracle.find(t))
-            .filter_map(|ct| ct.initialization_fn())
-            .collect()
-    }
 }
 
 /// Renders Typescript helper code for all types
@@ -234,6 +226,14 @@ impl<'a> TypeRenderer<'a> {
         let mut set = self.exported_converters.borrow_mut();
         set.insert(what.to_owned());
         ""
+    }
+
+    fn initialization_fns(&self) -> Vec<String> {
+        self.ci
+            .iter_sorted_types()
+            .map(|t| CodeOracle.find(&t))
+            .filter_map(|ct| ct.initialization_fn())
+            .collect()
     }
 }
 
