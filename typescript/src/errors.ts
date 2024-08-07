@@ -117,11 +117,6 @@ export const UniffiInternalError = (() => {
       super("The buffer still has data after lifting its containing value");
     }
   }
-  class UnexpectedOptionalTag extends Error {
-    constructor() {
-      super("Unexpected optional tag; should be 0 or 1");
-    }
-  }
   class UnexpectedEnumCase extends Error {
     constructor() {
       super("Raw enum value doesn't match any cases");
@@ -147,6 +142,20 @@ export const UniffiInternalError = (() => {
       super("The object in the handle map has been dropped already");
     }
   }
+  class ContractVersionMismatch extends Error {
+    constructor(rustVersion: any, bindingsVersion: any) {
+      super(
+        `Incompatible versions of uniffi were used to build the JS ($${bindingsVersion}) from the Rust (${rustVersion})`,
+      );
+    }
+  }
+  class ApiChecksumMismatch extends Error {
+    constructor(func: string) {
+      super(
+        `FFI function ${func} has a checksum mismatch; this may signify previously undetected incompatible Uniffi versions`,
+      );
+    }
+  }
   class RustPanic extends Error {
     constructor(message: string) {
       super(message);
@@ -158,10 +167,11 @@ export const UniffiInternalError = (() => {
     }
   }
   return {
+    ApiChecksumMismatch,
     NumberOverflow,
     BufferOverflow,
+    ContractVersionMismatch,
     IncompleteData,
-    UnexpectedOptionalTag,
     UnexpectedEnumCase,
     UnexpectedNullPointer,
     UnexpectedRustCallStatusCode,

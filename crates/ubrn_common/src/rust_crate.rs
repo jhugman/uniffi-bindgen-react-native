@@ -13,7 +13,6 @@ use crate::run_cmd_quietly;
 
 #[derive(Debug, Clone)]
 pub struct CrateMetadata {
-    #[allow(unused)]
     pub(crate) manifest_path: Utf8PathBuf,
     pub(crate) crate_dir: Utf8PathBuf,
     pub(crate) target_dir: Utf8PathBuf,

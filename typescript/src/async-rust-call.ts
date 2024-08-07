@@ -113,6 +113,7 @@ const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   resolve(pollResult);
 };
 
+// For testing only.
 export function uniffiRustFutureHandleCount(): number {
   return UNIFFI_RUST_FUTURE_RESOLVER_MAP.size;
 }

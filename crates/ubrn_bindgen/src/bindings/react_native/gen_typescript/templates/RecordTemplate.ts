@@ -1,5 +1,5 @@
-{% include "RustBufferTemplate.ts" %}
-{{ self.import_infra("uniffiCreateRecord", "records") }}
+{{- self.import_infra("RustBuffer", "ffi-types") }}
+{{- self.import_infra("uniffiCreateRecord", "records") }}
 
 {%- let rec = ci|get_record_definition(name) %}
 {%- call ts::docstring(rec, 0) %}
@@ -50,24 +50,25 @@ export const {{ decl_type_name }} = (() => {
 
 const {{ ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};
+    {{- self.import_infra("AbstractFfiConverterArrayBuffer", "ffi-converters") }}
     class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
         read(from: RustBuffer): TypeName {
             return {
             {%- for field in rec.fields() %}
-                {{ field.name()|arg_name }}: {{ field|read_fn }}(from)
+                {{ field.name()|arg_name }}: {{ field|ffi_converter_name }}.read(from)
                 {%- if !loop.last %}, {% endif %}
             {%- endfor %}
             };
         }
         write(value: TypeName, into: RustBuffer): void {
             {%- for field in rec.fields() %}
-            {{ field|write_fn }}(value.{{ field.name()|var_name }}, into);
+            {{ field|ffi_converter_name }}.write(value.{{ field.name()|var_name }}, into);
             {%- endfor %}
         }
         allocationSize(value: TypeName): number {
             {%- if rec.has_fields() %}
             return {% for field in rec.fields() -%}
-                {{ field|allocation_size_fn }}(value.{{ field.name()|var_name }})
+                {{ field|ffi_converter_name }}.allocationSize(value.{{ field.name()|var_name }})
             {%- if !loop.last %} + {% else %};{% endif %}
             {% endfor %}
             {%- else %}

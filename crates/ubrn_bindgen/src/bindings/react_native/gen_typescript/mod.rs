@@ -101,14 +101,6 @@ impl<'a> FrontendWrapper<'a> {
             imported_converters,
         }
     }
-
-    pub fn initialization_fns(&self) -> Vec<String> {
-        self.ci
-            .iter_types()
-            .map(|t| CodeOracle.find(t))
-            .filter_map(|ct| ct.initialization_fn())
-            .collect()
-    }
 }
 
 /// Renders Typescript helper code for all types
@@ -123,8 +115,6 @@ pub struct TypeRenderer<'a> {
     config: &'a Config,
     #[allow(unused)]
     module: &'a ModuleMetadata,
-    // Track included modules for the `include_once()` macro
-    include_once_names: RefCell<HashSet<String>>,
     // Track imports added with the `add_import()` macro
     imports: RefCell<BTreeMap<String, BTreeSet<Imported>>>,
 
@@ -140,7 +130,6 @@ impl<'a> TypeRenderer<'a> {
             ci,
             config,
             module,
-            include_once_names: RefCell::new(HashSet::new()),
             imports: RefCell::new(Default::default()),
             exported_converters: RefCell::new(Default::default()),
             imported_converters: RefCell::new(Default::default()),
@@ -148,16 +137,6 @@ impl<'a> TypeRenderer<'a> {
     }
 
     // The following methods are used by the `Types.ts` macros.
-
-    // Helper for the including a template, but only once.
-    //
-    // The first time this is called with a name it will return true, indicating that we should
-    // include the template.  Subsequent calls will return false.
-    fn include_once_check(&self, name: &str) -> bool {
-        self.include_once_names
-            .borrow_mut()
-            .insert(name.to_string())
-    }
 
     // Helper to add an import statement
     //
@@ -247,6 +226,14 @@ impl<'a> TypeRenderer<'a> {
         let mut set = self.exported_converters.borrow_mut();
         set.insert(what.to_owned());
         ""
+    }
+
+    fn initialization_fns(&self) -> Vec<String> {
+        self.ci
+            .iter_sorted_types()
+            .map(|t| CodeOracle.find(&t))
+            .filter_map(|ct| ct.initialization_fn())
+            .collect()
     }
 }
 

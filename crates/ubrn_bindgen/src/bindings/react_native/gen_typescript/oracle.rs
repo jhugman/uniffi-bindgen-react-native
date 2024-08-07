@@ -53,29 +53,6 @@ impl CodeOracle {
         format!("Uniffi{}", nm.to_upper_camel_case())
     }
 
-    pub(crate) fn ffi_type_label_by_value(&self, ffi_type: &FfiType) -> String {
-        // match ffi_type {
-        // FfiType::RustBuffer(_) => format!("{}.ByValue", self.ffi_type_label(ffi_type)),
-        // FfiType::Struct(name) => format!("{}.UniffiByValue", self.ffi_struct_name(name)),
-        // _ => self.ffi_type_label(ffi_type),
-        // }
-        self.ffi_type_label(ffi_type)
-    }
-
-    /// FFI type name to use inside structs
-    ///
-    /// The main requirement here is that all types must have default values or else the struct
-    /// won't work in some JNA contexts.
-    #[allow(unused)]
-    pub(crate) fn ffi_type_label_for_ffi_struct(&self, ffi_type: &FfiType) -> String {
-        match ffi_type {
-            // Make callbacks function pointers nullable. This matches the semantics of a C
-            // function pointer better and allows for `null` as a default value.
-            FfiType::Callback(name) => format!("{}?", self.ffi_callback_name(name)),
-            _ => self.ffi_type_label_by_value(ffi_type),
-        }
-    }
-
     /// Default values for FFI
     ///
     /// This is used to:

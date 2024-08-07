@@ -22,11 +22,13 @@ import { UniffiInternalError, UniffiThrownObject } from "./errors";
  * This typesscript interface contains the unffi methods that are needed to make
  * the FFI work. It should shrink to zero methods.
  */
-export abstract class AbstractUniffiObject {
+export abstract class UniffiAbstractObject {
   /**
    * Explicitly tell Rust to destroy the native peer that backs this object.
    *
    * Once this method has been called, any following method calls will throw an error.
+   *
+   * Can be called more than once.
    */
   public abstract uniffiDestroy(): void;
 
