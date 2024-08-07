@@ -406,14 +406,6 @@ impl FfiDefinition {
 
 #[ext]
 impl FfiType {
-    fn requires_argument_cleanup(&self) -> bool {
-        // If this returns true, there is expected a Bridging<{{ self|ffi_type_name() }}>.argument_cleanup(v).
-        match self {
-            Self::RustBuffer(_) => true, // includes/RustBuffer.h
-            _ => false,
-        }
-    }
-
     fn is_callable(&self) -> bool {
         matches!(self, Self::Callback(_))
     }

@@ -57,12 +57,6 @@ template <> struct Bridging<RustBuffer> {
     // Finally, return the ArrayBuffer.
     return jsi::Value(rt, arrayBuffer);
   }
-
-  // If we want this to be used, we should make FfiType::requires_cleanup()
-  // return true.
-  static void argument_cleanup(jsi::Runtime &rt, RustBuffer buf) {
-    // NOOP
-  }
 };
 
 } // namespace {{ ci.cpp_namespace() }}

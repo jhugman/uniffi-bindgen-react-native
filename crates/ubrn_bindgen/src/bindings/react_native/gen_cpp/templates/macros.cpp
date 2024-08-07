@@ -36,23 +36,13 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
         RustCallStatus status = {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::rustSuccess(rt);
         {%- endif %}
 
-        {#- Before the call, make variables out of the args that will need cleanup after the call. #}
-        {%- for arg in func.arguments() %}
-        {%-   if arg.type_().requires_argument_cleanup() %}
-        auto {% call arg_name_from_js(arg, loop.index0) %} = {% call arg_from_js(arg, loop.index0) %};
-        {%-   endif %}
-        {%- endfor %}
-
         {#- Now call into Rust #}
         {% if func.return_type().is_some() -%}
         auto value = {# space #}
-        {%- endif %}{{ func_name }}(
+        {%- endif %}
+        {{- func_name }}(
             {%- for arg in func.arguments() %}
-            {%    if arg.type_().requires_argument_cleanup() %}
-            {%-     call arg_name_from_js(arg, loop.index0) %}
-            {%-   else %}
-            {%-     call arg_from_js(arg, loop.index0) %}
-            {%-   endif %}
+            {%-   call arg_from_js(arg, loop.index0) %}
             {%-   if !loop.last %}, {# space #}
             {%-   endif %}
             {%- endfor %}
@@ -61,13 +51,6 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
             {%   endif %}&status
             {%- endif %}
         );
-
-        {#- Now the call is done, we can cleanup all arguments that need it. #}
-        {%- for arg in func.arguments() %}
-        {%-   if arg.type_().requires_argument_cleanup() %}
-        {{ arg.type_().borrow()|bridging_class(ci) }}::argument_cleanup(rt, {% call arg_name_from_js(arg, loop.index0) %});
-        {%-   endif %}
-        {%- endfor %}
 
         {#- Now copy the call status into JS. #}
         {%- if func.has_rust_call_status_arg() %}
@@ -86,11 +69,6 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 {%- macro arg_from_js(arg, index) -%}
 {{ arg.type_().borrow()|bridging_class(ci) }}::fromJs(rt, callInvoker, args[{{ index }}])
 {%- endmacro %}
-
-{%- macro arg_name_from_js(arg, index) -%}
-_{{ arg.name() }}_{{ index }}
-{%- endmacro %}
-
 
 {%- macro cpp_func_name(func) %}cpp_{{ func.name() }}{%- endmacro %}
 
@@ -133,7 +111,7 @@ _{{ arg.name() }}_{{ index }}
 #}
 {%- macro callback_fn_impl(callback) %}
 {%- let ns = callback.cpp_namespace(ci) %}
-{%- include "VTableCallbackFunction.cpp" %}
+{%- include "CallbackFunction.cpp" %}
 {%- endmacro %}
 
 {#-
@@ -143,7 +121,7 @@ _{{ arg.name() }}_{{ index }}
 {%- macro callback_fn_free_impl(callback) %}
 {%- for st in self.ci.iter_ffi_structs() %}
 {%- let ns = st.cpp_namespace_free(ci) %}
-{%- include "VTableCallbackFunction.cpp" %}
+{%- include "CallbackFunction.cpp" %}
 {%- endfor %}
 {%- endmacro %}
 
