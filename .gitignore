@@ -69,3 +69,6 @@ node_modules/
 
 # Uniffi
 generated/
+
+# mdbook artifacts
+docs/book
