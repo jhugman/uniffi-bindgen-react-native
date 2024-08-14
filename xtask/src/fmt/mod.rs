@@ -7,7 +7,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use ubrn_common::run_cmd;
+use ubrn_common::{run_cmd, run_cmd_quietly};
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
@@ -16,26 +16,29 @@ use crate::{
 
 #[derive(Debug, Args)]
 pub(crate) struct FmtArgs {
+    /// If set, only check, otherwise format files in place.
+    #[clap(long)]
+    check: bool,
     #[clap(subcommand)]
     cmd: Option<LanguageCmd>,
 }
 
 pub(crate) trait CodeFormatter {
-    fn format_code(&self) -> Result<()>;
+    fn format_code(&self, check_only: bool) -> Result<()>;
 }
 
 impl FmtArgs {
     pub(crate) fn run(&self) -> Result<()> {
-        self.format_code()
+        self.format_code(self.check)
     }
 }
 
 impl CodeFormatter for FmtArgs {
-    fn format_code(&self) -> Result<()> {
+    fn format_code(&self, check_only: bool) -> Result<()> {
         if let Some(c) = &self.cmd {
-            c.format_code()
+            c.format_code(check_only)
         } else {
-            LanguageCmd::format_all()
+            LanguageCmd::format_all(check_only)
         }
     }
 }
@@ -67,24 +70,24 @@ enum LanguageCmd {
 }
 
 impl CodeFormatter for LanguageCmd {
-    fn format_code(&self) -> Result<()> {
+    fn format_code(&self, check_only: bool) -> Result<()> {
         match self {
-            Self::Rust(c) => c.format_code()?,
-            Self::Typescript(c) => c.format_code()?,
-            Self::Cpp(c) => c.format_code()?,
-            Self::Licence(c) => c.format_code()?,
+            Self::Rust(c) => c.format_code(check_only)?,
+            Self::Typescript(c) => c.format_code(check_only)?,
+            Self::Cpp(c) => c.format_code(check_only)?,
+            Self::Licence(c) => c.format_code(check_only)?,
         }
         Ok(())
     }
 }
 
 impl LanguageCmd {
-    fn format_all() -> Result<()> {
+    fn format_all(check_only: bool) -> Result<()> {
         // We add to the source code, before formatting.
-        LicenceArgs.format_code()?;
-        RustArgs::default().format_code()?;
-        TypescriptArgs.format_code()?;
-        CppArgs.format_code()?;
+        LicenceArgs.format_code(check_only)?;
+        RustArgs::default().format_code(check_only)?;
+        TypescriptArgs.format_code(check_only)?;
+        CppArgs.format_code(check_only)?;
         Ok(())
     }
 }
@@ -101,22 +104,25 @@ struct RustArgs {
 }
 
 impl CodeFormatter for RustArgs {
-    fn format_code(&self) -> Result<()> {
+    fn format_code(&self, check_only: bool) -> Result<()> {
         let root = repository_root()?;
         let run_fmt = !self.only_clippy;
         let run_clippy = self.only_clippy || !self.no_clippy;
         if run_fmt {
-            run_cmd(
-                Command::new("cargo")
-                    .arg("fmt")
-                    .arg("--all")
-                    .current_dir(&root),
-            )?;
+            let mut cmd = Command::new("cargo");
+            cmd.arg("--quiet")
+                .arg("fmt")
+                .arg("--all")
+                .current_dir(&root);
+            if check_only {
+                cmd.arg("--check");
+            }
+            run_cmd_quietly(&mut cmd)?;
         }
-
         if run_clippy {
             run_cmd(
                 Command::new("cargo")
+                    .arg("--quiet")
                     .arg("clippy")
                     .arg("--all")
                     .current_dir(root),
@@ -131,11 +137,11 @@ impl CodeFormatter for RustArgs {
 struct TypescriptArgs;
 
 impl CodeFormatter for TypescriptArgs {
-    fn format_code(&self) -> Result<()> {
+    fn format_code(&self, check_only: bool) -> Result<()> {
         YarnCmd.ensure_ready()?;
         let root = repository_root()?;
-        if let Some(mut prettier) = ubrn_common::fmt::prettier(root)? {
-            run_cmd(&mut prettier)?
+        if let Some(mut prettier) = ubrn_common::fmt::prettier(root, check_only)? {
+            run_cmd_quietly(&mut prettier)?
         } else {
             unreachable!("Is prettier in package.json dependencies?")
         }
@@ -147,10 +153,12 @@ impl CodeFormatter for TypescriptArgs {
 struct CppArgs;
 
 impl CodeFormatter for CppArgs {
-    fn format_code(&self) -> Result<()> {
+    fn format_code(&self, check_only: bool) -> Result<()> {
         let root = repository_root()?;
-        if let Some(mut clang_format) = ubrn_common::fmt::clang_format(root.join("cpp"))? {
-            run_cmd(&mut clang_format)?;
+        if let Some(mut clang_format) =
+            ubrn_common::fmt::clang_format(root.join("cpp"), check_only)?
+        {
+            run_cmd_quietly(&mut clang_format)?;
         } else {
             eprintln!("clang-format doesn't seem to be installed")
         }
@@ -162,10 +170,15 @@ impl CodeFormatter for CppArgs {
 struct LicenceArgs;
 
 impl CodeFormatter for LicenceArgs {
-    fn format_code(&self) -> Result<()> {
+    fn format_code(&self, check_only: bool) -> Result<()> {
+        if check_only {
+            // source-licenser doesn't provide a check only.
+            // Rather than changing the files on disk, just return.
+            return Ok(());
+        }
         YarnCmd.ensure_ready()?;
         let root = repository_root()?;
-        run_cmd(
+        run_cmd_quietly(
             Command::new("./node_modules/.bin/source-licenser")
                 .arg(".")
                 .arg("--config-file")

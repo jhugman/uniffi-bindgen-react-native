@@ -98,7 +98,7 @@ impl BindingGenerator for ReactNativeBindingGenerator {
 }
 
 fn format_ts(out_dir: &Utf8Path) -> Result<()> {
-    if let Some(mut prettier) = fmt::prettier(out_dir)? {
+    if let Some(mut prettier) = fmt::prettier(out_dir, false)? {
         run_cmd_quietly(&mut prettier)?
     } else {
         eprintln!("No prettier found. Install with `yarn add --dev prettier`");
@@ -107,7 +107,7 @@ fn format_ts(out_dir: &Utf8Path) -> Result<()> {
 }
 
 fn format_cpp(out_dir: &Utf8Path) -> Result<()> {
-    if let Some(mut clang_format) = fmt::clang_format(out_dir)? {
+    if let Some(mut clang_format) = fmt::clang_format(out_dir, false)? {
         run_cmd_quietly(&mut clang_format)?
     } else {
         eprintln!("Skipping formatting C++. Is clang-format installed?");
