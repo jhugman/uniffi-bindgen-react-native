@@ -7,6 +7,7 @@
 import myModule, {
   alwaysReady,
   asStringUsingTrait,
+  AsyncError,
   asyncNewMegaphone,
   AsyncParser,
   cancelDelayUsingTrait,
@@ -467,28 +468,25 @@ function checkRemainingFutures(t: Asserts) {
     },
   );
 
-  await xasyncTest(
-    "a future that uses a lock and that is cancelled by Rust",
+  await asyncTest(
+    "a future that uses a lock and that is erroring with a timeout",
     async (t) => {
-      // #RUST_TASK_CANCELLATION
-      //
-      // We should be able to see this test pass if Rust is calling a
-      // timeout a cancellation.
-      //
-      await t.assertThrowsAsync(
-        (err) => {
-          t.assertEqual(err.message, "cancelled");
-          return true;
-        },
-        async () => {
-          await useSharedResource(
-            SharedResourceOptions.create({
-              releaseAfterMs: 1000,
-              timeoutMs: 100,
-            }),
-          );
-        },
+      const task1 = useSharedResource(
+        SharedResourceOptions.create({
+          releaseAfterMs: 200,
+          timeoutMs: 100,
+        }),
       );
+
+      await t.assertThrowsAsync(AsyncError.Timeout.instanceOf, async () => {
+        await useSharedResource(
+          SharedResourceOptions.create({
+            releaseAfterMs: 1000,
+            timeoutMs: 100,
+          }),
+        );
+      });
+      await task1;
       checkRemainingFutures(t);
       t.end();
     },
