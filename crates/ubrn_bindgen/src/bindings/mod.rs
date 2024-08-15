@@ -6,6 +6,7 @@
 
 pub mod metadata;
 pub(crate) mod react_native;
+pub(crate) mod type_map;
 
 use std::{fs, str::FromStr};
 

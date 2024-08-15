@@ -6,9 +6,9 @@
  * Typealias from the type name used in the UDL file to the builtin type.  This
  * is needed because the UDL type name is used in function/method signatures.
  */
-export type {{ type_name }} = {{ builtin|type_name(ci) }};
-// FfiConverter for {{ type_name }}, a type alias for {{ builtin|type_name(ci) }}.
-const {{ ffi_converter_name }} = {{ builtin|ffi_converter_name }};
+export type {{ type_name }} = {{ builtin|type_name(self) }};
+// FfiConverter for {{ type_name }}, a type alias for {{ builtin|type_name(self) }}.
+const {{ ffi_converter_name }} = {{ builtin|ffi_converter_name(self) }};
 
 {%-   when Some with (config) %}
 
@@ -32,7 +32,7 @@ export type {{ type_name }} = {{ concrete_type_name }};
 const {{ ffi_converter_name }} = (() => {
     type TsType = {{ type_name }};
     type FfiType = {{ ffi_type_name }};
-    const intermediateConverter = {{ builtin|ffi_converter_name }};
+    const intermediateConverter = {{ builtin|ffi_converter_name(self) }};
     class FFIConverter implements FfiConverter<FfiType, TsType> {
         lift(value: FfiType): TsType {
             const intermediate = intermediateConverter.lift(value);

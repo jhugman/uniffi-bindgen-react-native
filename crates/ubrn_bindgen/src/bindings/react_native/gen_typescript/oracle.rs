@@ -181,7 +181,9 @@ impl<T: AsType> AsCodeType for T {
                 key_type,
                 value_type,
             } => Box::new(compounds::MapCodeType::new(*key_type, *value_type)),
-            Type::External { name, .. } => Box::new(external::ExternalCodeType::new(name)),
+            Type::External { .. } => unreachable!(
+                "External types should have been elimintated by going through the TypeRenderer::as_type() method"
+            ),
             Type::Custom { name, .. } => Box::new(custom::CustomCodeType::new(name)),
         }
     }
