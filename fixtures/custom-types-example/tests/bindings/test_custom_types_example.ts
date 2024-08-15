@@ -11,7 +11,8 @@ import {
   MyEnum_Tags,
   unwapEnumWrapper,
 } from "../../generated/custom_types";
-import { Url, secondsToDate } from "../../src/converters";
+import { URL } from "@/hermes";
+import { secondsToDate } from "@/converters";
 import { test } from "@/asserts";
 
 /// These tests are worth looking at inconjunction with the uniffi.toml file
@@ -23,9 +24,9 @@ test("Rust url::Url --> via String --> Typescript Url", (t) => {
   // Url has an imported classe
   const urlString = "http://example.com/";
   t.assertEqual(demo.url.toString(), urlString);
-  t.assertEqual(demo.url, new Url(urlString));
+  t.assertEqual(demo.url, new URL(urlString));
 
-  demo.url = new Url("http://new.example.com/");
+  demo.url = new URL("http://new.example.com/");
   t.assertEqual(demo, getCustomTypesDemo(demo));
 });
 
