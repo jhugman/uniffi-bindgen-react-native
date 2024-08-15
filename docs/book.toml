@@ -1,0 +1,90 @@
+[book]
+title = "uniffi-bindgen for React Native"
+description = "Rust in your React Natives"
+authors = ["James Hugman", "Michael-F-Bryan"]
+language = "en"
+
+[rust]
+edition = "2018"
+
+[preprocessor.toc]
+command = "mdbook-toc"
+renderer = ["html"]
+marker = "<!-- toc -->"
+max-level = 4
+
+[preprocessor.open-on-gh]
+command = "mdbook-open-on-gh"
+renderer = ["html"]
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`
+
+[output.linkcheck]
+# Should we check links on the internet? Enabling this option adds a
+# non-negligible performance impact
+follow-web-links = false
+
+# Are we allowed to link to files outside of the book's root directory? This
+# may help prevent linking to sensitive files (e.g. "../../../../etc/shadow")
+traverse-parent-directories = false
+
+# If necessary, you can exclude one or more links from being checked with a
+# list of regular expressions. The regex will be applied to the link href (i.e.
+# the `./index.html` in `[some page](./index.html)`) so it can be used to
+# ignore both web and filesystem links.
+#
+# Hint: you can use TOML's raw strings (single quote) to avoid needing to
+# escape things twice.
+exclude = [ 'google\.com' ]
+
+# The User-Agent to use when sending web requests
+user-agent = "mdbook-linkcheck-0.4.0"
+
+# The number of seconds a cached result is valid for (12 hrs by default)
+cache-timeout = 43200
+
+# How should warnings be treated?
+#
+# - "warn" will emit warning messages
+# - "error" treats all warnings as errors, failing the linkcheck
+# - "ignore" will ignore warnings, suppressing diagnostic messages and allowing
+#   the linkcheck to continuing
+warning-policy = "warn"
+
+[output.html]
+smart-punctuation = true
+mathjax-support = false
+site-url = "/mdBook/"
+git-repository-url = "https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/docs/"
+edit-url-template = "https://github.com/jhugman/uniffi-bindgen-react-native/edit/main/docs/{path}"
+
+# open on gh config.
+git-branch = "main"
+
+# The text to use in the footer.
+# The link text is marked by `[]`
+open-on-text = "Found a bug? [Edit this page on GitHub.]"
+additional-css = ["./assets/css/mdbook-admonish.css"]
+
+[output.html.playground]
+editable = true
+line-numbers = true
+
+[output.html.code.hidelines]
+python = "~"
+typescript = "~"
+javascript = "~"
+
+[output.html.search]
+limit-results = 20
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 2
+boost-paragraph = 1
+expand = true
+heading-split-level = 2
+
+[output.html.redirect]
+"/format/config.html" = "configuration/index.html"
