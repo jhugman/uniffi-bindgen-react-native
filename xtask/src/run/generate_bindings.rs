@@ -41,9 +41,12 @@ impl GenerateBindingsArg {
         let bindings = BindingsArgs::new(source, output);
         let modules = bindings.run()?;
         let cpp_dir = bindings.cpp_dir();
+        let index = cpp_dir.join("Entrypoint.cpp");
+        bindings.render_entrypoint(&index, &modules)?;
         Ok(modules
             .iter()
             .map(|m| cpp_dir.join(m.cpp_filename()))
+            .chain(vec![index])
             .collect())
     }
 }

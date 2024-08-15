@@ -7,9 +7,10 @@
 pub mod metadata;
 pub(crate) mod react_native;
 
-use std::str::FromStr;
+use std::{fs, str::FromStr};
 
 use anyhow::Result;
+use askama::Template;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{command, Args};
 use ubrn_common::mk_dir;
@@ -150,4 +151,17 @@ impl BindingsArgs {
 
         Ok(configs)
     }
+
+    pub fn render_entrypoint(&self, path: &Utf8Path, modules: &Vec<ModuleMetadata>) -> Result<()> {
+        let index = EntrypointCpp { modules };
+        let string = index.render()?;
+        fs::write(path, string)?;
+        Ok(())
+    }
+}
+
+#[derive(Template)]
+#[template(path = "entrypoint.cpp", escape = "none")]
+struct EntrypointCpp<'a> {
+    modules: &'a Vec<ModuleMetadata>,
 }

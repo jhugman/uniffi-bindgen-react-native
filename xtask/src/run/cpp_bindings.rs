@@ -38,7 +38,7 @@ impl CppBindingArg {
             .filter_map(|f| f.canonicalize_utf8().ok())
             .map(|p| p.as_str().to_string())
             .collect::<Vec<_>>()
-            .join(" ")
+            .join(";")
     }
 
     pub(crate) fn compile_with_crate(
