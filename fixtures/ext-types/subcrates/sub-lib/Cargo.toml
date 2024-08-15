@@ -1,0 +1,27 @@
+[package]
+name = "uniffi-fixture-ext-types-sub-lib"
+edition = "2021"
+version = "0.22.0"
+authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
+license = "MPL-2.0"
+publish = false
+
+[package.metadata.uniffi.testing]
+external-crates = [
+    "uniffi-fixture-ext-types-lib-one",
+]
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "uniffi_sublib"
+
+[dependencies]
+anyhow = "1"
+uniffi = { workspace = true }
+uniffi-fixture-ext-types-lib-one = {path = "../uniffi-one"}
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+uniffi = { workspace = true, features = ["bindgen-tests"] }

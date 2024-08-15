@@ -1,0 +1,95 @@
+namespace imported_types_lib {
+    CombinedType get_combined_type(optional CombinedType? value);
+
+    Url get_url(Url url);
+    sequence<Url> get_urls(sequence<Url> urls);
+    Url? get_maybe_url(Url? url);
+    sequence<Url?> get_maybe_urls(sequence<Url?> urls);
+
+    UniffiOneType get_uniffi_one_type(UniffiOneType t);
+    sequence<UniffiOneType> get_uniffi_one_types(sequence<UniffiOneType> ts);
+    UniffiOneType? get_maybe_uniffi_one_type(UniffiOneType? t);
+    sequence<UniffiOneType?> get_maybe_uniffi_one_types(sequence<UniffiOneType?> ts);
+
+    UniffiOneEnum get_uniffi_one_enum(UniffiOneEnum e);
+    sequence<UniffiOneEnum> get_uniffi_one_enums(sequence<UniffiOneEnum> es);
+    UniffiOneEnum? get_maybe_uniffi_one_enum(UniffiOneEnum? e);
+    sequence<UniffiOneEnum?> get_maybe_uniffi_one_enums(sequence<UniffiOneEnum?> es);
+
+    UniffiOneInterface get_uniffi_one_interface();
+    ExternalCrateInterface get_external_crate_interface(string val);
+    UniffiOneProcMacroType get_uniffi_one_proc_macro_type(UniffiOneProcMacroType t);
+    UniffiOneUDLTrait? get_uniffi_one_udl_trait(UniffiOneUDLTrait? t);
+};
+
+// A type defined in a .udl file in the `uniffi-one` crate (ie, in
+// `../../uniffi-one/src/uniffi-one.udl`)
+[External="uniffi_one"]
+typedef extern UniffiOneType;
+
+// An enum in the same crate
+[External="uniffi_one"]
+typedef extern UniffiOneEnum;
+
+// An interface in the same crate
+[ExternalInterface="uniffi_one"]
+typedef extern UniffiOneInterface;
+
+// An UDL defined trait
+[ExternalTrait="uniffi_one"]
+typedef extern UniffiOneUDLTrait;
+
+// A type defined via procmacros in an external crate
+[ExternalExport="uniffi_one"]
+typedef extern UniffiOneProcMacroType;
+
+// A Custom (ie, "wrapped") type defined externally in `../../custom-types/src/lib.rs`,
+// but because it's in a UDL it's still "external" from our POV, so same as the `.udl` type above.
+[External="ext_types_custom"]
+typedef extern Guid;
+
+// And re-use the `custom-types` example - this exposes `Url` and `Handle`
+[External="custom_types"]
+typedef extern Url;
+
+[External="custom_types"]
+typedef extern Handle;
+
+// Here are some different kinds of "external" types - the types are described
+// in this UDL, but the types themselves are defined in a different crate.
+dictionary ExternalCrateDictionary {
+    string sval;
+};
+
+interface ExternalCrateInterface {
+    string value();
+};
+
+[NonExhaustive]
+enum ExternalCrateNonExhaustiveEnum {
+    "One",
+    "Two",
+};
+
+// And a new type here to tie them all together.
+dictionary CombinedType {
+    UniffiOneEnum uoe;
+    UniffiOneType uot;
+    sequence<UniffiOneType> uots;
+    UniffiOneType? maybe_uot;
+
+    Guid guid;
+    sequence<Guid> guids;
+    Guid? maybe_guid;
+
+    Url url;
+    sequence<Url> urls;
+    Url? maybe_url;
+
+    Handle handle;
+    sequence<Handle> handles;
+    Handle? maybe_handle;
+
+    ExternalCrateDictionary ecd;
+    ExternalCrateNonExhaustiveEnum ecnee;
+};

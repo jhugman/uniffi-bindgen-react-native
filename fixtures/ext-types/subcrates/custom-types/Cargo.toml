@@ -1,0 +1,23 @@
+[package]
+name = "uniffi-fixture-ext-types-custom-types"
+edition = "2021"
+version = "0.22.0"
+authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "ext_types_custom"
+
+[dependencies]
+anyhow = "1"
+bytes = "1.3"
+thiserror = "1.0"
+uniffi = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+uniffi = { workspace = true, features = ["bindgen-tests"] }

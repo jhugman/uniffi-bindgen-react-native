@@ -1,0 +1,35 @@
+[Custom]
+typedef string Guid;
+
+// Wrapping another custom type.
+[Custom]
+typedef Guid ANestedGuid;
+
+[Error]
+enum GuidError {
+    "TooShort"
+};
+
+dictionary GuidHelper {
+    Guid guid;
+    sequence<Guid> guids;
+    Guid? maybe_guid;
+};
+
+callback interface GuidCallback {
+   Guid run(Guid arg);
+};
+
+namespace ext_types_custom {
+    // Note this intentionally does not throw an error - uniffi will panic if
+    // a Guid can't be converted.
+    Guid get_guid(optional Guid? value);
+
+    // Uniffi will handle failure converting a string to a Guid correctly if
+    // the conversion returns `Err(GuidError)`, or panic otherwise.
+    [Throws=GuidError]
+    Guid try_get_guid(optional Guid? value);
+
+    GuidHelper get_guid_helper(optional GuidHelper? values);
+    Guid run_callback(GuidCallback callback);
+};

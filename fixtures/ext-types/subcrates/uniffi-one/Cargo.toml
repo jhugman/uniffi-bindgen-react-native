@@ -1,0 +1,20 @@
+[package]
+name = "uniffi-fixture-ext-types-lib-one"
+edition = "2021"
+version = "0.22.0"
+authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+# Note the crate name is different from the namespace used by this crate.
+name = "uniffi_one"
+
+[dependencies]
+anyhow = "1"
+bytes = "1.3"
+uniffi = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }

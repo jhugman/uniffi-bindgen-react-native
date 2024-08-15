@@ -1,0 +1,21 @@
+namespace uniffi_one_ns {};
+
+dictionary UniffiOneType {
+    string sval;
+};
+
+enum UniffiOneEnum {
+    "One",
+    "Two",
+};
+
+interface UniffiOneInterface {
+    constructor();
+
+    i32 increment();
+};
+
+[Trait, WithForeign]
+interface UniffiOneUDLTrait {
+    string hello();
+};
