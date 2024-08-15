@@ -22,7 +22,7 @@ pub(crate) struct ProjectConfig {
     #[serde(default = "ProjectConfig::default_repository")]
     pub(crate) repository: String,
 
-    #[serde(rename = "crate")]
+    #[serde(rename = "rust", alias = "crate")]
     pub(crate) crate_: CrateConfig,
 
     #[serde(default)]
