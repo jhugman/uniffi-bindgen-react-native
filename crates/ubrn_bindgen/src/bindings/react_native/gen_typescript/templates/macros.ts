@@ -32,9 +32,8 @@ import { decl_type_name } from "./EnumTemplate"
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
         {{- self.import_infra("rustCallWithError", "rust-call") }}
-        {%- let error_converter = e|ffi_error_converter_name %}
         rustCallWithError(
-            /*liftError:*/ {{ error_converter }}.lift.bind({{ error_converter }}),
+            /*liftError:*/ {{ e|lift_error_fn(self) }},
             /*caller:*/ (callStatus) => {
     {%- else -%}
         rustCall(
@@ -83,7 +82,7 @@ import { decl_type_name } from "./EnumTemplate"
 
 {%- macro raw_return_type(callable) %}
     {%- match callable.return_type() %}
-    {%-  when Some with (return_type) %}{{ return_type|type_name(ci) }}
+    {%-  when Some with (return_type) %}{{ return_type|type_name(self) }}
     {%-  when None %}void
     {%- endmatch %}
 {%- endmacro %}
@@ -107,7 +106,7 @@ import { decl_type_name } from "./EnumTemplate"
 {%- else %}
 {%-     match callable.return_type() -%}
 {%-         when Some with (return_type) %}
-    return {{ return_type|ffi_converter_name }}.lift({% call to_ffi_method_call(obj_factory, callable) %});
+    return {{ return_type|ffi_converter_name(self) }}.lift({% call to_ffi_method_call(obj_factory, callable) %});
 {%-         when None %}
 {%-             call to_ffi_method_call(obj_factory, callable) %};
 {%-     endmatch %}
@@ -124,7 +123,7 @@ import { decl_type_name } from "./EnumTemplate"
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
-                    {{ arg|ffi_converter_name }}.lower({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
+                    {{ arg|ffi_converter_name(self) }}.lower({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
                     {%- endfor %}
                 );
             },
@@ -134,15 +133,14 @@ import { decl_type_name } from "./EnumTemplate"
             /*freeFunc:*/ nativeModule().{{ callable.ffi_rust_future_free(ci) }},
             {%- match callable.return_type() %}
             {%- when Some(return_type) %}
-            /*liftFunc:*/ {{ return_type|lift_fn }},
+            /*liftFunc:*/ {{ return_type|lift_fn(self) }},
             {%- when None %}
             /*liftFunc:*/ (_v) => {},
             {%- endmatch %}
             /*liftString:*/ FfiConverterString.lift,
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
-            {%- let error_converter = e|ffi_error_converter_name %}
-            /*errorHandler:*/ {{ error_converter }}.lift.bind({{ error_converter }})
+            /*errorHandler:*/ {{ e|lift_error_fn(self) }}
             {%- else %}
             {% endmatch %}
         )
@@ -150,7 +148,7 @@ import { decl_type_name } from "./EnumTemplate"
 
 {%- macro arg_list_lowered(func) %}
     {%- for arg in func.arguments() %}
-        {{ arg|ffi_converter_name }}.lower({{ arg.name()|var_name }}),
+        {{ arg|ffi_converter_name(self) }}.lower({{ arg.name()|var_name }}),
     {%- endfor %}
 {%- endmacro -%}
 
@@ -161,7 +159,7 @@ import { decl_type_name } from "./EnumTemplate"
 
 {% macro arg_list_decl(func) %}
     {%- for arg in func.arguments() -%}
-        {{ arg.name()|var_name }}: {{ arg|type_name(ci) -}}
+        {{ arg.name()|var_name }}: {{ arg|type_name(self) -}}
         {%- match arg.default_value() %}
         {%- when Some with(literal) %} = {{ literal|render_literal(arg, ci) }}
         {%- else %}
@@ -179,9 +177,9 @@ import { decl_type_name } from "./EnumTemplate"
     {%-   call docstring(field, 8) %}
     {%-   if has_nameless_fields -%}
     v{{ loop.index0 }}: {# space #}
-    {{-     field|type_name(ci) }}
+    {{-     field|type_name(self) }}
     {%-   else %}
-    {{-     field.name()|var_name }}: {{ field|type_name(ci) -}}
+    {{-     field.name()|var_name }}: {{ field|type_name(self) -}}
     {%-     match field.default_value() %}
     {%-       when Some with(literal) %} = {{ literal|render_literal(field, ci) }}
     {%-       else %}
@@ -213,7 +211,7 @@ import { decl_type_name } from "./EnumTemplate"
 
 {% macro arg_list_protocol(func) %}
     {%- for arg in func.arguments() -%}
-        {{ arg.name()|var_name }}: {{ arg|type_name(ci) -}}
+        {{ arg.name()|var_name }}: {{ arg|type_name(self) -}}
         {%- if !loop.last %}, {% endif -%}
     {%- endfor %}
 {%- endmacro %}

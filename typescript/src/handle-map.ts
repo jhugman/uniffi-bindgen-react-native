@@ -34,6 +34,10 @@ export class UniffiHandleMap<T> {
     return obj;
   }
 
+  has(handle: UniffiHandle): boolean {
+    return this.map.has(handle);
+  }
+
   get size(): number {
     return this.map.size;
   }

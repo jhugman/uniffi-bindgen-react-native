@@ -54,7 +54,7 @@ const {{ ffi_converter_name }} = (() => {
                     {%- if flat %}FfiConverterString.read(from)
                     {%- else %}
                     {%-   for field in variant.fields() %}
-                    {{      field|ffi_converter_name }}.read(from)
+                    {{      field|ffi_converter_name(self) }}.read(from)
                     {%-     if !loop.last %}, {% endif %}
                     {%-   endfor %}
                     {%- endif %}
@@ -72,7 +72,7 @@ const {{ ffi_converter_name }} = (() => {
                 {%-   for variant in e.variants() %}
                 case {{ loop.index }}:
                 {%-     for field in variant.fields() %}
-                    {{ field|ffi_converter_name }}.write(obj.{{ field.name()|var_name }} as {{ field|type_name(ci) }}, into);
+                    {{ field|ffi_converter_name(self) }}.write(obj.{{ field.name()|var_name }} as {{ field|type_name(self) }}, into);
                 {%-     endfor -%}
                     break;
                 {%-   endfor %}
@@ -91,7 +91,7 @@ const {{ ffi_converter_name }} = (() => {
                 case {{ loop.index }}:
                     return (intConverter.allocationSize({{ loop.index }})
                 {%-     for field in variant.fields() %} + {# space #}
-                    {{ field|ffi_converter_name }}.allocationSize(obj.{{ field.name()|var_name }} as {{ field|type_name(ci) }})
+                    {{ field|ffi_converter_name(self) }}.allocationSize(obj.{{ field.name()|var_name }} as {{ field|type_name(self) }})
                 {%-     endfor -%}
                     );
                 {%-   endfor %}

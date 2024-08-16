@@ -55,3 +55,10 @@ function replacer(key: string, value: any): any {
 
   return value;
 }
+
+export class URL {
+  constructor(private urlString: string) {}
+  toString(): string {
+    return this.urlString;
+  }
+}

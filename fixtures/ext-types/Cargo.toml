@@ -1,0 +1,42 @@
+[package]
+name = "uniffi-fixture-ext-types"
+edition = "2021"
+version = "0.22.0"
+authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
+license = "MPL-2.0"
+publish = false
+
+[package.metadata.uniffi.testing]
+external-crates = [
+    "uniffi-fixture-ext-types-custom-types",
+    "uniffi-fixture-ext-types-lib-one",
+    "uniffi-fixture-ext-types-external-crate",
+    "uniffi-fixture-ext-types-sub-lib",
+    "uniffi-example-custom-types",
+]
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "uniffi_ext_types_lib"
+
+[dependencies]
+anyhow = "1"
+bytes = "1.3"
+# Add the "scaffolding-ffi-buffer-fns" feature to make sure things can build correctly
+uniffi = { workspace = true }
+
+uniffi-fixture-ext-types-external-crate = {path = "subcrates/external-crate"}
+uniffi-fixture-ext-types-lib-one = {path = "subcrates/uniffi-one"}
+uniffi-fixture-ext-types-custom-types = {path = "subcrates/custom-types"}
+uniffi-fixture-ext-types-sub-lib = {path = "subcrates/sub-lib"}
+
+# Reuse one of our examples.
+uniffi-example-custom-types = {path = "../custom-types-example"}
+
+url = "2.2"
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+uniffi = { workspace = true, features = ["bindgen-tests"] }

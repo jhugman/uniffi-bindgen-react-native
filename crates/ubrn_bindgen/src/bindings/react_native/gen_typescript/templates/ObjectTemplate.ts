@@ -6,8 +6,8 @@
 {{- self.import_infra_type("UniffiRustArcPtr", "rust-call") }}
 
 {%- let obj = ci|get_object_definition(name) %}
-{%- let protocol_name = obj|type_name(ci) %}
-{%- let impl_class_name = obj|decl_type_name(ci) %}
+{%- let protocol_name = obj|type_name(self) %}
+{%- let impl_class_name = obj|decl_type_name(self) %}
 {%- let obj_factory = format!("uniffiType{}ObjectFactory", impl_class_name) %}
 {%- let methods = obj.methods() %}
 
@@ -196,7 +196,7 @@ const {{ ffi_converter_name }} = new FfiConverterObjectWithCallbacks({{ obj_fact
 
 {#- Objects as error #}
 {%- if is_error %}
-{%- let ffi_error_converter_name = type_|ffi_error_converter_name %}
+{%- let ffi_error_converter_name = type_|ffi_error_converter_name(self) %}
 {{- self.import_infra("FfiConverterObjectAsError", "objects") }}
 // FfiConverter for {{ type_name }} as an error.
 const {{ ffi_error_converter_name }} = new FfiConverterObjectAsError("{{ decl_type_name }}", {{ ffi_converter_name }});

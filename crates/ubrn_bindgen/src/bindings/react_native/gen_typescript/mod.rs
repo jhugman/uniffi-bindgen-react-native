@@ -10,7 +10,6 @@ mod callback_interface;
 mod compounds;
 mod custom;
 mod enum_;
-mod external;
 mod miscellany;
 mod object;
 mod primitives;
@@ -18,20 +17,20 @@ mod record;
 
 use anyhow::{Context, Result};
 use askama::Template;
-use filters::ffi_converter_name;
+use filters::{ffi_converter_name, type_name};
 use heck::ToUpperCamelCase;
 use oracle::CodeOracle;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use uniffi_bindgen::interface::{Callable, FfiDefinition, FfiType, Type, UniffiTrait};
+use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
-use uniffi_meta::{AsType, ExternalKind};
 
 use crate::bindings::metadata::ModuleMetadata;
 use crate::bindings::react_native::{
     ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
 };
+use crate::bindings::type_map::TypeMap;
 
 #[derive(Default)]
 pub(crate) struct TsBindings {
@@ -45,11 +44,12 @@ pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
     config: &Config,
     module: &ModuleMetadata,
+    type_map: &TypeMap,
 ) -> Result<TsBindings> {
     let codegen = CodegenWrapper::new(ci, config, module)
         .render()
         .context("generating codegen bindings failed")?;
-    let frontend = FrontendWrapper::new(ci, config, module)
+    let frontend = FrontendWrapper::new(ci, config, module, type_map)
         .render()
         .context("generating frontend javascript failed")?;
 
@@ -85,8 +85,13 @@ struct FrontendWrapper<'a> {
 }
 
 impl<'a> FrontendWrapper<'a> {
-    pub fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
-        let type_renderer = TypeRenderer::new(ci, config, module);
+    pub fn new(
+        ci: &'a ComponentInterface,
+        config: &'a Config,
+        module: &'a ModuleMetadata,
+        type_map: &'a TypeMap,
+    ) -> Self {
+        let type_renderer = TypeRenderer::new(ci, config, module, type_map);
         let type_helper_code = type_renderer.render().unwrap();
         let type_imports = type_renderer.imports.into_inner();
         let exported_converters = type_renderer.exported_converters.into_inner();
@@ -122,10 +127,18 @@ pub struct TypeRenderer<'a> {
 
     // Track imports added with the `add_import()` macro
     imported_converters: RefCell<BTreeMap<(String, String), BTreeSet<String>>>,
+
+    // The universe of types outside of this module. For tracking external types.
+    type_map: &'a TypeMap,
 }
 
 impl<'a> TypeRenderer<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
+    fn new(
+        ci: &'a ComponentInterface,
+        config: &'a Config,
+        module: &'a ModuleMetadata,
+        type_map: &'a TypeMap,
+    ) -> Self {
         Self {
             ci,
             config,
@@ -133,6 +146,7 @@ impl<'a> TypeRenderer<'a> {
             imports: RefCell::new(Default::default()),
             exported_converters: RefCell::new(Default::default()),
             imported_converters: RefCell::new(Default::default()),
+            type_map,
         }
     }
 
@@ -186,39 +200,33 @@ impl<'a> TypeRenderer<'a> {
 
     fn import_external_type(&self, external: &impl AsType) -> &str {
         match external.as_type() {
-            Type::External {
-                namespace,
-                name,
-                kind,
-                ..
-            } => {
-                match kind {
-                    ExternalKind::DataClass => {
-                        self.import_ext_type(&name, &namespace);
-                    }
-                    ExternalKind::Interface => {
-                        self.import_ext(&name, &namespace);
-                    }
-                    ExternalKind::Trait => {
-                        self.import_ext(&name, &namespace);
-                    }
-                }
-                let converters = format!("uniffi{}Module", namespace.to_upper_camel_case());
-                let src = format!("./{namespace}");
-                let ffi_converter_name = ffi_converter_name(external)
+            Type::External { namespace, .. } => {
+                let type_ = self.as_type(external);
+                let name = type_name(&type_, self).expect("External types should have type names");
+                match &type_ {
+                    Type::CallbackInterface { .. }
+                    | Type::Object { .. }
+                    | Type::Custom { .. }
+                    | Type::Enum { .. } => self.import_ext(&name, &namespace),
+                    Type::Record { .. } => self.import_ext_type(&name, &namespace),
+                    _ => unreachable!(),
+                };
+                let ffi_converter_name = ffi_converter_name(&type_, self)
                     .expect("FfiConverter for External type will always exist");
-                self.import_converter(&ffi_converter_name, &src, &converters);
-                ""
+                self.import_converter(ffi_converter_name, &namespace)
             }
             _ => unreachable!(),
         }
     }
 
-    fn import_converter(&self, what: &str, src: &str, converters: &str) -> &str {
+    fn import_converter(&self, ffi_converter_name: String, namespace: &str) -> &str {
+        let converters = format!("uniffi{}Module", namespace.to_upper_camel_case());
+        let src = format!("./{namespace}");
+
         let mut map = self.imported_converters.borrow_mut();
-        let key = (src.to_owned(), converters.to_owned());
+        let key = (src, converters);
         let set = map.entry(key).or_default();
-        set.insert(what.to_owned());
+        set.insert(ffi_converter_name);
         ""
     }
 
@@ -231,9 +239,14 @@ impl<'a> TypeRenderer<'a> {
     fn initialization_fns(&self) -> Vec<String> {
         self.ci
             .iter_sorted_types()
+            .filter(|t| !matches!(t, Type::External { .. }))
             .map(|t| CodeOracle.find(&t))
             .filter_map(|ct| ct.initialization_fn())
             .collect()
+    }
+
+    pub(crate) fn as_type(&self, as_type: &impl AsType) -> Type {
+        self.type_map.as_type(as_type)
     }
 }
 

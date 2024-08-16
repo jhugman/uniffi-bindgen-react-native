@@ -27,7 +27,7 @@ use uniffi_toml::ReactNativeConfig;
 
 use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
 
-use super::OutputArgs;
+use super::{type_map::TypeMap, OutputArgs};
 use crate::bindings::metadata::ModuleMetadata;
 
 pub(crate) struct ReactNativeBindingGenerator {
@@ -70,12 +70,16 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         settings: &GenerationSettings,
         components: &[Component<Self::Config>],
     ) -> Result<()> {
+        let mut type_map = TypeMap::default();
+        for component in components {
+            type_map.insert_ci(&component.ci);
+        }
         for component in components {
             let ci = &component.ci;
             let module: ModuleMetadata = component.into();
             let config = &component.config;
             let TsBindings { codegen, frontend } =
-                gen_typescript::generate_bindings(ci, &config.typescript, &module)?;
+                gen_typescript::generate_bindings(ci, &config.typescript, &module, &type_map)?;
 
             let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
             let codegen_path = out_dir.join(module.ts_ffi_filename());

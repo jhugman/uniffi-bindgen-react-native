@@ -113,11 +113,19 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
   }
 
   lift(value: UnsafeMutableRawPointer): T {
-    return this.handleMap.get(value);
+    if (this.handleMap.has(value)) {
+      return this.handleMap.get(value);
+    } else {
+      return super.lift(value);
+    }
   }
 
-  drop(handle: UniffiHandle): T {
-    return this.handleMap.remove(handle);
+  drop(handle: UniffiHandle): T | undefined {
+    if (this.handleMap.has(handle)) {
+      return this.handleMap.remove(handle);
+    } else {
+      return undefined;
+    }
   }
 }
 

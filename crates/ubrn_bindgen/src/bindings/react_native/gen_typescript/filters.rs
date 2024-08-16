@@ -3,7 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use super::oracle::{AsCodeType, CodeOracle};
+use super::{
+    oracle::{AsCodeType, CodeOracle},
+    TypeRenderer,
+};
 pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
     backend::{Literal, Type},
@@ -12,47 +15,72 @@ use uniffi_bindgen::{
 };
 
 pub(super) fn type_name(
-    as_ct: &impl AsCodeType,
-    ci: &ComponentInterface,
+    as_type: &impl AsType,
+    types: &TypeRenderer,
 ) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().type_label(ci))
+    let type_ = types.as_type(as_type);
+    Ok(type_.as_codetype().type_label(types.ci))
 }
 
 pub(super) fn decl_type_name(
-    as_ct: &impl AsCodeType,
-    ci: &ComponentInterface,
+    as_type: &impl AsType,
+    types: &TypeRenderer,
 ) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().decl_type_label(ci))
+    let type_ = types.as_type(as_type);
+    Ok(type_.as_codetype().decl_type_label(types.ci))
 }
 
-pub(super) fn canonical_name(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().canonical_name())
+pub(super) fn ffi_converter_name(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
+    let type_ = types.as_type(as_type);
+    Ok(type_.as_codetype().ffi_converter_name())
 }
 
-pub(super) fn ffi_converter_name(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().ffi_converter_name())
-}
-
-pub(super) fn ffi_error_converter_name(as_type: &impl AsType) -> Result<String, askama::Error> {
+pub(super) fn ffi_error_converter_name(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
     // special handling for types used as errors.
-    let mut name = ffi_converter_name(as_type)?;
-    if matches!(&as_type.as_type(), Type::Object { .. }) {
+    let type_ = types.as_type(as_type);
+    let mut name = type_.as_codetype().ffi_converter_name();
+    if matches!(type_, Type::Object { .. }) {
         name.push_str("__as_error")
+    }
+    if let Type::External { namespace, .. } = as_type.as_type() {
+        types.import_converter(name.clone(), &namespace);
     }
     Ok(name)
 }
 
-pub(super) fn lower_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
+pub(super) fn lower_error_fn(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
     Ok(format!(
         "{ct}.lower.bind({ct})",
-        ct = as_ct.as_codetype().ffi_converter_name()
+        ct = ffi_error_converter_name(as_type, types)?
     ))
 }
 
-pub(super) fn lift_fn(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
+pub(super) fn lift_error_fn(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
     Ok(format!(
         "{ct}.lift.bind({ct})",
-        ct = as_ct.as_codetype().ffi_converter_name()
+        ct = ffi_error_converter_name(as_type, types)?
+    ))
+}
+
+pub(super) fn lift_fn(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
+    Ok(format!(
+        "{ct}.lift.bind({ct})",
+        ct = ffi_converter_name(as_type, types)?
     ))
 }
 

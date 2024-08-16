@@ -7,10 +7,9 @@
 {%- endfor %}
 
 {%- for type_ in ci.iter_sorted_types() %}
-{%- let type_name = type_|type_name(ci) %}
-{%- let decl_type_name = type_|decl_type_name(ci) %}
-{%- let ffi_converter_name = type_|ffi_converter_name %}
-{%- let canonical_type_name = type_|canonical_name %}
+{%- let type_name = type_|type_name(self) %}
+{%- let decl_type_name = type_|decl_type_name(self) %}
+{%- let ffi_converter_name = type_|ffi_converter_name(self) %}
 {%- let contains_object_references = ci.item_contains_object_references(type_) %}
 
 {#

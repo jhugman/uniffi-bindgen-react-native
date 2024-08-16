@@ -1,9 +1,10 @@
 [bindings.typescript.customTypes.Url]
 # Modules that need to be imported
-imports = [ [ "Url", "../src/converters" ] ]
+imports = [ [ "URL", "@/hermes" ] ]
+typeName = "URL"
 # Expressions to convert between strings and URLs.
 # The `{}` is substituted for the value.
-intoCustom = "new Url({})"
+intoCustom = "new URL({})"
 fromCustom = "{}.toString()"
 
 [bindings.typescript.customTypes.TimeIntervalMs]
@@ -18,8 +19,8 @@ fromCustom = "BigInt({}.getTime())"
 typeName = "Date"
 # Modules that need to be imported
 imports = [
-    ["dateToSeconds", "../src/converters"],
-    ["secondsToDate", "../src/converters"],
+    ["dateToSeconds", "@/converters"],
+    ["secondsToDate", "@/converters"],
 ]
 # Functions to convert between f64 and TimeIntervalSecDbl as a Date
 intoCustom = "secondsToDate({})"
@@ -30,8 +31,8 @@ fromCustom = "dateToSeconds({})"
 typeName = "Date"
 # Modules that need to be imported
 imports = [
-    ["dateToSeconds", "../src/converters"],
-    ["secondsToDate", "../src/converters"],
+    ["dateToSeconds", "@/converters"],
+    ["secondsToDate", "@/converters"],
 ]
 # Functions to convert between f64 and TimeIntervalSecFlt, as a Date
 intoCustom = "secondsToDate({})"

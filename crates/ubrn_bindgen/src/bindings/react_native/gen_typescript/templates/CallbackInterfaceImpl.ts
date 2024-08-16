@@ -27,7 +27,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 const jsCallback = {{ ffi_converter_name }}.lift(uniffiHandle);
                 return {% call ts::await(meth) %}jsCallback.{{ meth.name()|fn_name }}(
                     {%- for arg in meth.arguments() %}
-                    {{ arg|ffi_converter_name }}.lift({{ arg.name()|var_name }}){% if !loop.last %}, {% endif %}
+                    {{ arg|ffi_converter_name(self) }}.lift({{ arg.name()|var_name }}){% if !loop.last %}, {% endif %}
                     {%- endfor %}
                 )
             }
@@ -35,7 +35,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
 
             {% match meth.return_type() %}
             {%- when Some(t) %}
-            const uniffiWriteReturn = (obj: any) => { uniffiOutReturn.pointee = {{ t|lower_fn }}(obj) };
+            const uniffiWriteReturn = (obj: any) => { uniffiOutReturn.pointee = {{ t|ffi_converter_name(self) }}.lower(obj) };
             {%- when None %}
             const uniffiWriteReturn = (obj: any) => {};
             {%- endmatch %}
@@ -55,8 +55,8 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*callStatus:*/ uniffiCallStatus,
                 /*makeCall:*/ uniffiMakeCall,
                 /*writeReturn:*/ uniffiWriteReturn,
-                /*isErrorType:*/ {{ error_type|decl_type_name(ci) }}.instanceOf,
-                /*lowerError:*/ {{ error_type|lower_fn }},
+                /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
+                /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
                 /*lowerString:*/ FfiConverterString.lower
             )
             {%- endmatch %}
@@ -68,7 +68,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                     /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{
                         {%- match meth.return_type() %}
                         {%- when Some(return_type) %}
-                        returnValue: {{ return_type|ffi_converter_name }}.lower(returnValue),
+                        returnValue: {{ return_type|ffi_converter_name(self) }}.lower(returnValue),
                         {%- when None %}
                         {%- endmatch %}
                         callStatus: uniffiCreateCallStatus()
@@ -104,8 +104,8 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*isErrorType:*/ {{ error_type|decl_type_name(ci) }}.instanceOf,
-                /*lowerError:*/ {{ error_type|lower_fn }},
+                /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
+                /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
                 /*lowerString:*/ FfiConverterString.lower
             )
             {%- endmatch %}

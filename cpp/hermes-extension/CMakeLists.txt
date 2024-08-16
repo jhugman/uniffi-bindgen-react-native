@@ -46,5 +46,4 @@ link_directories("${HERMES_BUILD_DIR}/API/hermes")
 link_directories("${HERMES_BUILD_DIR}/jsi")
 link_libraries(jsi)
 
-add_definitions(-DUNIFFI_ENABLE_TEST_HOOKS)
 add_library(${HERMES_EXTENSION_NAME} SHARED ${HERMES_EXTENSION_CPP})
