@@ -262,6 +262,10 @@ impl AndroidArgs {
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
         self.config.clone().try_into()
     }
+
+    pub(crate) fn config(&self) -> Utf8PathBuf {
+        self.config.clone()
+    }
 }
 
 #[derive(Debug, Deserialize, Default, Clone, Hash, PartialEq, Eq)]

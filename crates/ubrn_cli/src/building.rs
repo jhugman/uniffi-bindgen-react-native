@@ -8,10 +8,9 @@ use anyhow::{anyhow, Result};
 use camino::Utf8PathBuf;
 use clap::{Args, Subcommand};
 use serde::Deserialize;
-use ubrn_bindgen::{BindingsArgs, OutputArgs, SourceArgs};
 use ubrn_common::CrateMetadata;
 
-use crate::{android::AndroidArgs, config::ProjectConfig, ios::IOsArgs};
+use crate::{android::AndroidArgs, generate::GenerateAllArgs, ios::IOsArgs};
 
 #[derive(Args, Debug)]
 pub(crate) struct BuildArgs {
@@ -30,7 +29,7 @@ pub(crate) enum BuildCmd {
 impl BuildArgs {
     pub(crate) fn build(&self) -> Result<()> {
         let lib_file = self.cmd.build()?;
-        if self.and_generate() {
+        if self.cmd.and_generate() {
             self.generate(lib_file)?;
         }
 
@@ -38,36 +37,7 @@ impl BuildArgs {
     }
 
     fn generate(&self, lib_file: Utf8PathBuf) -> Result<()> {
-        let project = self.cmd.project_config()?;
-        let root = project.project_root();
-        let pwd = ubrn_common::pwd()?;
-        let modules = {
-            let dir = project.crate_.directory()?;
-            ubrn_common::cd(&dir)?;
-            let ts_dir = project.bindings.ts_path(root);
-            let cpp_dir = project.bindings.cpp_path(root);
-            let config = project.bindings.uniffi_toml_path(root);
-            if let Some(ref file) = config {
-                if !file.exists() {
-                    anyhow::bail!("uniffi.toml file {:?} does not exist. Either delete the uniffiToml property or supply a file", file)
-                }
-            }
-            let bindings = BindingsArgs::new(
-                SourceArgs::library(&lib_file).with_config(config),
-                OutputArgs::new(&ts_dir, &cpp_dir, false),
-            );
-
-            bindings.run()?
-        };
-        ubrn_common::cd(&pwd)?;
-
-        let rust_crate = project.crate_.metadata()?;
-        crate::codegen::render_files(project, rust_crate, modules)?;
-        Ok(())
-    }
-
-    fn and_generate(&self) -> bool {
-        self.cmd.and_generate()
+        GenerateAllArgs::new(lib_file, self.cmd.config()).run()
     }
 }
 
@@ -84,10 +54,10 @@ impl BuildCmd {
             .ok_or_else(|| anyhow!("No targets were specified"))
     }
 
-    pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
+    fn config(&self) -> Utf8PathBuf {
         match self {
-            Self::Android(a) => a.project_config(),
-            Self::Ios(a) => a.project_config(),
+            Self::Android(a) => a.config(),
+            Self::Ios(a) => a.config(),
         }
     }
 
