@@ -97,6 +97,20 @@ fn get_animal(a: Option<Animal>) -> Animal {
     a.unwrap_or(Animal::Dog)
 }
 
+#[derive(uniffi::Enum)]
+pub(crate) enum CollidingVariants {
+    AnimalRecord(AnimalRecord),
+    AnimalObjectInterface(Arc<AnimalObject>),
+    AnimalObject(Arc<AnimalObject>),
+    Animal(Animal),
+    CollidingVariants,
+}
+
+#[uniffi::export]
+fn identity_colliding_variants(value: CollidingVariants) -> CollidingVariants {
+    value
+}
+
 uniffi::include_scaffolding!("enum_types");
 
 #[cfg(test)]
