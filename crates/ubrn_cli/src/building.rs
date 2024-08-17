@@ -109,6 +109,14 @@ pub(crate) struct CommonBuildArgs {
     #[clap(long, short, default_value = "false")]
     pub(crate) release: bool,
 
+    /// If the Rust library has been built for at least one target, then
+    /// don't re-run cargo build.
+    ///
+    /// This may be useful if you are using a pre-built library or are
+    /// managing the build process yourself.
+    #[clap(long)]
+    pub(crate) no_cargo: bool,
+
     /// Optionally generate the bindings and turbo-module code for the crate
     #[clap(long = "and-generate", short = 'g')]
     pub(crate) and_generate: bool,

@@ -28,12 +28,12 @@ impl CrateMetadata {
         }
     }
 
-    pub fn library_path(&self, target: Option<&str>, profile: &str) -> Result<Utf8PathBuf> {
+    pub fn library_path(&self, target: Option<&str>, profile: &str) -> Utf8PathBuf {
         let library_name = self.library_file(target);
-        Ok(match target {
+        match target {
             Some(t) => self.target_dir.join(t).join(profile).join(library_name),
             None => self.target_dir.join(profile).join(library_name),
-        })
+        }
     }
 
     pub fn library_path_exists(&self, path: &Utf8Path) -> Result<()> {

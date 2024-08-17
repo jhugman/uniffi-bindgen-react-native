@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use serde::Deserialize;
-use std::{fmt::Display, fs, process::Command, str::FromStr};
+use std::{collections::HashMap, fmt::Display, fs, process::Command, str::FromStr};
 
 use clap::Args;
 
@@ -15,6 +15,7 @@ use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
     config::ProjectConfig,
+    rust::CrateConfig,
     workspace,
 };
 
@@ -122,53 +123,111 @@ impl AndroidArgs {
         let config: ProjectConfig = self.project_config()?;
         let project_root = config.project_root();
         let crate_ = &config.crate_;
-        let rust_dir = crate_.directory()?;
-        let manifest_path = crate_.manifest_path()?;
 
         let android = &config.android;
 
+        let cargo_extras = &android.cargo_extras;
+        let api_level = android.api_level;
+        let target_files = if self.common_args.no_cargo {
+            let files = self.find_existing(&crate_.metadata()?, &android.targets);
+            if !files.is_empty() {
+                files
+            } else {
+                self.cargo_build_all(crate_, &android.targets, cargo_extras, api_level)?
+            }
+        } else {
+            self.cargo_build_all(crate_, &android.targets, cargo_extras, api_level)?
+        };
+
+        let metadata = crate_.metadata()?;
         let jni_libs = android.jni_libs(project_root);
         rm_dir(&jni_libs)?;
-
-        let mut target_files: Vec<_> = Vec::new();
-        for target in &android.targets {
-            let target = target.parse::<Target>()?;
-            let mut cmd = Command::new("cargo");
-            cmd.arg("ndk")
-                .arg("--manifest-path")
-                .arg(&manifest_path)
-                .arg("--target")
-                .arg(target.to_string())
-                .arg("--platform")
-                .arg(format!("{}", android.api_level));
-
-            if !self.common_args.release {
-                cmd.arg("--no-strip");
-            }
-
-            cmd.arg("--").arg("build");
-            if self.common_args.release {
-                cmd.arg("--release");
-            }
-
-            cmd.args(android.cargo_extras.clone());
-
-            run_cmd(cmd.current_dir(&rust_dir))?;
-            let metadata = crate_.metadata()?;
-            let src_lib = metadata.library_path(
-                Some(target.triple()),
-                CrateMetadata::profile(self.common_args.release),
-            )?;
+        for (target, library) in &target_files {
             let dst_dir = jni_libs.join(target.to_string());
             mk_dir(&dst_dir)?;
 
             let dst_lib = dst_dir.join(metadata.library_file(Some(target.triple())));
-            fs::copy(&src_lib, &dst_lib)?;
-
-            target_files.push(src_lib);
+            fs::copy(library, &dst_lib)?;
         }
 
+        Ok(target_files.into_values().collect())
+    }
+
+    fn cargo_build_all(
+        &self,
+        crate_: &CrateConfig,
+        targets: &[String],
+        cargo_extras: &ExtraArgs,
+        api_level: usize,
+    ) -> Result<HashMap<Target, Utf8PathBuf>> {
+        let rust_dir = crate_.directory()?;
+        let manifest_path = crate_.manifest_path()?;
+        let metadata = crate_.metadata()?;
+        let mut target_files = HashMap::new();
+        let profile = self.common_args.profile();
+        for target in targets {
+            let target =
+                self.cargo_build(target, &manifest_path, cargo_extras, api_level, &rust_dir)?;
+            let library = metadata.library_path(Some(target.triple()), profile);
+            metadata.library_path_exists(&library)?;
+            target_files.insert(target, library);
+        }
         Ok(target_files)
+    }
+
+    fn cargo_build(
+        &self,
+        target: &str,
+        manifest_path: &Utf8PathBuf,
+        cargo_extras: &ExtraArgs,
+        api_level: usize,
+        rust_dir: &Utf8PathBuf,
+    ) -> Result<Target> {
+        let target = target.parse::<Target>()?;
+        let mut cmd = Command::new("cargo");
+        cmd.arg("ndk")
+            .arg("--manifest-path")
+            .arg(manifest_path)
+            .arg("--target")
+            .arg(target.to_string())
+            .arg("--platform")
+            .arg(format!("{}", api_level));
+        if !self.common_args.release {
+            cmd.arg("--no-strip");
+        }
+        cmd.arg("--").arg("build");
+        if self.common_args.release {
+            cmd.arg("--release");
+        }
+        cmd.args(cargo_extras.clone());
+        run_cmd(cmd.current_dir(rust_dir))?;
+        Ok(target)
+    }
+
+    fn find_existing(
+        &self,
+        metadata: &CrateMetadata,
+        targets: &[String],
+    ) -> HashMap<Target, Utf8PathBuf> {
+        let profile = self.common_args.profile();
+        targets
+            .iter()
+            .filter_map(|target| {
+                let target = target.parse::<Target>();
+                match target {
+                    Ok(target) => Some(target),
+                    Err(_) => None,
+                }
+            })
+            .filter_map(|target| {
+                let library = metadata.library_path(Some(target.triple()), profile);
+                if library.exists() {
+                    Some((target, library))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
@@ -176,7 +235,7 @@ impl AndroidArgs {
     }
 }
 
-#[derive(Debug, Deserialize, Default, Clone)]
+#[derive(Debug, Deserialize, Default, Clone, Hash, PartialEq, Eq)]
 pub enum Target {
     #[serde(rename = "armeabi-v7a")]
     ArmeabiV7a,

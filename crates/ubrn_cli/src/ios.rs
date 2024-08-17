@@ -11,11 +11,12 @@ use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use heck::ToUpperCamelCase;
 use serde::Deserialize;
-use ubrn_common::{rm_dir, run_cmd};
+use ubrn_common::{rm_dir, run_cmd, CrateMetadata};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
     config::ProjectConfig,
+    rust::CrateConfig,
     workspace,
 };
 
@@ -112,48 +113,81 @@ impl IOsArgs {
     pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
         let config = self.project_config()?;
         let crate_ = &config.crate_;
-        let metadata = crate_.metadata()?;
-        let rust_dir = crate_.directory()?;
-        let profile = self.common_args.profile();
-        let manifest_path = crate_.manifest_path()?;
-
         let ios = &config.ios;
 
-        let mut target_files = Vec::new();
-        let targets = ios.targets.iter().filter(|target| {
-            let is_sim = target.contains("sim");
-            if self.no_sim {
-                !is_sim
-            } else if self.sim_only {
-                is_sim
+        let targets = ios
+            .targets
+            .iter()
+            .filter(|target| {
+                let is_sim = target.contains("sim");
+                if self.no_sim {
+                    !is_sim
+                } else if self.sim_only {
+                    is_sim
+                } else {
+                    true
+                }
+            })
+            .map(String::clone)
+            .collect::<Vec<_>>();
+
+        let target_files = if self.common_args.no_cargo {
+            let files = self.find_existing(&crate_.metadata()?, &targets);
+            if !files.is_empty() {
+                files
             } else {
-                true
+                self.cargo_build_all(crate_, &targets, &ios.cargo_extras)?
             }
-        });
-        for target in targets {
-            let mut cmd = Command::new("cargo");
-            cmd.arg("build")
-                .arg("--manifest-path")
-                .arg(&manifest_path)
-                .arg("--target")
-                .arg(target);
-            if self.common_args.release {
-                cmd.arg("--release");
-            }
-
-            cmd.args(ios.cargo_extras.clone());
-            run_cmd(cmd.current_dir(&rust_dir))?;
-
-            // Now we need to get the path to the lib.a file, to feed to xcodebuild.
-            let library = metadata.library_path(Some(target), profile)?;
-            metadata.library_path_exists(&library)?;
-            target_files.push(library);
-        }
+        } else {
+            self.cargo_build_all(crate_, &targets, &ios.cargo_extras)?
+        };
 
         if !self.no_xcodebuild {
             self.create_xcframework(&config, &target_files)?;
         }
         Ok(target_files)
+    }
+
+    fn cargo_build_all(
+        &self,
+        crate_: &CrateConfig,
+        targets: &[String],
+        cargo_extras: &ExtraArgs,
+    ) -> Result<Vec<Utf8PathBuf>> {
+        let mut target_files = Vec::new();
+        let metadata = crate_.metadata()?;
+        let rust_dir = crate_.directory()?;
+        let manifest_path = crate_.manifest_path()?;
+        for target in targets {
+            self.cargo_build(&manifest_path, target, cargo_extras, &rust_dir)?;
+
+            // Now we need to get the path to the lib.a file, to feed to xcodebuild.
+            let library = metadata.library_path(Some(target), self.common_args.profile());
+            metadata.library_path_exists(&library)?;
+            target_files.push(library);
+        }
+        Ok(target_files)
+    }
+
+    fn cargo_build(
+        &self,
+        manifest_path: &Utf8PathBuf,
+        target: &String,
+        cargo_extras: &ExtraArgs,
+        rust_dir: &Utf8PathBuf,
+    ) -> Result<()> {
+        let mut cmd = Command::new("cargo");
+        cmd.arg("build")
+            .arg("--manifest-path")
+            .arg(manifest_path)
+            .arg("--target")
+            .arg(target);
+        if self.common_args.release {
+            cmd.arg("--release");
+        }
+        cmd.args(cargo_extras.clone());
+        run_cmd(cmd.current_dir(rust_dir))?;
+        Ok(())
     }
 
     fn create_xcframework(
@@ -182,6 +216,21 @@ impl IOsArgs {
             .args(ios.xcodebuild_extras.clone());
         run_cmd(cmd.current_dir(ios_dir))?;
         Ok(())
+    }
+
+    fn find_existing(&self, metadata: &CrateMetadata, targets: &[String]) -> Vec<Utf8PathBuf> {
+        let profile = self.common_args.profile();
+        targets
+            .iter()
+            .filter_map(|target| {
+                let library = metadata.library_path(Some(target), profile);
+                if library.exists() {
+                    Some(library)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
     }
 
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {

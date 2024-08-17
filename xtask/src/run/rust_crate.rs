@@ -32,7 +32,7 @@ impl CrateArg {
     pub(crate) fn cargo_build(&self, clean: bool) -> Result<CrateMetadata> {
         let metadata = CrateMetadata::try_from(self.crate_dir.clone().expect("crate has no path"))?;
         let profile = CrateMetadata::profile(self.release);
-        let lib_path = metadata.library_path(None, profile)?;
+        let lib_path = metadata.library_path(None, profile);
         if lib_path.exists() && clean {
             metadata.cargo_clean()?;
         }
