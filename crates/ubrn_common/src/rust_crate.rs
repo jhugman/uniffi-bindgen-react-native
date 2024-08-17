@@ -36,6 +36,13 @@ impl CrateMetadata {
         })
     }
 
+    pub fn library_path_exists(&self, path: &Utf8Path) -> Result<()> {
+        if !path.exists() {
+            anyhow::bail!("Library doesn't exist. This may be because `staticlib` is not in the `crate-type` list in the [lib] entry of Cargo.toml: {}", self.manifest_path());
+        }
+        Ok(())
+    }
+
     pub fn library_file(&self, target: Option<&str>) -> String {
         let ext = so_extension(target);
         format!("lib{}.{ext}", &self.library_name)

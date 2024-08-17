@@ -97,6 +97,13 @@ pub(crate) struct IOsArgs {
     #[clap(long, conflicts_with_all = ["sim_only"], default_value = "false")]
     no_sim: bool,
 
+    /// Does not perform the xcodebuild step to generate the xcframework
+    ///
+    /// The xcframework will need to be generated externally from this tool.
+    /// This is useful when adding extra bindings (e.g. Swift) to the project.
+    #[clap(long, alias = "no-xcframework")]
+    no_xcodebuild: bool,
+
     #[clap(flatten)]
     pub(crate) common_args: CommonBuildArgs,
 }
@@ -104,7 +111,6 @@ pub(crate) struct IOsArgs {
 impl IOsArgs {
     pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
         let config = self.project_config()?;
-        let project_root = config.project_root();
         let crate_ = &config.crate_;
         let metadata = crate_.metadata()?;
         let rust_dir = crate_.directory()?;
@@ -112,18 +118,19 @@ impl IOsArgs {
         let manifest_path = crate_.manifest_path()?;
 
         let ios = &config.ios;
-        let ios_dir = ios.directory(project_root);
 
-        let mut library_args = Vec::new();
         let mut target_files = Vec::new();
-        for target in &ios.targets {
-            if self.no_sim && target.contains("sim") {
-                continue;
+        let targets = ios.targets.iter().filter(|target| {
+            let is_sim = target.contains("sim");
+            if self.no_sim {
+                !is_sim
+            } else if self.sim_only {
+                is_sim
+            } else {
+                true
             }
-            if self.sim_only && !target.contains("sim") {
-                continue;
-            }
-
+        });
+        for target in targets {
             let mut cmd = Command::new("cargo");
             cmd.arg("build")
                 .arg("--manifest-path")
@@ -137,33 +144,44 @@ impl IOsArgs {
             cmd.args(ios.cargo_extras.clone());
             run_cmd(cmd.current_dir(&rust_dir))?;
 
-            // Now we need to get the path to the lib.a file,
-            // to feed to xcodebuild.
+            // Now we need to get the path to the lib.a file, to feed to xcodebuild.
             let library = metadata.library_path(Some(target), profile)?;
-            if !library.exists() {
-                anyhow::bail!("Calculated library doesn't exist. This may be because `staticlib` is not in the `crate_type` list in the [[lib]] entry of Cargo.toml.");
-            }
-            // :eyes: single dash arg.
-            library_args.push("-library".to_string());
-            library_args.push(library.to_string());
+            metadata.library_path_exists(&library)?;
             target_files.push(library);
         }
 
+        if !self.no_xcodebuild {
+            self.create_xcframework(&config, &target_files)?;
+        }
+        Ok(target_files)
+    }
+
+    fn create_xcframework(
+        &self,
+        config: &ProjectConfig,
+        target_files: &Vec<Utf8PathBuf>,
+    ) -> Result<(), anyhow::Error> {
+        let ios = &config.ios;
+        let project_root = config.project_root();
+        let ios_dir = ios.directory(project_root);
+        let mut library_args = Vec::new();
+        for library in target_files {
+            // :eyes: single dash arg.
+            library_args.push("-library".to_string());
+            library_args.push(library.to_string());
+        }
         let framework_path = ios.framework_path(project_root);
         if framework_path.exists() {
             rm_dir(&framework_path)?;
         }
         let mut cmd = Command::new("xcodebuild");
-        // :eyes: single dash arg.
         cmd.arg("-create-xcframework")
             .args(library_args)
             .arg("-output")
             .arg(&framework_path)
             .args(ios.xcodebuild_extras.clone());
-
         run_cmd(cmd.current_dir(ios_dir))?;
-
-        Ok(target_files)
+        Ok(())
     }
 
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
