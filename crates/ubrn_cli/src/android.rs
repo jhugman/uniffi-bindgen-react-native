@@ -116,38 +116,47 @@ pub(crate) struct AndroidArgs {
 
     #[clap(flatten)]
     pub(crate) common_args: CommonBuildArgs,
+
+    /// Suppress the copying of the Rust library into the JNI library directories.
+    #[clap(long = "no-jniLibs")]
+    no_jni_libs: bool,
 }
 
 impl AndroidArgs {
     pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
         let config: ProjectConfig = self.project_config()?;
-        let project_root = config.project_root();
+
         let crate_ = &config.crate_;
 
         let android = &config.android;
-
-        let cargo_extras = &android.cargo_extras;
-        let api_level = android.api_level;
         let target_files = if self.common_args.no_cargo {
             let files = self.find_existing(&crate_.metadata()?, &android.targets);
             if !files.is_empty() {
                 files
             } else {
-                self.cargo_build_all(crate_, &android.targets, cargo_extras, api_level)?
+                self.cargo_build_all(
+                    crate_,
+                    &android.targets,
+                    &android.cargo_extras,
+                    android.api_level,
+                )?
             }
         } else {
-            self.cargo_build_all(crate_, &android.targets, cargo_extras, api_level)?
+            self.cargo_build_all(
+                crate_,
+                &android.targets,
+                &android.cargo_extras,
+                android.api_level,
+            )?
         };
 
-        let metadata = crate_.metadata()?;
-        let jni_libs = android.jni_libs(project_root);
-        rm_dir(&jni_libs)?;
-        for (target, library) in &target_files {
-            let dst_dir = jni_libs.join(target.to_string());
-            mk_dir(&dst_dir)?;
-
-            let dst_lib = dst_dir.join(metadata.library_file(Some(target.triple())));
-            fs::copy(library, &dst_lib)?;
+        if !self.no_jni_libs {
+            let project_root = config.project_root();
+            self.copy_into_jni_libs(
+                &crate_.metadata()?,
+                &android.jni_libs(project_root),
+                &target_files,
+            )?;
         }
 
         Ok(target_files.into_values().collect())
@@ -228,6 +237,26 @@ impl AndroidArgs {
                 }
             })
             .collect()
+    }
+
+    fn copy_into_jni_libs(
+        &self,
+        metadata: &CrateMetadata,
+        jni_libs: &Utf8Path,
+        target_files: &HashMap<Target, Utf8PathBuf>,
+    ) -> Result<()> {
+        println!("-- Copying into jniLibs directory");
+        println!("rm -Rf {jni_libs}");
+        rm_dir(jni_libs)?;
+        for (target, library) in target_files {
+            let dst_dir = jni_libs.join(target.to_string());
+            mk_dir(&dst_dir)?;
+
+            let dst_lib = dst_dir.join(metadata.library_file(Some(target.triple())));
+            println!("cp {library} {dst_lib}");
+            fs::copy(library, &dst_lib)?;
+        }
+        Ok(())
     }
 
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
