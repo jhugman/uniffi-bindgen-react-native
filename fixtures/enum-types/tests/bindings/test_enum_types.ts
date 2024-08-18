@@ -13,11 +13,15 @@ import {
   AnimalNamedAssociatedType_Tags,
   AnimalNoReprInt,
   AnimalObject,
+  AnimalRecord,
   AnimalSignedInt,
   AnimalUInt,
   getAnimal,
   identityEnumWithAssociatedType,
   identityEnumWithNamedAssociatedType,
+  CollidingVariants,
+  CollidingVariants_Tags,
+  identityCollidingVariants,
 } from "../../generated/enum_types";
 
 test("Enum disriminant", (t) => {
@@ -98,5 +102,74 @@ test("Roundtripping enums with name values", (t) => {
   for (const v of values) {
     t.assertTrue(AnimalNamedAssociatedType.instanceOf(v as any));
     assertEqual(v, identityEnumWithNamedAssociatedType(v));
+  }
+});
+
+test("Variant naming cam collide with existing types", (t) => {
+  {
+    const record = AnimalRecord.create({ value: 5 });
+    const variant1 = CollidingVariants.AnimalRecord.new(record);
+    const variant2 = new CollidingVariants.AnimalRecord(record);
+
+    t.assertEqual(variant1.tag, CollidingVariants_Tags.AnimalRecord);
+    t.assertEqual(variant2.tag, CollidingVariants_Tags.AnimalRecord);
+    t.assertEqual(variant1, variant2);
+    t.assertEqual(identityCollidingVariants(variant1), variant2);
+
+    t.assertTrue(CollidingVariants.instanceOf(variant1));
+    t.assertTrue(CollidingVariants.AnimalRecord.instanceOf(variant1));
+  }
+  {
+    const obj = new AnimalObject(1);
+    const variant1 = CollidingVariants.AnimalObject.new(obj);
+    const variant2 = new CollidingVariants.AnimalObject(obj);
+
+    t.assertEqual(variant1.tag, CollidingVariants_Tags.AnimalObject);
+    t.assertEqual(variant2.tag, CollidingVariants_Tags.AnimalObject);
+    t.assertEqual(variant1, variant2);
+    t.assertEqual(identityCollidingVariants(variant1), variant2);
+
+    t.assertTrue(CollidingVariants.instanceOf(variant1));
+    t.assertTrue(CollidingVariants.AnimalObject.instanceOf(variant1));
+  }
+
+  {
+    const obj = new AnimalObject(1);
+    const variant1 = CollidingVariants.AnimalObjectInterface.new(obj);
+    const variant2 = new CollidingVariants.AnimalObjectInterface(obj);
+
+    t.assertEqual(variant1.tag, CollidingVariants_Tags.AnimalObjectInterface);
+    t.assertEqual(variant2.tag, CollidingVariants_Tags.AnimalObjectInterface);
+    t.assertEqual(variant1, variant2);
+    t.assertEqual(identityCollidingVariants(variant1), variant2);
+
+    t.assertTrue(CollidingVariants.instanceOf(variant1));
+    t.assertTrue(CollidingVariants.AnimalObjectInterface.instanceOf(variant1));
+  }
+  {
+    const animal = Animal.Dog;
+    const variant1 = CollidingVariants.Animal.new(animal);
+    const variant2 = new CollidingVariants.Animal(animal);
+
+    t.assertEqual(variant1.tag, CollidingVariants_Tags.Animal);
+    t.assertEqual(variant2.tag, CollidingVariants_Tags.Animal);
+    t.assertEqual(variant1, variant2);
+    t.assertEqual(identityCollidingVariants(variant1), variant2);
+
+    t.assertTrue(CollidingVariants.instanceOf(variant1));
+    t.assertTrue(CollidingVariants.Animal.instanceOf(variant1));
+  }
+
+  {
+    const variant1 = CollidingVariants.CollidingVariants.new();
+    const variant2 = new CollidingVariants.CollidingVariants();
+
+    t.assertEqual(variant1.tag, CollidingVariants_Tags.CollidingVariants);
+    t.assertEqual(variant2.tag, CollidingVariants_Tags.CollidingVariants);
+    t.assertEqual(variant1, variant2);
+    t.assertEqual(identityCollidingVariants(variant1), variant2);
+
+    t.assertTrue(CollidingVariants.instanceOf(variant1));
+    t.assertTrue(CollidingVariants.CollidingVariants.instanceOf(variant1));
   }
 });

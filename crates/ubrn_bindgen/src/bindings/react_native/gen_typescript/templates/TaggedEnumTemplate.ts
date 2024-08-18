@@ -11,10 +11,23 @@ export enum {{ kind_type_name }} {
 {%- call ts::docstring(e, 0) %}
 export const {{ decl_type_name }} = (() => {
   {%- for variant in e.variants() %}
-    {%- let variant_name = variant.name()|class_name(ci) %}
+    {#
+    // We have an external name and an internal name so that variants of the enum can
+    // have names the same as other types. Since we're building Tagged Enums from
+    // scratch in Typescript, we should make effort to make enums match what is possible
+    // or common in Rust.
+    // Internally to this IIFE, we use a generated name which is impossible to express
+    // in a different type name in Rust (we append a `_`, which would be sifted out by
+    // UpperCamelCasing of type names into Typescript). This lets use the class without
+    // colliding with the outside world. e.g.  `new Variant_(record: Variant)`.
+    // Externally, just as we return, we name it with the Variant name, so now
+    // client code can use `new MyEnum.Variant(record: Variant)`.
+    #}
+    {%- let external_name = variant.name()|class_name(ci) %}
+    {%- let variant_name = external_name|fmt("{}_") %}
     {%- let variant_data = variant_name|fmt("{}_data") %}
     {%- let variant_interface = variant_name|fmt("{}_interface") %}
-    {%- let variant_tag = format!("{kind_type_name}.{variant_name}") %}
+    {%- let variant_tag = format!("{kind_type_name}.{external_name}") %}
     {%- let has_fields = !variant.fields().is_empty() %}
     {%- let is_tuple = variant.has_nameless_fields() %}
     {%- if has_fields %}
@@ -40,7 +53,7 @@ export const {{ decl_type_name }} = (() => {
         readonly inner: Readonly<{{ variant_data }}>;
         {%-   if !is_tuple %}
         constructor(inner: { {% call ts::field_list_decl(variant, false) %} }) {
-            super("{{ type_name }}", "{{ variant_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
             this.inner = Object.freeze(inner);
         }
 
@@ -49,7 +62,7 @@ export const {{ decl_type_name }} = (() => {
         }
         {%-   else %}
         constructor({%- call ts::field_list_decl(variant, true) -%}) {
-            super("{{ type_name }}", "{{ variant_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
             this.inner = Object.freeze([{%- call ts::field_list(variant, true) -%}]);
         }
 
@@ -59,7 +72,7 @@ export const {{ decl_type_name }} = (() => {
         {%-   endif %}
         {%- else %}
         constructor() {
-            super("{{ type_name }}", "{{ variant_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
         }
 
         static new(): {{ variant_name }} {
@@ -92,19 +105,21 @@ export const {{ decl_type_name }} = (() => {
 
     function instanceOf(obj: any): obj is {# space #}
   {%- for variant in e.variants() %}
-  {{-  variant.name()|class_name(ci) }}
+  {{-  variant.name()|class_name(ci)|fmt("{}_") }}
   {%-  if !loop.last %}| {% endif -%}
   {%- endfor %} {
         return obj.__uniffiTypeName === "{{ type_name }}";
     }
 
-    return {
+    return Object.freeze({
         instanceOf,
   {%- for variant in e.variants() %}
-  {{    variant.name()|class_name(ci) }}
+  {%-   let external_name = variant.name()|class_name(ci) %}
+  {%-   let variant_name = external_name|fmt("{}_") %}
+  {{    external_name }}: {{ variant_name }}
   {%-   if !loop.last %}, {% endif -%}
   {%- endfor %}
-    };
+    });
 
 })();
 
