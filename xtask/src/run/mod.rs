@@ -74,7 +74,7 @@ impl RunCmd {
                 Ok(Some(so_file))
             }
             (Some(crate_), None, Some(bindings)) => {
-                let crate_lib = crate_.library_path(None, release)?;
+                let crate_lib = crate_.library_path(None, release);
                 let target_dir = crate_.target_dir();
                 let lib_name = crate_.library_name();
                 let cpp_files = bindings.generate(&crate_lib)?;
