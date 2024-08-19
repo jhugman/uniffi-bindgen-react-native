@@ -5,8 +5,20 @@
  */
 export class UniffiEnum {
   constructor(
-    private readonly __uniffiTypeName: string,
-    private readonly __variantName: string,
-    private readonly __variant: number,
+    /*
+     * This member should be private, but typescript requires
+     * it be public because it cannot enforce it.
+     */
+    public readonly __uniffiTypeName: string,
+    /*
+     * This member should be private, but typescript requires
+     * it be public because it cannot enforce it.
+     */
+    public readonly __variantName: string,
+    /*
+     * This member should be private, but typescript requires
+     * it be public because it cannot enforce it.
+     */
+    public readonly __variant: number
   ) {}
 }

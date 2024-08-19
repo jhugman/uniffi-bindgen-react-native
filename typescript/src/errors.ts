@@ -11,10 +11,22 @@
 // for each error.
 export class UniffiError extends Error {
   constructor(
-    private readonly __uniffiTypeName: string,
-    private readonly __variantName: string,
-    private readonly __variant: number,
-    message?: string,
+    /*
+     * This member should be private, but typescript requires
+     * it be public because it cannot enforce it.
+     */
+    public readonly __uniffiTypeName: string,
+    /*
+     * This member should be private, but typescript requires
+     * it be public because it cannot enforce it.
+     */
+    public readonly __variantName: string,
+    /*
+     * This member should be private, but typescript requires
+     * it be public because it cannot enforce it.
+     */
+    public readonly __variant: number,
+    message?: string
   ) {
     // We append the error type and variant to the message because we cannot override `toString()`—
     // in errors.test.ts, we see that the overridden `toString()` method is not called.
@@ -26,7 +38,7 @@ export class UniffiError extends Error {
     return UniffiError.createMessage(
       this.__uniffiTypeName,
       this.__variantName,
-      this.message,
+      this.message
     );
   }
 
@@ -37,7 +49,7 @@ export class UniffiError extends Error {
   private static createMessage(
     typeName: string,
     variantName: string,
-    message: string | undefined,
+    message: string | undefined
   ): string {
     const prefix = `${typeName}.${variantName}`;
     if (message) {
@@ -54,7 +66,7 @@ export class UniffiThrownObject<T> extends Error {
   constructor(
     private readonly __uniffiTypeName: string,
     public readonly inner: T,
-    message?: string,
+    message?: string
   ) {
     // We append the error type and variant to the message because we cannot override `toString()`—
     // in errors.test.ts, we see that the overridden `toString()` method is not called.
@@ -66,7 +78,7 @@ export class UniffiThrownObject<T> extends Error {
     return UniffiThrownObject.createMessage(
       this.__uniffiTypeName,
       this.inner,
-      this.message,
+      this.message
     );
   }
 
@@ -81,7 +93,7 @@ export class UniffiThrownObject<T> extends Error {
   private static createMessage<T>(
     typeName: string,
     obj: any,
-    message: string | undefined,
+    message: string | undefined
   ): string {
     return [typeName, stringRepresentation(obj), message]
       .filter((s) => !!s)
@@ -108,7 +120,7 @@ export const UniffiInternalError = (() => {
   class BufferOverflow extends Error {
     constructor() {
       super(
-        "Reading the requested value would read past the end of the buffer",
+        "Reading the requested value would read past the end of the buffer"
       );
     }
   }
@@ -145,14 +157,14 @@ export const UniffiInternalError = (() => {
   class ContractVersionMismatch extends Error {
     constructor(rustVersion: any, bindingsVersion: any) {
       super(
-        `Incompatible versions of uniffi were used to build the JS ($${bindingsVersion}) from the Rust (${rustVersion})`,
+        `Incompatible versions of uniffi were used to build the JS ($${bindingsVersion}) from the Rust (${rustVersion})`
       );
     }
   }
   class ApiChecksumMismatch extends Error {
     constructor(func: string) {
       super(
-        `FFI function ${func} has a checksum mismatch; this may signify previously undetected incompatible Uniffi versions`,
+        `FFI function ${func} has a checksum mismatch; this may signify previously undetected incompatible Uniffi versions`
       );
     }
   }
