@@ -22,6 +22,7 @@ import {
   CollidingVariants,
   CollidingVariants_Tags,
   identityCollidingVariants,
+  AnimalObjectInterface,
 } from "../../generated/enum_types";
 
 test("Enum disriminant", (t) => {
@@ -173,3 +174,74 @@ test("Variant naming cam collide with existing types", (t) => {
     t.assertTrue(CollidingVariants.CollidingVariants.instanceOf(variant1));
   }
 });
+
+// This tests the generated Typescript and serves as an example of how to
+// to use enums with values.
+//
+// In each of the variants, we switch match on the `variant.tag`. Typescript then
+// infers the type of `variant.inner`.
+//
+// In this particular example, each of the variants has a tuple value, of length 1.
+// If the types aren't inferred correctly, then Typescript would error at compile time.
+function testPatternMatching(variant: CollidingVariants) {
+  switch (variant.tag) {
+    case CollidingVariants_Tags.AnimalRecord: {
+      const record: AnimalRecord = variant.inner[0];
+      break;
+    }
+    case CollidingVariants_Tags.AnimalObject: {
+      const object: AnimalObjectInterface = variant.inner[0];
+      break;
+    }
+    case CollidingVariants_Tags.AnimalObjectInterface: {
+      const object: AnimalObjectInterface = variant.inner[0];
+      break;
+    }
+    case CollidingVariants_Tags.Animal: {
+      const animal: Animal = variant.inner[0];
+      break;
+    }
+  }
+}
+
+// This tests the generated Typescript and serves as an example of how to
+// to use enums with values.
+//
+// In each of the variants, we switch match on the `variant.tag`. Typescript then
+// infers the type of `variant.inner`.
+//
+// In this particular example, Cat has no associated variables. Dog an associated tuple
+// of length 1, and of type `AnimalObjectInterface`.
+function testPatternMatching3(variant: AnimalAssociatedType) {
+  switch (variant.tag) {
+    case AnimalAssociatedType_Tags.Cat: {
+      // const none: undefined = variant.inner;
+      break;
+    }
+    case AnimalAssociatedType_Tags.Dog: {
+      const dog: AnimalObjectInterface = variant.inner[0];
+      break;
+    }
+  }
+}
+
+// This tests the generated Typescript and serves as an example of how to
+// to use enums with values.
+//
+// In each of the variants, we switch match on the `variant.tag`. Typescript then
+// infers the type of `variant.inner`.
+//
+// In this particular example, Cat has no associated variables. Dog has an object
+// with one named value, of type `AnimalObjectInterface`.
+function testPatternMatching2(variant: AnimalNamedAssociatedType) {
+  switch (variant.tag) {
+    case AnimalNamedAssociatedType_Tags.Cat: {
+      // const cat: AnimalObjectInterface = variant.inner.value;
+      break;
+    }
+    case AnimalNamedAssociatedType_Tags.Dog: {
+      const dog: AnimalObjectInterface = variant.inner.value;
+      break;
+    }
+  }
+}
