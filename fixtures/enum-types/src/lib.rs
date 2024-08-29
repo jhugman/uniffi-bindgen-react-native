@@ -103,6 +103,7 @@ pub(crate) enum CollidingVariants {
     AnimalObjectInterface(Arc<AnimalObject>),
     AnimalObject(Arc<AnimalObject>),
     Animal(Animal),
+    #[allow(clippy::enum_variant_names)]
     CollidingVariants,
 }
 
