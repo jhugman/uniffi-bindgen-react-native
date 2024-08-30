@@ -323,7 +323,7 @@ export class FfiConverterMap<K, V> extends AbstractFfiConverterArrayBuffer<
 
 export const FfiConverterArrayBuffer = (() => {
   const lengthConverter = FfiConverterInt32;
-  class FFIConverter extends FfiConverterPrimitive<ArrayBuffer> {
+  class FFIConverter extends AbstractFfiConverterArrayBuffer<ArrayBuffer> {
     read(from: RustBuffer): ArrayBuffer {
       const length = lengthConverter.read(from);
       return from.readBytes(length);
