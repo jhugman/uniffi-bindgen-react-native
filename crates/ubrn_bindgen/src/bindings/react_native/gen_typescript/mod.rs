@@ -204,11 +204,11 @@ impl<'a> TypeRenderer<'a> {
                 let type_ = self.as_type(external);
                 let name = type_name(&type_, self).expect("External types should have type names");
                 match &type_ {
+                    Type::Enum { .. } => self.import_ext(&name, &namespace),
                     Type::CallbackInterface { .. }
-                    | Type::Object { .. }
                     | Type::Custom { .. }
-                    | Type::Enum { .. } => self.import_ext(&name, &namespace),
-                    Type::Record { .. } => self.import_ext_type(&name, &namespace),
+                    | Type::Object { .. }
+                    | Type::Record { .. } => self.import_ext_type(&name, &namespace),
                     _ => unreachable!(),
                 };
                 let ffi_converter_name = ffi_converter_name(&type_, self)
