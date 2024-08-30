@@ -12,10 +12,11 @@ export const MyEnum = (() => {
     inner: Readonly<{ myValue: string }>;
   };
   class Variant1_ extends UniffiEnum implements Variant1__interface {
+    private readonly __uniffiTypeName = typeName;
     readonly tag = "Variant1";
     readonly inner: Readonly<{ myValue: string }>;
     constructor(inner: { myValue: string }) {
-      super(typeName, "Varian1", 0);
+      super(typeName, "Variant1");
       this.inner = Object.freeze(inner);
     }
     static instanceOf(obj: any): obj is Variant1_ {
@@ -28,10 +29,11 @@ export const MyEnum = (() => {
     inner: Readonly<[number, string]>;
   };
   class Variant2_ extends UniffiEnum implements Variant2__interface {
+    private readonly __uniffiTypeName = typeName;
     readonly tag = "Variant2";
     readonly inner: Readonly<[number, string]>;
     constructor(p1: number, p2: string) {
-      super(typeName, "Variant2", 1);
+      super(typeName, "Variant2");
       this.inner = Object.freeze([p1, p2]);
     }
     static instanceOf(obj: any): obj is Variant2_ {

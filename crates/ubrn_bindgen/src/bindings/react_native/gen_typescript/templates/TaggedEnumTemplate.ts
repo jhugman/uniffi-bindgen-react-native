@@ -56,12 +56,13 @@ export const {{ decl_type_name }} = (() => {
 
     {% call ts::docstring(variant, 4) %}
     class {{ variant_name }} extends {{ superclass }} implements {{ variant_interface }} {
+        private readonly __uniffiTypeName = "{{ type_name }}";
         readonly tag = {{ variant_tag }};
         {%- if has_fields %}
         readonly inner: {% call variant_data_type(variant) %};
         {%-   if !is_tuple %}
         constructor(inner: { {% call ts::field_list_decl(variant, false) %} }) {
-            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}");
             this.inner = Object.freeze(inner);
         }
 
@@ -70,7 +71,7 @@ export const {{ decl_type_name }} = (() => {
         }
         {%-   else %}
         constructor({%- call ts::field_list_decl(variant, true) -%}) {
-            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}");
             this.inner = Object.freeze([{%- call ts::field_list(variant, true) -%}]);
         }
 
@@ -80,7 +81,7 @@ export const {{ decl_type_name }} = (() => {
         {%-   endif %}
         {%- else %}
         constructor() {
-            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}");
         }
 
         static new(): {{ variant_name }} {
