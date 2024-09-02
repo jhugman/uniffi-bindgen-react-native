@@ -100,7 +100,19 @@
 
 {%- macro call_body(obj_factory, callable) %}
 {%- if callable.is_async() %}
+    {%- if config.is_debug() %}
+    const _stack = new Error().stack;
+    try {
+    {%- endif %}
     return {# space #}{%- call call_async(obj_factory, callable) %};
+    {%- if config.is_debug() %}
+    } catch (_error: any) {
+        if (_error instanceof Error) {
+            _error.stack = _stack;
+        }
+        throw _error;
+    }
+    {%- endif %}
 {%- else %}
 {%-     match callable.return_type() -%}
 {%-         when Some with (return_type) %}

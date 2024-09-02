@@ -115,7 +115,9 @@ const UNIFFI_RUST_FUTURE_RESOLVER_MAP = new UniffiHandleMap<
 
 // pollRust makes a new promise, stores the resolver in the resolver map,
 // then calls the pollFunc with the handle.
-function pollRust(pollFunc: (handle: UniffiHandle) => void): Promise<number> {
+async function pollRust(
+  pollFunc: (handle: UniffiHandle) => void,
+): Promise<number> {
   return new Promise<number>((resolve) => {
     const handle = UNIFFI_RUST_FUTURE_RESOLVER_MAP.insert(resolve);
     pollFunc(handle);

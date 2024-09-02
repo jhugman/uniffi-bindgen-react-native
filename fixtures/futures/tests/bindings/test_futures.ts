@@ -599,4 +599,26 @@ function checkRemainingFutures(t: Asserts) {
       t.end();
     },
   );
+
+  await asyncTest("Test error stack traces", async (t) => {
+    t.assertEqual(42, await fallibleMe(false));
+    await t.assertThrowsAsync(
+      (err) => {
+        if (!MyError.Foo.instanceOf(err)) {
+          return false;
+        }
+        if (!(err instanceof Error)) {
+          return false;
+        }
+        t.assertNotNull(err.stack);
+        t.assertTrue(
+          err.stack!.indexOf("fallibleMe") >= 0,
+          `STACK does not contain fallibleMe: ${err.stack!}`,
+        );
+        return true;
+      },
+      async () => await fallibleMe(true),
+    );
+    t.end();
+  });
 })();
