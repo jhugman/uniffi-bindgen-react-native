@@ -10,11 +10,6 @@
 namespace {{ self.config.project.cpp_namespace() }} {
 	using namespace facebook;
 
-	// TODO Remove `multiply` after seeing this work on iOS and Android.
-	double multiply(double a, double b) {
-		return a * b;
-	}
-
 	uint8_t installRustCrate(jsi::Runtime &runtime, std::shared_ptr<react::CallInvoker> callInvoker) {
         {%- for m in self.config.modules %}
 		{{ m.cpp_module() }}::registerModule(runtime, callInvoker);
@@ -22,7 +17,7 @@ namespace {{ self.config.project.cpp_namespace() }} {
 		return false;
 	}
 
-	uint8_t cleanupRustCrate(jsi::Runtime &runtime, uint8_t b) {
+	uint8_t cleanupRustCrate(jsi::Runtime &runtime) {
 		return false;
 	}
 }

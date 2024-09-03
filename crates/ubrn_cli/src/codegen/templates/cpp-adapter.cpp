@@ -12,13 +12,6 @@
 namespace jsi = facebook::jsi;
 namespace react = facebook::react;
 
-// TODO Remove `multiply` after seeing this work on iOS and Android.
-extern "C"
-JNIEXPORT jdouble JNICALL
-{{ prefix }}_nativeMultiply(JNIEnv *env, jclass type, jdouble a, jdouble b) {
-    return {{ ns }}::multiply(a, b);
-}
-
 // Installer coming from {{ module_class_name }}
 extern "C"
 JNIEXPORT jboolean JNICALL
@@ -61,7 +54,7 @@ JNIEXPORT jboolean JNICALL
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-{{ prefix }}_nativeCleanupRustCrate(JNIEnv *env, jclass type, jlong rtPtr, jboolean a) {
+{{ prefix }}_nativeCleanupRustCrate(JNIEnv *env, jclass type, jlong rtPtr) {
     auto runtime = reinterpret_cast<jsi::Runtime *>(rtPtr);
-    return {{ ns }}::cleanupRustCrate(*runtime, a);
+    return {{ ns }}::cleanupRustCrate(*runtime);
 }
