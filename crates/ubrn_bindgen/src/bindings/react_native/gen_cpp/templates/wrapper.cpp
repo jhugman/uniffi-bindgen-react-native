@@ -63,7 +63,7 @@ extern "C" {
 {{ module_name }}::{{ module_name }}(
     jsi::Runtime &rt,
     std::shared_ptr<uniffi_runtime::UniffiCallInvoker> invoker
-) : props(), callInvoker(invoker) {
+) : callInvoker(invoker), props() {
     // Map from Javascript names to the cpp names
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
     {%- let name = func.name() %}
