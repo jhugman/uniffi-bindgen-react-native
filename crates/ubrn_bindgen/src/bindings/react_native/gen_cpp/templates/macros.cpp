@@ -119,7 +119,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 // It should match the value rendered by the callback_fn_namespace macro.
 #}
 {%- macro callback_fn_free_impl(callback) %}
-{%- for st in self.ci.iter_ffi_structs() %}
+{%- for st in self.ci.iter_ffi_structs_for_free() %}
 {%- let ns = st.cpp_namespace_free(ci) %}
 {%- include "CallbackFunction.cpp" %}
 {%- endfor %}
@@ -139,7 +139,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 // It should match the value rendered by the callback_fn_namespace macro.
 #}
 {%- macro callback_fn_free_cleanup(callback) %}
-{%- for st in self.ci.iter_ffi_structs() %}
+{%- for st in self.ci.iter_ffi_structs_for_free() %}
 {%- let ns = st.cpp_namespace_free(ci) %}
 {{- ns }}::cleanup();
 {%- endfor %}

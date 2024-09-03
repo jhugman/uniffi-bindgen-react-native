@@ -145,7 +145,8 @@ namespace {{ ns }} {
     }
 
     static {{ name }}
-    makeCallbackFunction(jsi::Runtime &rt,
+    makeCallbackFunction( // {{ ns }}
+                    jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
                      const jsi::Value &value) {
         auto callbackFunction = value.asObject(rt).asFunction(rt);

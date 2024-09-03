@@ -41,8 +41,7 @@ extern "C" {
 {%-       if callback.is_rust_calling_js() %}
 {%-         if callback.is_free_callback() %}
     // Implementation of free callback function {{ callback.name() }}
-{%-           call cpp::callback_fn_impl(callback) %}
-{%-           call cpp::callback_fn_free_impl(callback) %}
+{%            call cpp::callback_fn_free_impl(callback) %}
 {%-         else %}
     // Implementation of callback function calling from Rust to JS {{ callback.name() }}
 {%-           call cpp::callback_fn_impl(callback) %}
@@ -117,7 +116,6 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 {%-       if callback.is_rust_calling_js() %}
 {%-         if callback.is_free_callback() %}
     // Cleanup for "free" callback function {{ callback.name() }}
-{%            call cpp::callback_fn_cleanup(callback) %}
 {%            call cpp::callback_fn_free_cleanup(callback) %}
 {%-         else %}
     // Cleanup for callback function {{ callback.name() }}
