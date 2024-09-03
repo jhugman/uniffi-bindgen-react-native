@@ -39,6 +39,14 @@ add_library(
     cpp-adapter.cpp
 )
 
+# Set C++ compiler flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -frtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstack-protector-all")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+
 {%- let dir = self.config.project.android.jni_libs(root) %}
 {%- let jni_libs_dir = self.relative_to(root, dir) %}
 
