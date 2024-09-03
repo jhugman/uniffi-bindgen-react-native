@@ -25,7 +25,7 @@ template <> struct Bridging<RustBuffer> {
       // Once it leaves this function, the buffer is immediately passed back
       // into Rust, where it's used to deserialize into the Rust versions of the
       // arguments. At that point, the copy is destroyed.
-      return std::move(buf);
+      return buf;
     } catch (const std::logic_error &e) {
       throw jsi::JSError(rt, e.what());
     }
