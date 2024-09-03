@@ -51,16 +51,14 @@ template <> struct Bridging<void *> {
 /// unlikely to get better.
 class DestructibleObject : public jsi::HostObject {
 private:
-  jsi::Runtime &rt;
   std::mutex destructorMutex;
   bool isDestroyed = false;
   uint64_t pointer;
   std::function<void(uint64_t)> destructor;
 
 public:
-  DestructibleObject(jsi::Runtime &rt, uint64_t pointer,
-                     std::function<void(uint64_t)> destructor)
-      : jsi::HostObject(), rt(rt), pointer(pointer), destructor(destructor) {}
+  DestructibleObject(uint64_t pointer, std::function<void(uint64_t)> destructor)
+      : jsi::HostObject(), pointer(pointer), destructor(destructor) {}
 
   ~DestructibleObject() {
     /// You can use uniffiDestroy() from JS instead of relying on GC.
