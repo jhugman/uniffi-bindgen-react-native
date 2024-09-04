@@ -9,8 +9,10 @@ export const {{ decl_type_name }} = (() => {
     {%-   call ts::docstring(variant, 4) %}
     {%-   let variant_name = variant.name()|class_name(ci) %}
     class {{ variant_name }} extends UniffiError {
+        private readonly __uniffiTypeName = "{{ type_name }}";
+        private readonly __variant = {{ loop.index }};
         constructor(message: string) {
-            super("{{ type_name }}", "{{ variant_name }}", {{ loop.index }}, message);
+            super("{{ type_name }}", "{{ variant_name }}", message);
         }
 
         static {{ instance_of }}(e: any): e is {{ variant_name }} {

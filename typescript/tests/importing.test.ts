@@ -11,7 +11,7 @@ import {
   MyObject,
   type MyObjectInterface,
   type MyRecord,
-} from "./exported";
+} from "./playground/exported";
 
 import { test } from "../testing/asserts";
 

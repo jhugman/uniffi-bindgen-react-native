@@ -4,9 +4,5 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 export class UniffiEnum {
-  constructor(
-    private readonly __uniffiTypeName: string,
-    private readonly __variantName: string,
-    private readonly __variant: number,
-  ) {}
+  protected constructor(...args: any) {}
 }

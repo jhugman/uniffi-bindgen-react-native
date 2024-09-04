@@ -10,28 +10,14 @@
 // in tests and in the generated callback code, and more locally the FfiConverters
 // for each error.
 export class UniffiError extends Error {
-  constructor(
-    private readonly __uniffiTypeName: string,
-    private readonly __variantName: string,
-    private readonly __variant: number,
-    message?: string,
-  ) {
+  constructor(enumTypeName: string, variantName: string, message?: string) {
     // We append the error type and variant to the message because we cannot override `toString()`—
     // in errors.test.ts, we see that the overridden `toString()` method is not called.
-    super(UniffiError.createMessage(__uniffiTypeName, __variantName, message));
+    super(UniffiError.createMessage(enumTypeName, variantName, message));
   }
 
-  // Current implementations of hermes errors do not repect instance methods or calculated properties.
-  toString(): string {
-    return UniffiError.createMessage(
-      this.__uniffiTypeName,
-      this.__variantName,
-      this.message,
-    );
-  }
-
-  static instanceOf(err: any): err is UniffiError {
-    return err instanceof Error && (err as any).__uniffiTypeName !== undefined;
+  static instanceOf(obj: any): obj is UniffiError {
+    return obj.__uniffiTypeName !== undefined && obj instanceof Error;
   }
 
   private static createMessage(
@@ -52,22 +38,13 @@ export class UniffiThrownObject<T> extends Error {
   private static __baseTypeName = "UniffiThrownObject";
   private readonly __baseTypeName: string = UniffiThrownObject.__baseTypeName;
   constructor(
-    private readonly __uniffiTypeName: string,
+    typeName: string,
     public readonly inner: T,
     message?: string,
   ) {
     // We append the error type and variant to the message because we cannot override `toString()`—
     // in errors.test.ts, we see that the overridden `toString()` method is not called.
-    super(UniffiThrownObject.createMessage(__uniffiTypeName, inner, message));
-  }
-
-  // Current implementations of hermes errors do not repect instance methods or calculated properties.
-  toString(): string {
-    return UniffiThrownObject.createMessage(
-      this.__uniffiTypeName,
-      this.inner,
-      this.message,
-    );
+    super(UniffiThrownObject.createMessage(typeName, inner, message));
   }
 
   static instanceOf(err: any): err is UniffiThrownObject<unknown> {

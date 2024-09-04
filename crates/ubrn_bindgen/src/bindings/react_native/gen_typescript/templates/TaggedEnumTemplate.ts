@@ -1,12 +1,29 @@
 
 // Enum: {{ type_name }}
-{%- let kind_type_name = format!("{type_name}_Tags") %}
-export enum {{ kind_type_name }} {
+{%- let type_name__Tags = format!("{type_name}_Tags") %}
+export enum {{ type_name__Tags }} {
     {%- for variant in e.variants() %}
     {{ variant|variant_name }} = "{{ variant.name() }}"
     {%- if !loop.last %},{% endif -%}
     {% endfor %}
 }
+
+{%- macro variant_data_type(variant) %}Readonly<
+{%-   let fields = variant.fields() %}
+{%-   if !is_tuple %}{
+{%-     for field in fields %}
+{{-       field.name()|var_name }}: {{ field|type_name(self) }}
+{%-       if !loop.last %}; {% endif -%}
+{%-     endfor %}}
+{%-   else %}
+[
+{%-     for field in fields %}
+{{-       field|type_name(self) }}
+{%-       if !loop.last %}, {% endif -%}
+{%-     endfor %}
+]
+{%-   endif %}>
+{%- endmacro %}
 
 {%- call ts::docstring(e, 0) %}
 export const {{ decl_type_name }} = (() => {
@@ -25,35 +42,27 @@ export const {{ decl_type_name }} = (() => {
     #}
     {%- let external_name = variant.name()|class_name(ci) %}
     {%- let variant_name = external_name|fmt("{}_") %}
-    {%- let variant_data = variant_name|fmt("{}_data") %}
     {%- let variant_interface = variant_name|fmt("{}_interface") %}
-    {%- let variant_tag = format!("{kind_type_name}.{external_name}") %}
+    {%- let variant_tag = format!("{type_name__Tags}.{external_name}") %}
     {%- let has_fields = !variant.fields().is_empty() %}
     {%- let is_tuple = variant.has_nameless_fields() %}
-    {%- if has_fields %}
-    type {{ variant_data }} = {# space #}
-    {%-   if !is_tuple %}{
-    {%-     for field in variant.fields() %}
-    {{-       field.name()|var_name }}: {{ field|type_name(self) }}
-    {%-       if !loop.last %}; {% endif -%}
-    {%-     endfor %}}
-    {%-   else %}[
-    {%-     for field in variant.fields() %}
-    {{-       field|type_name(self) }}
-    {%-       if !loop.last %}, {% endif -%}
-    {%-     endfor %}]
-    {%-   endif %};
-    {%- endif %}
-    type {{ variant_interface }} = { tag: {{ variant_tag }} {%- if has_fields %}; inner: Readonly<{{ variant_data }}> {%- endif %}};
+
+    type {{ variant_interface }} = {
+        tag: {{ variant_tag }}
+        {%- if has_fields %};
+        inner: {% call variant_data_type(variant) %}
+        {%- endif %}
+    };
 
     {% call ts::docstring(variant, 4) %}
     class {{ variant_name }} extends {{ superclass }} implements {{ variant_interface }} {
+        private readonly __uniffiTypeName = "{{ type_name }}";
         readonly tag = {{ variant_tag }};
         {%- if has_fields %}
-        readonly inner: Readonly<{{ variant_data }}>;
+        readonly inner: {% call variant_data_type(variant) %};
         {%-   if !is_tuple %}
         constructor(inner: { {% call ts::field_list_decl(variant, false) %} }) {
-            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}");
             this.inner = Object.freeze(inner);
         }
 
@@ -62,7 +71,7 @@ export const {{ decl_type_name }} = (() => {
         }
         {%-   else %}
         constructor({%- call ts::field_list_decl(variant, true) -%}) {
-            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}");
             this.inner = Object.freeze([{%- call ts::field_list(variant, true) -%}]);
         }
 
@@ -72,7 +81,7 @@ export const {{ decl_type_name }} = (() => {
         {%-   endif %}
         {%- else %}
         constructor() {
-            super("{{ type_name }}", "{{ external_name }}", {{ loop.index }});
+            super("{{ type_name }}", "{{ external_name }}");
         }
 
         static new(): {{ variant_name }} {
@@ -90,7 +99,7 @@ export const {{ decl_type_name }} = (() => {
             return {{ variant_name }}.instanceOf(obj);
         }
 
-        static getInner(obj: {{ variant_name }}): Readonly<{{ variant_data }}> {
+        static getInner(obj: {{ variant_name }}): {% call variant_data_type(variant) %} {
             return obj.inner;
         }
         {%- else %}
@@ -103,11 +112,7 @@ export const {{ decl_type_name }} = (() => {
     }
   {%- endfor %}
 
-    function instanceOf(obj: any): obj is {# space #}
-  {%- for variant in e.variants() %}
-  {{-  variant.name()|class_name(ci)|fmt("{}_") }}
-  {%-  if !loop.last %}| {% endif -%}
-  {%- endfor %} {
+    function instanceOf(obj: any): obj is {{ type_name }} {
         return obj.__uniffiTypeName === "{{ type_name }}";
     }
 
@@ -135,9 +140,11 @@ const {{ ffi_converter_name }} = (() => {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
             {%- for variant in e.variants() %}
+            {%-   let has_fields = !variant.fields().is_empty() %}
+            {%-   let is_tuple = variant.has_nameless_fields() %}
                 case {{ loop.index }}: return new {{ type_name }}.{{ variant|variant_name }}(
-            {%-   if !variant.fields().is_empty() %}
-            {%-     if !variant.has_nameless_fields() %}{
+            {%-   if has_fields %}
+            {%-     if !is_tuple %}{
             {%-     for field in variant.fields() %}
             {{-       field.name()|var_name }}: {{ field|ffi_converter_name(self) }}.read(from)
             {%-       if !loop.last -%}, {% endif %}
@@ -156,9 +163,11 @@ const {{ ffi_converter_name }} = (() => {
         write(value: TypeName, into: RustBuffer): void {
             switch (value.tag) {
                 {%- for variant in e.variants() %}
-                case {{ kind_type_name }}.{{ variant|variant_name }}: {
+                {%-   let has_fields = !variant.fields().is_empty() %}
+                {%-   let is_tuple = variant.has_nameless_fields() %}
+                case {{ type_name__Tags }}.{{ variant|variant_name }}: {
                     ordinalConverter.write({{ loop.index }}, into);
-                    {%- if !variant.fields().is_empty() %}
+                    {%- if has_fields %}
                     const inner = value.inner;
                     {%-   for field in variant.fields() %}
                     {{ field|ffi_converter_name(self) }}.write({% call ts::field_name("inner", field, loop.index0) %}, into);
@@ -168,24 +177,26 @@ const {{ ffi_converter_name }} = (() => {
                 }
                 {%- endfor %}
                 default:
-                    // Throwing from here means that {{ kind_type_name }} hasn't matched an ordinal.
+                    // Throwing from here means that {{ type_name__Tags }} hasn't matched an ordinal.
                     throw new UniffiInternalError.UnexpectedEnumCase();
             }
         }
         allocationSize(value: TypeName): number {
             switch (value.tag) {
                 {%- for variant in e.variants() %}
-                case {{ kind_type_name }}.{{ variant|variant_name }}: {
-                    {%- if !variant.fields().is_empty() %}
+                {%-   let has_fields = !variant.fields().is_empty() %}
+                {%-   let is_tuple = variant.has_nameless_fields() %}
+                case {{ type_name__Tags }}.{{ variant|variant_name }}: {
+                {%-   if has_fields %}
                     const inner = value.inner;
                     let size = ordinalConverter.allocationSize({{ loop.index }});
-                    {%- for field in variant.fields() %}
+                {%-     for field in variant.fields() %}
                     size += {{ field|ffi_converter_name(self) }}.allocationSize({% call ts::field_name("inner", field, loop.index0) %});
-                    {%- endfor %}
+                {%-     endfor %}
                     return size;
-                    {%- else %}
+                {%-   else %}
                     return ordinalConverter.allocationSize({{ loop.index }});
-                    {%- endif %}
+                {%-   endif %}
                 }
                 {%- endfor %}
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
