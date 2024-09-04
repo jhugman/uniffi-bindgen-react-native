@@ -311,7 +311,9 @@ impl ComponentInterface {
 
         let mut sorted: Vec<Type> = Vec::new();
         while !graph.peek_all().is_empty() {
-            sorted.extend(graph.pop_all().iter().filter_map(|name| types.remove(name)));
+            let mut next = graph.pop_all();
+            next.sort();
+            sorted.extend(next.iter().filter_map(|name| types.remove(name)));
         }
 
         if !graph.is_empty() {
