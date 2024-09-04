@@ -169,11 +169,11 @@ export const FfiConverterDuration = (() => {
       if (ms === Number.POSITIVE_INFINITY || ms === Number.NEGATIVE_INFINITY) {
         throw new UniffiInternalError.NumberOverflow();
       }
-      return ms + nanos / 1000;
+      return ms + nanos / nanosPerMs;
     }
     write(value: UniffiDuration, into: RustBuffer): void {
       const ms = value.valueOf();
-      const secsBigInt = BigInt(ms) / msPerSecBigInt;
+      const secsBigInt = BigInt(Math.trunc(ms)) / msPerSecBigInt;
       const remainingNanos = (ms % 1000) * nanosPerMs;
       secondsConverter.write(secsBigInt, into);
       nanosConverter.write(remainingNanos, into);
@@ -196,24 +196,30 @@ export const FfiConverterTimestamp = (() => {
   const nanosConverter = FfiConverterUInt32;
   const msPerSecBigInt = BigInt("1000");
   const nanosPerMs = 1e6;
+  const msPerSec = 1e3;
+  const maxMsFromEpoch = 8.64e15;
+  function safeDate(ms: number) {
+    if (Math.abs(ms) > 8.64e15) {
+      throw new UniffiInternalError.DateTimeOverflow();
+    }
+    return new Date(ms);
+  }
+
   class FFIConverter extends AbstractFfiConverterArrayBuffer<UniffiTimestamp> {
     read(from: RustBuffer): UniffiTimestamp {
       const secsBigInt = secondsConverter.read(from);
       const nanos = nanosConverter.read(from);
       const ms = Number(secsBigInt * msPerSecBigInt);
-      if (ms === Number.POSITIVE_INFINITY || ms === Number.NEGATIVE_INFINITY) {
-        throw new UniffiInternalError.NumberOverflow();
-      }
       if (ms >= 0) {
-        return new Date(ms + nanos / 1000);
+        return safeDate(ms + nanos / nanosPerMs);
       } else {
-        return new Date(ms - nanos / 1000);
+        return safeDate(ms - nanos / nanosPerMs);
       }
     }
     write(value: UniffiTimestamp, into: RustBuffer): void {
       const ms = value.valueOf();
-      const secsBigInt = BigInt(ms) / msPerSecBigInt;
-      const remainingNanos = (ms % 1000) * nanosPerMs;
+      const secsBigInt = BigInt(Math.trunc(ms / msPerSec));
+      const remainingNanos = Math.abs((ms % msPerSec) * nanosPerMs);
       secondsConverter.write(secsBigInt, into);
       nanosConverter.write(remainingNanos, into);
     }

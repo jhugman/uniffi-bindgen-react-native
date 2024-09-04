@@ -105,6 +105,11 @@ export const UniffiInternalError = (() => {
       super("Cannot convert a large BigInt into a number");
     }
   }
+  class DateTimeOverflow extends Error {
+    constructor() {
+      super("Date overflowed passed maximum number of ms passed the epoch");
+    }
+  }
   class BufferOverflow extends Error {
     constructor() {
       super(
@@ -169,6 +174,7 @@ export const UniffiInternalError = (() => {
   return {
     ApiChecksumMismatch,
     NumberOverflow,
+    DateTimeOverflow,
     BufferOverflow,
     ContractVersionMismatch,
     IncompleteData,
