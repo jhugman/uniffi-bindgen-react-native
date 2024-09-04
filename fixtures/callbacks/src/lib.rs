@@ -105,6 +105,9 @@ impl Default for RustGetters {
 #[allow(clippy::wrong_self_convention)]
 trait StoredForeignStringifier: Send + Sync + std::fmt::Debug {
     fn from_simple_type(&self, value: i32) -> String;
+    // We are not expecting to run this, but we would like to see the resulting
+    // bindings compile.
+    #[allow(dead_code)]
     fn from_complex_type(&self, values: Option<Vec<Option<f64>>>) -> String;
 }
 
