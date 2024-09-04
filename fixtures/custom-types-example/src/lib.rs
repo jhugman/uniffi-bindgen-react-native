@@ -130,7 +130,7 @@ pub fn identity_enum_wrapper(v: EnumWrapper) -> EnumWrapper {
 }
 
 #[uniffi::export]
-pub fn unwap_enum_wrapper(v: EnumWrapper) -> MyEnum {
+pub fn unwrap_enum_wrapper(v: EnumWrapper) -> MyEnum {
     v.0
 }
 
