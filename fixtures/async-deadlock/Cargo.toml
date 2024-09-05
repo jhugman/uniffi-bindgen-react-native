@@ -1,0 +1,28 @@
+[package]
+name = "regression-async-deadlock"
+edition = "2021"
+version = "0.0.1"
+authors = ["Filament Team <team@filament.im>"]
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+name = "regression_async_deadlock"
+
+[patch.crates-io]
+async-compat = { git = "https://github.com/jplatte/async-compat", rev = "16dc8597ec09a6102d58d4e7b67714a35dd0ecb8" }
+const_panic = { git = "https://github.com/jplatte/const_panic", rev = "9024a4cb3eac45c1d2d980f17aaee287b17be498" }
+
+[dependencies]
+uniffi = { workspace = true }
+matrix-sdk-ffi = { workspace = true }
+matrix-sdk = { workspace = true }
+thiserror = "1.0"
+
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+uniffi = { workspace = true, features = ["bindgen-tests"] }

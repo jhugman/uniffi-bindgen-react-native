@@ -20,3 +20,9 @@ serde = { version = "1", features = ["derive"] }
 uniffi = "=0.28.0"
 uniffi_bindgen = "=0.28.0"
 uniffi_meta = "=0.28.0"
+matrix-sdk-ffi = { rev = "8fbf1101c232bcd69583eaaa4605542653213822", git = "https://github.com/vimeiro-co/matrix-rust-sdk-mirror" }
+matrix-sdk = { rev = "8fbf1101c232bcd69583eaaa4605542653213822", git = "https://github.com/vimeiro-co/matrix-rust-sdk-mirror" }
+
+[patch.crates-io]
+# async-compat = { git = "https://github.com/jplatte/async-compat", rev = "16dc8597ec09a6102d58d4e7b67714a35dd0ecb8" }
+# const_panic = { git = "https://github.com/jplatte/const_panic", rev = "9024a4cb3eac45c1d2d980f17aaee287b17be498" }
