@@ -11,7 +11,7 @@
         RustCallStatus status = {0};
         {{ free.name() }}(pointer, &status);
     };
-    auto ptrObj = std::make_shared<{{ ci.cpp_namespace_includes() }}::DestructibleObject>(rt, pointer, destructor);
+    auto ptrObj = std::make_shared<{{ ci.cpp_namespace_includes() }}::DestructibleObject>(pointer, destructor);
     auto obj = jsi::Object::createFromHostObject(rt, ptrObj);
     return jsi::Value(rt, obj);
 }

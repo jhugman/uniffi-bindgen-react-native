@@ -9,7 +9,7 @@ import {
   Handle,
   identityEnumWrapper,
   MyEnum_Tags,
-  unwapEnumWrapper,
+  unwrapEnumWrapper,
 } from "../../generated/custom_types";
 import { URL } from "@/hermes";
 import { secondsToDate } from "@/converters";
@@ -60,7 +60,7 @@ test("Rust EnumWrapper structs --> via MyEnum --> string", (t) => {
   const strings = ["A", "dAtA", "Alice", "Bob", "Charlie"];
   for (const s of strings) {
     t.assertEqual(s, identityEnumWrapper(s));
-    const enumValue = unwapEnumWrapper(s);
+    const enumValue = unwrapEnumWrapper(s);
     switch (enumValue.tag) {
       case MyEnum_Tags.A: {
         const value = enumValue.inner[0];

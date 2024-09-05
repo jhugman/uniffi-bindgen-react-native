@@ -41,8 +41,7 @@ extern "C" {
 {%-       if callback.is_rust_calling_js() %}
 {%-         if callback.is_free_callback() %}
     // Implementation of free callback function {{ callback.name() }}
-{%-           call cpp::callback_fn_impl(callback) %}
-{%-           call cpp::callback_fn_free_impl(callback) %}
+{%            call cpp::callback_fn_free_impl(callback) %}
 {%-         else %}
     // Implementation of callback function calling from Rust to JS {{ callback.name() }}
 {%-           call cpp::callback_fn_impl(callback) %}
@@ -63,7 +62,7 @@ extern "C" {
 {{ module_name }}::{{ module_name }}(
     jsi::Runtime &rt,
     std::shared_ptr<uniffi_runtime::UniffiCallInvoker> invoker
-) : props(), callInvoker(invoker) {
+) : callInvoker(invoker), props() {
     // Map from Javascript names to the cpp names
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
     {%- let name = func.name() %}
@@ -93,7 +92,7 @@ jsi::Value {{ module_name }}::get(jsi::Runtime& rt, const jsi::PropNameID& name)
     try {
         return jsi::Value(rt, props.at(name.utf8(rt)));
     }
-    catch (std::out_of_range e) {
+    catch (std::out_of_range &e) {
         return jsi::Value::undefined();
     }
 }
@@ -117,7 +116,6 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 {%-       if callback.is_rust_calling_js() %}
 {%-         if callback.is_free_callback() %}
     // Cleanup for "free" callback function {{ callback.name() }}
-{%            call cpp::callback_fn_cleanup(callback) %}
 {%            call cpp::callback_fn_free_cleanup(callback) %}
 {%-         else %}
     // Cleanup for callback function {{ callback.name() }}

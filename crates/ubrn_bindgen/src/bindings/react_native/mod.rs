@@ -237,6 +237,11 @@ impl ComponentInterface {
         })
     }
 
+    fn iter_ffi_structs_for_free(&self) -> impl Iterator<Item = FfiStruct> {
+        self.iter_ffi_structs()
+            .filter(|s| !s.is_future() || s.name() == "ForeignFuture")
+    }
+
     fn iter_ffi_definitions_exported_by_ts(&self) -> impl Iterator<Item = FfiDefinition> {
         self.ffi_definitions().filter(|d| d.is_exported())
     }
@@ -522,7 +527,11 @@ impl FfiStruct {
     }
 
     fn is_exported(&self) -> bool {
-        self.is_vtable() || self.name() == "ForeignFuture"
+        self.is_vtable() || self.is_future()
+    }
+
+    fn is_future(&self) -> bool {
+        self.name().starts_with("ForeignFuture")
     }
 
     fn is_vtable(&self) -> bool {

@@ -11,7 +11,7 @@
 #include "registerNatives.h"
 
 {%- for m in modules %}
-#include "{{ m.hpp_filename() }}";
+#include "{{ m.hpp_filename() }}"
 {%- endfor %}
 
 extern "C" void registerNatives(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker) {
