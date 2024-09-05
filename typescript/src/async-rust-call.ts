@@ -92,7 +92,7 @@ export async function uniffiRustCallAsync<F, T>(
       pollResult = await pollRust((handle) => {
         pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
       });
-    } while (pollResult != UNIFFI_RUST_FUTURE_POLL_READY);
+    } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
 
     // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
@@ -128,6 +128,13 @@ const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   pollResult: number,
 ) => {
   const resolve = UNIFFI_RUST_FUTURE_RESOLVER_MAP.remove(handle);
+  // From https://github.com/mozilla/uniffi-rs/pull/1837/files#diff-8a28c9cf1245b4f714d406ea4044d68e1000099928eaca1afb504ccbc008fe9fR35-R37
+  //
+  // > WARNING: the call to [rust_future_poll] must be scheduled to happen soon after the callback is
+  // > called, but not inside the callback itself.  If [rust_future_poll] is called inside the
+  // > callback, some futures will deadlock and our scheduler code might as well.
+  //
+  // We avoid this by using UniffiCallInvoker::invokeNonBlocking for this callback.
   resolve(pollResult);
 };
 
