@@ -5,9 +5,10 @@
  */
 #pragma once
 #include <ReactCommon/CallInvoker.h>
-#include <future>
+#include <condition_variable>
 #include <jsi/jsi.h>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 namespace uniffi_runtime {
@@ -57,23 +58,26 @@ public:
     if (std::this_thread::get_id() == threadId_) {
       func(rt);
     } else {
-      std::promise<void> promise;
-      auto future = promise.get_future();
+      std::mutex mtx;
+      std::condition_variable cv;
+      bool done = false;
       // The runtime argument was added to CallFunc in
       // https://github.com/facebook/react-native/pull/43375
       //
-      // Once that is released, there will be a deprecation period.
-      //
-      // Any time during the deprecation period, we can switch `&rt`
-      // from being a captured variable to being an argument, i.e.
-      // commenting out one line, and uncommenting the other.
-      std::function<void()> wrapper = [&func, &promise, &rt]() {
-        // react::CallFunc wrapper = [&func, &promise](jsi::Runtime &rt) {
+      // This can be changed once that change is released.
+      // react::CallFunc wrapper = [&func, &mtx, &cv, &done](jsi::Runtime &rt) {
+      std::function<void()> wrapper = [&func, &rt, &mtx, &cv, &done]() {
         func(rt);
-        promise.set_value();
+        {
+          std::lock_guard<std::mutex> lock(mtx);
+          done = true;
+        }
+        cv.notify_one();
       };
       callInvoker_->invokeAsync(std::move(wrapper));
-      future.wait();
+
+      std::unique_lock<std::mutex> lock(mtx);
+      cv.wait(lock, [&done] { return done; });
     }
   }
 };
