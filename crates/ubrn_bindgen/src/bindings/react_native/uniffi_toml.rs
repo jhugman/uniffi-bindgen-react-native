@@ -21,7 +21,17 @@ pub(crate) struct ReactNativeConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TsConfig {
     #[serde(default)]
+    pub(crate) is_verbose: bool,
+    #[serde(default)]
+    pub(crate) console_import: Option<String>,
+    #[serde(default)]
     pub(crate) custom_types: HashMap<String, CustomTypeConfig>,
+}
+
+impl TsConfig {
+    pub(crate) fn is_verbose(&self) -> bool {
+        self.is_verbose
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

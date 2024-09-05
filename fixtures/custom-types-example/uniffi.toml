@@ -1,3 +1,7 @@
+[bindings.typescript]
+isVerbose = true
+consoleImport = "@/hermes"
+
 [bindings.typescript.customTypes.Url]
 # Modules that need to be imported
 imports = [ [ "URL", "@/hermes" ] ]
