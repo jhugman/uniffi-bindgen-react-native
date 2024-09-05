@@ -92,7 +92,7 @@ jsi::Value {{ module_name }}::get(jsi::Runtime& rt, const jsi::PropNameID& name)
     try {
         return jsi::Value(rt, props.at(name.utf8(rt)));
     }
-    catch (std::out_of_range e) {
+    catch (std::out_of_range &e) {
         return jsi::Value::undefined();
     }
 }
