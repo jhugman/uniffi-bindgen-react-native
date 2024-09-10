@@ -9,7 +9,15 @@ export const {{ decl_type_name }} = (() => {
     {%-   call ts::docstring(variant, 4) %}
     {%-   let variant_name = variant.name()|class_name(ci) %}
     class {{ variant_name }} extends UniffiError {
+        /**
+         * @private
+         * This field is private and should not be used.
+         */
         readonly __uniffiTypeName = "{{ type_name }}";
+        /**
+         * @private
+         * This field is private and should not be used.
+         */
         readonly __variant = {{ loop.index }};
         constructor(message: string) {
             super("{{ type_name }}", "{{ variant_name }}", message);
