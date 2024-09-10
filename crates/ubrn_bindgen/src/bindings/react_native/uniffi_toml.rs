@@ -21,16 +21,37 @@ pub(crate) struct ReactNativeConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TsConfig {
     #[serde(default)]
-    pub(crate) is_verbose: bool,
+    pub(crate) log_level: LogLevel,
     #[serde(default)]
     pub(crate) console_import: Option<String>,
     #[serde(default)]
     pub(crate) custom_types: HashMap<String, CustomTypeConfig>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum LogLevel {
+    #[default]
+    None,
+    Debug,
+    Verbose,
+}
+
+impl LogLevel {
+    fn is_verbose(&self) -> bool {
+        matches!(self, Self::Verbose)
+    }
+    fn is_debug(&self) -> bool {
+        matches!(self, Self::Debug | Self::Verbose)
+    }
+}
+
 impl TsConfig {
     pub(crate) fn is_verbose(&self) -> bool {
-        self.is_verbose
+        self.log_level.is_verbose()
+    }
+    pub(crate) fn is_debug(&self) -> bool {
+        self.log_level.is_debug()
     }
 }
 
