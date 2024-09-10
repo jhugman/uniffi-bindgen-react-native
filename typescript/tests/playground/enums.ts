@@ -12,7 +12,7 @@ export const MyEnum = (() => {
     inner: Readonly<{ myValue: string }>;
   };
   class Variant1_ extends UniffiEnum implements Variant1__interface {
-    private readonly __uniffiTypeName = typeName;
+    readonly __uniffiTypeName = typeName;
     readonly tag = "Variant1";
     readonly inner: Readonly<{ myValue: string }>;
     constructor(inner: { myValue: string }) {
@@ -29,7 +29,7 @@ export const MyEnum = (() => {
     inner: Readonly<[number, string]>;
   };
   class Variant2_ extends UniffiEnum implements Variant2__interface {
-    private readonly __uniffiTypeName = typeName;
+    readonly __uniffiTypeName = typeName;
     readonly tag = "Variant2";
     readonly inner: Readonly<[number, string]>;
     constructor(p1: number, p2: string) {
