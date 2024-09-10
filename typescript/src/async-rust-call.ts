@@ -34,18 +34,6 @@ type PollFunc = (
   handle: UniffiHandle,
 ) => void;
 
-// Calls setTimeout and then resolves the promise.
-// This may be used as a simple yield.
-export async function delayPromise(delayMs: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, delayMs));
-}
-
-// We'd most likely want this to be a microTask, but hermes doesn't support the
-// Javascript API for them yet.
-async function nextTickPromise(): Promise<void> {
-  return await delayPromise(0);
-}
-
 /**
  * This method calls an asynchronous method on the Rust side.
  *
@@ -99,21 +87,12 @@ export async function uniffiRustCallAsync<F, T>(
   try {
     let pollResult: number | undefined;
     do {
-      // Now we have a future, we should prompt some work to happen in Rust.
-      // We need to make sure we don't poll from the stack frame as we the end of the poll,
-      // so we wait until the next tick before polling.
-      await nextTickPromise();
-
       // Calling pollFunc with a callback that resolves the promise that pollRust
       // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
       pollResult = await pollRust((handle) => {
         pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
       });
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
-
-    // Now we've finished polling, as a precaution, we wait until the next tick before
-    // picking up the results.
-    await nextTickPromise();
 
     // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
@@ -124,7 +103,7 @@ export async function uniffiRustCallAsync<F, T>(
       ),
     );
   } finally {
-    setTimeout(() => freeFunc(rustFuture), 0);
+    freeFunc(rustFuture);
   }
 }
 
@@ -155,9 +134,8 @@ const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   // > called, but not inside the callback itself.  If [rust_future_poll] is called inside the
   // > callback, some futures will deadlock and our scheduler code might as well.
   //
-  // This setImmediate is to ensure that `uniffiFutureContinuationCallback` returns
-  // before the next poll, i.e. so that the next poll is outside of this callback.
-  setTimeout(() => resolve(pollResult), 0);
+  // We avoid this by using UniffiCallInvoker::invokeNonBlocking for this callback.
+  resolve(pollResult);
 };
 
 // For testing only.
