@@ -56,6 +56,10 @@ export const {{ decl_type_name }} = (() => {
 
     {% call ts::docstring(variant, 4) %}
     class {{ variant_name }} extends {{ superclass }} implements {{ variant_interface }} {
+        /**
+         * @private
+         * This field is private and should not be used, use `tag` instead.
+         */
         readonly __uniffiTypeName = "{{ type_name }}";
         readonly tag = {{ variant_tag }};
         {%- if has_fields %}
