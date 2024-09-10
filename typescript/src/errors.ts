@@ -13,24 +13,24 @@ export class UniffiError extends Error {
   constructor(enumTypeName: string, variantName: string, message?: string) {
     // We append the error type and variant to the message because we cannot override `toString()`—
     // in errors.test.ts, we see that the overridden `toString()` method is not called.
-    super(UniffiError.createMessage(enumTypeName, variantName, message));
+    super(createErrorMessage(enumTypeName, variantName, message));
   }
 
   static instanceOf(obj: any): obj is UniffiError {
     return obj.__uniffiTypeName !== undefined && obj instanceof Error;
   }
+}
 
-  private static createMessage(
-    typeName: string,
-    variantName: string,
-    message: string | undefined,
-  ): string {
-    const prefix = `${typeName}.${variantName}`;
-    if (message) {
-      return `${prefix}: ${message}`;
-    } else {
-      return prefix;
-    }
+function createErrorMessage(
+  typeName: string,
+  variantName: string,
+  message: string | undefined,
+): string {
+  const prefix = `${typeName}.${variantName}`;
+  if (message) {
+    return `${prefix}: ${message}`;
+  } else {
+    return prefix;
   }
 }
 
@@ -44,7 +44,7 @@ export class UniffiThrownObject<T> extends Error {
   ) {
     // We append the error type and variant to the message because we cannot override `toString()`—
     // in errors.test.ts, we see that the overridden `toString()` method is not called.
-    super(UniffiThrownObject.createMessage(typeName, inner, message));
+    super(createObjectMessage(typeName, inner, message));
   }
 
   static instanceOf(err: any): err is UniffiThrownObject<unknown> {
@@ -54,16 +54,16 @@ export class UniffiThrownObject<T> extends Error {
       err instanceof Error
     );
   }
+}
 
-  private static createMessage<T>(
-    typeName: string,
-    obj: any,
-    message: string | undefined,
-  ): string {
-    return [typeName, stringRepresentation(obj), message]
-      .filter((s) => !!s)
-      .join(": ");
-  }
+function createObjectMessage(
+  typeName: string,
+  obj: any,
+  message: string | undefined,
+): string {
+  return [typeName, stringRepresentation(obj), message]
+    .filter((s) => !!s)
+    .join(": ");
 }
 
 function stringRepresentation(obj: any): string | undefined {
