@@ -80,5 +80,15 @@ public:
       cv.wait(lock, [&done] { return done; });
     }
   }
+
+  /**
+   * Invokes the given function on the JS thread, by adding to
+   * the event queue.
+   */
+  void invokeNonBlocking(jsi::Runtime &rt, UniffiCallFunc func) {
+    // react::CallFunc wrapper = [func](jsi::Runtime &rt) {
+    std::function<void()> wrapper = [func, &rt]() { func(rt); };
+    callInvoker_->invokeAsync(std::move(wrapper));
+  }
 };
 } // namespace uniffi_runtime

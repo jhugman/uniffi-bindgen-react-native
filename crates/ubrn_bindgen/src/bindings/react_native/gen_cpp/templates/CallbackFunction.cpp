@@ -187,7 +187,11 @@ namespace {{ ns }} {
                 };
                 // We'll then call that lambda from the callInvoker which will
                 // look after calling it on the correct thread.
+                {% if callback.is_blocking() -%}
                 callInvoker->invokeBlocking(rt, jsLambda);
+                {%- else %}
+                callInvoker->invokeNonBlocking(rt, jsLambda);
+                {%- endif %}
         };
         return callback;
     }

@@ -501,6 +501,10 @@ impl FfiCallbackFunction {
             .find(|a| a.is_return() && !a.type_().is_void());
         arg.map(|a| a.type_())
     }
+
+    fn is_blocking(&self) -> bool {
+        self.name() != "RustFutureContinuationCallback"
+    }
 }
 
 fn is_future(nm: &str) -> bool {
