@@ -42,6 +42,52 @@ test("array buffer roundtrip using read/write", (t) => {
   }
 });
 
+test("array buffer roundtrip with ArrayBufferView", (t) => {
+  function rt(ab: ArrayBuffer) {
+    t.assertEqual(
+      ab,
+      identityArrayBuffer(new Uint32Array(ab)),
+      undefined,
+      abEquals,
+    );
+  }
+  for (let i = 0; i < 64; i += 4) {
+    rt(arrayBuffer(i));
+  }
+});
+
+test("array buffer roundtrip with ArrayBufferView of different sizes", (t) => {
+  function rt(ta: ArrayBuffer, slice: ArrayBuffer) {
+    t.assertEqual(slice, identityArrayBuffer(ta), undefined, abEquals);
+  }
+  const base = arrayBuffer(64);
+  for (const TypedArray of [
+    Uint8Array,
+    Uint16Array,
+    Uint32Array,
+    BigUint64Array,
+    Int8Array,
+    Int16Array,
+    Int32Array,
+    BigInt64Array,
+    Float32Array,
+    Float64Array,
+  ]) {
+    const width = TypedArray.BYTES_PER_ELEMENT;
+    for (let length = width; length < base.byteLength; length += width) {
+      for (
+        let offset = 0;
+        offset + length < base.byteLength;
+        offset += length
+      ) {
+        const typedArray = new TypedArray(base, offset, length / width);
+        const slice = base.slice(offset, offset + length);
+        rt(typedArray, slice);
+      }
+    }
+  }
+});
+
 function abEquals(a: ArrayBuffer, b: ArrayBuffer): boolean {
   if (a.byteLength !== b.byteLength) {
     return false;
