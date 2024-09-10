@@ -40,6 +40,10 @@ export async function delayPromise(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+async function nextTickPromise(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 /**
  * This method calls an asynchronous method on the Rust side.
  *
@@ -98,6 +102,9 @@ export async function uniffiRustCallAsync<F, T>(
       pollResult = await pollRust((handle) => {
         pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
       });
+      // We yield here to allow other tasks to happen between
+      // the end of the poll and the beginning of the next one.
+      await nextTickPromise();
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
 
     // Now it's ready, all we need to do is pick up the result (and error).
@@ -109,7 +116,7 @@ export async function uniffiRustCallAsync<F, T>(
       ),
     );
   } finally {
-    setTimeout(() => freeFunc(rustFuture), 0);
+    setImmediate(() => freeFunc(rustFuture));
   }
 }
 
@@ -134,24 +141,15 @@ const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   pollResult: number,
 ) => {
   const resolve = UNIFFI_RUST_FUTURE_RESOLVER_MAP.remove(handle);
-  if (pollResult === UNIFFI_RUST_FUTURE_POLL_READY) {
-    resolve(pollResult);
-  } else {
-    // From https://github.com/mozilla/uniffi-rs/pull/1837/files#diff-8a28c9cf1245b4f714d406ea4044d68e1000099928eaca1afb504ccbc008fe9fR35-R37
-    //
-    // > WARNING: the call to [rust_future_poll] must be scheduled to happen soon after the callback is
-    // > called, but not inside the callback itself.  If [rust_future_poll] is called inside the
-    // > callback, some futures will deadlock and our scheduler code might as well.
-    //
-    // This delay is to ensure that `uniffiFutureContinuationCallback` returns before the next poll, i.e.
-    // so that the next poll is outside of this callback.
-    //
-    // The length of the delay seems to be significant (at least in tests which hammer a network).
-    // I would like to understand this more: I am still seeing deadlocks when this drops below its current
-    // delay, but these maybe related to a different issue, as alluded to in
-    // https://github.com/mozilla/uniffi-rs/pull/1901
-    setTimeout(() => resolve(pollResult), 20);
-  }
+  // From https://github.com/mozilla/uniffi-rs/pull/1837/files#diff-8a28c9cf1245b4f714d406ea4044d68e1000099928eaca1afb504ccbc008fe9fR35-R37
+  //
+  // > WARNING: the call to [rust_future_poll] must be scheduled to happen soon after the callback is
+  // > called, but not inside the callback itself.  If [rust_future_poll] is called inside the
+  // > callback, some futures will deadlock and our scheduler code might as well.
+  //
+  // This setImmediate is to ensure that `uniffiFutureContinuationCallback` returns
+  // before the next poll, i.e. so that the next poll is outside of this callback.
+  setImmediate(() => resolve(pollResult));
 };
 
 // For testing only.
