@@ -4,6 +4,9 @@
 {{- self.import_infra_type("UniffiObjectFactory", "objects") -}}
 {{- self.import_infra_type("FfiConverter", "ffi-converters") -}}
 {{- self.import_infra_type("UniffiRustArcPtr", "rust-call") }}
+{{- self.import_infra("destructorGuardSymbol", "symbols") -}}
+{{- self.import_infra("pointerLiteralSymbol", "symbols") -}}
+{{- self.import_infra("uniffiTypeNameSymbol", "symbols") -}}
 
 {%- let obj = ci|get_object_definition(name) %}
 {%- let protocol_name = obj|type_name(self) %}
@@ -17,17 +20,17 @@
 {%- macro private_ctor() %}
 private constructor(pointer: UnsafeMutableRawPointer) {
     super();
-    this.__rustPointer = pointer;
-    this.__rustArcPtr = {{ obj_factory }}.bless(pointer);
+    this[pointerLiteralSymbol] = pointer;
+    this[destructorGuardSymbol] = {{ obj_factory }}.bless(pointer);
 }
 {%- endmacro %}
 
 {% call ts::docstring(obj, 0) %}
 export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ protocol_name }} {
 
-    private readonly __uniffiTypeName = "{{ impl_class_name }}";
-    private readonly __rustArcPtr: UniffiRustArcPtr;
-    private readonly __rustPointer: UnsafeMutableRawPointer;
+    readonly [uniffiTypeNameSymbol] = "{{ impl_class_name }}";
+    readonly [destructorGuardSymbol]: UniffiRustArcPtr;
+    readonly [pointerLiteralSymbol]: UnsafeMutableRawPointer;
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
@@ -112,11 +115,11 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
      * {@inheritDoc uniffi-bindgen-react-native#UniffiAbstractObject.uniffiDestroy}
      */
     uniffiDestroy(): void {
-        if ((this as any).__rustArcPtr) {
+        if ((this as any)[destructorGuardSymbol]) {
             const pointer = {{ obj_factory }}.pointer(this);
             {{ obj_factory }}.freePointer(pointer);
-            this.__rustArcPtr.markDestroyed();
-            delete (this as any).__rustArcPtr;
+            this[destructorGuardSymbol].markDestroyed();
+            delete (this as any)[destructorGuardSymbol];
         }
     }
 
@@ -139,9 +142,9 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
 const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
         const instance = Object.create({{ impl_class_name }}.prototype);
-        instance.__rustPointer = pointer;
-        instance.__rustArcPtr = this.bless(pointer);
-        instance.__uniffiTypeName = "{{ impl_class_name }}";
+        instance[pointerLiteralSymbol] = pointer;
+        instance[destructorGuardSymbol] = this.bless(pointer);
+        instance[uniffiTypeNameSymbol] = "{{ impl_class_name }}";
         return instance;
     },
 
@@ -154,10 +157,10 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     },
 
     pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
-        if ((obj as any).__rustArcPtr === undefined) {
+        if ((obj as any)[destructorGuardSymbol] === undefined) {
             throw new UniffiInternalError.UnexpectedNullPointer();
         }
-        return (obj as any).__rustPointer;
+        return (obj as any)[pointerLiteralSymbol];
     },
 
     clonePointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
@@ -176,7 +179,7 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     },
 
     isConcreteType(obj: any): obj is {{ type_name }} {
-        return obj.__rustArcPtr && obj.__uniffiTypeName === "{{ impl_class_name }}";
+        return obj[destructorGuardSymbol] && obj[uniffiTypeNameSymbol] === "{{ impl_class_name }}";
     },
 };
 

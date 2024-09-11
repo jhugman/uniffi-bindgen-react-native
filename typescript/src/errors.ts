@@ -4,6 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+import { uniffiTypeNameSymbol } from "./symbols";
+
 // The top level error class for all uniffi-wrapped errors.
 //
 // The readonly fields are used to implement both the instanceOf checks which are used
@@ -17,7 +19,7 @@ export class UniffiError extends Error {
   }
 
   static instanceOf(obj: any): obj is UniffiError {
-    return obj.__uniffiTypeName !== undefined && obj instanceof Error;
+    return obj[uniffiTypeNameSymbol] !== undefined && obj instanceof Error;
   }
 }
 

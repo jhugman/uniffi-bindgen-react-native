@@ -1,3 +1,4 @@
+{{- self.import_infra("uniffiTypeNameSymbol", "symbols") -}}
 
 // Enum: {{ type_name }}
 {%- let type_name__Tags = format!("{type_name}_Tags") %}
@@ -56,7 +57,11 @@ export const {{ decl_type_name }} = (() => {
 
     {% call ts::docstring(variant, 4) %}
     class {{ variant_name }} extends {{ superclass }} implements {{ variant_interface }} {
-        private readonly __uniffiTypeName = "{{ type_name }}";
+        /**
+         * @private
+         * This field is private and should not be used, use `tag` instead.
+         */
+        readonly [uniffiTypeNameSymbol] = "{{ type_name }}";
         readonly tag = {{ variant_tag }};
         {%- if has_fields %}
         readonly inner: {% call variant_data_type(variant) %};
@@ -113,7 +118,7 @@ export const {{ decl_type_name }} = (() => {
   {%- endfor %}
 
     function instanceOf(obj: any): obj is {{ type_name }} {
-        return obj.__uniffiTypeName === "{{ type_name }}";
+        return obj[uniffiTypeNameSymbol] === "{{ type_name }}";
     }
 
     return Object.freeze({
