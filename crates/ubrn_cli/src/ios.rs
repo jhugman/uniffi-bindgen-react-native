@@ -4,13 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::{collections::HashMap, process::Command};
+use std::{collections::HashMap, fmt::Display, process::Command, str::FromStr};
 
-use anyhow::Result;
+use anyhow::{Context, Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use heck::ToUpperCamelCase;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
 
 use crate::{
@@ -33,7 +33,7 @@ pub(crate) struct IOsConfig {
     pub(crate) xcodebuild_extras: ExtraArgs,
 
     #[serde(default = "IOsConfig::default_targets")]
-    pub(crate) targets: Vec<String>,
+    pub(crate) targets: Vec<Target>,
 
     #[serde(default = "IOsConfig::default_cargo_extras")]
     pub(crate) cargo_extras: ExtraArgs,
@@ -61,9 +61,9 @@ impl IOsConfig {
         args.into()
     }
 
-    fn default_targets() -> Vec<String> {
+    fn default_targets() -> Vec<Target> {
         let args: &[&str] = &["aarch64-apple-ios", "aarch64-apple-ios-sim"];
-        args.iter().map(|s| s.to_string()).collect()
+        args.iter().map(|s| Target::from_str(s).unwrap()).collect()
     }
 }
 
@@ -105,6 +105,16 @@ pub(crate) struct IOsArgs {
     #[clap(long, alias = "no-xcframework")]
     no_xcodebuild: bool,
 
+    /// Comma separated list of targets, that override the values in
+    /// the `config.yaml` file.
+    ///
+    /// iOS:
+    ///  aarch64-apple-ios,
+    ///  aarch64-apple-ios-sim,
+    ///  x86_64-apple-ios
+    #[clap(short, long, value_parser, num_args = 1.., value_delimiter = ',')]
+    pub(crate) targets: Vec<Target>,
+
     #[clap(flatten)]
     pub(crate) common_args: CommonBuildArgs,
 }
@@ -115,15 +125,14 @@ impl IOsArgs {
         let crate_ = &config.crate_;
         let ios = &config.ios;
 
-        let targets = ios
-            .targets
+        let target_list = if !self.targets.is_empty() {
+            &self.targets
+        } else {
+            &ios.targets
+        };
+
+        let targets = target_list
             .iter()
-            .map(|t| {
-                TARGETS
-                    .iter()
-                    .find(|target| target.triple == *t)
-                    .unwrap_or_else(|| panic!("Invalid target specified: {t}"))
-            })
             .filter(|target| {
                 let is_sim = target.platform == Platform::IosSimulator;
                 if self.no_sim {
@@ -171,7 +180,7 @@ impl IOsArgs {
             self.cargo_build(&manifest_path, target, cargo_extras, &rust_dir)?;
 
             // Now we need to get the path to the lib.a file, to feed to xcodebuild.
-            let library = metadata.library_path(Some(target.triple), self.common_args.profile());
+            let library = metadata.library_path(Some(&target.triple), self.common_args.profile());
             metadata.library_path_exists(&library)?;
             target_files.insert(target.clone(), library);
         }
@@ -190,7 +199,7 @@ impl IOsArgs {
             .arg("--manifest-path")
             .arg(manifest_path)
             .arg("--target")
-            .arg(target.triple);
+            .arg(&target.triple);
         if self.common_args.release {
             cmd.arg("--release");
         }
@@ -270,7 +279,7 @@ impl IOsArgs {
         targets
             .iter()
             .filter_map(|target| {
-                let library = metadata.library_path(Some(target.triple), profile);
+                let library = metadata.library_path(Some(&target.triple), profile);
                 if library.exists() {
                     Some((target.clone(), library))
                 } else {
@@ -290,15 +299,16 @@ impl IOsArgs {
 }
 
 /// A specific build target supported by the SDK.
-#[derive(Hash, PartialEq, Eq, Clone)]
-struct Target {
-    triple: &'static str,
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[serde(try_from = "String", into = "String")]
+pub(crate) struct Target {
+    triple: String,
     platform: Platform,
-    description: &'static str,
+    description: String,
 }
 
 /// The platform for which a particular target can run on.
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 enum Platform {
     Macos,
     Ios,
@@ -318,30 +328,66 @@ impl Platform {
 }
 
 /// The list of targets supported by the SDK.
-const TARGETS: &[Target] = &[
-    Target {
-        triple: "aarch64-apple-ios",
-        platform: Platform::Ios,
-        description: "iOS",
-    },
-    Target {
-        triple: "aarch64-apple-darwin",
-        platform: Platform::Macos,
-        description: "macOS (Apple Silicon)",
-    },
-    Target {
-        triple: "x86_64-apple-darwin",
-        platform: Platform::Macos,
-        description: "macOS (Intel)",
-    },
-    Target {
-        triple: "aarch64-apple-ios-sim",
-        platform: Platform::IosSimulator,
-        description: "iOS Simulator (Apple Silicon)",
-    },
-    Target {
-        triple: "x86_64-apple-ios",
-        platform: Platform::IosSimulator,
-        description: "iOS Simulator (Intel) ",
-    },
-];
+fn supported_targets() -> Vec<Target> {
+    vec![
+        Target {
+            triple: "aarch64-apple-ios".into(),
+            platform: Platform::Ios,
+            description: "iOS".into(),
+        },
+        Target {
+            triple: "aarch64-apple-darwin".into(),
+            platform: Platform::Macos,
+            description: "macOS (Apple Silicon)".into(),
+        },
+        Target {
+            triple: "x86_64-apple-darwin".into(),
+            platform: Platform::Macos,
+            description: "macOS (Intel)".into(),
+        },
+        Target {
+            triple: "aarch64-apple-ios-sim".into(),
+            platform: Platform::IosSimulator,
+            description: "iOS Simulator (Apple Silicon)".into(),
+        },
+        Target {
+            triple: "x86_64-apple-ios".into(),
+            platform: Platform::IosSimulator,
+            description: "iOS Simulator (Intel)".into(),
+        },
+    ]
+}
+
+/// Additional work to make Target serializable/deserializable
+/// to and from a string without another dependency
+impl FromStr for Target {
+    type Err = Error;
+
+    fn from_str(t: &str) -> Result<Self, Self::Err> {
+        supported_targets()
+            .iter()
+            .find(|target| target.triple == t)
+            .cloned()
+            .with_context(|| format!("Unsupported target: '{t}'"))
+    }
+}
+
+impl TryFrom<String> for Target {
+    type Error = Error;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Target::from_str(&value)
+    }
+}
+
+impl From<Target> for String {
+    fn from(value: Target) -> Self {
+        value.to_string()
+    }
+}
+
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.triple)
+    }
+}

@@ -29,7 +29,7 @@ pub(crate) struct AndroidConfig {
     pub(crate) jni_libs: String,
 
     #[serde(default = "AndroidConfig::default_targets")]
-    pub(crate) targets: Vec<String>,
+    pub(crate) targets: Vec<Target>,
 
     #[serde(default = "AndroidConfig::default_cargo_extras")]
     pub(crate) cargo_extras: ExtraArgs,
@@ -58,14 +58,13 @@ impl AndroidConfig {
         args.into()
     }
 
-    fn default_targets() -> Vec<String> {
-        let args: &[&str] = &[
-            "aarch64-linux-android",
-            "armv7-linux-androideabi",
-            "i686-linux-android",
-            "x86_64-linux-android",
-        ];
-        args.iter().map(|s| s.to_string()).collect()
+    fn default_targets() -> Vec<Target> {
+        vec![
+            Target::Arm64V8a,
+            Target::ArmeabiV7a,
+            Target::X86,
+            Target::X86_64,
+        ]
     }
 
     fn default_platform() -> usize {
@@ -114,6 +113,23 @@ pub(crate) struct AndroidArgs {
     #[clap(long)]
     config: Utf8PathBuf,
 
+    /// Comma separated list of targets, that override the values in the
+    /// `config.yaml` file.
+    ///
+    /// Android:
+    ///   aarch64-linux-android,
+    ///   armv7-linux-androideabi,
+    ///   x86_64-linux-android
+    ///   i686-linux-android,
+    ///
+    /// Synonyms for:
+    ///   arm64-v8a,
+    ///   armeabi-v7a,
+    ///   x86_64,
+    ///   x86
+    #[clap(short, long, value_parser, num_args = 1.., value_delimiter = ',')]
+    pub(crate) targets: Vec<Target>,
+
     #[clap(flatten)]
     pub(crate) common_args: CommonBuildArgs,
 
@@ -129,14 +145,19 @@ impl AndroidArgs {
         let crate_ = &config.crate_;
 
         let android = &config.android;
+        let target_list = if !self.targets.is_empty() {
+            &self.targets
+        } else {
+            &android.targets
+        };
         let target_files = if self.common_args.no_cargo {
-            let files = self.find_existing(&crate_.metadata()?, &android.targets);
+            let files = self.find_existing(&crate_.metadata()?, target_list);
             if !files.is_empty() {
                 files
             } else {
                 self.cargo_build_all(
                     crate_,
-                    &android.targets,
+                    target_list,
                     &android.cargo_extras,
                     android.api_level,
                 )?
@@ -144,7 +165,7 @@ impl AndroidArgs {
         } else {
             self.cargo_build_all(
                 crate_,
-                &android.targets,
+                target_list,
                 &android.cargo_extras,
                 android.api_level,
             )?
@@ -165,7 +186,7 @@ impl AndroidArgs {
     fn cargo_build_all(
         &self,
         crate_: &CrateConfig,
-        targets: &[String],
+        targets: &[Target],
         cargo_extras: &ExtraArgs,
         api_level: usize,
     ) -> Result<HashMap<Target, Utf8PathBuf>> {
@@ -186,13 +207,12 @@ impl AndroidArgs {
 
     fn cargo_build(
         &self,
-        target: &str,
+        target: &Target,
         manifest_path: &Utf8PathBuf,
         cargo_extras: &ExtraArgs,
         api_level: usize,
         rust_dir: &Utf8PathBuf,
     ) -> Result<Target> {
-        let target = target.parse::<Target>()?;
         let mut cmd = Command::new("cargo");
         cmd.arg("ndk")
             .arg("--manifest-path")
@@ -210,28 +230,21 @@ impl AndroidArgs {
         }
         cmd.args(cargo_extras.clone());
         run_cmd(cmd.current_dir(rust_dir))?;
-        Ok(target)
+        Ok(target.clone())
     }
 
     fn find_existing(
         &self,
         metadata: &CrateMetadata,
-        targets: &[String],
+        targets: &[Target],
     ) -> HashMap<Target, Utf8PathBuf> {
         let profile = self.common_args.profile();
         targets
             .iter()
             .filter_map(|target| {
-                let target = target.parse::<Target>();
-                match target {
-                    Ok(target) => Some(target),
-                    Err(_) => None,
-                }
-            })
-            .filter_map(|target| {
                 let library = metadata.library_path(Some(target.triple()), profile);
                 if library.exists() {
-                    Some((target, library))
+                    Some((target.clone(), library))
                 } else {
                     None
                 }
