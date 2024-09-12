@@ -14,7 +14,8 @@ template <> struct Bridging<UniffiRustFutureContinuationCallback> {
       static auto callback = {{ cb_type.borrow()|cpp_namespace(ci) }}::makeCallbackFunction(
         rt,
         callInvoker,
-        value
+        value,
+        true
       );
       return callback;
     } catch (const std::logic_error &e) {

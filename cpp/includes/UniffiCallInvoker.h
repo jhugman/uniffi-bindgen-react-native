@@ -80,5 +80,16 @@ public:
       cv.wait(lock, [&done] { return done; });
     }
   }
+
+  void invokeAsync(jsi::Runtime &rt, UniffiCallFunc &func) {
+    if (std::this_thread::get_id() == threadId_) {
+      func(rt);
+    } else {
+      std::function<void()> wrapper = [&func, &rt]() {
+        func(rt);
+      };
+      callInvoker_->invokeAsync(std::move(wrapper));
+    }
+  }
 };
 } // namespace uniffi_runtime

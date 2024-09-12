@@ -148,10 +148,11 @@ namespace {{ ns }} {
     makeCallbackFunction( // {{ ns }}
                     jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
-                     const jsi::Value &value) {
+                     const jsi::Value &value,
+                     bool invokeAsync = false) {
         auto callbackFunction = value.asObject(rt).asFunction(rt);
         auto callbackValue = std::make_shared<jsi::Value>(rt, callbackFunction);
-        rsLambda = [&rt, callInvoker, callbackValue](
+        rsLambda = [&rt, callInvoker, callbackValue, invokeAsync](
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -187,7 +188,11 @@ namespace {{ ns }} {
                 };
                 // We'll then call that lambda from the callInvoker which will
                 // look after calling it on the correct thread.
-                callInvoker->invokeBlocking(rt, jsLambda);
+                if (invokeAsync) {
+                    callInvoker->invokeAsync(rt, jsLambda);
+                } else {
+                    callInvoker->invokeBlocking(rt, jsLambda);
+                }
         };
         return callback;
     }
