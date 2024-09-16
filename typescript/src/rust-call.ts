@@ -89,16 +89,9 @@ function uniffiCheckCallStatus(
       // This error code is expected when a Rust Future is cancelled or aborted, either
       // from the foreign side, or from within Rust itself.
       //
-      // It's expected that this would be encountered when the `completeFunc` is called
-      // from `uniffiRustCallAsync`.
-      //
-      // Currently, there is no generated API of cancelling a promise from JS.
-      //
       // As of uniffi-rs v0.28.0, call cancellation is only checked for in the Swift bindings,
-      // and has a similar Unimplemeneted error.
-      throw new UniffiInternalError.Unimplemented(
-        "Cancellation not supported yet",
-      );
+      // and uses an Unimplemeneted error.
+      throw new UniffiInternalError.AbortError();
 
     default:
       throw new UniffiInternalError.UnexpectedRustCallStatusCode();

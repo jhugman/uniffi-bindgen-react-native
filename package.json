@@ -18,6 +18,7 @@
     "uniffi-bindgen-react-native": "./bin/cli"
   },
   "devDependencies": {
+    "abortcontroller-polyfill": "^1.7.5",
     "metro": "^0.80.8",
     "metro-core": "^0.80.8",
     "prettier": "^3.2.5",

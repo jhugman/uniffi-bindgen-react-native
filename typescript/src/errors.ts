@@ -101,6 +101,12 @@ export const UniffiInternalError = (() => {
       super("The buffer still has data after lifting its containing value");
     }
   }
+  class AbortError extends Error {
+    constructor() {
+      super("A Rust future was aborted");
+      this.name = "AbortError";
+    }
+  }
   class UnexpectedEnumCase extends Error {
     constructor() {
       super("Raw enum value doesn't match any cases");
@@ -157,6 +163,7 @@ export const UniffiInternalError = (() => {
     BufferOverflow,
     ContractVersionMismatch,
     IncompleteData,
+    AbortError,
     UnexpectedEnumCase,
     UnexpectedNullPointer,
     UnexpectedRustCallStatusCode,

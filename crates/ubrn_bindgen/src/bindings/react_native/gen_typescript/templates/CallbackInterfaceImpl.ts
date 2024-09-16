@@ -22,13 +22,21 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             {%- endif %}
         ) => {
             const uniffiMakeCall = {# space #}
-            {%- call ts::async(meth) -%}
-            (): {% call ts::return_type(meth) %} => {
+            {%- if meth.is_async() %}
+            async (signal: AbortSignal)
+            {%- else %}
+            ()
+            {%- endif %}
+            : {% call ts::return_type(meth) %} => {
                 const jsCallback = {{ ffi_converter_name }}.lift(uniffiHandle);
                 return {% call ts::await(meth) %}jsCallback.{{ meth.name()|fn_name }}(
                     {%- for arg in meth.arguments() %}
                     {{ arg|ffi_converter_name(self) }}.lift({{ arg.name()|var_name }}){% if !loop.last %}, {% endif %}
                     {%- endfor %}
+                    {%- if meth.is_async() -%}
+                    {%-   if !meth.arguments().is_empty() %}, {% endif -%}
+                    { signal }
+                    {%- endif %}
                 )
             }
             {%- if !meth.is_async() %}
@@ -60,7 +68,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*lowerString:*/ FfiConverterString.lower
             )
             {%- endmatch %}
-            {%- else %}
+            {%- else %} {# // is_async = true #}
 
             const uniffiHandleSuccess = (returnValue: {% call ts::raw_return_type(meth) %}) => {
                 uniffiFutureCallback(
