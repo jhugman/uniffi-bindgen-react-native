@@ -1,5 +1,3 @@
-import { decl_type_name } from "./EnumTemplate"
-
 {#
     // Template to defining types. This may endup using codegen,
     // but may not.
@@ -95,8 +93,8 @@ import { decl_type_name } from "./EnumTemplate"
         super();
         const pointer =
             {% call to_ffi_method_call(obj_factory, callable) %};
-        this.__rustPointer = pointer;
-        this.__rustArcPtr = {{ obj_factory }}.bless(pointer);
+        this[pointerLiteralSymbol] = pointer;
+        this[destructorGuardSymbol] = {{ obj_factory }}.bless(pointer);
     }
 {%- endmacro %}
 

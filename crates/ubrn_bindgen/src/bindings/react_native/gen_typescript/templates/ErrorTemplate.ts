@@ -1,4 +1,6 @@
 {{- self.import_infra("UniffiError", "errors") }}
+{{- self.import_infra("uniffiTypeNameSymbol", "symbols") }}
+{{- self.import_infra("variantOrdinalSymbol", "symbols") }}
 {%- let instance_of = "instanceOf" %}
 {%- let flat = e.is_flat() %}
 {%- if flat %}
@@ -9,15 +11,23 @@ export const {{ decl_type_name }} = (() => {
     {%-   call ts::docstring(variant, 4) %}
     {%-   let variant_name = variant.name()|class_name(ci) %}
     class {{ variant_name }} extends UniffiError {
-        private readonly __uniffiTypeName = "{{ type_name }}";
-        private readonly __variant = {{ loop.index }};
+        /**
+         * @private
+         * This field is private and should not be used.
+         */
+        readonly [uniffiTypeNameSymbol]: string = "{{ type_name }}";
+        /**
+         * @private
+         * This field is private and should not be used.
+         */
+        readonly [variantOrdinalSymbol] = {{ loop.index }};
         constructor(message: string) {
             super("{{ type_name }}", "{{ variant_name }}", message);
         }
 
         static {{ instance_of }}(e: any): e is {{ variant_name }} {
             return (
-                {{ instance_of }}(e) && (e as any).__variant === {{ loop.index }}
+                {{ instance_of }}(e) && (e as any)[variantOrdinalSymbol] === {{ loop.index }}
             );
         }
     }
@@ -29,7 +39,7 @@ export const {{ decl_type_name }} = (() => {
     {{-   variant.name()|class_name(ci) }}
     {%-   if !loop.last %} | {% endif -%}
     {%- endfor %} {
-        return (e as any).__uniffiTypeName === "{{ decl_type_name }}";
+        return (e as any)[uniffiTypeNameSymbol] === "{{ decl_type_name }}";
     }
     return {
         {%- for variant in e.variants() %}
@@ -45,7 +55,6 @@ export const {{ decl_type_name }} = (() => {
 
 const {{ ffi_converter_name }} = (() => {
     const intConverter = FfiConverterInt32;
-
     type TypeName = {{ type_name }};
     {{- self.import_infra("AbstractFfiConverterArrayBuffer", "ffi-converters") }}
     class FfiConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
@@ -67,7 +76,7 @@ const {{ ffi_converter_name }} = (() => {
         }
         write(value: TypeName, into: RustBuffer): void {
             const obj = value as any;
-            const index = obj.__variant as number;
+            const index = obj[variantOrdinalSymbol] as number;
             intConverter.write(index, into);
             {%- if !flat %}
             switch (index) {
@@ -87,7 +96,7 @@ const {{ ffi_converter_name }} = (() => {
             return intConverter.allocationSize(0);
             {%- else %}
             const obj = value as any;
-            const index = obj.__variant as number;
+            const index = obj[variantOrdinalSymbol] as number;
             switch (index) {
                 {%-   for variant in e.variants() %}
                 case {{ loop.index }}:

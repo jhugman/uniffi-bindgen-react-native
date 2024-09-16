@@ -5,6 +5,7 @@
  */
 import { UniffiEnum } from "../../src/enums";
 
+const uniffiTypeNameSymbol = Symbol("uniffiTypeName");
 export const MyEnum = (() => {
   const typeName = "MyEnum";
   type Variant1__interface = {
@@ -12,7 +13,7 @@ export const MyEnum = (() => {
     inner: Readonly<{ myValue: string }>;
   };
   class Variant1_ extends UniffiEnum implements Variant1__interface {
-    private readonly __uniffiTypeName = typeName;
+    readonly [uniffiTypeNameSymbol]: string = typeName;
     readonly tag = "Variant1";
     readonly inner: Readonly<{ myValue: string }>;
     constructor(inner: { myValue: string }) {
@@ -29,7 +30,7 @@ export const MyEnum = (() => {
     inner: Readonly<[number, string]>;
   };
   class Variant2_ extends UniffiEnum implements Variant2__interface {
-    private readonly __uniffiTypeName = typeName;
+    readonly [uniffiTypeNameSymbol]: string = typeName;
     readonly tag = "Variant2";
     readonly inner: Readonly<[number, string]>;
     constructor(p1: number, p2: string) {
@@ -42,7 +43,7 @@ export const MyEnum = (() => {
   }
 
   function instanceOf(obj: any): obj is MyEnum {
-    return obj.__uniffiTypeName === "MyEnum";
+    return obj[uniffiTypeNameSymbol] === "MyEnum";
   }
 
   return Object.freeze({
