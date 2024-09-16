@@ -41,7 +41,7 @@ export async function delayPromise(delayMs: number): Promise<void> {
 }
 
 async function nextTickPromise(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve));
+  return await delayPromise(0);
 }
 
 /**
@@ -116,7 +116,7 @@ export async function uniffiRustCallAsync<F, T>(
       ),
     );
   } finally {
-    setImmediate(() => freeFunc(rustFuture));
+    setTimeout(() => freeFunc(rustFuture), 0);
   }
 }
 
@@ -149,7 +149,7 @@ const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   //
   // This setImmediate is to ensure that `uniffiFutureContinuationCallback` returns
   // before the next poll, i.e. so that the next poll is outside of this callback.
-  setImmediate(() => resolve(pollResult));
+  setTimeout(() => resolve(pollResult), 0);
 };
 
 // For testing only.
