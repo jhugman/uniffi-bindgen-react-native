@@ -49,6 +49,19 @@ function delayPromise(delayMs: number): Promise<void> {
   });
 }
 
+function cancellableDelayPromise(
+  delayMs: number,
+  abortSignal: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, delayMs);
+    abortSignal.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(abortSignal.reason);
+    });
+  });
+}
+
 function checkRemainingFutures(t: Asserts) {
   t.assertEqual(
     0,
@@ -282,6 +295,38 @@ function checkRemainingFutures(t: Asserts) {
     t.end();
   });
 
+  class CancellableTsAsyncParser extends TsAsyncParser {
+    /**
+     * Each async callback method has an additional optional argument
+     * `asyncOptions_`. This contains an `AbortSignal`.
+     *
+     * If the Rust task is cancelled, then this abort signal is
+     * told, which can be used to co-operatively cancel the
+     * async callback.
+     *
+     * @param delayMs
+     * @param asyncOptions_
+     */
+    async delay(
+      delayMs: number,
+      asyncOptions_?: { signal: AbortSignal },
+    ): Promise<void> {
+      await this.doCancellableDelay(delayMs, asyncOptions_?.signal);
+    }
+
+    private async doCancellableDelay(
+      ms: number,
+      signal?: AbortSignal,
+    ): Promise<void> {
+      if (signal) {
+        await cancellableDelayPromise(ms, signal);
+      } else {
+        await delayPromise(ms);
+      }
+      this.completedDelays += 1;
+    }
+  }
+
   /**
    * Rust supports task cancellation, but it's not automatic. It is rather like
    * Javascript's.
@@ -460,28 +505,61 @@ function checkRemainingFutures(t: Asserts) {
     },
   );
 
-  await xasyncTest(
+  class Counter {
+    expectedCount = 0;
+    unexpectedCount = 0;
+    ok() {
+      return () => this.expectedCount++;
+    }
+    wat() {
+      return () => this.unexpectedCount++;
+    }
+  }
+
+  await asyncTest(
     "a future that uses a lock and that is cancelled from JS",
     async (t) => {
+      const errors = new Counter();
+      const success = new Counter();
+
+      // Task 1 should hold the resource for 100 seconds.
+      // We make an abort controller and get the signal from it, and pass it to
+      // Rust.
+      // Cancellation is done by dropping the future, so the Rust should be prepared
+      // for that.
+      const abortController = new AbortController();
       const task1 = useSharedResource(
         SharedResourceOptions.create({
-          releaseAfterMs: 5000,
+          releaseAfterMs: 100000,
           timeoutMs: 100,
         }),
-      );
-      // #RUST_TASK_CANCELLATION
-      //
-      // Again this test is not really applicable for JS, as it has no standard way of
-      // cancelling a task.
-      // task1.cancel()
+        { signal: abortController.signal },
+      ).then(success.wat(), errors.ok());
 
-      // Try accessing the shared resource again.  The initial task should release the shared resource
-      // before the timeout expires.
+      // Task 2 should try to grab the resource, but timeout after 1 second.
+      // Unless we abort task 1, then task 1 will hold on, but task 2 will timeout and
+      // fail.
       const task2 = useSharedResource(
         SharedResourceOptions.create({ releaseAfterMs: 0, timeoutMs: 1000 }),
+      ).then(success.ok(), errors.wat());
+
+      // We wait for 500 ms, then call the abortController.abort().
+      const delay = delayPromise(500).then(() => abortController.abort());
+
+      await Promise.allSettled([task1, task2, delay]);
+      t.assertEqual(errors.expectedCount, 1, "only task1 should have failed");
+      t.assertEqual(
+        success.expectedCount,
+        1,
+        "only task2 should have succeeded",
       );
 
-      await Promise.allSettled([task1, task2]);
+      t.assertEqual(errors.unexpectedCount, 0, "task2 should not have failed");
+      t.assertEqual(
+        success.unexpectedCount,
+        0,
+        "task1 should not have succeeded",
+      );
       checkRemainingFutures(t);
       t.end();
     },

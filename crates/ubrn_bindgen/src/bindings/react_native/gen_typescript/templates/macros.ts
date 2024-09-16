@@ -215,11 +215,20 @@ import { decl_type_name } from "./EnumTemplate"
 {%- endif -%}
 {%- endmacro %}
 
+{#-
+// This macros is almost identical to `arg_list_decl`,
+// but is for interface methods, which do not allow
+// default values for arguments.
+#}
 {% macro arg_list_protocol(func) %}
     {%- for arg in func.arguments() -%}
         {{ arg.name()|var_name }}: {{ arg|type_name(self) -}}
         {%- if !loop.last %}, {% endif -%}
     {%- endfor %}
+    {%- if func.is_async() %}
+    {%-   if !func.arguments().is_empty() %}, {% endif -%}
+    asyncOpts_?: { signal: AbortSignal }
+    {%- endif %}
 {%- endmacro %}
 
 {%- macro async(func) %}
