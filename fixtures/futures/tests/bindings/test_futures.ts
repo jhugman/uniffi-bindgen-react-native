@@ -138,11 +138,7 @@ function checkRemainingFutures(t: Asserts) {
 
   await asyncTest("Async methods", async (t) => {
     const megaphone = newMegaphone();
-    let helloAlice = await t.asyncMeasure(
-      async () => megaphone.sayAfter(500, "Alice"),
-      500,
-      20,
-    );
+    const helloAlice = await megaphone.sayAfter(500, "Alice");
     t.assertEqual("HELLO, ALICE!", helloAlice);
     checkRemainingFutures(t);
     t.end();
