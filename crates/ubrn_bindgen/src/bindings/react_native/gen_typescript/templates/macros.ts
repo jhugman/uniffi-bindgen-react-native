@@ -138,6 +138,7 @@ import { decl_type_name } from "./EnumTemplate"
             /*liftFunc:*/ (_v) => {},
             {%- endmatch %}
             /*liftString:*/ FfiConverterString.lift,
+            /*asyncOpts:*/ asyncOpts_,
             {%- match callable.throws_type() %}
             {%- when Some with (e) %}
             /*errorHandler:*/ {{ e|lift_error_fn(self) }}
@@ -166,6 +167,11 @@ import { decl_type_name } from "./EnumTemplate"
         {%- endmatch %}
         {%- if !loop.last %}, {% endif -%}
     {%- endfor %}
+    {%- if func.is_async() %}
+    {%-   if !func.arguments().is_empty() %}, {% endif -%}
+    asyncOpts_?: { signal: AbortSignal }
+    {%- endif %}
+
 {%- endmacro %}
 
 {#-

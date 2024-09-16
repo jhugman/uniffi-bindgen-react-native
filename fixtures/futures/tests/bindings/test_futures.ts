@@ -37,7 +37,7 @@ import {
   uniffiRustFutureHandleCount,
   uniffiForeignFutureHandleCount,
 } from "uniffi-bindgen-react-native";
-import { console } from "@/hermes";
+import "@/polyfills";
 
 // Initialize the callbacks for the module.
 // This will be hidden in the installation process.
@@ -283,26 +283,29 @@ function checkRemainingFutures(t: Asserts) {
   });
 
   /**
-   * Skipping this test as it is testing an abort being propogated to Javascript.
+   * Rust supports task cancellation, but it's not automatic. It is rather like
+   * Javascript's.
    *
-   * Cancellable promises aren't a standard in JS, so there is nothing to cancel.
+   * In Javascript, an `AbortController` is used to make an `AbortSignal`.
    *
-   * Even then, the single threaded-ness of JS means that this test would rely on client
-   * code, i.e. `doDelay` checking if the Promise had been cancelled before incrementing
-   * the `completedDelays` count.
+   * The task itself periodically checks the `AbortSignal` (or listens for an `abort` event),
+   * then takes abortive actions. This usually happens when the `AbortController.abort` method
+   * is called.
+   *
+   * In Rust, an `AbortHandle` is analagous to the `AbortController`.
+   *
+   * This test checks if that signal is being triggered by a Rust.
    */
-  await xasyncTest("cancellation of async JS callbacks", async (t) => {
-    const traitObj = new TsAsyncParser();
+  await asyncTest("cancellation of async JS callbacks", async (t) => {
+    const traitObj = new CancellableTsAsyncParser();
 
     // #JS_TASK_CANCELLATION
     const completedDelaysBefore = traitObj.completedDelays;
-    const promise = cancelDelayUsingTrait(traitObj, 100);
-    // sleep long enough so that the `delay()` call would finish if it wasn't cancelled.
-    await delayPromise(1000);
-    await promise;
-    // If the task was cancelled, then completedDelays won't have increased
-    // however, this is cancelling the async callback, which doesn't really make any sense
-    // in Javascript.
+    // This method calls into the async callback to sleep (in Javascript) for 100 seconds.
+    // On a different thread, in Rust, it cancels the task. This sets the `AbortSignal` passed to the
+    // callback function.
+    await cancelDelayUsingTrait(traitObj, 10000);
+    // If the task was cancelled, then completedDelays won't have increased.
     t.assertEqual(
       traitObj.completedDelays,
       completedDelaysBefore,
@@ -423,6 +426,22 @@ function checkRemainingFutures(t: Asserts) {
   });
 
   await asyncTest(
+    "future method… which is cancelled before it starts",
+    async (t) => {
+      // The polyfill doesn't support AbortSignal.abort(), so we have
+      // to make do with making one ourselves.
+      const abortController = new AbortController();
+      abortController.abort();
+
+      await t.assertThrowsAsync(
+        (err: any) => err instanceof Error && err.name == "AbortError",
+        async () => fallibleMe(true, { signal: abortController.signal }),
+      ),
+        t.end();
+    },
+  );
+
+  await asyncTest(
     "a future that uses a lock and that is not cancelled",
     async (t) => {
       const task1 = useSharedResource(
@@ -478,6 +497,7 @@ function checkRemainingFutures(t: Asserts) {
         }),
       );
 
+      console.info("Expect a timeout here");
       await t.assertThrowsAsync(AsyncError.Timeout.instanceOf, async () => {
         await useSharedResource(
           SharedResourceOptions.create({

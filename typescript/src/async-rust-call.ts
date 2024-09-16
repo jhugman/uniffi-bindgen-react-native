@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+import { UniffiInternalError } from "./errors";
 import { UniffiHandleMap, type UniffiHandle } from "./handle-map";
 import {
   type UniffiErrorHandler,
@@ -56,10 +57,30 @@ export async function uniffiRustCallAsync<F, T>(
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
   liftString: (arrayBuffer: ArrayBuffer) => string,
+  asyncOpts?: { signal: AbortSignal },
   errorHandler?: UniffiErrorHandler,
 ): Promise<T> {
+  // If the underlying Rust API supports task cancellation, then we should
+  // check if should bail early.
+  //
+  // However, it's unlikely that the Rust API does; so this maybe the
+  // only support we're giving that abort is supported.
+  //
+  // We'd like to use signal.throwIfAborted(), but the polyfill we use during
+  // testing does not implement this method.
+  if (asyncOpts?.signal.aborted === true) {
+    return Promise.reject(new UniffiInternalError.AbortError());
+  }
+
   // This actually calls into the client rust method.
   const rustFuture = rustFutureFunc();
+
+  asyncOpts?.signal.addEventListener("abort", () => {
+    cancelFunc(rustFuture);
+    // We don't do anything other than call cancel.
+    // This will have cause pollFunc to come back with a POLL_READY,
+    // then the makeRustCall will throw an AbortError.
+  });
 
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
@@ -81,9 +102,6 @@ export async function uniffiRustCallAsync<F, T>(
         errorHandler,
       ),
     );
-
-    // #RUST_TASK_CANCELLATION: the unused `cancelFunc` function should be exposed
-    // to client code in order for clients to be able to cancel the running Rust task.
   } finally {
     freeFunc(rustFuture);
   }
