@@ -40,6 +40,8 @@ export async function delayPromise(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+// We'd most likely want this to be a microTask, but hermes doesn't support the
+// Javascript API for them yet.
 async function nextTickPromise(): Promise<void> {
   return await delayPromise(0);
 }
@@ -97,15 +99,21 @@ export async function uniffiRustCallAsync<F, T>(
   try {
     let pollResult: number | undefined;
     do {
+      // Now we have a future, we should prompt some work to happen in Rust.
+      // We need to make sure we don't poll from the stack frame as we the end of the poll,
+      // so we wait until the next tick before polling.
+      await nextTickPromise();
+
       // Calling pollFunc with a callback that resolves the promise that pollRust
       // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
       pollResult = await pollRust((handle) => {
         pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
       });
-      // We yield here to allow other tasks to happen between
-      // the end of the poll and the beginning of the next one.
-      await nextTickPromise();
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
+
+    // Now we've finished polling, as a precaution, we wait until the next tick before
+    // picking up the results.
+    await nextTickPromise();
 
     // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
