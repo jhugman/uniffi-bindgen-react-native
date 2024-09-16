@@ -4,14 +4,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::process::Command;
+use std::{collections::HashMap, fmt::Display, process::Command, str::FromStr};
 
-use anyhow::Result;
+use anyhow::{Context, Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use heck::ToUpperCamelCase;
-use serde::Deserialize;
-use ubrn_common::{rm_dir, run_cmd, CrateMetadata};
+use serde::{Deserialize, Serialize};
+use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
@@ -33,7 +33,7 @@ pub(crate) struct IOsConfig {
     pub(crate) xcodebuild_extras: ExtraArgs,
 
     #[serde(default = "IOsConfig::default_targets")]
-    pub(crate) targets: Vec<String>,
+    pub(crate) targets: Vec<Target>,
 
     #[serde(default = "IOsConfig::default_cargo_extras")]
     pub(crate) cargo_extras: ExtraArgs,
@@ -61,9 +61,9 @@ impl IOsConfig {
         args.into()
     }
 
-    fn default_targets() -> Vec<String> {
+    fn default_targets() -> Vec<Target> {
         let args: &[&str] = &["aarch64-apple-ios", "aarch64-apple-ios-sim"];
-        args.iter().map(|s| s.to_string()).collect()
+        args.iter().map(|s| Target::from_str(s).unwrap()).collect()
     }
 }
 
@@ -105,6 +105,16 @@ pub(crate) struct IOsArgs {
     #[clap(long, alias = "no-xcframework")]
     no_xcodebuild: bool,
 
+    /// Comma separated list of targets, that override the values in
+    /// the `config.yaml` file.
+    ///
+    /// iOS:
+    ///  aarch64-apple-ios,
+    ///  aarch64-apple-ios-sim,
+    ///  x86_64-apple-ios
+    #[clap(short, long, value_parser, num_args = 1.., value_delimiter = ',')]
+    pub(crate) targets: Vec<Target>,
+
     #[clap(flatten)]
     pub(crate) common_args: CommonBuildArgs,
 }
@@ -115,11 +125,16 @@ impl IOsArgs {
         let crate_ = &config.crate_;
         let ios = &config.ios;
 
-        let targets = ios
-            .targets
+        let target_list = if !self.targets.is_empty() {
+            &self.targets
+        } else {
+            &ios.targets
+        };
+
+        let targets = target_list
             .iter()
             .filter(|target| {
-                let is_sim = target.contains("sim");
+                let is_sim = target.platform == Platform::IosSimulator;
                 if self.no_sim {
                     !is_sim
                 } else if self.sim_only {
@@ -128,7 +143,7 @@ impl IOsArgs {
                     true
                 }
             })
-            .map(String::clone)
+            .cloned()
             .collect::<Vec<_>>();
 
         let target_files = if self.common_args.no_cargo {
@@ -142,19 +157,22 @@ impl IOsArgs {
             self.cargo_build_all(crate_, &targets, &ios.cargo_extras)?
         };
 
-        if !self.no_xcodebuild {
+        Ok(if !self.no_xcodebuild {
+            let target_files = self.lipo_when_necessary(crate_, target_files)?;
             self.create_xcframework(&config, &target_files)?;
-        }
-        Ok(target_files)
+            target_files
+        } else {
+            target_files.into_values().collect()
+        })
     }
 
     fn cargo_build_all(
         &self,
         crate_: &CrateConfig,
-        targets: &[String],
+        targets: &[Target],
         cargo_extras: &ExtraArgs,
-    ) -> Result<Vec<Utf8PathBuf>> {
-        let mut target_files = Vec::new();
+    ) -> Result<HashMap<Target, Utf8PathBuf>> {
+        let mut target_files = HashMap::new();
         let metadata = crate_.metadata()?;
         let rust_dir = crate_.directory()?;
         let manifest_path = crate_.manifest_path()?;
@@ -162,9 +180,9 @@ impl IOsArgs {
             self.cargo_build(&manifest_path, target, cargo_extras, &rust_dir)?;
 
             // Now we need to get the path to the lib.a file, to feed to xcodebuild.
-            let library = metadata.library_path(Some(target), self.common_args.profile());
+            let library = metadata.library_path(Some(&target.triple), self.common_args.profile());
             metadata.library_path_exists(&library)?;
-            target_files.push(library);
+            target_files.insert(target.clone(), library);
         }
         Ok(target_files)
     }
@@ -172,7 +190,7 @@ impl IOsArgs {
     fn cargo_build(
         &self,
         manifest_path: &Utf8PathBuf,
-        target: &String,
+        target: &Target,
         cargo_extras: &ExtraArgs,
         rust_dir: &Utf8PathBuf,
     ) -> Result<()> {
@@ -181,7 +199,7 @@ impl IOsArgs {
             .arg("--manifest-path")
             .arg(manifest_path)
             .arg("--target")
-            .arg(target);
+            .arg(&target.triple);
         if self.common_args.release {
             cmd.arg("--release");
         }
@@ -190,10 +208,44 @@ impl IOsArgs {
         Ok(())
     }
 
+    fn lipo_when_necessary(
+        &self,
+        crate_: &CrateConfig,
+        target_files: HashMap<Target, Utf8PathBuf>,
+    ) -> Result<Vec<Utf8PathBuf>> {
+        let mut by_platform = HashMap::new();
+        for (target, file) in target_files {
+            let files = by_platform.entry(target.platform).or_insert(Vec::new());
+            files.push(file);
+        }
+        let metadata = crate_.metadata()?;
+
+        let mut sorted = Vec::new();
+        for (p, mut files) in by_platform {
+            if files.len() == 1 {
+                sorted.append(&mut files);
+            } else {
+                let dir = metadata.target_dir().join("lipo").join(p.lib_folder_name());
+                mk_dir(&dir)?;
+                let output = dir.join(metadata.library_file(Some("ios")));
+                let mut cmd = Command::new("lipo");
+                cmd.arg("-create");
+                for f in files {
+                    cmd.arg(f);
+                }
+                cmd.arg("-output").arg(&output);
+                run_cmd(&mut cmd)?;
+                sorted.push(output);
+            }
+        }
+
+        Ok(sorted)
+    }
+
     fn create_xcframework(
         &self,
         config: &ProjectConfig,
-        target_files: &Vec<Utf8PathBuf>,
+        target_files: &[Utf8PathBuf],
     ) -> Result<(), anyhow::Error> {
         let ios = &config.ios;
         let project_root = config.project_root();
@@ -218,19 +270,23 @@ impl IOsArgs {
         Ok(())
     }
 
-    fn find_existing(&self, metadata: &CrateMetadata, targets: &[String]) -> Vec<Utf8PathBuf> {
+    fn find_existing(
+        &self,
+        metadata: &CrateMetadata,
+        targets: &[Target],
+    ) -> HashMap<Target, Utf8PathBuf> {
         let profile = self.common_args.profile();
         targets
             .iter()
             .filter_map(|target| {
-                let library = metadata.library_path(Some(target), profile);
+                let library = metadata.library_path(Some(&target.triple), profile);
                 if library.exists() {
-                    Some(library)
+                    Some((target.clone(), library))
                 } else {
                     None
                 }
             })
-            .collect::<Vec<_>>()
+            .collect::<HashMap<_, _>>()
     }
 
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
@@ -239,5 +295,99 @@ impl IOsArgs {
 
     pub(crate) fn config(&self) -> Utf8PathBuf {
         self.config.clone()
+    }
+}
+
+/// A specific build target supported by the SDK.
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[serde(try_from = "String", into = "String")]
+pub(crate) struct Target {
+    triple: String,
+    platform: Platform,
+    description: String,
+}
+
+/// The platform for which a particular target can run on.
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+enum Platform {
+    Macos,
+    Ios,
+    IosSimulator,
+}
+
+impl Platform {
+    /// The name of the subfolder in which to place the library for the platform
+    /// once all architectures are lipo'd together.
+    fn lib_folder_name(&self) -> &str {
+        match self {
+            Platform::Macos => "macos",
+            Platform::Ios => "ios",
+            Platform::IosSimulator => "ios-simulator",
+        }
+    }
+}
+
+/// The list of targets supported by the SDK.
+fn supported_targets() -> Vec<Target> {
+    vec![
+        Target {
+            triple: "aarch64-apple-ios".into(),
+            platform: Platform::Ios,
+            description: "iOS".into(),
+        },
+        Target {
+            triple: "aarch64-apple-darwin".into(),
+            platform: Platform::Macos,
+            description: "macOS (Apple Silicon)".into(),
+        },
+        Target {
+            triple: "x86_64-apple-darwin".into(),
+            platform: Platform::Macos,
+            description: "macOS (Intel)".into(),
+        },
+        Target {
+            triple: "aarch64-apple-ios-sim".into(),
+            platform: Platform::IosSimulator,
+            description: "iOS Simulator (Apple Silicon)".into(),
+        },
+        Target {
+            triple: "x86_64-apple-ios".into(),
+            platform: Platform::IosSimulator,
+            description: "iOS Simulator (Intel)".into(),
+        },
+    ]
+}
+
+/// Additional work to make Target serializable/deserializable
+/// to and from a string without another dependency
+impl FromStr for Target {
+    type Err = Error;
+
+    fn from_str(t: &str) -> Result<Self, Self::Err> {
+        supported_targets()
+            .iter()
+            .find(|target| target.triple == t)
+            .cloned()
+            .with_context(|| format!("Unsupported target: '{t}'"))
+    }
+}
+
+impl TryFrom<String> for Target {
+    type Error = Error;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Target::from_str(&value)
+    }
+}
+
+impl From<Target> for String {
+    fn from(value: Target) -> Self {
+        value.to_string()
+    }
+}
+
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.triple)
     }
 }

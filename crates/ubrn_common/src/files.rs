@@ -5,7 +5,7 @@
  */
 use std::fs;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Deserialize;
 
@@ -91,11 +91,15 @@ where
     P: AsRef<Utf8Path>,
     for<'a> T: Deserialize<'a>,
 {
-    let s = std::fs::read_to_string(file.as_ref())?;
-    Ok(if is_yaml(&file) {
-        serde_yaml::from_str(&s)?
+    let file = file.as_ref();
+    let s =
+        std::fs::read_to_string(file).with_context(|| format!("Failed to read from {file:?}"))?;
+    Ok(if is_yaml(file) {
+        serde_yaml::from_str(&s)
+            .with_context(|| format!("Failed to read {file:?} as valid YAML"))?
     } else {
-        serde_json::from_str(&s)?
+        serde_json::from_str(&s)
+            .with_context(|| format!("Failed to read {file:?} as valid YAML or JSON"))?
     })
 }
 
