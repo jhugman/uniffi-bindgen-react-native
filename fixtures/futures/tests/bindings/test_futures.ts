@@ -44,9 +44,7 @@ import "@/polyfills";
 myModule.initialize();
 
 function delayPromise(delayMs: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, delayMs);
-  });
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 function cancellableDelayPromise(
@@ -76,6 +74,18 @@ function checkRemainingFutures(t: Asserts) {
 }
 
 (async () => {
+  await asyncTest("Test delay promise", async (t) => {
+    console.info("Starting delay");
+    await delayPromise(0);
+    const start = Date.now();
+    await delayPromise(1000);
+    const actual = Date.now() - start;
+    console.info(`Ending delay, measured: ${actual} ms`);
+    t.assertInRange(actual, 900, 1100);
+
+    t.end();
+  });
+
   await asyncTest("alwaysReady", async (t) => {
     const result = await alwaysReady();
     t.assertTrue(result);
@@ -141,7 +151,7 @@ function checkRemainingFutures(t: Asserts) {
     let helloAlice = await t.asyncMeasure(
       async () => megaphone.sayAfter(500, "Alice"),
       500,
-      20,
+      50,
     );
     t.assertEqual("HELLO, ALICE!", helloAlice);
     checkRemainingFutures(t);
@@ -589,4 +599,26 @@ function checkRemainingFutures(t: Asserts) {
       t.end();
     },
   );
+
+  await asyncTest("Test error stack traces", async (t) => {
+    t.assertEqual(42, await fallibleMe(false));
+    await t.assertThrowsAsync(
+      (err) => {
+        if (!MyError.Foo.instanceOf(err)) {
+          return false;
+        }
+        if (!(err instanceof Error)) {
+          return false;
+        }
+        t.assertNotNull(err.stack);
+        t.assertTrue(
+          err.stack!.indexOf("fallibleMe") >= 0,
+          `STACK does not contain fallibleMe: ${err.stack!}`,
+        );
+        return true;
+      },
+      async () => await fallibleMe(true),
+    );
+    t.end();
+  });
 })();

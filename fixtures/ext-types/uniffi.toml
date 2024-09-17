@@ -1,3 +1,7 @@
+[bindings.typescript]
+logLevel = "debug"
+consoleImport = "@/hermes"
+
 [bindings.python.external_packages]
 # This fixture does not create a Python package, so we want all modules to be top-level modules.
 custom_types = ""
