@@ -64,6 +64,8 @@ impl TemplateConfig {
         rust_crate: CrateMetadata,
         modules: Vec<ModuleMetadata>,
     ) -> Self {
+        let mut modules = modules;
+        modules.sort_by_key(|m| m.ts());
         Self {
             project,
             rust_crate,
