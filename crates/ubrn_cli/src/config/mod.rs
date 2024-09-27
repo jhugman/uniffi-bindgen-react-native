@@ -7,6 +7,7 @@ mod npm;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use globset::GlobSet;
+use heck::ToUpperCamelCase;
 pub(crate) use npm::PackageJson;
 
 use serde::Deserialize;
@@ -45,7 +46,7 @@ pub(crate) struct ProjectConfig {
 
 impl ProjectConfig {
     fn default_name() -> String {
-        workspace::package_json().raw_name()
+        workspace::package_json().trimmed_name()
     }
 
     fn default_repository() -> String {
@@ -73,7 +74,7 @@ impl ProjectConfig {
 
 impl ProjectConfig {
     fn name(&self) -> String {
-        trim_react_native(&self.name)
+        self.name.clone()
     }
 
     pub(crate) fn raw_name(&self) -> &str {
@@ -180,8 +181,7 @@ impl TurboModulesConfig {
 
     fn default_spec_name() -> String {
         let package_json = workspace::package_json();
-        let codegen_name = &package_json.codegen().name;
-        format!("Native{}", trim_react_native(codegen_name))
+        trim_react_native(&package_json.codegen().name)
     }
 }
 
@@ -201,7 +201,7 @@ impl TurboModulesConfig {
     }
 
     pub(crate) fn spec_name(&self) -> String {
-        self.spec_name.clone()
+        self.spec_name.to_upper_camel_case()
     }
 
     pub(crate) fn name(&self) -> String {
