@@ -12,6 +12,6 @@ export const uniffiCreateRecord = <T, D extends Partial<T>>(
   defaults: () => D,
 ) => {
   type MissingKeys = Omit<T, keyof D>;
-  return (partial: Required<MissingKeys> & Partial<D>): T =>
+  return (partial: Partial<T> & Required<MissingKeys>): T =>
     Object.freeze({ ...defaults(), ...partial } as T);
 };
