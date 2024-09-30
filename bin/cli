@@ -1,19 +1,10 @@
-#!/usr/bin/env bash
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/
-#
-set -e
+#!/usr/bin/env node
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ */
 
-# Use Node to resolve the path to the module. The require.resolve
-# function returns a thing like:
-#
-# PATH_TO/node_modules/uniffi-bindgen-react-native/typescript/src/index.ts
-#
-# So we drop the /typescript/src/index.ts.
-resolved_path=$(node --print "require.resolve('uniffi-bindgen-react-native')")
-root_dir=${resolved_path/\/typescript\/src\/index.ts*/}
-manifest_path="${root_dir}/crates/ubrn_cli/Cargo.toml"
-
-cargo run --quiet --manifest-path "${manifest_path}" -- "$@"
+// Launchable shell script.
+// We just invoke the node cjs file.
+import "./cli.cjs";
