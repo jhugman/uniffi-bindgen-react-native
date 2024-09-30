@@ -14,7 +14,7 @@ namespace {{ self.config.project.cpp_namespace() }} {
         {%- for m in self.config.modules %}
 		{{ m.cpp_module() }}::registerModule(runtime, callInvoker);
         {%- endfor %}
-		return true;
+		return false;
 	}
 
 	uint8_t cleanupRustCrate(jsi::Runtime &runtime) {

@@ -25,7 +25,7 @@ impl PackageJson {
         self.name.clone()
     }
 
-    pub(crate) fn trimmed_name(&self) -> String {
+    pub(crate) fn name(&self) -> String {
         trim_react_native(&self.name)
     }
 
@@ -34,14 +34,7 @@ impl PackageJson {
             .android
             .java_package_name
             .clone()
-            .unwrap_or_else(|| {
-                format!(
-                    "com.{}",
-                    trim_react_native(&self.raw_name())
-                        .to_upper_camel_case()
-                        .to_lowercase()
-                )
-            })
+            .unwrap_or_else(|| format!("com.{}", self.name().to_upper_camel_case().to_lowercase()))
     }
 
     pub(crate) fn repo(&self) -> &PackageJsonRepo {
