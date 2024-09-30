@@ -42,6 +42,41 @@ test("array buffer roundtrip using read/write", (t) => {
   }
 });
 
+test("ArrayBuffer roundtrip of different sizes", (t) => {
+  function rt(ab: ArrayBuffer) {
+    t.assertNotNull(identityArrayBuffer(ab)!);
+  }
+  // 1 kB = 1<<10
+  // 1 MB = 1<<20
+  // 16 MB = 1<<24
+  for (let i = 0; i < 26; i++) {
+    const byteLength = 1 << i;
+    const buffer = new ArrayBuffer(byteLength);
+    const start = Date.now();
+    rt(buffer);
+    const end = Date.now();
+    console.log(
+      `ArrayBuffer roundtrip: ${bytes(byteLength)} in ${end - start} ms`,
+    );
+  }
+});
+
+function bytes(n: number): string {
+  if (n === 0) {
+    return "0 bytes";
+  }
+  if (n < 1 << 10) {
+    return `${n} bytes`;
+  }
+  if (n < 1 << 20) {
+    return `${n / (1 << 10)} kB`;
+  }
+  if (n < 1 << 30) {
+    return `${n / (1 << 20)} MB`;
+  }
+  return `${n / (1 << 30)} GB`;
+}
+
 test("array buffer roundtrip with ArrayBufferView", (t) => {
   function rt(ab: ArrayBuffer) {
     t.assertEqual(
@@ -107,6 +142,6 @@ function abEquals(a: ArrayBuffer, b: ArrayBuffer): boolean {
 }
 
 function arrayBuffer(numBytes: number): ArrayBuffer {
-  const array = Uint8Array.from({ length: numBytes }, (_v, i) => i);
+  const array = Uint8Array.from({ length: numBytes }, (_v, i) => i % 255);
   return array.buffer;
 }
