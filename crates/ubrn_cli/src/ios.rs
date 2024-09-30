@@ -47,9 +47,7 @@ impl IOsConfig {
     fn default_framework_name() -> String {
         format!(
             "{}Framework",
-            workspace::package_json()
-                .trimmed_name()
-                .to_upper_camel_case()
+            workspace::package_json().name().to_upper_camel_case()
         )
     }
 

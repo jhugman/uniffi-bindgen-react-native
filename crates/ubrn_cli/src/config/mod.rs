@@ -7,7 +7,6 @@ mod npm;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use globset::GlobSet;
-use heck::ToUpperCamelCase;
 pub(crate) use npm::PackageJson;
 
 use serde::Deserialize;
@@ -46,7 +45,7 @@ pub(crate) struct ProjectConfig {
 
 impl ProjectConfig {
     fn default_name() -> String {
-        workspace::package_json().trimmed_name()
+        workspace::package_json().raw_name()
     }
 
     fn default_repository() -> String {
@@ -57,13 +56,7 @@ impl ProjectConfig {
 }
 
 fn trim_react_native(name: &str) -> String {
-    name.strip_prefix("RN")
-        .unwrap_or(name)
-        .replace("ReactNative", "")
-        .replace("react-native", "")
-        .trim_matches('-')
-        .trim_matches('_')
-        .to_string()
+    name.trim_matches('-').trim_matches('_').to_string()
 }
 
 impl ProjectConfig {
@@ -74,7 +67,7 @@ impl ProjectConfig {
 
 impl ProjectConfig {
     fn name(&self) -> String {
-        self.name.clone()
+        trim_react_native(&self.name)
     }
 
     pub(crate) fn raw_name(&self) -> &str {
@@ -181,7 +174,8 @@ impl TurboModulesConfig {
 
     fn default_spec_name() -> String {
         let package_json = workspace::package_json();
-        trim_react_native(&package_json.codegen().name)
+        let codegen_name = &package_json.codegen().name;
+        trim_react_native(codegen_name)
     }
 }
 
@@ -201,7 +195,7 @@ impl TurboModulesConfig {
     }
 
     pub(crate) fn spec_name(&self) -> String {
-        self.spec_name.to_upper_camel_case()
+        self.spec_name.clone()
     }
 
     pub(crate) fn name(&self) -> String {
