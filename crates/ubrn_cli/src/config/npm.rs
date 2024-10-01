@@ -7,7 +7,7 @@
 use heck::ToUpperCamelCase;
 use serde::Deserialize;
 
-use super::trim_react_native;
+use super::{trim_react_native, trim_react_native_2};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,7 +34,14 @@ impl PackageJson {
             .android
             .java_package_name
             .clone()
-            .unwrap_or_else(|| format!("com.{}", self.name().to_upper_camel_case().to_lowercase()))
+            .unwrap_or_else(|| {
+                format!(
+                    "com.{}",
+                    trim_react_native_2(&self.name)
+                        .to_upper_camel_case()
+                        .to_lowercase()
+                )
+            })
     }
 
     pub(crate) fn repo(&self) -> &PackageJsonRepo {
