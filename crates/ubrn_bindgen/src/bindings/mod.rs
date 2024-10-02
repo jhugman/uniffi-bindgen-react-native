@@ -75,8 +75,6 @@ pub struct SourceArgs {
     lib_file: Option<Utf8PathBuf>,
 
     /// Override the default crate name that is guessed from UDL file path.
-    ///
-    /// In library mode, this
     #[clap(long = "crate")]
     crate_name: Option<String>,
 

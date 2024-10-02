@@ -24,7 +24,7 @@ impl GenerateArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum GenerateCmd {
-    /// Generate the just the bindings
+    /// Generate just the Typescript and C++ bindings
     Bindings(BindingsArgs),
     /// Generate the TurboModule code to plug the bindings into the app
     TurboModule(TurboModuleArgs),
@@ -75,8 +75,7 @@ impl GenerateAllArgs {
         let pwd = ubrn_common::pwd()?;
         let lib_file = pwd.join(&self.lib_file);
         let modules = {
-            let dir = project.crate_.directory()?;
-            ubrn_common::cd(&dir)?;
+            ubrn_common::cd(&project.crate_.crate_dir()?)?;
             let ts_dir = project.bindings.ts_path(root);
             let cpp_dir = project.bindings.cpp_path(root);
             let config = project.bindings.uniffi_toml_path(root);

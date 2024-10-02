@@ -11,7 +11,7 @@ import com.facebook.react.module.annotations.ReactModule;
 import com.facebook.react.turbomodule.core.interfaces.CallInvokerHolder;
 
 @ReactModule(name = {{ module_class_name }}.NAME)
-public class {{ module_class_name }} extends {{ self.config.project.tm.spec_name() }} {
+public class {{ module_class_name }} extends {{ self.config.project.codegen_filename() }}Spec {
   public static final String NAME = "{{ name }}";
 
   public {{ module_class_name }}(ReactApplicationContext reactContext) {

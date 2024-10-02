@@ -43,6 +43,12 @@ impl CrateConfig {
         Ok(self.directory()?.join(&self.manifest_path))
     }
 
+    pub(crate) fn crate_dir(&self) -> Result<Utf8PathBuf> {
+        let manifest = self.manifest_path()?;
+        let dir = manifest.parent().unwrap();
+        Ok(dir.into())
+    }
+
     pub(crate) fn metadata(&self) -> Result<CrateMetadata> {
         self.manifest_path()?.try_into()
     }
@@ -57,7 +63,7 @@ pub(crate) enum RustSource {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct OnDiskArgs {
-    #[serde(alias = "rust")]
+    #[serde(alias = "rust", alias = "directory")]
     pub(crate) src: String,
 }
 

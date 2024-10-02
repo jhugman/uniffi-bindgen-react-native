@@ -250,6 +250,7 @@ impl IOsArgs {
         let ios = &config.ios;
         let project_root = config.project_root();
         let ios_dir = ios.directory(project_root);
+        ubrn_common::mk_dir(&ios_dir)?;
         let mut library_args = Vec::new();
         for library in target_files {
             // :eyes: single dash arg.

@@ -61,7 +61,9 @@ pub(crate) struct CustomTypeConfig {
     #[serde(default)]
     pub(crate) imports: Vec<(String, String)>,
     pub(crate) type_name: Option<String>,
+    #[serde(alias = "lift")]
     pub(crate) into_custom: TemplateExpression,
+    #[serde(alias = "lower")]
     pub(crate) from_custom: TemplateExpression,
 }
 

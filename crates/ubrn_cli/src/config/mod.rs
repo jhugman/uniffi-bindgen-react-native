@@ -22,7 +22,7 @@ pub(crate) struct ProjectConfig {
     #[serde(default = "ProjectConfig::default_repository")]
     pub(crate) repository: String,
 
-    #[serde(rename = "crate")]
+    #[serde(rename = "rust", alias = "crate")]
     pub(crate) crate_: CrateConfig,
 
     #[serde(default)]
@@ -57,6 +57,16 @@ impl ProjectConfig {
 
 fn trim_react_native(name: &str) -> String {
     name.trim_matches('-').trim_matches('_').to_string()
+}
+
+fn trim_react_native_2(name: &str) -> String {
+    name.strip_prefix("RN")
+        .unwrap_or(name)
+        .replace("ReactNative", "")
+        .replace("react-native", "")
+        .trim_matches('-')
+        .trim_matches('_')
+        .to_string()
 }
 
 impl ProjectConfig {

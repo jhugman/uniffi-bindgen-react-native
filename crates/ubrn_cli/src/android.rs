@@ -37,7 +37,6 @@ pub(crate) struct AndroidConfig {
     #[serde(default = "AndroidConfig::default_platform", alias = "platform")]
     pub(crate) api_level: usize,
 
-    #[allow(dead_code)]
     #[serde(default = "AndroidConfig::default_package_name")]
     pub(crate) package_name: String,
 }
@@ -190,8 +189,8 @@ impl AndroidArgs {
         cargo_extras: &ExtraArgs,
         api_level: usize,
     ) -> Result<HashMap<Target, Utf8PathBuf>> {
-        let rust_dir = crate_.directory()?;
         let manifest_path = crate_.manifest_path()?;
+        let rust_dir = crate_.crate_dir()?;
         let metadata = crate_.metadata()?;
         let mut target_files = HashMap::new();
         let profile = self.common_args.profile();
