@@ -160,6 +160,7 @@ mod files {
             BuildGradle::rc_new(config.clone()),
             CMakeLists::rc_new(config.clone()),
             CppAdapter::rc_new(config.clone()),
+            AndroidManifest::rc_new(config.clone()),
             // iOS
             ModuleTemplateH::rc_new(config.clone()),
             ModuleTemplateMm::rc_new(config.clone()),
@@ -293,6 +294,18 @@ mod files {
             let name = self.config.project.raw_name();
             let filename = format!("{name}.podspec");
             project_root.join(filename)
+        }
+    }
+
+    templated_file!(AndroidManifest, "AndroidManifest.xml");
+    impl RenderedFile for AndroidManifest {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let filename = "AndroidManifest.xml";
+            self.config
+                .project
+                .android
+                .src_main_dir(project_root)
+                .join(filename)
         }
     }
 }
