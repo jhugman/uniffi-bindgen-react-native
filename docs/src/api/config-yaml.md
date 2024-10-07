@@ -28,7 +28,7 @@ rust:
 	branch: main
 	manifest-path: crates/my-api/Cargo.toml
 ```
-In this case, the `ubrn checkout` command will clone the given repo with the branch/ref into the `rust_modules` directory of the project.
+In this case, the `ubrn checkout` command will clone the given repo with the branch/ref into the `rust_modules` directory of the project. Note that instead of `branch` you can also use `rev` or `ref`.
 
 If run a second time, no overwriting will occur.
 

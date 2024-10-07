@@ -19,7 +19,7 @@ pub(crate) struct GitRepoArgs {
     pub(crate) repo: String,
     /// The branch or tag which to checkout
     #[clap(long, default_value = "main")]
-    #[serde(default = "GitRepoArgs::default_branch")]
+    #[serde(alias = "rev", alias = "ref", default = "GitRepoArgs::default_branch")]
     pub(crate) branch: String,
 }
 
