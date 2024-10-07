@@ -19,7 +19,7 @@ pub(crate) struct GitRepoArgs {
     pub(crate) repo: String,
     /// The branch or tag which to checkout
     #[clap(long, default_value = "main")]
-    #[serde(default = "GitRepoArgs::default_branch")]
+    #[serde(alias = "rev", alias = "ref", default = "GitRepoArgs::default_branch")]
     pub(crate) branch: String,
 }
 
@@ -68,12 +68,31 @@ impl GitRepoArgs {
     }
 
     pub(crate) fn checkout(&self, project_root: &Utf8Path) -> Result<()> {
+        // git clone --depth 1 if directory doesn't already exist
+        if !self.directory(project_root)?.exists() {
+            let mut cmd = Command::new("git");
+            cmd.arg("clone")
+                .arg(&self.repo)
+                .arg(self.directory(project_root)?)
+                .arg("--depth")
+                .arg("1");
+            run_cmd(&mut cmd)?;
+        }
+
+        // git fetch --depth 1 origin $branch
         let mut cmd = Command::new("git");
-        cmd.arg("clone")
-            .arg(&self.repo)
-            .arg(self.directory(project_root)?)
-            .arg("--single-branch")
-            .arg("--branch")
+        cmd.current_dir(self.directory(project_root)?)
+            .arg("fetch")
+            .arg("--depth")
+            .arg("1")
+            .arg("origin")
+            .arg(&self.branch);
+        run_cmd(&mut cmd)?;
+
+        // git checkout $branch
+        let mut cmd = Command::new("git");
+        cmd.current_dir(self.directory(project_root)?)
+            .arg("checkout")
             .arg(&self.branch);
         run_cmd(&mut cmd)
     }
