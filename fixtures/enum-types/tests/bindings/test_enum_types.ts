@@ -25,7 +25,7 @@ import {
   AnimalObjectInterface,
 } from "../../generated/enum_types";
 
-test("Enum disriminant", (t) => {
+test("Enum discriminant", (t) => {
   t.assertEqual(Animal.Dog, 0);
   t.assertEqual(Animal.Cat, 1);
   t.assertEqual(getAnimal(undefined), Animal.Dog);
