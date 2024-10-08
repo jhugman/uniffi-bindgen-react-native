@@ -58,6 +58,7 @@ impl HermesCmd {
         run_cmd(
             Command::new("git")
                 .arg("clone")
+                .arg("--single-branch")
                 .arg("-b")
                 .arg(self.branch.as_str())
                 .arg(&repo)
