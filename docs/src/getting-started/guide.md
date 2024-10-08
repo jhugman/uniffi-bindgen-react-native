@@ -115,7 +115,7 @@ alias ubrn=$(yarn ubrn --path)
 
 There is a guide to the `ubrn` command [here][cli].
 
-[cli]: ../api/commandline.md
+[cli]: ../reference/commandline.md
 
 
 ```admonish warning title="Pre-release"
@@ -123,7 +123,7 @@ While this is before the first release, we're installing straight from local `no
 
 After release, the C++ runtime will be published to Cocoa Pods.
 
-Until thenm you need to add the dependency to the `example/ios/Podfile`:
+Until then, you need to add the dependency to the app's Podfile, in this case `example/ios/Podfile`:
 ```
 
 ```diff
@@ -143,7 +143,7 @@ Until thenm you need to add the dependency to the `example/ios/Podfile`:
 
 Full documentation on how to configure your library can be found in [the YAML configuration file page][config] of this book.
 
-[config]: ../api/config-yaml.md
+[config]: ../reference/config-yaml.md
 
 For now, we just want to get started; let's start with an existing Rust crate that has uniffi bindings.
 
@@ -151,10 +151,8 @@ For now, we just want to get started; let's start with an existing Rust crate th
 ---
 name: MyRustLib
 rust:
-  # forked from https://github.com/ianthetechie/uniffi-starter
-  # and bumped to 0.28.1
-  repo: https://github.com/jhugman/uniffi-starter
-  branch: jhugman/bump-uniffi-rs-to-0.28.1
+  repo: https://github.com/ianthetechie/uniffi-starter
+  branch: main
   manifestPath: rust/foobar/Cargo.toml
 ```
 
@@ -173,9 +171,10 @@ This will checkout the `uniffi-starter` repo into the `rust_modules` directory w
 Building for iOS will:
 
 1. Build the Rust crate for iOS, including the uniffi scaffolding in Rust.
-1. Build an `xcframework`
+1. Build an `xcframework` for Xcode to pick up.
 1. Generate the typescript and C++ bindings between Hermes and the Rust.
-1. Generate the files to make a turbo-module from the C++.
+1. Generate the files to set up the JS -> Objective C -> C++ installation flow for the turbo-module.
+1. Re-run the `Podfile` in the `example/ios` directory so Xcode can see the C++ files.
 
 ```sh
 yarn ubrn:ios
@@ -184,8 +183,8 @@ yarn ubrn:ios
 Building for Android will:
 
 1. Build the Rust crate for Android, including the uniffi scaffolding in Rust.
-1. Build an `xcframework`
-1. Generate the typescript and C++ bindings between Hermes and the Rust.
+1. Copy the files into the correct place in for `gradlew` to pick them up.
+1. Generate the files to set up the JS -> Java -> C++ installation flow for the turbo-module.
 1. Generate the files to make a turbo-module from the C++.
 
 ```sh
@@ -207,14 +206,14 @@ import { StyleSheet, View, Text } from 'react-native';
 export default function App() {
 ```
 
-Next, add the following lines in place of the ones we just deleted:
+Next, add the following lines in place of the lines we just deleted:
 
 ```ts
 import { Calculator, type BinaryOperator, SafeAddition, ComputationResult } from '../../src';
 
 // A Rust object
 const calculator = new Calculator();
-// A Rust object implementing BinaryOperator
+// A Rust object implementing the Rust trait BinaryOperator
 const addOp = new SafeAddition();
 
 // A Typescript class, implementing BinaryOperator

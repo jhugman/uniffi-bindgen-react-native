@@ -51,14 +51,14 @@ cache-timeout = 43200
 # - "error" treats all warnings as errors, failing the linkcheck
 # - "ignore" will ignore warnings, suppressing diagnostic messages and allowing
 #   the linkcheck to continuing
-warning-policy = "warn"
+warning-policy = "error"
 
 [output.html]
 smart-punctuation = true
 mathjax-support = false
 site-url = "/mdBook/"
-git-repository-url = "https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/docs/"
-edit-url-template = "https://github.com/jhugman/uniffi-bindgen-react-native/edit/main/docs/{path}"
+git-repository-url = "https://github.com/jhugman/uniffi-bindgen-react-native"
+edit-url-template = "edit/main/docs/{path}"
 
 # open on gh config.
 git-branch = "main"

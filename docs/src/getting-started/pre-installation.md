@@ -51,7 +51,7 @@ cargo install cargo-ndk
 
 ## iOS
 
-### Ensure `xcodebuild` is avaiable
+### Ensure `xcodebuild` is available
 
 This command checks if Xcode command line tools are available, and if not, will start the installation process.
 
