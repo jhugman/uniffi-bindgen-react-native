@@ -8,6 +8,15 @@ It has since grown to support for other languages not in use at Mozilla.
 
 [`uniffi-bindgen-react-native`](https://github.com/jhugman/uniffi-bindgen-react-native) is the project that houses the bindings generators for react-native.
 
+It supports all language features that `uniffi-rs` supports, including:
+
+- calling functions from Typescript to Rust, synchronous and asynchronous.
+- calling functions from Rust to Typescript, synchronous and asynchronous.
+- objects with methods, including:
+    - garbage collection integration.
+    - uniffi traits
+- custom types
+
 It contains tooling to generate bindings from Hermes via JSI, and to generate the code to create turbo-modules.
 
 ```admonish warning

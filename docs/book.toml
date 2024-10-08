@@ -51,7 +51,7 @@ cache-timeout = 43200
 # - "error" treats all warnings as errors, failing the linkcheck
 # - "ignore" will ignore warnings, suppressing diagnostic messages and allowing
 #   the linkcheck to continuing
-warning-policy = "warn"
+warning-policy = "error"
 
 [output.html]
 smart-punctuation = true

@@ -1,23 +1,15 @@
-`uniffi-bindgen-react-native` the command line utility that ties together much of the building of Rust, and the generating the bindings and turbo-modules.
+`uniffi-bindgen-react-native` the command line utility that ties together much of the building of Rust, and the generating the bindings and turbo-modules. It is also available called `ubrn`.
 
 Most commands take a `--config FILE` option. This is a YAML file which collects commonly used options together, and is [documented here](config-yaml.md).
 
-You can make the command available to `package.json` by adding a script:
-
-```json
-{
-  "scripts": {
-    "ubrn": "npx uniffi-bindgen-react-native"
-  }
-}
-```
+Both spellings of the command `ubrn` and `uniffi-bindgen-react-native` are NodeJS scripts.
 
 This makes `ubrn` available to other scripts in `package.json`.
 
 If you find yourself running commands from the command line, you can alias the command
 
 ```bash
-alias ubrn=$(npx uniffi-bindgen-react-native --path)
+alias ubrn=$(yarn uniffi-bindgen-react-native --path)
 ```
 
 allows you to run the command from the shell as `ubrn`, which is simpler to type. From hereon, commands will be given as `ubrn` commands.
