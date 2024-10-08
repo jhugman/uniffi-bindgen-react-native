@@ -7,6 +7,7 @@ mod npm;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use globset::GlobSet;
+use heck::ToUpperCamelCase;
 pub(crate) use npm::PackageJson;
 
 use serde::Deserialize;
@@ -55,15 +56,21 @@ impl ProjectConfig {
     }
 }
 
-fn trim_react_native(name: &str) -> String {
+fn trim(name: &str) -> String {
     name.trim_matches('-').trim_matches('_').to_string()
 }
 
-fn trim_react_native_2(name: &str) -> String {
-    name.strip_prefix("RN")
-        .unwrap_or(name)
-        .replace("ReactNative", "")
-        .replace("react-native", "")
+#[allow(dead_code)]
+fn trim_rn(name: &str) -> String {
+    trim_react_native(strip_prefix(name, "RN"))
+}
+
+fn strip_prefix<'a>(name: &'a str, prefix: &str) -> &'a str {
+    name.strip_prefix(prefix).unwrap_or(name)
+}
+
+pub(crate) fn trim_react_native(name: &str) -> String {
+    strip_prefix(strip_prefix(name, "ReactNative"), "react-native")
         .trim_matches('-')
         .trim_matches('_')
         .to_string()
@@ -73,13 +80,13 @@ impl ProjectConfig {
     pub(crate) fn project_root(&self) -> &Utf8Path {
         &self.crate_.project_root
     }
+
+    pub(crate) fn module_cpp(&self) -> String {
+        trim_react_native(&self.name).to_upper_camel_case()
+    }
 }
 
 impl ProjectConfig {
-    fn name(&self) -> String {
-        trim_react_native(&self.name)
-    }
-
     pub(crate) fn raw_name(&self) -> &str {
         &self.name
     }
@@ -88,13 +95,10 @@ impl ProjectConfig {
         &self.repository
     }
 
-    pub(crate) fn name_upper_camel(&self) -> String {
-        use heck::ToUpperCamelCase;
-        self.name().to_upper_camel_case()
-    }
-
     pub(crate) fn cpp_namespace(&self) -> String {
-        self.name_upper_camel().to_lowercase()
+        trim_react_native(&self.name)
+            .to_upper_camel_case()
+            .to_lowercase()
     }
 
     pub(crate) fn cpp_filename(&self) -> String {
@@ -103,7 +107,11 @@ impl ProjectConfig {
     }
 
     pub(crate) fn codegen_filename(&self) -> String {
-        format!("Native{}", self.name_upper_camel())
+        format!("Native{}", self.spec_name())
+    }
+
+    pub(crate) fn spec_name(&self) -> String {
+        trim_react_native(&self.name).to_upper_camel_case()
     }
 
     pub(crate) fn exclude_files(&self) -> &GlobSet {
@@ -185,7 +193,7 @@ impl TurboModulesConfig {
     fn default_spec_name() -> String {
         let package_json = workspace::package_json();
         let codegen_name = &package_json.codegen().name;
-        trim_react_native(codegen_name)
+        trim(codegen_name)
     }
 }
 

@@ -4,13 +4,21 @@
 #include <ReactCommon/CallInvokerHolder.h>
 #include "{{ self.config.project.cpp_filename() }}.h"
 {%- let package_name = self.config.project.android.package_name().replace(".", "_") %}
-{%- let name = self.config.project.name_upper_camel() %}
+{%- let name = self.config.project.module_cpp() %}
 {%- let module_class_name = name|fmt("{}Module") %}
 {%- let prefix = "Java_{}_{}"|format(package_name, module_class_name) %}
 {%- let ns = self.config.project.cpp_namespace() %}
 
 namespace jsi = facebook::jsi;
 namespace react = facebook::react;
+
+// Automated testing checks {{ prefix }} and {{ ns }}
+// by comparing the whole line here.
+/*
+{{ prefix }}_nativeMultiply(JNIEnv *env, jclass type, jdouble a, jdouble b) {
+    return {{ ns }}::multiply(a, b);
+}
+*/
 
 // Installer coming from {{ module_class_name }}
 extern "C"

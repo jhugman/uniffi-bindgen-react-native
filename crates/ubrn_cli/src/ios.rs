@@ -9,13 +9,12 @@ use std::{collections::HashMap, fmt::Display, process::Command, str::FromStr};
 use anyhow::{Context, Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use heck::ToUpperCamelCase;
 use serde::{Deserialize, Serialize};
 use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
-    config::ProjectConfig,
+    config::{trim_react_native, ProjectConfig},
     rust::CrateConfig,
     workspace,
 };
@@ -47,7 +46,7 @@ impl IOsConfig {
     fn default_framework_name() -> String {
         format!(
             "{}Framework",
-            workspace::package_json().name().to_upper_camel_case()
+            trim_react_native(&workspace::package_json().name())
         )
     }
 

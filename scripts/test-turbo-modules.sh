@@ -1,18 +1,20 @@
 #!/bin/bash
 set -e
-
 ROOT=
-PROJECT_DIR=my-test-library
-KEEP_ROOT_ON_ERROR=false
-BOB_VERSION=latest
-PROJECT_SLUG=my-test-library
-FORCE_NEW_DIR=false
-IOS_NAME=MyTestLibrary
-SKIP_IOS=false
-SKIP_ANDROID=false
-UBRN_CONFIG=
 UBRN_BIN=
 PWD=
+
+reset_args() {
+  PROJECT_DIR=my-test-library
+  KEEP_ROOT_ON_ERROR=false
+  BOB_VERSION=latest
+  PROJECT_SLUG=my-test-library
+  FORCE_NEW_DIR=false
+  IOS_NAME=MyTestLibrary
+  SKIP_IOS=false
+  SKIP_ANDROID=false
+  UBRN_CONFIG=
+}
 
 usage() {
   echo "Usage: $0 [options] [PROJECT_DIR]"
@@ -20,6 +22,8 @@ usage() {
   echo "Options:"
   echo "  -A, --skip-android                 Skip building for Android."
   echo "  -I, --skip-ios                     Skip building for iOS."
+  echo "  -C, --ubrn-config                  Use a ubrn config file."
+
   echo "  -u, --builder-bob-version VERSION  Specify the version of builder-bob to use."
   echo "  -s, --slug PROJECT_SLUG            Specify the project slug."
   echo "  -i, --ios-name IOS_NAME            Specify the iOS project name."
@@ -32,16 +36,23 @@ usage() {
 }
 
 cleanup() {
-  if [ "$KEEP_ROOT_ON_ERROR" == false ] && [ -d "$PROJECT_DIR" ]; then
-    echo "Removing $PROJECT_DIR..."
-    rm -rf "$PROJECT_DIR"
-  fi
+  echo "Removing $PROJECT_DIR..."
+  rm -rf "$PROJECT_DIR"
   cd "$PWD"
 }
 
+diagnostics() {
+  echo "-- PROJECT_DIR = $PROJECT_DIR"
+  echo "-- PROJECT_SLUG = $PROJECT_SLUG"
+  echo "-- IOS_NAME = $IOS_NAME"
+}
+
 error() {
-  echo "Error: $1"
-  cleanup
+  if [ "$KEEP_ROOT_ON_ERROR" == false ] && [ -d "$PROJECT_DIR" ]; then
+    cleanup
+  fi
+  diagnostics
+  echo "❌ Error: $1"
   exit 1
 }
 
@@ -59,6 +70,7 @@ derive_paths() {
 }
 
 parse_cli_options() {
+  reset_args
   # Parse command line options
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -114,14 +126,16 @@ parse_cli_options() {
   if [ -z "$PROJECT_DIR" ]; then
     PROJECT_DIR=my-test-library
   fi
-
-  echo "-- PROJECT_DIR = $PROJECT_DIR"
-  echo "-- PROJECT_SLUG = $PROJECT_SLUG"
-  echo "-- IOS_NAME = $IOS_NAME"
-
 }
 
+enter_dir() {
+  local dir=$1
+  pushd "$dir" >/dev/null || error "Cannot enter $dir"
+}
 
+exit_dir() {
+  popd >/dev/null || error "Cannot exit directory"
+}
 
 create_library() {
   local directory
@@ -132,7 +146,7 @@ create_library() {
     mkdir -p "$directory" || error "Cannot create $directory"
   fi
 
-  pushd "$directory" || error "Cannot enter $directory"
+  enter_dir "$directory"
 
   if [ "$FORCE_NEW_DIR" == true ] && [ -d "$base" ]; then
     rm -rf "$base" || error "Failed to remove existing directory $base"
@@ -142,7 +156,8 @@ create_library() {
   if [ "$BOB_VERSION" == "latest" ] ; then
     example_type=test-app
   fi
-  npx create-react-native-library@$BOB_VERSION \
+  echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
+  npx "create-react-native-library@$BOB_VERSION" \
     --slug "$PROJECT_SLUG" \
     --description "An automated test" \
     --author-name "James" \
@@ -152,33 +167,33 @@ create_library() {
     --languages cpp \
     --type module-new \
     --example $example_type \
-    "$base" || error "Failed to create library in $PROJECT_DIR"
-  popd || error "Cannot exit $directory"
+    "$base" > /dev/null || error "Failed to create library in $PROJECT_DIR"
+  exit_dir
 }
 
 install_dependencies() {
-  pushd "$PROJECT_DIR" || error "Failed to navigate to $PROJECT_DIR"
+  enter_dir "$PROJECT_DIR"
   # touch yarn.lock
   yarn || error "Failed to install dependencies"
   # rm yarn.lock
-  popd || error "Failed to return from $PROJECT_DIR"
+  exit_dir
 }
 
 install_example_dependencies() {
-  pushd "$PROJECT_DIR/example" || error "Failed to navigate to $PROJECT_DIR/example"
+  enter_dir "$PROJECT_DIR/example"
   # touch yarn.lock
   yarn || error "Failed to install example dependencies"
   # rm yarn.lock
   # rm -Rf .yarn
-  popd || error "Failed to return from $PROJECT_DIR/example"
+  exit_dir
 }
 
 check_deleted_files() {
   local extensions="$1"
   local deleted_files
+  echo "-- Checking for deleted files with extensions $extensions"
   deleted_files=$(git status --porcelain | grep '^ D' || true | grep -E "\\.(${extensions// /|})$" || true )
 
-  echo "-- finished grep"
   if [ -n "$deleted_files" ]; then
     echo "Error: The following files have been deleted:"
     echo "$deleted_files"
@@ -186,12 +201,65 @@ check_deleted_files() {
   fi
 }
 
-generate_turbo_module() {
-  pushd "$PROJECT_DIR" || error "Can't enter $PROJECT_DIR"
-  echo "-- Running $UBRN_BIN in PROJECT_DIR = $(pwd)"
+check_line_unchanged() {
+  local file_pattern="$1"
+  local search_string="$2"
+  # Find all files matching the pattern
+  local files
+  files=$(find . -path "$file_pattern")
+  for file_path in $files; do
+    # Get the current content of the line containing the search string
+    current_line=$(grep -E "$search_string" "$file_path" || true)
+    # Get the content of the line containing the search string from the last commit
+    last_commit_line=$(git show HEAD:"$file_path" | grep -E "$search_string" || true)
+
+    # Compare the current line with the line from the last commit
+    if [ "$current_line" != "$last_commit_line" ]; then
+        error "$file_path: found line with \"$search_string\" to have changed"
+    fi
+  done
+}
+
+check_lines() {
+  echo "-- Checking for unmodified lines in generated code"
+  check_line_unchanged "./cpp/*.h" "#ifndef"
+  check_line_unchanged "./cpp/*.h" "^namespace"
+  check_line_unchanged "./cpp/*.cpp" ".h\""
+  check_line_unchanged "./cpp/*.cpp" "^namespace"
+  check_line_unchanged "./src/Native*" "getEnforcing"
+
+  check_line_unchanged "./android/CMakeLists.txt" "^project"
+  check_line_unchanged "./android/build.gradle" "return rootProject"
+  check_line_unchanged "./android/build.gradle" "libraryName"
+  check_line_unchanged "./android/src/*/*Package*" "package"
+  check_line_unchanged "./android/src/*/*Module*" "System.loadLibrary"
+  check_line_unchanged "./android/src/*/*Module*" "@ReactModule"
+  check_line_unchanged "./android/src/*/*Module*" "package"
+  check_line_unchanged "./android/src/*/*Module*" "public class"
+  check_line_unchanged "./android/cpp-adapter.cpp" "#include \""
+  check_line_unchanged "./android/cpp-adapter.cpp" "nativeMultiply"
+  check_line_unchanged "./android/cpp-adapter.cpp" "::multiply"
+
+  check_line_unchanged "./ios/*.h" "#import"
+  check_line_unchanged "./ios/*.h" "Spec.h"
+  check_line_unchanged "./ios/*.h" "<Native"
+  check_line_unchanged "./ios/*.h" "<RCTBridgeModule"
+  check_line_unchanged "./ios/*.mm" "#import \""
+  check_line_unchanged "./ios/*.mm" "@implementation"
+  check_line_unchanged "./ios/*.mm" "::multiply"
+}
+
+clean_turbo_modules() {
   rm -Rf cpp/ android/src/main/java ios/ src/Native* src/generated/ src/index.ts*
-  "$UBRN_BIN" checkout --config "$UBRN_CONFIG"
-  "$UBRN_BIN" build ios --config "$UBRN_CONFIG" --and-generate --targets aarch64-apple-ios-sim
+}
+
+generate_turbo_module_for_diffing() {
+  enter_dir "$PROJECT_DIR"
+  clean_turbo_modules
+  echo "-- Running ubrn checkout"
+  "$UBRN_BIN" checkout --config "$UBRN_CONFIG" 2>/dev/null
+  echo "-- Running ubrn generate turbo-module"
+  "$UBRN_BIN" generate turbo-module --config "$UBRN_CONFIG" fake_module
 
   local jvm_lang
   if [ "$BOB_VERSION" == "latest" ] ; then
@@ -199,11 +267,18 @@ generate_turbo_module() {
   else
     jvm_lang=java
   fi
-  echo "-- Checking for deleted files"
   check_deleted_files "$jvm_lang h mm ts podspec tsx"
-  echo "-- No deleted files detected"
+  check_lines
 
-  popd || error "Can't exit $PROJECT_DIR"
+  exit_dir
+}
+
+generate_turbo_module_for_compiling() {
+  enter_dir "$PROJECT_DIR"
+  echo "-- Running ubrn checkout"
+  clean_turbo_modules
+  "$UBRN_BIN" checkout      --config "$UBRN_CONFIG"
+  exit_dir
 }
 
 copy_into_node_modules() {
@@ -213,6 +288,7 @@ copy_into_node_modules() {
 
   # Use rsync to copy contents, excluding cpp_modules and rust_modules directories
   rsync -av \
+    --exclude '.git' \
     --exclude 'cpp_modules' \
     --exclude 'rust_modules' \
     --exclude 'build' \
@@ -221,17 +297,21 @@ copy_into_node_modules() {
 }
 
 build_android_example() {
-  pushd "$PROJECT_DIR" || error "Failed to navigate to $PROJECT_DIR"
-  "$UBRN_BIN" build android --config "$UBRN_CONFIG"
-  popd || error "Failed to exit $PROJECT_DIR"
-
-  pushd "$PROJECT_DIR/example/android" || error "Failed to navigate to $PROJECT_DIR/example/android"
+  enter_dir "$PROJECT_DIR"
+  echo "-- Running ubrn build"
+  "$UBRN_BIN" build android --config "$UBRN_CONFIG" --and-generate --targets aarch64-linux-android
+  exit_dir
+  enter_dir "$PROJECT_DIR/example/android"
   ./gradlew build || error "Failed to build Android example"
-  popd || error "Failed to return from $PROJECT_DIR/example/android"
+  exit_dir
 }
 
 build_ios_example() {
-  pushd "$PROJECT_DIR/example/ios" || error "Failed to navigate to $PROJECT_DIR/example/ios"
+  enter_dir "$PROJECT_DIR"
+  echo "-- Running ubrn build"
+  "$UBRN_BIN" build ios     --config "$UBRN_CONFIG" --and-generate --targets aarch64-apple-ios-sim
+  exit_dir
+  enter_dir "$PROJECT_DIR/example/ios"
   echo "pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'" >> Podfile
   pod install || error "Cannot run Podfile"
 
@@ -246,17 +326,21 @@ build_ios_example() {
   fi
 
   xcodebuild -workspace "${IOS_NAME}Example.xcworkspace" -scheme "${IOS_NAME}Example" -configuration Debug -destination "id=$udid" || error "Failed to build iOS example"
-  popd || error "Failed to return from $PROJECT_DIR/example/ios"
+  exit_dir
 }
 
 main() {
+  parse_cli_options "$@"
+  echo "ℹ️  Starting $PROJECT_SLUG"
   create_library
-  install_dependencies
-  if [ -n "$UBRN_CONFIG" ]; then
-    generate_turbo_module
+  if [ "$SKIP_ANDROID" == false ] || [ "$SKIP_IOS" == false ]; then
+    generate_turbo_module_for_compiling
+    install_dependencies
+    install_example_dependencies
+    copy_into_node_modules
+  else
+    generate_turbo_module_for_diffing
   fi
-  install_example_dependencies
-  copy_into_node_modules
   if [ "$SKIP_ANDROID" == false ]; then
     build_android_example
   fi
@@ -264,7 +348,86 @@ main() {
     build_ios_example
   fi
   cleanup
+  echo "✅ Success!"
 }
+
+run_default() {
+  local fixture_dir="$ROOT/integration/fixtures/turbo-module-testing"
+  local working_dir="/tmp/turbomodule-tests"
+  local config="$fixture_dir/ubrn.config.yaml"
+  main \
+        --force-new-directory \
+        --keep-directory-on-exit \
+        --ubrn-config "$config" \
+        --builder-bob-version 0.35.1 \
+        --skip-ios \
+        --skip-android \
+        --slug dummy-lib \
+        "$working_dir/dummy-lib"
+  main \
+        --force-new-directory \
+        --keep-directory-on-exit \
+        --ubrn-config "$config" \
+        --builder-bob-version 0.35.1 \
+        --skip-ios \
+        --skip-android \
+        --slug rn-dummy-lib \
+        "$working_dir/rn-dummy-lib"
+  main \
+        --force-new-directory \
+        --keep-directory-on-exit \
+        --ubrn-config "$config" \
+        --builder-bob-version 0.35.1 \
+        --skip-ios \
+        --skip-android \
+        --slug react-native-dummy-lib \
+        "$working_dir/react-native-dummy-lib"
+  main \
+        --force-new-directory \
+        --keep-directory-on-exit \
+        --ubrn-config "$config" \
+        --builder-bob-version 0.35.1 \
+        --skip-ios \
+        --skip-android \
+        --slug dummy-lib-react-native \
+        "$working_dir/dummy-lib-react-native"
+  main \
+        --force-new-directory \
+        --keep-directory-on-exit \
+        --ubrn-config "$config" \
+        --builder-bob-version 0.35.1 \
+        --skip-ios \
+        --skip-android \
+        --slug dummy-lib-react-native \
+        "$working_dir/dummy-lib-rn"
+  # ReactNativeDummyLib fails with "› Must be a valid npm package name"
+  local os
+  os=$(uname -o)
+  if [ "$os" == "Darwin" ] ; then
+    main \
+        --force-new-directory \
+        --keep-directory-on-exit \
+        --ubrn-config "$config" \
+        --builder-bob-version 0.35.1 \
+        --slug react-native-dummy-lib-for-ios \
+        --skip-android \
+        --ios-name DummyLibForIos \
+        "$working_dir/react-native-dummy-lib-for-ios"
+  fi
+  main \
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --slug react-native-dummy-lib-for-android \
+    --skip-ios \
+    "$working_dir/react-native-dummy-lib-for-android"
+}
+
 derive_paths
-parse_cli_options "$@"
-main
+# Check if there are no command line arguments
+if [ $# -eq 0 ]; then
+  run_default
+else
+  main "$@"
+fi

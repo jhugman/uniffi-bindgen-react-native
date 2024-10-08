@@ -1,4 +1,4 @@
-{%- let module_name = self.config.project.name_upper_camel() %}
+{%- let module_name = self.config.project.module_cpp() %}
 {%- let spec_jsi = self.config.project.tm.spec_name()|fmt("{}JSI") %}
 {%- let ns = self.config.project.cpp_namespace() %}
 {%- let uniffi_ns = "uniffi_generated" %}
@@ -40,6 +40,15 @@ RCT_EXPORT_MODULE()
 
 // Don't compile this code when we build for the old architecture.
 #ifdef RCT_NEW_ARCH_ENABLED
+
+// Automated testing checks {{ ns }}
+// by comparing the whole line here.
+/*
+- (NSNumber *)multiply:(double)a b:(double)b {
+    NSNumber *result = @({{ ns }}::multiply(a, b));
+}
+*/
+
 - (NSNumber *)installRustCrate {
     @throw [NSException exceptionWithName:@"UnreachableException"
                         reason:@"This method should never be called."
