@@ -30,6 +30,7 @@ In Rust, instead of throwing with try/catch, a method returns a `Result` enum.
 #[derive(uniffi::Error)]
 pub enum MathError {
     DivideByZero,
+    NumberOverflow,
 }
 
 #[uniffi::export]
@@ -63,7 +64,32 @@ try {
 }
 ```
 
-Enums-as-errors may also have properties. These are exactly the same as [other enums](./enums.md#enums-with-properties), except they subclass `Error`.
+Such enums as errors, without properties also have a companion `_Tags` enum.
+
+Using a `switch` on the error's `tag` property is a convenient way of handling all cases:
+
+```typescript
+try {
+    divide(x, y);
+} catch (e: any) {
+    if (MathError.instanceOf(e)) {
+        switch (e.tag) {
+            case MathError_Tags.DivideByZero: {
+                // handle divide by zero
+                break;
+            }
+            case MathError_Tahs.NumberOverflow: {
+                // handle overflow
+                break;
+            }
+        }
+    }
+}
+```
+
+#### Enums with properties as Errors
+
+Enums-as-errors may also have properties. These are exactly the same as [other enums with properties](./enums.md#enums-with-properties), except they subclass `Error`.
 
 e.g.
 
@@ -106,6 +132,61 @@ try {
     }
 }
 
+```
+
+#### Flat errors
+
+A common pattern in Rust is to convert enum properties to a message. Uniffi calls these error enums `flat_errors`.
+
+In this example, a `MyError::InvalidDataError` has no properties but gets the message `"Invalid data"`, `ParseError` converts its properties in to a message, and `JSONError` takes any `serde_json::Error` to make a `JSONError`, which then gets converted to a string.
+
+In this case, the conversion is being managed by the `thiserror` crate's macros.
+
+```rust
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+#[uniffi(flat_error)]
+pub enum MyError {
+    // A message from a variant with no properties
+    #[error("Invalid data")]
+    InvalidDataError,
+
+    // A message from a variant with named properties
+    #[error("Parse error at line {line}, column {col}")]
+    ParseError { line: usize, col: usize },
+
+    // A message from an JSON error, converted into a MyError
+    #[error("JSON Error: {0}")]
+    JSONError(#[from] serde_json::Error),
+}
+```
+
+Unlike [flat enums](enums.md#enums-without-properties), flat errors have a `tag` property and a companion `MyError_Tags` enum.
+
+These can be handled in typescript like so:
+
+```typescript
+try {
+    // … do sometihng that throws
+} catch (err: any) {
+    if (MyError.instanceOf(err)) {
+        switch (err.tag) {
+            case MyError_Tags.InvalidDataError: {
+                // e.message will be "MyError.InvalidDataError: Invalid data"
+                break;
+            }
+            case MyError_Tags.ParseError: {
+                // e.message will be paramterized, e.g.
+                // "MyError.ParseError: Parse error at line 12, column 4"
+                break;
+            }
+            case MyError_Tags.JSONError: {
+                // e.message will be a wrapped serde_json error, e.g.
+                // "MyError.JSONError: Expected , \" or \]"
+                break;
+            }
+        }
+    }
+}
 ```
 
 ### Objects as Errors
