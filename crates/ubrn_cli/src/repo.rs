@@ -84,7 +84,8 @@ impl GitRepoArgs {
             .current_dir(self.directory(project_root)?)
             .arg("ls-remote")
             .arg("origin")
-            .arg(&self.branch).output()?;
+            .arg(&self.branch)
+            .output()?;
         let output = String::from_utf8(output.stdout)?;
 
         // Find $branch in the output and resolve the SHA or fall back to $branch
