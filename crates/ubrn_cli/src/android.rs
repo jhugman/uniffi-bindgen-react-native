@@ -124,16 +124,10 @@ pub(crate) struct AndroidArgs {
     /// `config.yaml` file.
     ///
     /// Android:
-    ///   aarch64-linux-android,
-    ///   armv7-linux-androideabi,
-    ///   x86_64-linux-android
-    ///   i686-linux-android,
+    ///   aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android,
     ///
     /// Synonyms for:
-    ///   arm64-v8a,
-    ///   armeabi-v7a,
-    ///   x86_64,
-    ///   x86
+    ///   arm64-v8a,armeabi-v7a,x86_64,x86
     #[clap(short, long, value_parser, num_args = 1.., value_delimiter = ',')]
     pub(crate) targets: Vec<Target>,
 
@@ -148,15 +142,9 @@ pub(crate) struct AndroidArgs {
 impl AndroidArgs {
     pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
         let config: ProjectConfig = self.project_config()?;
-
-        let crate_ = &config.crate_;
-
         let android = &config.android;
-        let target_list = if !self.targets.is_empty() {
-            &self.targets
-        } else {
-            &android.targets
-        };
+        let target_list = &android.targets;
+        let crate_ = &config.crate_;
         let target_files = if self.common_args.no_cargo {
             let files = self.find_existing(&crate_.metadata()?, target_list);
             if !files.is_empty() {
@@ -280,11 +268,12 @@ impl AndroidArgs {
     }
 
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
-        self.config.clone().try_into()
-    }
-
-    pub(crate) fn config(&self) -> Utf8PathBuf {
-        self.config.clone()
+        let mut config: ProjectConfig = self.config.clone().try_into()?;
+        let android = &mut config.android;
+        if !self.targets.is_empty() {
+            android.targets = self.targets.clone();
+        }
+        Ok(config)
     }
 }
 

@@ -50,3 +50,9 @@ impl TryFrom<Utf8PathBuf> for ProjectConfig {
         ubrn_common::read_from_file(value)
     }
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum Platform {
+    Android,
+    Ios,
+}

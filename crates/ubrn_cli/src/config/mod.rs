@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 use crate::{android::AndroidConfig, ios::IOsConfig, rust::CrateConfig, workspace};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectConfig {
     #[serde(default = "ProjectConfig::default_name")]
@@ -111,7 +111,7 @@ impl ProjectConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BindingsConfig {
     #[serde(default = "BindingsConfig::default_cpp_dir")]
@@ -153,7 +153,7 @@ impl BindingsConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TurboModulesConfig {
     #[serde(default = "TurboModulesConfig::default_cpp_dir")]

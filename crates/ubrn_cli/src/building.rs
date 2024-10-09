@@ -10,7 +10,10 @@ use clap::{Args, Subcommand};
 use serde::Deserialize;
 use ubrn_common::CrateMetadata;
 
-use crate::{android::AndroidArgs, generate::GenerateAllArgs, ios::IOsArgs};
+use crate::{
+    android::AndroidArgs, config::ProjectConfig, generate::GenerateAllCommand, ios::IOsArgs,
+    Platform,
+};
 
 #[derive(Args, Debug)]
 pub(crate) struct BuildArgs {
@@ -37,7 +40,12 @@ impl BuildArgs {
     }
 
     fn generate(&self, lib_file: Utf8PathBuf) -> Result<()> {
-        GenerateAllArgs::new(lib_file, self.cmd.config()).run()
+        GenerateAllCommand::platform_specific(
+            lib_file,
+            self.cmd.project_config()?,
+            Platform::from(&self.cmd),
+        )
+        .run()
     }
 }
 
@@ -54,10 +62,10 @@ impl BuildCmd {
             .ok_or_else(|| anyhow!("No targets were specified"))
     }
 
-    fn config(&self) -> Utf8PathBuf {
+    fn project_config(&self) -> Result<ProjectConfig> {
         match self {
-            Self::Android(a) => a.config(),
-            Self::Ios(a) => a.config(),
+            Self::Android(a) => a.project_config(),
+            Self::Ios(a) => a.project_config(),
         }
     }
 
@@ -131,5 +139,14 @@ impl From<&[&str]> for ExtraArgs {
     fn from(value: &[&str]) -> Self {
         let vec = value.iter().map(|&s| s.to_string()).collect();
         ExtraArgs::AsList(vec)
+    }
+}
+
+impl From<&BuildCmd> for Platform {
+    fn from(value: &BuildCmd) -> Self {
+        match value {
+            BuildCmd::Android(..) => Self::Android,
+            BuildCmd::Ios(..) => Self::Ios,
+        }
     }
 }

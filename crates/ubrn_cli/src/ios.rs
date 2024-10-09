@@ -109,9 +109,7 @@ pub(crate) struct IOsArgs {
     /// the `config.yaml` file.
     ///
     /// iOS:
-    ///  aarch64-apple-ios,
-    ///  aarch64-apple-ios-sim,
-    ///  x86_64-apple-ios
+    ///  aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
     #[clap(short, long, value_parser, num_args = 1.., value_delimiter = ',')]
     pub(crate) targets: Vec<Target>,
 
@@ -124,12 +122,7 @@ impl IOsArgs {
         let config = self.project_config()?;
         let crate_ = &config.crate_;
         let ios = &config.ios;
-
-        let target_list = if !self.targets.is_empty() {
-            &self.targets
-        } else {
-            &ios.targets
-        };
+        let target_list = &ios.targets;
 
         let targets = target_list
             .iter()
@@ -291,11 +284,12 @@ impl IOsArgs {
     }
 
     pub(crate) fn project_config(&self) -> Result<ProjectConfig> {
-        self.config.clone().try_into()
-    }
-
-    pub(crate) fn config(&self) -> Utf8PathBuf {
-        self.config.clone()
+        let mut config: ProjectConfig = self.config.clone().try_into()?;
+        let ios = &mut config.ios;
+        if !self.targets.is_empty() {
+            ios.targets = self.targets.clone();
+        }
+        Ok(config)
     }
 }
 

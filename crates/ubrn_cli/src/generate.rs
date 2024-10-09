@@ -5,10 +5,11 @@
  */
 use anyhow::Result;
 use camino::Utf8PathBuf;
-use clap::{Args, Subcommand};
+use clap::{self, Args, Subcommand};
+use std::convert::TryFrom;
 use ubrn_bindgen::{BindingsArgs, OutputArgs, SourceArgs};
 
-use crate::{codegen::TurboModuleArgs, config::ProjectConfig};
+use crate::{codegen::TurboModuleArgs, config::ProjectConfig, Platform};
 
 #[derive(Args, Debug)]
 pub(crate) struct GenerateArgs {
@@ -47,6 +48,7 @@ impl GenerateCmd {
                 Ok(())
             }
             Self::All(t) => {
+                let t = GenerateAllCommand::try_from(t)?;
                 t.run()?;
                 Ok(())
             }
@@ -64,9 +66,36 @@ pub(crate) struct GenerateAllArgs {
     lib_file: Utf8PathBuf,
 }
 
-impl GenerateAllArgs {
-    pub(crate) fn new(lib_file: Utf8PathBuf, config: Utf8PathBuf) -> Self {
-        Self { lib_file, config }
+#[derive(Debug)]
+pub(crate) struct GenerateAllCommand {
+    /// The configuration file for this project
+    project_config: ProjectConfig,
+
+    /// A path to staticlib file.
+    lib_file: Utf8PathBuf,
+
+    platform: Option<Platform>,
+}
+
+impl GenerateAllCommand {
+    pub(crate) fn new(lib_file: Utf8PathBuf, project_config: ProjectConfig) -> Self {
+        Self {
+            lib_file,
+            project_config,
+            platform: None,
+        }
+    }
+
+    pub(crate) fn platform_specific(
+        lib_file: Utf8PathBuf,
+        project_config: ProjectConfig,
+        platform: Platform,
+    ) -> Self {
+        Self {
+            lib_file,
+            project_config,
+            platform: Some(platform),
+        }
     }
 
     pub(crate) fn run(&self) -> Result<()> {
@@ -93,11 +122,23 @@ impl GenerateAllArgs {
         };
         ubrn_common::cd(&pwd)?;
         let rust_crate = project.crate_.metadata()?;
-        crate::codegen::render_files(project, rust_crate, modules)?;
+        crate::codegen::render_files(self.platform.clone(), project, rust_crate, modules)?;
         Ok(())
     }
 
     fn project_config(&self) -> Result<ProjectConfig> {
-        self.config.clone().try_into()
+        Ok(self.project_config.clone())
+    }
+}
+
+impl TryFrom<&GenerateAllArgs> for GenerateAllCommand {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &GenerateAllArgs) -> Result<Self> {
+        let project_config = value.config.clone().try_into()?;
+        Ok(GenerateAllCommand::new(
+            value.lib_file.clone(),
+            project_config,
+        ))
     }
 }

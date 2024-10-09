@@ -191,6 +191,14 @@ Building for Android will:
 yarn ubrn:android
 ```
 
+```admonish hint
+You can change the targets that get built by adding a comma separated list to the `ubrn build android` and `ubrn build ios` commands.
+```
+
+```sh
+yarn ubrn:android --targets aarch64-linux-android,armv7-linux-androideabi
+```
+
 ## Step 5: Write an example app exercising the Rust API
 
 Here, we're editing the app file at `example/src/App.tsx`.
