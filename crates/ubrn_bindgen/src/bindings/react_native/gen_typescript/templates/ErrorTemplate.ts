@@ -1,10 +1,18 @@
 {{- self.import_infra("UniffiError", "errors") }}
 {{- self.import_infra("uniffiTypeNameSymbol", "symbols") }}
 {{- self.import_infra("variantOrdinalSymbol", "symbols") }}
-{%- let instance_of = "instanceOf" %}
 {%- let flat = e.is_flat() %}
 {%- if flat %}
+
 // Flat error type: {{ decl_type_name }}
+{%- let type_name__Tags = format!("{type_name}_Tags") %}
+export enum {{ type_name__Tags }} {
+    {%- for variant in e.variants() %}
+    {{ variant|variant_name }} = "{{ variant.name() }}"
+    {%- if !loop.last %},{% endif -%}
+    {% endfor %}
+}
+
 {%- call ts::docstring(e, 0) %}
 export const {{ decl_type_name }} = (() => {
     {%- for variant in e.variants() %}
@@ -21,31 +29,30 @@ export const {{ decl_type_name }} = (() => {
          * This field is private and should not be used.
          */
         readonly [variantOrdinalSymbol] = {{ loop.index }};
+
+        public readonly tag = {{ type_name__Tags }}.{{ variant|variant_name }};
+
         constructor(message: string) {
             super("{{ type_name }}", "{{ variant_name }}", message);
         }
 
-        static {{ instance_of }}(e: any): e is {{ variant_name }} {
+        static instanceOf(e: any): e is {{ variant_name }} {
             return (
-                {{ instance_of }}(e) && (e as any)[variantOrdinalSymbol] === {{ loop.index }}
+                instanceOf(e) && (e as any)[variantOrdinalSymbol] === {{ loop.index }}
             );
         }
     }
     {%- endfor %}
 
     // Utility function which does not rely on instanceof.
-    function {{ instance_of }}(e: any): e is {# space #}
-    {%- for variant in e.variants() %}
-    {{-   variant.name()|class_name(ci) }}
-    {%-   if !loop.last %} | {% endif -%}
-    {%- endfor %} {
+    function instanceOf(e: any): e is {{ type_name }} {
         return (e as any)[uniffiTypeNameSymbol] === "{{ decl_type_name }}";
     }
     return {
         {%- for variant in e.variants() %}
         {{   variant.name()|class_name(ci) }},
         {%- endfor %}
-        {{ instance_of }},
+        instanceOf,
     };
 })();
 

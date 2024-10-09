@@ -8,7 +8,9 @@ import {
   ErrorInterface,
   ErrorTrait,
   Exception,
+  Exception_Tags,
   FlatInner,
+  FlatInner_Tags,
   getError,
   Inner,
   oops,
@@ -97,16 +99,27 @@ test("oopsEnum 2", (t) => {
 test("oopsEnum 3", (t) => {
   t.assertThrows(
     (error) => {
-      if (Exception.FlatInnerError.instanceOf(error)) {
-        t.assertEqual(error.toString(), "Error: Exception.FlatInnerError");
-        t.assertTrue(FlatInner.CaseA.instanceOf(error.inner.error));
-        t.assertEqual(
-          error.inner.error.toString(),
-          "Error: FlatInner.CaseA: inner",
-        );
-        // assert(String(describing: e) == "FlatInnerError(error: error_types.FlatInner.CaseA(message: \"inner\"))")
-        // assert(String(reflecting: e) == "error_types.Error.FlatInnerError(error: error_types.FlatInner.CaseA(message: \"inner\"))")
-        return true;
+      if (Exception.instanceOf(error)) {
+        switch (error.tag) {
+          case Exception_Tags.FlatInnerError: {
+            t.assertTrue(Exception.FlatInnerError.instanceOf(error));
+            t.assertEqual(error.toString(), "Error: Exception.FlatInnerError");
+            const inner = error.inner.error;
+            t.assertEqual(inner.toString(), "Error: FlatInner.CaseA: inner");
+            switch (inner.tag) {
+              case FlatInner_Tags.CaseA: {
+                t.assertTrue(FlatInner.CaseA.instanceOf(inner));
+                t.assertFalse(FlatInner.CaseB.instanceOf(inner));
+                return true;
+              }
+              default: {
+                // NOOP
+              }
+            }
+          }
+          default:
+          // NOOP
+        }
       }
       return false;
     },
@@ -120,15 +133,22 @@ test("oopsEnum 4", (t) => {
       if (Exception.FlatInnerError.instanceOf(error)) {
         t.assertEqual(error.toString(), "Error: Exception.FlatInnerError");
         if (Exception.FlatInnerError.hasInner(error)) {
-          const inner = Exception.FlatInnerError.getInner(error);
-          if (FlatInner.CaseB.instanceOf(inner)) {
-            t.assertEqual(inner.error.toString(), "NonUniffiTypeValue: value");
-            return true;
+          const innerError = Exception.FlatInnerError.getInner(error);
+          const inner = innerError.error;
+          if (FlatInner.instanceOf(inner)) {
+            switch (inner.tag) {
+              case FlatInner_Tags.CaseA:
+                t.assertTrue(FlatInner.CaseA.instanceOf(inner));
+                return true;
+              case FlatInner_Tags.CaseB:
+                // We know that the Rust only produces this variant.
+                t.assertTrue(FlatInner.CaseB.instanceOf(inner));
+                return true;
+            }
           }
         }
         // assert(String(describing: e) == "FlatInnerError(error: error_types.FlatInner.CaseB(message: \"NonUniffiTypeValue: value\"))")
         // assert(String(reflecting: e) == "error_types.Error.FlatInnerError(error: error_types.FlatInner.CaseB(message: \"NonUniffiTypeValue: value\"))")
-        return true;
       }
       return false;
     },
