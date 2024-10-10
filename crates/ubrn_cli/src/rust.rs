@@ -12,7 +12,7 @@ use ubrn_common::CrateMetadata;
 
 use crate::{repo::GitRepoArgs, workspace};
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CrateConfig {
     #[serde(default = "CrateConfig::default_project_root", skip)]
@@ -54,14 +54,14 @@ impl CrateConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum RustSource {
     OnDisk(OnDiskArgs),
     GitRepo(GitRepoArgs),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct OnDiskArgs {
     #[serde(alias = "rust", alias = "directory")]
     pub(crate) src: String,

@@ -92,6 +92,9 @@ where
     for<'a> T: Deserialize<'a>,
 {
     let file = file.as_ref();
+    if !file.exists() {
+        anyhow::bail!("File {file} does not exist");
+    }
     let s =
         std::fs::read_to_string(file).with_context(|| format!("Failed to read from {file:?}"))?;
     Ok(if is_yaml(file) {

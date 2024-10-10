@@ -12,7 +12,7 @@ use std::{collections::BTreeMap, rc::Rc};
 use ubrn_bindgen::ModuleMetadata;
 use ubrn_common::{mk_dir, CrateMetadata};
 
-use crate::config::ProjectConfig;
+use crate::{config::ProjectConfig, Platform};
 
 #[derive(Args, Debug)]
 pub(crate) struct TurboModuleArgs {
@@ -33,7 +33,7 @@ impl TurboModuleArgs {
             .map(|s| ModuleMetadata::new(s))
             .collect();
         let rust_crate = project.crate_.metadata()?;
-        render_files(project, rust_crate, modules)?;
+        render_files(None, project, rust_crate, modules)?;
         Ok(())
     }
 }
@@ -41,6 +41,8 @@ impl TurboModuleArgs {
 pub(crate) trait RenderedFile: DynTemplate {
     fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf;
     fn project_root(&self) -> Utf8PathBuf {
+        // This provides a convenience for templates to calculate
+        // relative paths between one another.
         Utf8PathBuf::new()
     }
     fn relative_to(&self, project_root: &Utf8Path, to: &Utf8Path) -> Utf8PathBuf {
@@ -49,6 +51,19 @@ pub(crate) trait RenderedFile: DynTemplate {
             .parent()
             .expect("Expected this file to have a directory");
         pathdiff::diff_utf8_paths(to, from).expect("Should be able to find a relative path")
+    }
+    fn platform(&self) -> Option<Platform> {
+        None
+    }
+    fn filter_by(&self, platform: &Option<Platform>) -> bool {
+        platforms_match(platform, &self.platform())
+    }
+}
+
+fn platforms_match(platform: &Option<Platform>, this_file_wants: &Option<Platform>) -> bool {
+    match (platform, this_file_wants) {
+        (Some(building_for), Some(this_file)) => building_for == this_file,
+        (_, _) => true,
     }
 }
 
@@ -75,12 +90,14 @@ impl TemplateConfig {
 }
 
 pub(crate) fn render_files(
+    platform: Option<Platform>,
     project: ProjectConfig,
     rust_crate: CrateMetadata,
     modules: Vec<ModuleMetadata>,
 ) -> Result<()> {
     let config = Rc::new(TemplateConfig::new(project, rust_crate, modules));
     let files = files::get_files(config.clone());
+    let files = files.iter().filter(|f| f.filter_by(&platform)).cloned();
 
     let project_root = config.project.project_root();
     let map = render_templates(project_root, files)?;
@@ -104,10 +121,10 @@ pub(crate) fn render_files(
 
 fn render_templates(
     project_root: &Utf8Path,
-    files: Vec<Rc<dyn RenderedFile>>,
+    files: impl Iterator<Item = Rc<dyn RenderedFile>>,
 ) -> Result<BTreeMap<Utf8PathBuf, String>> {
     let mut map = BTreeMap::default();
-    for f in &files {
+    for f in files {
         let text = f.dyn_render()?;
         let path = f.path(project_root);
         map.insert(path, text);
@@ -141,6 +158,7 @@ macro_rules! templated_file {
 mod files {
     use super::RenderedFile;
     use super::TemplateConfig;
+    use crate::Platform;
     use camino::Utf8Path;
     use camino::Utf8PathBuf;
     use std::rc::Rc;
@@ -192,6 +210,9 @@ mod files {
                 .codegen_package_dir(project_root)
                 .join(filename)
         }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
     }
 
     templated_file!(BuildGradle, "build.gradle");
@@ -204,6 +225,9 @@ mod files {
                 .directory(project_root)
                 .join(filename)
         }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
     }
 
     templated_file!(CMakeLists, "CMakeLists.txt");
@@ -215,6 +239,9 @@ mod files {
                 .android
                 .directory(project_root)
                 .join(filename)
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
         }
     }
 
@@ -260,6 +287,9 @@ mod files {
                 .directory(project_root)
                 .join(filename)
         }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
     }
 
     templated_file!(ModuleTemplateH, "ModuleTemplate.h");
@@ -272,6 +302,9 @@ mod files {
                 .ios
                 .directory(project_root)
                 .join(filename)
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Ios)
         }
     }
 
@@ -286,6 +319,9 @@ mod files {
                 .directory(project_root)
                 .join(filename)
         }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Ios)
+        }
     }
 
     templated_file!(PodspecTemplate, "module-template.podspec");
@@ -294,6 +330,9 @@ mod files {
             let name = self.config.project.raw_name();
             let filename = format!("{name}.podspec");
             project_root.join(filename)
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Ios)
         }
     }
 
@@ -306,6 +345,9 @@ mod files {
                 .android
                 .src_main_dir(project_root)
                 .join(filename)
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
         }
     }
 }
@@ -418,5 +460,23 @@ mod tests {
         assert!(s.contains("name_upper_camel = MyTesterTemplateProject."));
         assert!(s.contains("list of modules = ['NativeAlice', 'NativeBob', 'NativeCharlie']"));
         Ok(())
+    }
+
+    #[test]
+    fn test_platform_matching() {
+        let not_specfied: Option<Platform> = None;
+        let android_only = Some(Platform::Android);
+        let ios_only = Some(Platform::Ios);
+        assert!(platforms_match(&not_specfied, &not_specfied));
+        assert!(platforms_match(&not_specfied, &android_only));
+        assert!(platforms_match(&not_specfied, &ios_only));
+
+        assert!(platforms_match(&android_only, &not_specfied));
+        assert!(platforms_match(&android_only, &android_only));
+        assert!(!platforms_match(&android_only, &ios_only));
+
+        assert!(platforms_match(&ios_only, &not_specfied));
+        assert!(!platforms_match(&ios_only, &android_only));
+        assert!(platforms_match(&ios_only, &ios_only));
     }
 }

@@ -101,7 +101,9 @@ Options:
 
 `--release` sets the release profile for `cargo`.
 
-`--and-generate` is a convenience option to pass the built library file to `generate bindings` and `generate turbo-module`.
+`--and-generate` is a convenience option to pass the built library file to `generate bindings` and `generate turbo-module` for Android and common files.
+
+This is useful as some generated files use the targets specified in this command.
 
 Once the library files (one for each target) are created, they are copied into the `jniLibs` specified by the YAML configuration.
 
@@ -174,7 +176,9 @@ The configuration file refers to [the YAML configuration][config].
 
 `--sim-only` and `--no-sim` restricts the targets to targets with/without `sim` in the target triple.
 
-`--and-generate` is a convenience option to pass the built library file to `generate bindings` and `generate turbo-module`.
+`--and-generate` is a convenience option to pass the built library file to `generate bindings` and `generate turbo-module` for iOS and common files.
+
+This is useful as some generated files use the targets specified in this command.
 
 Once the target libraries are compiled, and a config file is specified, they are passed to `xcodebuild -create-xcframework` to generate an `xcframework`.
 

@@ -67,6 +67,13 @@ android {
         arguments '-DANDROID_STL=c++_shared'
       }
     }
+    ndk {
+      abiFilters {# space #}
+      {%- for t in self.config.project.android.targets -%}
+      "{{ t }}"
+      {%- if !loop.last %}, {% endif %}
+      {%- endfor %}
+    }
   }
 
   externalNativeBuild {
