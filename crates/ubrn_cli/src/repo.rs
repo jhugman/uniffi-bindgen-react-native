@@ -89,16 +89,17 @@ impl GitRepoArgs {
         let output = String::from_utf8(output.stdout)?;
 
         // Find $branch in the output and resolve the SHA or fall back to $branch
-        let mut sha = None;
         let branch_ref = format!("refs/heads/{}", &self.branch);
         let tag_ref = format!("refs/tags/{}", &self.branch);
-        for line in output.lines() {
-            if line.ends_with(&branch_ref) || line.ends_with(&tag_ref) {
-                sha = Some(line.split_whitespace().next().unwrap());
-                break;
-            }
-        }
-        let sha = sha.unwrap_or(&self.branch);
+        let sha = output
+            .lines()
+            .find(|line| line.ends_with(&branch_ref) || line.ends_with(&tag_ref))
+            .map(|line| {
+                line.split_whitespace()
+                    .next()
+                    .expect("Git lines have sha then space")
+            })
+            .unwrap_or(&self.branch);
 
         // git fetch --depth 1 origin $sha
         let mut cmd = Command::new("git");
