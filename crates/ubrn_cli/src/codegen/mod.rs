@@ -166,7 +166,7 @@ mod files {
     pub(super) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
         vec![
             // typescript
-            IndexTs::rc_new(config.clone()),
+            IndexTsx::rc_new(config.clone()),
             // C++
             TMHeader::rc_new(config.clone()),
             TMCpp::rc_new(config.clone()),
@@ -261,8 +261,8 @@ mod files {
         }
     }
 
-    templated_file!(IndexTs, "index.ts");
-    impl RenderedFile for IndexTs {
+    templated_file!(IndexTsx, "index.tsx");
+    impl RenderedFile for IndexTsx {
         fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
             let filename = "index.tsx";
             self.config.project.tm.ts_path(project_root).join(filename)
