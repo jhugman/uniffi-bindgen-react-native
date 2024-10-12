@@ -41,6 +41,8 @@ jobs:
         run: cargo xtask bootstrap
       - name: Run tests of generated bindings
         run: ./scripts/run-tests.sh
+      - name: Run tests for checkout command
+        run: ./scripts/run-checkout-tests.sh
 
       - name: Done
         run: echo "Success!"

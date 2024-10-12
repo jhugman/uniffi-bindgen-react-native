@@ -79,21 +79,43 @@ impl GitRepoArgs {
             run_cmd(&mut cmd)?;
         }
 
-        // git fetch --depth 1 origin $branch
+        // git ls-remote origin $branch
+        let output = Command::new("git")
+            .current_dir(self.directory(project_root)?)
+            .arg("ls-remote")
+            .arg("origin")
+            .arg(&self.branch)
+            .output()?;
+        let output = String::from_utf8(output.stdout)?;
+
+        // Find $branch in the output and resolve the SHA or fall back to $branch
+        let branch_ref = format!("refs/heads/{}", &self.branch);
+        let tag_ref = format!("refs/tags/{}", &self.branch);
+        let sha = output
+            .lines()
+            .find(|line| line.ends_with(&branch_ref) || line.ends_with(&tag_ref))
+            .map(|line| {
+                line.split_whitespace()
+                    .next()
+                    .expect("Git lines have sha then space")
+            })
+            .unwrap_or(&self.branch);
+
+        // git fetch --depth 1 origin $sha
         let mut cmd = Command::new("git");
         cmd.current_dir(self.directory(project_root)?)
             .arg("fetch")
             .arg("--depth")
             .arg("1")
             .arg("origin")
-            .arg(&self.branch);
+            .arg(sha);
         run_cmd(&mut cmd)?;
 
-        // git checkout $branch
+        // git checkout $sha
         let mut cmd = Command::new("git");
         cmd.current_dir(self.directory(project_root)?)
             .arg("checkout")
-            .arg(&self.branch);
+            .arg(sha);
         run_cmd(&mut cmd)
     }
 }
