@@ -136,7 +136,6 @@ Until then, you need to add the dependency to the app's Podfile, in this case `e
 +  # We need to specify this here in the app because we can't add a local dependency within
 +  # the react-native-matrix-rust-sdk
 +  pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'
-
 ```
 
 ## Step 3: Create the `ubrn.config.yaml` file
@@ -165,6 +164,14 @@ yarn ubrn:checkout
 ```
 
 This will checkout the `uniffi-starter` repo into the `rust_modules` directory within your project.
+
+You may want to add to `.gitignore` at this point:
+
+```diff
++# From uniffi-bindgen-react-native
++rust_modules/
++*.a
+```
 
 ## Step 4: Build the Rust
 
@@ -197,6 +204,10 @@ You can change the targets that get built by adding a comma separated list to th
 
 ```sh
 yarn ubrn:android --targets aarch64-linux-android,armv7-linux-androideabi
+```
+
+```admonish warning title="Troubleshooting"
+This won't happen with the `uniffi-starter` library, however a common error is to not enable a `staticlib` crate type in the project's `Cargo.toml`. Instructions on how to do this are given [here](../reference/commandline.md#admonition-note).
 ```
 
 ## Step 5: Write an example app exercising the Rust API
