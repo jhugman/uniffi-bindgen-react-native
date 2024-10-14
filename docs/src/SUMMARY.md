@@ -22,8 +22,9 @@
 # Contributing
 
 - [Local development](contributing/local-development.md)
-- [Adding or changing generated turbo-module templates](contributing/changing-turbo-module-templates.md)
-- [Changing generated Typescript or C++ templates](contributing/changing-bindings-templates.md)
+- [Turbo-module Templates: Adding or changing](contributing/changing-turbo-module-templates.md)
+- [Documentation: Contributing or reviewing](contributing/documentation.md)
+- [Typescript or C++ templates: Changing](contributing/changing-bindings-templates.md)
 - [Cutting a Release](./contributing/cutting-a-release.md)
 
 # Reference
