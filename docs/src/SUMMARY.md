@@ -15,9 +15,9 @@
 - [Records: Objects without methods](idioms/records.md)
 - [Enums and Tagged Unions](idioms/enums.md)
 - [Errors](idioms/errors.md)
-- [Callback interfaces]()
+- [Callback interfaces](idioms/callback-interfaces.md)
 - [Promises/Futures](idioms/promises.md)
-- [Async Callback interfaces]()
+- [Async Callback interfaces](idioms/async-callbacks.md)
 
 # Contributing
 
