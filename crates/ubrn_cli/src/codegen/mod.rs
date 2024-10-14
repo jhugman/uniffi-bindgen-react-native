@@ -327,7 +327,7 @@ mod files {
     templated_file!(PodspecTemplate, "module-template.podspec");
     impl RenderedFile for PodspecTemplate {
         fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-            let name = self.config.project.raw_name();
+            let name = self.config.project.cpp_filename();
             let filename = format!("{name}.podspec");
             project_root.join(filename)
         }

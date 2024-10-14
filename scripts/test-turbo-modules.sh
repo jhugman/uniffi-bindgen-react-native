@@ -247,10 +247,11 @@ check_lines() {
   check_line_unchanged "./ios/*.mm" "#import \""
   check_line_unchanged "./ios/*.mm" "@implementation"
   check_line_unchanged "./ios/*.mm" "::multiply"
+  check_line_unchanged "./*.podspec" "s.name"
 }
 
 clean_turbo_modules() {
-  rm -Rf cpp/ android/src/main/java ios/ src/Native* src/generated/ src/index.ts*
+  rm -Rf cpp/ android/src/main/java ios/ src/Native* src/generated/ src/index.ts* ./*.podspec
 }
 
 generate_turbo_module_for_diffing() {
@@ -401,6 +402,51 @@ run_default() {
         --slug dummy-lib-react-native \
         "$working_dir/dummy-lib-rn"
   # ReactNativeDummyLib fails with "› Must be a valid npm package name"
+  main \
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug @my-org/react-native-dummy-lib \
+    "$working_dir/@my-org/react-native-dummy-lib"
+  main \
+      --force-new-directory \
+      --keep-directory-on-exit \
+      --ubrn-config "$config" \
+      --builder-bob-version 0.35.1 \
+      --skip-ios \
+      --skip-android \
+      --slug @my-org/dummy-lib \
+      "$working_dir/@my-org/dummy-lib"
+  main \
+      --force-new-directory \
+      --keep-directory-on-exit \
+      --ubrn-config "$config" \
+      --builder-bob-version 0.35.1 \
+      --skip-ios \
+      --skip-android \
+      --slug @react-native/dummy-lib \
+      "$working_dir/@react-native/dummy-lib"
+  main \
+      --force-new-directory \
+      --keep-directory-on-exit \
+      --ubrn-config "$config" \
+      --builder-bob-version 0.35.1 \
+      --skip-ios \
+      --skip-android \
+      --slug @react-native-org/dummy-lib \
+      "$working_dir/@react-native-org/dummy-lib"
+  main \
+      --force-new-directory \
+      --keep-directory-on-exit \
+      --ubrn-config "$config" \
+      --builder-bob-version 0.35.1 \
+      --skip-ios \
+      --skip-android \
+      --slug @react-native/dummy-lib \
+      "$working_dir/@react-native/react-native-lib"
   local os
   os=$(uname -o)
   if [ "$os" == "Darwin" ] ; then
@@ -413,6 +459,15 @@ run_default() {
         --skip-android \
         --ios-name DummyLibForIos \
         "$working_dir/react-native-dummy-lib-for-ios"
+    main \
+      --force-new-directory \
+      --keep-directory-on-exit \
+      --ubrn-config "$config" \
+      --builder-bob-version 0.35.1 \
+      --skip-android \
+      --ios-name ReactNativeDummyLibForIos \
+      --slug @my-org/react-native-dummy-lib-for-ios \
+      "$working_dir/@my-org/react-native-dummy-lib-for-ios"
   fi
   main \
     --force-new-directory \
@@ -422,6 +477,14 @@ run_default() {
     --slug react-native-dummy-lib-for-android \
     --skip-ios \
     "$working_dir/react-native-dummy-lib-for-android"
+  main \
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --slug @my-org/react-native-dummy-lib-for-android \
+    "$working_dir/@my-org/react-native-dummy-lib-for-android"
 }
 
 derive_paths

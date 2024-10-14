@@ -4,8 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use heck::ToUpperCamelCase;
 use serde::Deserialize;
+
+use crate::config::{lower, org_and_name};
 
 use super::{trim, trim_react_native};
 
@@ -34,14 +35,16 @@ impl PackageJson {
             .android
             .java_package_name
             .clone()
-            .unwrap_or_else(|| {
-                format!(
-                    "com.{}",
-                    trim_react_native(&self.name)
-                        .to_upper_camel_case()
-                        .to_lowercase()
-                )
-            })
+            .unwrap_or_else(|| self.default_android_package_name())
+    }
+
+    fn default_android_package_name(&self) -> String {
+        let (org, name) = org_and_name(&self.name);
+        if let Some(org) = org {
+            format!("com.{}.{}", lower(org), lower(name))
+        } else {
+            format!("com.{}", lower(&trim_react_native(name)))
+        }
     }
 
     pub(crate) fn repo(&self) -> &PackageJsonRepo {
