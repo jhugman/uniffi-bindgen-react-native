@@ -111,10 +111,11 @@ impl GitRepoArgs {
             .arg(sha);
         run_cmd(&mut cmd)?;
 
-        // git checkout $sha
+        // git checkout --quiet $sha
         let mut cmd = Command::new("git");
         cmd.current_dir(self.directory(project_root)?)
             .arg("checkout")
+            .arg("--quiet") // Suppress detached head and dangling commit warnings
             .arg(sha);
         run_cmd(&mut cmd)
     }
