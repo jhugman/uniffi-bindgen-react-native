@@ -4,9 +4,9 @@
 
 # Getting started
 
-- [Before you start](getting-started/pre-installation.md)
-- [Step by step: Make your first library project](getting-started/guide.md)
-- [Publishing your library project](getting-started/publishing.md)
+- [Before you start](guides/pre-installation.md)
+- [Step by step: Make your first library project](guides/getting-started.md)
+- [Publishing your library project](guides/publishing.md)
 
 # Mapping Rust on to Typescript
 
