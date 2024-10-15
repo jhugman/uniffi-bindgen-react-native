@@ -13,11 +13,34 @@ If you're ready to start, then start with [a step-by-step tutorial to make a Rus
 If you're new to uniFFI, then [**the UniFFI user guide**](https://mozilla.github.io/uniffi-rs/latest/)
 or [**the UniFFI examples**](https://github.com/mozilla/uniffi-rs/tree/main/examples#example-uniffi-components) are interesting places to start.
 
+## Why `uniffi-bindgen-react-native`?
+
+- Spend more time writing Typescript and Rust
+- Full compatibility with `uniffi-rs`
+- Your Rust SDK is portable across multiple languages.
+
+### Why not, say WASM, via `wasm-bindgen`?
+
+WASM is an amazing virtual machine however:
+
+- your Rust crate must make alternative arrangements if it needs things that the virtual machine does not offer:
+    - threads and
+    - file access.
+- you need to maintain a separate FFI (this is a temporary issue, solvable by something like uniFFI).
+
+## Who is using `uniffi-bindgen-react-native`?
+
+- [@unomed/react-native-matrix-sdk](https://www.npmjs.com/package/@unomed/react-native-matrix-sdk)
+
+## Prior art and related projects
+
+- [cawfree/react-native-webassembly](https://github.com/cawfree/react-native-webassembly)
+
 ## Contributing
 
 If this tool sounds interesting to you, please help us develop it! You can:
 
-* View the [contributor guidelines](./docs/contributing.md).
+* View the [contributor guidelines](https://jhugman.github.io/uniffi-bindgen-react-native/).
 * File or work on [issues](https://github.com/jhugman/uniffi-bindgen-react-native/issues) here in GitHub.
 <!--
 * Join discussions in the [#uniffi:mozilla.org](https://matrix.to/#/#uniffi:mozilla.org) room on Matrix.
