@@ -1,4 +1,4 @@
-name: Rust
+name: Lint, build & test
 
 on:
   push:
@@ -10,39 +10,62 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Build
-      - name: Build
-        run: cargo build --verbose
 
-      # Install tooling
       - name: Install clang-format
         run: sudo apt-get install -y clang-format
+
       - name: Install yarn
         run: cargo xtask bootstrap yarn
 
-      # Lint
       - name: Check Typescript format
         run: cargo xtask fmt --check typescript
+
       - name: Check Rust format
         run: cargo xtask fmt --check rust
 
-      # Unit tests
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: cargo build --verbose
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Run tests
         run: cargo test --verbose
 
-      # Integration tests
+  integration-tests-generation:
+    name: Integration tests (generation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Install tooling for building C++
         run: sudo apt-get install -y cmake ninja-build
+
       - name: Installing hermes and test-runner
         run: cargo xtask bootstrap
+
       - name: Run tests of generated bindings
         run: ./scripts/run-tests.sh
+
+  integration-tests-checkout:
+    name: Integration tests (checkout)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Run tests for checkout command
         run: ./scripts/run-checkout-tests.sh
-
-      - name: Done
-        run: echo "Success!"
