@@ -86,7 +86,6 @@ Opening `package.json` add the following:
 +    "ubrn:android":  "ubrn build android --config ubrn.config.yaml --and-generate",
 +    "ubrn:checkout": "ubrn checkout      --config ubrn.config.yaml",
 +    "ubrn:clean": "rm -Rf cpp/ android/src/main/java ios/ src/Native* src/generated/ src/index.ts*",
-+    "postinstall": "yarn ubrn:checkout && yarn ubrn:android && yarn ubrn:ios",
     "example": "yarn workspace react-native-my-rust-lib-example",
     "test": "jest",
     "typecheck": "tsc",
