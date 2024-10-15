@@ -11,7 +11,7 @@ env:
 
 jobs:
   lint:
-    name: Lint
+    name: 🔍 Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
         run: cargo xtask fmt --check rust
 
   build:
-    name: Build
+    name: 🏗️ Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
         run: cargo build --verbose
 
   unit-tests:
-    name: Unit tests
+    name: 🧪 Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
         run: cargo test --verbose
 
   integration-tests-generation:
-    name: Integration tests (generation)
+    name: 🧩 Integration tests (generation)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,7 +62,7 @@ jobs:
         run: ./scripts/run-tests.sh
 
   integration-tests-checkout:
-    name: Integration tests (checkout)
+    name: 🧩 Integration tests (checkout)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
