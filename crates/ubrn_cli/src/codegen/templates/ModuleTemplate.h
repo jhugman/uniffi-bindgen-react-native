@@ -6,11 +6,11 @@
 #ifdef RCT_NEW_ARCH_ENABLED
 #import "{{ self.config.project.tm.name() }}.h"
 
-@interface {{ self.config.project.name_upper_camel() }} : NSObject <{{ self.config.project.codegen_filename() }}Spec>
+@interface {{ self.config.project.module_cpp() }} : NSObject <{{ self.config.project.codegen_filename() }}Spec>
 #else
 #import <React/RCTBridgeModule.h>
 
-@interface {{ self.config.project.name_upper_camel() }} : NSObject <RCTBridgeModule>
+@interface {{ self.config.project.module_cpp() }} : NSObject <RCTBridgeModule>
 #endif
 
 @end

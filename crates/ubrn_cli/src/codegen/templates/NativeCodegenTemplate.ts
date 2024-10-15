@@ -7,4 +7,4 @@ export interface Spec extends TurboModule {
   cleanupRustCrate(): boolean;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('{{ self.config.project.name_upper_camel() }}');
+export default TurboModuleRegistry.getEnforcing<Spec>('{{ self.config.project.spec_name() }}');

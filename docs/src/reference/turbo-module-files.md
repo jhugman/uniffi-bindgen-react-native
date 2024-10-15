@@ -7,7 +7,7 @@ There is a host of smaller files that need to be configured with these namespace
 These include:
 
 - For Javascript:
-	- An `index.ts` file, to call into the installation process, initialize the bindings for each namespace, and re-export the generated bindings for client code.
+	- An `index.tsx` file, to call into the installation process, initialize the bindings for each namespace, and re-export the generated bindings for client code.
 	- A Codegen file, to generates install methods from Javascript to Java and Objective C.
 - For Android:
 	- A `Package.java` and `Module.java` file, which receives the codegen'd install method calls, to get the Hermes `JavascriptRuntime` and `CallInvokerHolder` to pass it via JNI to
@@ -21,3 +21,5 @@ These include:
 - To build for Android
 	- A `CMakeLists.txt` file to configure the Android specific tool chain for all the generated C++ files.
 	- The `build.gradle` file which tells keeps the codegen package name in-sync and configures `cmake`. (note to self, this could be done from within the `CMakeLists.txt` file).
+
+An up-to-date list can be found in [`ubrn_cli/src/codegen/templates`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/crates/ubrn_cli/src/codegen/templates).

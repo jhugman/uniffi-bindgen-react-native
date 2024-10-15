@@ -166,7 +166,7 @@ mod files {
     pub(super) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
         vec![
             // typescript
-            IndexTs::rc_new(config.clone()),
+            IndexTsx::rc_new(config.clone()),
             // C++
             TMHeader::rc_new(config.clone()),
             TMCpp::rc_new(config.clone()),
@@ -189,7 +189,7 @@ mod files {
     templated_file!(JavaModule, "ModuleTemplate.java");
     impl RenderedFile for JavaModule {
         fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-            let name = self.config.project.name_upper_camel();
+            let name = self.config.project.module_cpp();
             let filename = format!("{name}Module.java");
             self.config
                 .project
@@ -202,7 +202,7 @@ mod files {
     templated_file!(JavaPackage, "PackageTemplate.java");
     impl RenderedFile for JavaPackage {
         fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-            let name = self.config.project.name_upper_camel();
+            let name = self.config.project.module_cpp();
             let filename = format!("{name}Package.java");
             self.config
                 .project
@@ -261,10 +261,10 @@ mod files {
         }
     }
 
-    templated_file!(IndexTs, "index.ts");
-    impl RenderedFile for IndexTs {
+    templated_file!(IndexTsx, "index.tsx");
+    impl RenderedFile for IndexTsx {
         fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-            let filename = "index.ts";
+            let filename = "index.tsx";
             self.config.project.tm.ts_path(project_root).join(filename)
         }
     }
@@ -295,7 +295,7 @@ mod files {
     templated_file!(ModuleTemplateH, "ModuleTemplate.h");
     impl RenderedFile for ModuleTemplateH {
         fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-            let name = self.config.project.name_upper_camel();
+            let name = self.config.project.module_cpp();
             let filename = format!("{name}.h");
             self.config
                 .project
@@ -311,7 +311,7 @@ mod files {
     templated_file!(ModuleTemplateMm, "ModuleTemplate.mm");
     impl RenderedFile for ModuleTemplateMm {
         fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-            let name = self.config.project.name_upper_camel();
+            let name = self.config.project.module_cpp();
             let filename = format!("{name}.mm");
             self.config
                 .project
@@ -432,7 +432,7 @@ mod tests {
         templated_file!(TemplateTester, "TemplateTester.txt");
         impl RenderedFile for TemplateTester {
             fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-                let name = self.config.project.name_upper_camel();
+                let name = self.config.project.module_cpp();
                 let filename = format!("{name}.txt");
                 self.config
                     .project
@@ -454,10 +454,10 @@ mod tests {
         // This is hard coded into the file. If this isn't here, then the test file hasn't rendered.
         assert!(s.contains("hardcoded into template."));
         assert_eq!(
-            config.project.name_upper_camel(),
+            config.project.module_cpp(),
             "MyTesterTemplateProject".to_string()
         );
-        assert!(s.contains("name_upper_camel = MyTesterTemplateProject."));
+        assert!(s.contains("module_cpp = MyTesterTemplateProject."));
         assert!(s.contains("list of modules = ['NativeAlice', 'NativeBob', 'NativeCharlie']"));
         Ok(())
     }
