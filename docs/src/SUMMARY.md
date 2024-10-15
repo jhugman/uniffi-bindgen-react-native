@@ -36,3 +36,8 @@
 - [Generating a Turbo Module](reference/turbo-module-files.md)
 - [Reserved words](reference/reserved-words.md)
 - [Potential collisions](reference/potential-collisions.md)
+
+# Internals
+
+- [Lifting and lowering](./internals/lifting-and-lowering.md)
+- [NativeModule.ts and Codegen](./internals/rn-codegen.md)
