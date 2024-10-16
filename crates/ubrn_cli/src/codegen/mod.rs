@@ -7,7 +7,7 @@ use anyhow::Result;
 use askama::DynTemplate;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use std::{collections::BTreeMap, rc::Rc};
+use std::{cell::OnceCell, collections::BTreeMap, rc::Rc};
 
 use ubrn_bindgen::ModuleMetadata;
 use ubrn_common::{mk_dir, CrateMetadata};
@@ -71,6 +71,7 @@ pub(crate) struct TemplateConfig {
     pub(crate) project: ProjectConfig,
     pub(crate) rust_crate: CrateMetadata,
     pub(crate) modules: Vec<ModuleMetadata>,
+    pub(crate) uses_kotlin: OnceCell<bool>,
 }
 
 impl TemplateConfig {
@@ -85,6 +86,7 @@ impl TemplateConfig {
             project,
             rust_crate,
             modules,
+            uses_kotlin: OnceCell::new(),
         }
     }
 }
@@ -156,6 +158,7 @@ macro_rules! templated_file {
 }
 
 mod files {
+    use super::platforms_match;
     use super::RenderedFile;
     use super::TemplateConfig;
     use crate::Platform;
@@ -163,6 +166,26 @@ mod files {
     use camino::Utf8PathBuf;
     use std::rc::Rc;
 
+    impl TemplateConfig {
+        fn uses_kotlin(self: &Rc<Self>) -> bool {
+            *self.uses_kotlin.get_or_init(|| {
+                let project_root = self.project.project_root();
+                let gradle_file = BuildGradle::new(self.clone()).path(project_root);
+                if gradle_file.exists() {
+                    let file = std::fs::read_to_string(gradle_file)
+                        .expect("Cannot read build.gradle file");
+                    file.contains("kotlin")
+                } else {
+                    // assume that if the user blew away the gradle file,
+                    // then we should remake it as one with kotlin.
+                    true
+                }
+            })
+        }
+    }
+
+    // The set of files to be generated. These are filtered depending on what platform we're
+    // building for, and based upon the template config.
     pub(super) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
         vec![
             // typescript
@@ -173,12 +196,17 @@ mod files {
             // Codegen (for installer)
             NativeCodegenTs::rc_new(config.clone()),
             // Android
-            JavaModule::rc_new(config.clone()),
-            JavaPackage::rc_new(config.clone()),
-            BuildGradle::rc_new(config.clone()),
             CMakeLists::rc_new(config.clone()),
             CppAdapter::rc_new(config.clone()),
             AndroidManifest::rc_new(config.clone()),
+            // Android with Java
+            JavaModule::rc_new(config.clone()),
+            JavaPackage::rc_new(config.clone()),
+            BuildGradle::rc_new(config.clone()),
+            // Android with Kotlin
+            KtModule::rc_new(config.clone()),
+            KtPackage::rc_new(config.clone()),
+            KtBuildGradle::rc_new(config.clone()),
             // iOS
             ModuleTemplateH::rc_new(config.clone()),
             ModuleTemplateMm::rc_new(config.clone()),
@@ -197,6 +225,12 @@ mod files {
                 .codegen_package_dir(project_root)
                 .join(filename)
         }
+        fn filter_by(&self, platform: &Option<Platform>) -> bool {
+            platforms_match(platform, &self.platform()) && !self.config.uses_kotlin()
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
     }
 
     templated_file!(JavaPackage, "PackageTemplate.java");
@@ -209,6 +243,9 @@ mod files {
                 .android
                 .codegen_package_dir(project_root)
                 .join(filename)
+        }
+        fn filter_by(&self, platform: &Option<Platform>) -> bool {
+            platforms_match(platform, &self.platform()) && !self.config.uses_kotlin()
         }
         fn platform(&self) -> Option<Platform> {
             Some(Platform::Android)
@@ -224,6 +261,65 @@ mod files {
                 .android
                 .directory(project_root)
                 .join(filename)
+        }
+        fn filter_by(&self, platform: &Option<Platform>) -> bool {
+            platforms_match(platform, &self.platform()) && !self.config.uses_kotlin()
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
+    }
+
+    templated_file!(KtModule, "ModuleTemplate.kt");
+    impl RenderedFile for KtModule {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.module_cpp();
+            let filename = format!("{name}Module.kt");
+            self.config
+                .project
+                .android
+                .codegen_package_dir(project_root)
+                .join(filename)
+        }
+        fn filter_by(&self, platform: &Option<Platform>) -> bool {
+            platforms_match(platform, &self.platform()) && self.config.uses_kotlin()
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
+    }
+
+    templated_file!(KtPackage, "PackageTemplate.kt");
+    impl RenderedFile for KtPackage {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.module_cpp();
+            let filename = format!("{name}Package.kt");
+            self.config
+                .project
+                .android
+                .codegen_package_dir(project_root)
+                .join(filename)
+        }
+        fn filter_by(&self, platform: &Option<Platform>) -> bool {
+            platforms_match(platform, &self.platform()) && self.config.uses_kotlin()
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
+    }
+
+    templated_file!(KtBuildGradle, "build.kt.gradle");
+    impl RenderedFile for KtBuildGradle {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let filename = "build.gradle";
+            self.config
+                .project
+                .android
+                .directory(project_root)
+                .join(filename)
+        }
+        fn filter_by(&self, platform: &Option<Platform>) -> bool {
+            platforms_match(platform, &self.platform()) && self.config.uses_kotlin()
         }
         fn platform(&self) -> Option<Platform> {
             Some(Platform::Android)

@@ -12,20 +12,21 @@ By the end of this tutorial you will:
 
 We first use `create-react-native-library` to generate our basic turbo-module library.
 
-```admonish warning title="Known issue with builder-bob"
-`create-react-native-library` has changed a few things around, and so the following does not work yet with the latest version of `create-react-native-library`.
-
-We can still work with a previous version of builder-bob for this tutorial.
+```sh
+npx create-react-native-library@latest my-rust-lib
 ```
 
-```sh
-npx create-react-native-library@0.35.1 my-rust-lib
+```admonish warning title="Builder Bob version drift"
+`create-react-native-library` has changed a few things around recently.
+
+These steps have been tested with `0.35.1` and `0.41.2`, which at time of writing, is the `latest`.
 ```
 
 The important bits are:
 ```
 ✔ What type of library do you want to develop? › Turbo module
 ✔ Which languages do you want to use? › C++ for Android & iOS
+✔ What type of example app do you want to create? › Vanilla
 ```
 
 For following along, here are the rest of my answers.
@@ -39,6 +40,7 @@ For following along, here are the rest of my answers.
 ✔ What is the URL for the repository? … https://github.com/jhugman/react-native-my-rust-lib
 ✔ What type of library do you want to develop? › Turbo module
 ✔ Which languages do you want to use? › C++ for Android & iOS
+✔ What type of example app do you want to create? › Vanilla
 ✔ Project created successfully at my-rust-lib!
 ```
 
@@ -62,7 +64,7 @@ Then `i` for iOS.
 
 After that has launched, then you can hit the `a` key to launch Android.
 
-We should, if all has gone to plan, see `Result = 21` on screen.
+We should, if all has gone to plan, see `Result: 21` on screen.
 
 ## Step 2: Add `uniffi-bindgen-react-native` to the project
 
@@ -267,7 +269,7 @@ yarn example start
 
 As with the starter app from `create-react-native-library`, there is very little to look at.
 
-We should, if all has gone to plan, see `Result = 42` on screen.
+We should, if all has gone to plan, see `Result: 42` on screen.
 
 ## Step 7: Make changes in the Rust
 
