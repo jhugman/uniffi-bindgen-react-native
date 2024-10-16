@@ -14,7 +14,7 @@ The following assumes you have checked out the `uniffi-bindgen-react-native` pro
 
 The docs are produced by [`mdbook`, a static-site generator](https://rust-lang.github.io/mdBook/index.html) written for documenting Rust projects.
 
-`uniffi-bindgen-react-native` uses a this with a few plugins. Opening the terminal and using `cd` to navigate to the project directory, then running the following command:
+`uniffi-bindgen-react-native` uses this with a few plugins. You can install it by opening the terminal and using `cd` to navigate to the project directory, then running the following command:
 
 ```sh
 ./scripts/run-bootstrap-docs.sh
