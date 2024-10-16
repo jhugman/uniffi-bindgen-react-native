@@ -41,7 +41,7 @@ scripts: {
     "ubrn:ios":      "ubrn build ios     --config ubrn.config.yaml --and-generate && (cd example/ios && pod install)",
     "ubrn:android":  "ubrn build android --config ubrn.config.yaml --and-generate",
     "ubrn:checkout": "ubrn checkout      --config ubrn.config.yaml",
-+   "postinstall":   "yarn ubrn:checkout && yarn ubrn:android && yarn ubrn:ios",
++   "postinstall":   "yarn ubrn:checkout && yarn ubrn:android --release && yarn ubrn:ios --release",
 ```
 
 Make sure to enable release mode in `ubrn.config` before distributing your package as the impact on size and performance can be dramatic.
