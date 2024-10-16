@@ -4,8 +4,9 @@
 
 # Getting started
 
-- [Before you start](getting-started/pre-installation.md)
-- [Step by step: Make your first library project](getting-started/guide.md)
+- [Before you start](guides/pre-installation.md)
+- [Step by step: Make your first library project](guides/getting-started.md)
+- [Publishing your library project](guides/publishing.md)
 
 # Mapping Rust on to Typescript
 
@@ -15,15 +16,16 @@
 - [Records: Objects without methods](idioms/records.md)
 - [Enums and Tagged Unions](idioms/enums.md)
 - [Errors](idioms/errors.md)
-- [Callback interfaces]()
+- [Callback interfaces](idioms/callback-interfaces.md)
 - [Promises/Futures](idioms/promises.md)
-- [Async Callback interfaces]()
+- [Async Callback interfaces](idioms/async-callbacks.md)
 
 # Contributing
 
 - [Local development](contributing/local-development.md)
-- [Adding or changing generated turbo-module templates](contributing/changing-turbo-module-templates.md)
-- [Changing generated Typescript or C++ templates](contributing/changing-bindings-templates.md)
+- [Turbo-module Templates: Adding or changing](contributing/changing-turbo-module-templates.md)
+- [Documentation: Contributing or reviewing](contributing/documentation.md)
+- [Typescript or C++ templates: Changing](contributing/changing-bindings-templates.md)
 - [Cutting a Release](./contributing/cutting-a-release.md)
 
 # Reference
@@ -34,3 +36,8 @@
 - [Generating a Turbo Module](reference/turbo-module-files.md)
 - [Reserved words](reference/reserved-words.md)
 - [Potential collisions](reference/potential-collisions.md)
+
+# Internals
+
+- [Lifting and lowering](./internals/lifting-and-lowering.md)
+- [NativeModule.ts and Codegen](./internals/rn-codegen.md)

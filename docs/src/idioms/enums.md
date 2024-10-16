@@ -144,7 +144,7 @@ const cat = MyAnimal.Cat.new();
 
 ## Enums with explicit discriminants
 
-Both [Rust](https://doc.rust-lang.org/reference/items/enumerations.html#discriminants) and Typescript allow you to specify discriminants to enum variants. As [in other bindings for uniffi-rs](https://mozilla.github.io/uniffi-rs/latest/proc_macro/index.html#variant-discriminants), this is suppoorted by `uniffi-bindgen-react-native`. For example,
+Both [Rust](https://doc.rust-lang.org/reference/items/enumerations.html#discriminants) and Typescript allow you to specify discriminants to enum variants. As [in other bindings for uniffi-rs](https://mozilla.github.io/uniffi-rs/latest/proc_macro/index.html#variant-discriminants), this is supported by `uniffi-bindgen-react-native`. For example,
 
 ```rust
 #[derive(uniffi::Enum)]
