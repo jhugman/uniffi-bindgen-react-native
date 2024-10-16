@@ -8,17 +8,26 @@ I would love some [help with this document](../contributing/documentation.md).
 
 ## Binary builds
 
-In order to distribute pre-built packages you will need to add to `.gitignore` the built `.a`:
+You likely don't want to track pre-built binaries in your git repository but you may want to include them in published packages. If so, you will have to work around `npm`'s behaviour of factoring in `.gitignore` when picking files to include in packages.
 
-```diff
-# From uniffi-bindgen-react-native
-rust_modules/
-+*.a
+One way to do this is by using the `files` array in `package.json`. The steps to achieve this will depend on the particular contents of your repository. For illustration purposes, let's assume you're ignoring binaries in `.gitignore` with
+
+```
+build/
+*.a
 ```
 
-but add them back in to the `files` section of `package.json`[^issue121].
+To include the libraries in `/build/$library.xcframework` and `/android/src/main/jniLibs/$target/$library.a` in your npm package, you can add the following to `package.json`:
 
-[^issue121]: [This advice](https://github.com/jhugman/uniffi-bindgen-react-native/issues/121) is from @Johennes
+```diff
+"files": [
++ "android",
++ "build",
+```
+
+Another option is to create an `.npmignore` file. This will require you to duplicate most of the contents of `.gitignore` though and might create issues if you forget to duplicate entries as you add them later.
+
+In either case, it's good practice to run `npm pack --dry-run` and verify the package contents before publishing.
 
 ## Source packages
 
@@ -34,6 +43,8 @@ scripts: {
     "ubrn:checkout": "ubrn checkout      --config ubrn.config.yaml",
 +   "postinstall":   "yarn ubrn:checkout && yarn ubrn:android && yarn ubrn:ios",
 ```
+
+Make sure to enable release mode in `ubrn.config` before distributing your package as the impact on size and performance can be dramatic.
 
 ## Add `uniffi-bindgen-react-native` to your README.md
 
