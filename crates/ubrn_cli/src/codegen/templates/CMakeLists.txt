@@ -30,8 +30,7 @@ include_directories(
     ${UNIFFI_BINDGEN_PATH}/cpp/includes
 )
 
-add_library(
-    ${CMAKE_PROJECT_NAME} SHARED
+add_library({{ self.config.project.cpp_filename() }}            SHARED
     {{ tm_dir }}/{{ self.config.project.cpp_filename() }}.cpp
     {%- for m in self.config.modules %}
     {{ bindings_dir }}/{{ m.cpp_filename() }}
@@ -63,7 +62,7 @@ find_package(fbjni REQUIRED CONFIG)
 find_library(LOGCAT log)
 
 target_link_libraries(
-  ${CMAKE_PROJECT_NAME}
+  {{ self.config.project.cpp_filename() }}
   fbjni::fbjni
   ReactAndroid::jsi
   ReactAndroid::turbomodulejsijni

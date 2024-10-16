@@ -229,6 +229,7 @@ check_lines() {
   check_line_unchanged "./src/Native*" "getEnforcing"
 
   check_line_unchanged "./android/CMakeLists.txt" "^project"
+  check_line_unchanged "./android/CMakeLists.txt" "^add_library.*SHARED"
   check_line_unchanged "./android/build.gradle" "return rootProject"
   check_line_unchanged "./android/build.gradle" "libraryName"
   check_line_unchanged "./android/src/*/*Package*" "package"
