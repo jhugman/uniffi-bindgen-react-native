@@ -32,7 +32,7 @@ scripts: {
     "ubrn:ios":      "ubrn build ios     --config ubrn.config.yaml --and-generate && (cd example/ios && pod install)",
     "ubrn:android":  "ubrn build android --config ubrn.config.yaml --and-generate",
     "ubrn:checkout": "ubrn checkout      --config ubrn.config.yaml",
-+    "postinstall": "yarn ubrn:checkout && yarn ubrn:android && yarn ubrn:ios",
++   "postinstall":   "yarn ubrn:checkout && yarn ubrn:android && yarn ubrn:ios",
 ```
 
 ## Add `uniffi-bindgen-react-native` to your README.md

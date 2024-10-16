@@ -47,9 +47,9 @@ This will produce output like:
 
 You can edit pages with your text editor.
 
-New pages should be added to the `SUMMARY.md` file so that a) `mdbook` knows about it b) it ends up in the table of contents.
+New pages should be added to the `SUMMARY.md` file so that a) `mdbook` knows about them and b) they ends up in the table of contents.
 
-You can now navigate your browser to see the changes you've made [localhost:3000](http://localhost:3000/).
+You can now navigate your browser to [localhost:3000](http://localhost:3000/) to see the changes you've made.
 
 ## Pushing these changes back into the project
 

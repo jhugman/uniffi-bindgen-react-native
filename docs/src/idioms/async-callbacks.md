@@ -34,7 +34,7 @@ When the Rust Future is completed, it is dropped, and Typescript is informed. If
 
 `uniffi-bindgen-react-native` generates an optional argument for each async callback method, which is an options bag containing an `AbortSignal`.
 
-It is up to implementer of each method whether they want to use it or not.
+It is up to the implementer of each method whether they want to use it or not.
 
 Using exactly the same `MyFetcher` trait from above, this example passes the signal straight to [the `fetch` API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch#canceling_a_request).
 
