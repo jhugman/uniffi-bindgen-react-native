@@ -1,3 +1,5 @@
+[![CI](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/ci.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/ci.yml)
+
 # uniffi-bindgen-react-native
 [UniFFI](https://mozilla.github.io/uniffi-rs/latest/) is a multi-language bindings generator for Rust.
 
