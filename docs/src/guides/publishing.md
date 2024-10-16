@@ -44,8 +44,6 @@ scripts: {
 +   "postinstall":   "yarn ubrn:checkout && yarn ubrn:android --release && yarn ubrn:ios --release",
 ```
 
-Make sure to enable release mode in `ubrn.config` before distributing your package as the impact on size and performance can be dramatic.
-
 ## Add `uniffi-bindgen-react-native` to your README.md
 
 If you publish your source code anywhere, it would be lovely if you could add something to your README.md. For example:
