@@ -123,7 +123,7 @@ impl GitRepoArgs {
             .arg(sha);
         run_cmd(&mut cmd)?;
 
-        // git checkout --quiet $sha
+        // git checkout $sha
         let mut cmd = Command::new("git");
         cmd.current_dir(self.directory(project_root)?)
             .arg("checkout")
