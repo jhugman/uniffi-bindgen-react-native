@@ -6,7 +6,7 @@ PWD=
 
 reset_args() {
   PROJECT_DIR=my-test-library
-  KEEP_ROOT_ON_ERROR=false
+  KEEP_ROOT_ON_EXIT=false
   BOB_VERSION=latest
   PROJECT_SLUG=my-test-library
   FORCE_NEW_DIR=false
@@ -14,6 +14,7 @@ reset_args() {
   SKIP_IOS=false
   SKIP_ANDROID=false
   UBRN_CONFIG=
+  APP_TSX=
 }
 
 usage() {
@@ -23,6 +24,7 @@ usage() {
   echo "  -A, --skip-android                 Skip building for Android."
   echo "  -I, --skip-ios                     Skip building for iOS."
   echo "  -C, --ubrn-config                  Use a ubrn config file."
+  echo "  -T, --app-tsx                      Use a App.tsx file."
 
   echo "  -u, --builder-bob-version VERSION  Specify the version of builder-bob to use."
   echo "  -s, --slug PROJECT_SLUG            Specify the project slug."
@@ -48,7 +50,7 @@ diagnostics() {
 }
 
 error() {
-  if [ "$KEEP_ROOT_ON_ERROR" == false ] && [ -d "$PROJECT_DIR" ]; then
+  if [ "$KEEP_ROOT_ON_EXIT" == false ] && [ -d "$PROJECT_DIR" ]; then
     cleanup
   fi
   diagnostics
@@ -69,6 +71,16 @@ derive_paths() {
   PWD=$(pwd)
 }
 
+join_paths() {
+  local prefix="$1"
+  local suffix="$2"
+  if [[ "$suffix" = /* ]] ; then
+    echo -n "$suffix"
+  else
+    echo -n "$prefix/$suffix"
+  fi
+}
+
 parse_cli_options() {
   reset_args
   # Parse command line options
@@ -87,17 +99,15 @@ parse_cli_options() {
         shift
         ;;
       -C|--ubrn-config)
-        local config_file
-        config_file="$2"
-        if [[ "$config_file" = /* ]] ; then
-          UBRN_CONFIG="$config_file"
-        else
-          UBRN_CONFIG="$PWD/$config_file"
-        fi
+        UBRN_CONFIG=$(join_paths "$PWD" "$2")
+        shift
+        ;;
+      -T|--app-tsx)
+        APP_TSX=$(join_paths "$PWD" "$2")
         shift
         ;;
       -k|--keep-directory-on-exit)
-        KEEP_ROOT_ON_ERROR=true
+        KEEP_ROOT_ON_EXIT=true
         ;;
       -f|--force-new-directory)
         FORCE_NEW_DIR=true
@@ -113,7 +123,7 @@ parse_cli_options() {
         exit 0
         ;;
       -*)
-        KEEP_ROOT_ON_ERROR=true
+        KEEP_ROOT_ON_EXIT=true
         error "Bad argument: $1"
         ;;
       *)
@@ -280,6 +290,9 @@ generate_turbo_module_for_compiling() {
   echo "-- Running ubrn checkout"
   clean_turbo_modules
   "$UBRN_BIN" checkout      --config "$UBRN_CONFIG"
+  if [ -f "$APP_TSX" ] ; then
+    cp "$APP_TSX" ./example/src/App.tsx
+  fi
   exit_dir
 }
 
@@ -349,7 +362,9 @@ main() {
   if [ "$SKIP_IOS" == false ]; then
     build_ios_example
   fi
-  cleanup
+  if [ "$KEEP_ROOT_ON_EXIT" == false ] && [ -d "$PROJECT_DIR" ]; then
+    cleanup
+  fi
   echo "✅ Success!"
 }
 
@@ -357,6 +372,7 @@ run_default() {
   local fixture_dir="$ROOT/integration/fixtures/turbo-module-testing"
   local working_dir="/tmp/turbomodule-tests"
   local config="$fixture_dir/ubrn.config.yaml"
+  local app_tsx="$fixture_dir/App.tsx"
   main \
         --force-new-directory \
         --keep-directory-on-exit \
@@ -413,59 +429,61 @@ run_default() {
     --slug @my-org/react-native-dummy-lib \
     "$working_dir/@my-org/react-native-dummy-lib"
   main \
-      --force-new-directory \
-      --keep-directory-on-exit \
-      --ubrn-config "$config" \
-      --builder-bob-version 0.35.1 \
-      --skip-ios \
-      --skip-android \
-      --slug @my-org/dummy-lib \
-      "$working_dir/@my-org/dummy-lib"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug @my-org/dummy-lib \
+    "$working_dir/@my-org/dummy-lib"
   main \
-      --force-new-directory \
-      --keep-directory-on-exit \
-      --ubrn-config "$config" \
-      --builder-bob-version 0.35.1 \
-      --skip-ios \
-      --skip-android \
-      --slug @react-native/dummy-lib \
-      "$working_dir/@react-native/dummy-lib"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug @react-native/dummy-lib \
+    "$working_dir/@react-native/dummy-lib"
   main \
-      --force-new-directory \
-      --keep-directory-on-exit \
-      --ubrn-config "$config" \
-      --builder-bob-version 0.35.1 \
-      --skip-ios \
-      --skip-android \
-      --slug @react-native-org/dummy-lib \
-      "$working_dir/@react-native-org/dummy-lib"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug @react-native-org/dummy-lib \
+    "$working_dir/@react-native-org/dummy-lib"
   main \
-      --force-new-directory \
-      --keep-directory-on-exit \
-      --ubrn-config "$config" \
-      --builder-bob-version 0.35.1 \
-      --skip-ios \
-      --skip-android \
-      --slug @react-native/dummy-lib \
-      "$working_dir/@react-native/react-native-lib"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug @react-native/dummy-lib \
+    "$working_dir/@react-native/react-native-lib"
   local os
   os=$(uname -o)
   if [ "$os" == "Darwin" ] ; then
     main \
-        --force-new-directory \
-        --keep-directory-on-exit \
-        --ubrn-config "$config" \
-        --builder-bob-version 0.35.1 \
-        --slug react-native-dummy-lib-for-ios \
-        --skip-android \
-        --ios-name DummyLibForIos \
-        "$working_dir/react-native-dummy-lib-for-ios"
+      --force-new-directory \
+      --keep-directory-on-exit \
+      --ubrn-config "$config" \
+      --builder-bob-version 0.35.1 \
+      --slug react-native-dummy-lib-for-ios \
+      --skip-android \
+      --app-tsx "$app_tsx" \
+      --ios-name DummyLibForIos \
+      "$working_dir/react-native-dummy-lib-for-ios"
     main \
       --force-new-directory \
       --keep-directory-on-exit \
       --ubrn-config "$config" \
       --builder-bob-version 0.35.1 \
       --skip-android \
+      --app-tsx "$app_tsx" \
       --ios-name ReactNativeDummyLibForIos \
       --slug @my-org/react-native-dummy-lib-for-ios \
       "$working_dir/@my-org/react-native-dummy-lib-for-ios"
@@ -477,6 +495,7 @@ run_default() {
     --builder-bob-version 0.35.1 \
     --slug react-native-dummy-lib-for-android \
     --skip-ios \
+    --app-tsx "$app_tsx" \
     "$working_dir/react-native-dummy-lib-for-android"
   main \
     --force-new-directory \
@@ -484,6 +503,7 @@ run_default() {
     --ubrn-config "$config" \
     --builder-bob-version 0.35.1 \
     --skip-ios \
+    --app-tsx "$app_tsx" \
     --slug @my-org/react-native-dummy-lib-for-android \
     "$working_dir/@my-org/react-native-dummy-lib-for-android"
 }
