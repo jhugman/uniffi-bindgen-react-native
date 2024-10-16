@@ -9,12 +9,13 @@ use std::{collections::HashMap, fmt::Display, process::Command, str::FromStr};
 use anyhow::{Context, Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
+use heck::ToUpperCamelCase;
 use serde::{Deserialize, Serialize};
 use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
-    config::{trim_react_native, ProjectConfig},
+    config::{org_and_name, trim_react_native, ProjectConfig},
     rust::CrateConfig,
     workspace,
 };
@@ -44,10 +45,14 @@ impl IOsConfig {
     }
 
     fn default_framework_name() -> String {
-        format!(
-            "{}Framework",
-            trim_react_native(&workspace::package_json().name())
-        )
+        let name = workspace::package_json().name();
+        let (org, name) = org_and_name(&name);
+        let prefix = if let Some(org) = org {
+            format!("{}_{}", org, name).to_upper_camel_case()
+        } else {
+            trim_react_native(name).to_upper_camel_case()
+        };
+        format!("{prefix}Framework")
     }
 
     fn default_cargo_extras() -> ExtraArgs {

@@ -76,13 +76,31 @@ pub(crate) fn trim_react_native(name: &str) -> String {
         .to_string()
 }
 
+pub(crate) fn org_and_name(name: &str) -> (Option<&str>, &str) {
+    if let Some((left, right)) = name.split_once('/') {
+        let org = left.strip_prefix('@').unwrap_or(left);
+        (Some(org), right)
+    } else {
+        (None, name)
+    }
+}
+
+pub(crate) fn lower(s: &str) -> String {
+    s.to_upper_camel_case().to_lowercase()
+}
+
 impl ProjectConfig {
     pub(crate) fn project_root(&self) -> &Utf8Path {
         &self.crate_.project_root
     }
 
     pub(crate) fn module_cpp(&self) -> String {
-        trim_react_native(&self.name).to_upper_camel_case()
+        let (org, name) = org_and_name(&self.name);
+        if org.is_some() {
+            name.to_upper_camel_case()
+        } else {
+            trim_react_native(name).to_upper_camel_case()
+        }
     }
 }
 
@@ -96,9 +114,12 @@ impl ProjectConfig {
     }
 
     pub(crate) fn cpp_namespace(&self) -> String {
-        trim_react_native(&self.name)
-            .to_upper_camel_case()
-            .to_lowercase()
+        let (org, name) = org_and_name(&self.name);
+        if let Some(org) = org {
+            format!("{}_{}", lower(org), lower(name))
+        } else {
+            lower(&trim_react_native(name))
+        }
     }
 
     pub(crate) fn cpp_filename(&self) -> String {
@@ -106,12 +127,16 @@ impl ProjectConfig {
         self.raw_name().to_kebab_case()
     }
 
+    pub(crate) fn podspec_filename(&self) -> String {
+        self.cpp_filename()
+    }
+
     pub(crate) fn codegen_filename(&self) -> String {
         format!("Native{}", self.spec_name())
     }
 
     pub(crate) fn spec_name(&self) -> String {
-        trim_react_native(&self.name).to_upper_camel_case()
+        self.module_cpp()
     }
 
     pub(crate) fn exclude_files(&self) -> &GlobSet {
