@@ -374,50 +374,50 @@ run_default() {
   local config="$fixture_dir/ubrn.config.yaml"
   local app_tsx="$fixture_dir/App.tsx"
   main \
-        --force-new-directory \
-        --keep-directory-on-exit \
-        --ubrn-config "$config" \
-        --builder-bob-version 0.35.1 \
-        --skip-ios \
-        --skip-android \
-        --slug dummy-lib \
-        "$working_dir/dummy-lib"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug dummy-lib \
+    "$working_dir/dummy-lib"
   main \
-        --force-new-directory \
-        --keep-directory-on-exit \
-        --ubrn-config "$config" \
-        --builder-bob-version 0.35.1 \
-        --skip-ios \
-        --skip-android \
-        --slug rn-dummy-lib \
-        "$working_dir/rn-dummy-lib"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug rn-dummy-lib \
+    "$working_dir/rn-dummy-lib"
   main \
-        --force-new-directory \
-        --keep-directory-on-exit \
-        --ubrn-config "$config" \
-        --builder-bob-version 0.35.1 \
-        --skip-ios \
-        --skip-android \
-        --slug react-native-dummy-lib \
-        "$working_dir/react-native-dummy-lib"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug react-native-dummy-lib \
+    "$working_dir/react-native-dummy-lib"
   main \
-        --force-new-directory \
-        --keep-directory-on-exit \
-        --ubrn-config "$config" \
-        --builder-bob-version 0.35.1 \
-        --skip-ios \
-        --skip-android \
-        --slug dummy-lib-react-native \
-        "$working_dir/dummy-lib-react-native"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug dummy-lib-react-native \
+    "$working_dir/dummy-lib-react-native"
   main \
-        --force-new-directory \
-        --keep-directory-on-exit \
-        --ubrn-config "$config" \
-        --builder-bob-version 0.35.1 \
-        --skip-ios \
-        --skip-android \
-        --slug dummy-lib-react-native \
-        "$working_dir/dummy-lib-rn"
+    --force-new-directory \
+    --keep-directory-on-exit \
+    --ubrn-config "$config" \
+    --builder-bob-version 0.35.1 \
+    --skip-ios \
+    --skip-android \
+    --slug dummy-lib-react-native \
+    "$working_dir/dummy-lib-rn"
   # ReactNativeDummyLib fails with "› Must be a valid npm package name"
   main \
     --force-new-directory \

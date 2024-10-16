@@ -127,6 +127,10 @@ impl ProjectConfig {
         self.raw_name().to_kebab_case()
     }
 
+    pub(crate) fn podspec_filename(&self) -> String {
+        self.cpp_filename()
+    }
+
     pub(crate) fn codegen_filename(&self) -> String {
         format!("Native{}", self.spec_name())
     }
