@@ -237,6 +237,7 @@ impl TurboModulesConfig {
         project_root.join(&self.ts)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn spec_name(&self) -> String {
         self.spec_name.clone()
     }
