@@ -79,21 +79,33 @@ impl GitRepoArgs {
             run_cmd(&mut cmd)?;
         }
 
-        // git ls-remote origin $branch
+        // git remote set-branches origin '*' to start tracking all branches and
+        // enable checking out branch names
+        let mut cmd = Command::new("git");
+        cmd.current_dir(self.directory(project_root)?)
+            .arg("remote")
+            .arg("set-branches")
+            .arg("origin")
+            .arg("*");
+        run_cmd(&mut cmd)?;
+
+        // git ls-remote --tags origin $branch
         let output = Command::new("git")
             .current_dir(self.directory(project_root)?)
             .arg("ls-remote")
+            .arg("--tags")
             .arg("origin")
             .arg(&self.branch)
             .output()?;
         let output = String::from_utf8(output.stdout)?;
 
-        // Find $branch in the output and resolve the SHA or fall back to $branch
-        let branch_ref = format!("refs/heads/{}", &self.branch);
+        // Find $branch in the output and resolve the SHA or fall back to $branch. We
+        // deliberately don't resolve branch names to their SHAs because checking out
+        // with the SHA would cause a detached HEAD state.
         let tag_ref = format!("refs/tags/{}", &self.branch);
         let sha = output
             .lines()
-            .find(|line| line.ends_with(&branch_ref) || line.ends_with(&tag_ref))
+            .find(|line| line.ends_with(&tag_ref))
             .map(|line| {
                 line.split_whitespace()
                     .next()
@@ -115,7 +127,6 @@ impl GitRepoArgs {
         let mut cmd = Command::new("git");
         cmd.current_dir(self.directory(project_root)?)
             .arg("checkout")
-            .arg("--quiet") // Suppress detached head and dangling commit warnings
             .arg(sha);
         run_cmd(&mut cmd)
     }
