@@ -159,31 +159,55 @@ mod files {
     use super::RenderedFile;
     use super::TemplateConfig;
     use crate::Platform;
+    use anyhow::Result;
     use camino::Utf8Path;
     use camino::Utf8PathBuf;
     use std::rc::Rc;
 
+    impl TemplateConfig {
+        fn uses_kotlin(self: &Rc<Self>) -> Result<bool> {
+            let project_root = self.project.project_root();
+            let file = std::fs::read_to_string(BuildGradle::new(self.clone()).path(project_root))?;
+            Ok(file.contains("kotlin"))
+        }
+    }
+
     pub(super) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
-        vec![
-            // typescript
-            IndexTsx::rc_new(config.clone()),
-            // C++
-            TMHeader::rc_new(config.clone()),
-            TMCpp::rc_new(config.clone()),
-            // Codegen (for installer)
-            NativeCodegenTs::rc_new(config.clone()),
-            // Android
-            JavaModule::rc_new(config.clone()),
-            JavaPackage::rc_new(config.clone()),
-            BuildGradle::rc_new(config.clone()),
-            CMakeLists::rc_new(config.clone()),
-            CppAdapter::rc_new(config.clone()),
-            AndroidManifest::rc_new(config.clone()),
-            // iOS
-            ModuleTemplateH::rc_new(config.clone()),
-            ModuleTemplateMm::rc_new(config.clone()),
-            PodspecTemplate::rc_new(config.clone()),
+        let uses_kotlin = config.uses_kotlin().unwrap_or_default();
+        let android_src = if uses_kotlin {
+            vec![
+                KtModule::rc_new(config.clone()),
+                KtPackage::rc_new(config.clone()),
+                KtBuildGradle::rc_new(config.clone()),
+            ]
+        } else {
+            vec![
+                JavaModule::rc_new(config.clone()),
+                JavaPackage::rc_new(config.clone()),
+                BuildGradle::rc_new(config.clone()),
+            ]
+        };
+        [
+            vec![
+                // typescript
+                IndexTsx::rc_new(config.clone()),
+                // C++
+                TMHeader::rc_new(config.clone()),
+                TMCpp::rc_new(config.clone()),
+                // Codegen (for installer)
+                NativeCodegenTs::rc_new(config.clone()),
+                // Android
+                CMakeLists::rc_new(config.clone()),
+                CppAdapter::rc_new(config.clone()),
+                AndroidManifest::rc_new(config.clone()),
+                // iOS
+                ModuleTemplateH::rc_new(config.clone()),
+                ModuleTemplateMm::rc_new(config.clone()),
+                PodspecTemplate::rc_new(config.clone()),
+            ],
+            android_src,
         ]
+        .concat()
     }
 
     templated_file!(JavaModule, "ModuleTemplate.java");
@@ -208,6 +232,50 @@ mod files {
                 .project
                 .android
                 .codegen_package_dir(project_root)
+                .join(filename)
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
+    }
+
+    templated_file!(KtModule, "ModuleTemplate.kt");
+    impl RenderedFile for KtModule {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.module_cpp();
+            let filename = format!("{name}Module.kt");
+            self.config
+                .project
+                .android
+                .codegen_package_dir(project_root)
+                .join(filename)
+        }
+    }
+
+    templated_file!(KtPackage, "PackageTemplate.kt");
+    impl RenderedFile for KtPackage {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let name = self.config.project.module_cpp();
+            let filename = format!("{name}Package.kt");
+            self.config
+                .project
+                .android
+                .codegen_package_dir(project_root)
+                .join(filename)
+        }
+        fn platform(&self) -> Option<Platform> {
+            Some(Platform::Android)
+        }
+    }
+
+    templated_file!(KtBuildGradle, "build.kt.gradle");
+    impl RenderedFile for KtBuildGradle {
+        fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+            let filename = "build.gradle";
+            self.config
+                .project
+                .android
+                .directory(project_root)
                 .join(filename)
         }
         fn platform(&self) -> Option<Platform> {
