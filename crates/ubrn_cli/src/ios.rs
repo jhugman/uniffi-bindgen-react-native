@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::{collections::HashMap, fmt::Display, process::Command, str::FromStr};
+use std::{collections::HashMap, env::consts::ARCH, fmt::Display, process::Command, str::FromStr};
 
 use anyhow::{Context, Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -66,7 +66,12 @@ impl IOsConfig {
     }
 
     fn default_targets() -> Vec<Target> {
-        let args: &[&str] = &["aarch64-apple-ios", "aarch64-apple-ios-sim"];
+        let sim_target = if ARCH.starts_with("x86") {
+            "x86_64-apple-ios"
+        } else {
+            "aarch64-apple-ios-sim"
+        };
+        let args: &[&str] = &["aarch64-apple-ios", sim_target];
         args.iter().map(|s| Target::from_str(s).unwrap()).collect()
     }
 }
