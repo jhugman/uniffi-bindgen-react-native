@@ -1,5 +1,5 @@
 {%- let module_name = self.config.project.module_cpp() %}
-{%- let spec_jsi = self.config.project.tm.spec_name()|fmt("{}JSI") %}
+{%- let spec_jsi = self.config.project.codegen_filename()|fmt("{}SpecJSI") %}
 {%- let ns = self.config.project.cpp_namespace() %}
 {%- let uniffi_ns = "uniffi_generated" %}
 {%- let fn_prefix = "__hostFunction_{}"|format(module_name) -%}
