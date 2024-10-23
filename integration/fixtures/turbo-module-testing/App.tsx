@@ -1,5 +1,4 @@
 import { StyleSheet, View, Text } from "react-native";
-import { multiply } from "react-native-by-hand";
 import {
   Calculator,
   type BinaryOperator,
