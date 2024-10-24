@@ -8,7 +8,12 @@ Below are a list of the dependencies, and a non-comprehensive instructions on ho
 
 Make sure you have a functional React Native environment including Node.js, Android Studio and Xcode. The [official documentation](https://reactnative.dev/docs/set-up-your-environment) contains steps to achieve this for different platforms.
 
-`uniffi-bindgen-react-native` is designed to integrate with projects created with [react-native-builder-bob](https://github.com/callstack/react-native-builder-bob). The latter assumes that you have `yarn` installed. If you don't already, you can install it by following the [official documentation](https://classic.yarnpkg.com/lang/en/docs/install).
+`uniffi-bindgen-react-native` is designed to integrate with projects created with [react-native-builder-bob](https://github.com/callstack/react-native-builder-bob).
+
+
+```admonish info
+The latter assumes that you have `yarn` installed. If you don't already, you can install it by following the [official documentation](https://classic.yarnpkg.com/lang/en/docs/install).
+```
 
 ## Install Rust
 
