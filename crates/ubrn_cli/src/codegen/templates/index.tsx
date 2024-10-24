@@ -12,11 +12,23 @@ installer.installRustCrate();
 export * from './{{ bindings }}/{{ m.ts() }}';
 {%- endfor %}
 
+// Now import the bindings so we can:
+// - intialize them
+// - export them as namespaced objects as the default export.
+{%- for m in self.config.modules %}
+import * as {{ m.ts() }} from './{{ bindings }}/{{ m.ts() }}';
+{%- endfor %}
+
 // Initialize the generated bindings: mostly checksums, but also callbacks.
 {%- for m in self.config.modules %}
-import {{ m.ts() }}_ from './{{ bindings }}/{{ m.ts() }}';
+{{ m.ts() }}.default.initialize();
 {%- endfor %}
-{% for m in self.config.modules %}
-{{ m.ts() }}_.initialize();
+
+// Export the crates as individually namespaced objects.
+export default {
+{%- for m in self.config.modules %}
+  {{ m.ts() }},
 {%- endfor %}
+};
+
 {# space #}
