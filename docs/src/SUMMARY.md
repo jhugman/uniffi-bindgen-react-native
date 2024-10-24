@@ -7,6 +7,7 @@
 - [Before you start](guides/pre-installation.md)
 - [Step by step: Make your first library project](guides/getting-started.md)
 - [Publishing your library project](guides/publishing.md)
+- [Working with multiple crates in one library](guides/megazords.md)
 
 # Mapping Rust on to Typescript
 
