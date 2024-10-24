@@ -12,7 +12,7 @@ Make sure you have a functional React Native environment including Node.js, Andr
 
 
 ```admonish info
-The latter assumes that you have `yarn` installed. If you don't already, you can install it by following the [official documentation](https://classic.yarnpkg.com/lang/en/docs/install).
+[react-native-builder-bob](https://github.com/callstack/react-native-builder-bob) assumes that you have `yarn` installed. If you don't already, you can install it by following the [official documentation](https://classic.yarnpkg.com/lang/en/docs/install).
 ```
 
 ## Install Rust
