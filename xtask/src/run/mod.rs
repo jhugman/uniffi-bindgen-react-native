@@ -77,7 +77,8 @@ impl RunCmd {
                 let crate_lib = crate_.library_path(None, release);
                 let target_dir = crate_.target_dir();
                 let lib_name = crate_.library_name();
-                let cpp_files = bindings.generate(&crate_lib)?;
+                let cpp_files =
+                    bindings.generate(&crate_lib, &crate_.manifest_path().to_path_buf())?;
                 let cpp = CppBindingArg::with_files(&cpp_files);
                 let so_file = cpp.compile_with_crate(clean, target_dir, lib_name)?;
                 Ok(Some(so_file))

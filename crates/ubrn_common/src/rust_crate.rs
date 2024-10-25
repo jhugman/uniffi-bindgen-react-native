@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -75,6 +75,16 @@ impl CrateMetadata {
         run_cmd_quietly(cmd.arg("clean").current_dir(&self.crate_dir))?;
         Ok(())
     }
+
+    pub fn cargo_metadata_cwd() -> Result<Metadata> {
+        // Run `cargo metadata`
+        Ok(MetadataCommand::new().exec()?)
+    }
+
+    pub fn cargo_metadata(manifest_path: impl Into<PathBuf>) -> Result<Metadata> {
+        // Run `cargo metadata`
+        Ok(MetadataCommand::new().manifest_path(manifest_path).exec()?)
+    }
 }
 
 pub fn so_extension<'a>(target: Option<&str>) -> &'a str {
@@ -130,10 +140,7 @@ impl TryFrom<Utf8PathBuf> for CrateMetadata {
         if !manifest_path.exists() {
             anyhow::bail!("Crate manifest doesn't exist");
         }
-        // Run `cargo metadata`
-        let metadata = MetadataCommand::new()
-            .manifest_path(&manifest_path)
-            .exec()?;
+        let metadata = Self::cargo_metadata(&manifest_path)?;
 
         let library_name = guess_library_name(&metadata, &manifest_path.canonicalize_utf8()?);
         let target_dir = metadata.target_directory;
