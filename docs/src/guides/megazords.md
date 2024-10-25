@@ -39,7 +39,7 @@ In this case, your library's client code would import `Crate1Type` and `Crate2Ty
 import { Crate1Type, Crate2Type } from "react-native-my-megazord";
 ```
 
-Alternatively, they can the default export:
+Alternatively, they can use the default export:
 
 ```ts
 import megazord from "react-native-my-megazord";
