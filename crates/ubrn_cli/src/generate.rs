@@ -40,7 +40,7 @@ impl GenerateCmd {
     pub(crate) fn run(&self) -> Result<()> {
         match self {
             Self::Bindings(b) => {
-                b.run()?;
+                b.run(None)?;
                 Ok(())
             }
             Self::TurboModule(t) => {
@@ -113,12 +113,13 @@ impl GenerateAllCommand {
                     anyhow::bail!("uniffi.toml file {:?} does not exist. Either delete the uniffiToml property or supply a file", file)
                 }
             }
+            let manifest_path = project.crate_.manifest_path()?;
             let bindings = BindingsArgs::new(
                 SourceArgs::library(&lib_file).with_config(config),
                 OutputArgs::new(&ts_dir, &cpp_dir, false),
             );
 
-            bindings.run()?
+            bindings.run(Some(&manifest_path))?
         };
         ubrn_common::cd(&pwd)?;
         let rust_crate = project.crate_.metadata()?;

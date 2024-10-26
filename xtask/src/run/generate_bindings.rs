@@ -34,12 +34,16 @@ impl GenerateBindingsArg {
         self.toml.clone()
     }
 
-    pub(crate) fn generate(&self, library: &Utf8PathBuf) -> Result<Vec<Utf8PathBuf>> {
+    pub(crate) fn generate(
+        &self,
+        library: &Utf8PathBuf,
+        manifest_path: &Utf8PathBuf,
+    ) -> Result<Vec<Utf8PathBuf>> {
         let output = OutputArgs::new(&self.ts_dir(), &self.cpp_dir(), false);
         let toml = self.uniffi_toml().filter(|file| file.exists());
         let source = SourceArgs::library(library).with_config(toml);
         let bindings = BindingsArgs::new(source, output);
-        let modules = bindings.run()?;
+        let modules = bindings.run(Some(manifest_path))?;
         let cpp_dir = bindings.cpp_dir();
         let index = cpp_dir.join("Entrypoint.cpp");
         bindings.render_entrypoint(&index, &modules)?;

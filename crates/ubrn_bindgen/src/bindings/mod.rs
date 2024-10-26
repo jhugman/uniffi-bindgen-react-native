@@ -14,7 +14,8 @@ use anyhow::Result;
 use askama::Template;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{command, Args};
-use ubrn_common::mk_dir;
+use ubrn_common::{mk_dir, CrateMetadata};
+use uniffi_bindgen::cargo_metadata::CrateConfigSupplier;
 
 use crate::ModuleMetadata;
 
@@ -111,7 +112,7 @@ impl SourceArgs {
 }
 
 impl BindingsArgs {
-    pub fn run(&self) -> Result<Vec<ModuleMetadata>> {
+    pub fn run(&self, manifest_path: Option<&Utf8PathBuf>) -> Result<Vec<ModuleMetadata>> {
         let input = &self.source;
         let out = &self.output;
 
@@ -123,11 +124,19 @@ impl BindingsArgs {
 
         let try_format_code = !out.no_format;
 
+        let metadata = if let Some(manifest_path) = manifest_path {
+            CrateMetadata::cargo_metadata(manifest_path)?
+        } else {
+            CrateMetadata::cargo_metadata_cwd()?
+        };
+        let config_supplier = CrateConfigSupplier::from(metadata);
+
         let configs: Vec<ModuleMetadata> = if input.library_mode {
             uniffi_bindgen::library_mode::generate_bindings(
                 &input.source,
                 input.crate_name.clone(),
                 &generator,
+                &config_supplier,
                 input.config.as_deref(),
                 &dummy_dir,
                 try_format_code,

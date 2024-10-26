@@ -11,12 +11,12 @@ resolver = "2"
 anyhow = "1"
 askama = "0.12.1"
 camino = "1.1.6"
-cargo_metadata = "0.18.1"
+cargo_metadata = "0.15"
 clap = { version = "4.5.4", features = ["derive"] }
 heck = "0.5.0"
 paste = "1.0.14"
 pathdiff = { version = "0.2.1", features = ["camino"] }
 serde = { version = "1", features = ["derive"] }
-uniffi = "=0.28.0"
-uniffi_bindgen = "=0.28.0"
-uniffi_meta = "=0.28.0"
+uniffi = "=0.28.2"
+uniffi_bindgen = "=0.28.2"
+uniffi_meta = "=0.28.2"
