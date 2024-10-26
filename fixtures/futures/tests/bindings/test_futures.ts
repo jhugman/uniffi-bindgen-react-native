@@ -497,6 +497,42 @@ function checkRemainingFutures(t: Asserts) {
   );
 
   await asyncTest(
+    "future method… which is cancelled after it is resolved",
+    async (t) => {
+      const abortController = new AbortController();
+      const expected = await fallibleMe(false, {
+        signal: abortController.signal,
+      });
+      t.assertEqual(expected, 42);
+      // Now we cancel, but after the task has been resolved.
+      // This should do so cleanly.
+      abortController.abort();
+      // Are we still here? Then we pass.
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "future method… which is cancelled after it is rejected",
+    async (t) => {
+      const abortController = new AbortController();
+      try {
+        await fallibleMe(true, {
+          signal: abortController.signal,
+        });
+        t.fail("We should have failed here. This is not the test.");
+      } catch (e: any) {
+        // OK
+      }
+      // Now we cancel, but after the task has been rejected.
+      // This should do so cleanly.
+      abortController.abort();
+      // Are we still here? Then we pass.
+      t.end();
+    },
+  );
+
+  await asyncTest(
     "a future that uses a lock and that is not cancelled",
     async (t) => {
       const task1 = useSharedResource(
