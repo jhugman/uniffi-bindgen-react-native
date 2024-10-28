@@ -116,6 +116,9 @@ parse_cli_options() {
       -I|--ios)
         SKIP_IOS=false
         ;;
+      --debug)
+        set -x
+        ;;
       -h|--help)
         usage
         exit 0
@@ -291,6 +294,7 @@ generate_turbo_module_for_compiling() {
   echo "-- Running ubrn checkout"
   clean_turbo_modules
   "$UBRN_BIN" checkout      --config "$UBRN_CONFIG"
+  cp "$UBRN_CONFIG" ./ubrn.config.yaml
   if [ -f "$APP_TSX" ] ; then
     cp "$APP_TSX" ./example/src/App.tsx
   fi
@@ -332,9 +336,10 @@ build_ios_example() {
   pod install || error "Cannot run Podfile"
 
   # Find the UDID of the first booted device, or fall back to the first available device
-  udid=$(xcrun simctl list --json devices | jq -r '.devices | to_entries | .[].value | map(select(.state == "Booted")) | .[0].udid')
+  udid=$(xcrun simctl list --json devices | jq -r '.devices[][] | select(.state == "Booted") | .udid')
   if [ "$udid" == "null" ]; then
-    udid=$(xcrun simctl list --json devices | jq -r '.devices | to_entries | .[].value | map(select(.isAvailable == true)) | .[0].udid')
+    udid=$(xcrun simctl list --json devices | jq -r '.devices[][] | select(.isAvailable == true) | .udid' | head -n 1)
+    xcrun simctl boot "$udid"
   fi
 
   if [ "$udid" == "null" ]; then
@@ -376,6 +381,8 @@ run_default() {
 
 run_for_builder_bob() {
   local builder_bob_version=$1
+  echo "y" | npx "create-react-native-library@$builder_bob_version" > /dev/null 2>&1
+
   local fixture_dir="$ROOT/integration/fixtures/turbo-module-testing"
   local working_dir="/tmp/turbomodule-tests"
   local config="$fixture_dir/ubrn.config.yaml"

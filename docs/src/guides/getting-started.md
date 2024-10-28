@@ -16,10 +16,14 @@ We first use `create-react-native-library` to generate our basic turbo-module li
 npx create-react-native-library@latest my-rust-lib
 ```
 
-```admonish warning title="Builder Bob version drift"
+```admonish warning title="Version drift"
 `create-react-native-library` has changed a few things around recently.
 
 These steps have been tested with `0.35.1` and `0.41.2`, which at time of writing, is the `latest`.
+
+`react-native` also changes from time to time.
+
+These steps have been tested with versions `0.75` and `0.76`, which at time of writing is the `latest`.
 ```
 
 The important bits are:
