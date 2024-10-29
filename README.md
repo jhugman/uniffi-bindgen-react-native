@@ -44,9 +44,7 @@ If this tool sounds interesting to you, please help us develop it! You can:
 
 * View the [contributor guidelines](https://jhugman.github.io/uniffi-bindgen-react-native/).
 * File or work on [issues](https://github.com/jhugman/uniffi-bindgen-react-native/issues) here in GitHub.
-<!--
-* Join discussions in the [#uniffi:mozilla.org](https://matrix.to/#/#uniffi:mozilla.org) room on Matrix.
--->
+* Join discussions in the [#uniffi-bindgen-js:matrix.org](https://matrix.to/#/#uniffi-bindgen-js:matrix.org) room on Matrix.
 
 ## Code of Conduct
 
@@ -54,7 +52,7 @@ This project is governed by Mozilla's [Community Participation Guidelines](./COD
 
 ## Funding
 
-`uniffi-bindgen-react-native` is lead by James Hugman, with deep collaboration from the [Filament](https://filament.im) engineering team, funded by [Filament](https://filament.im) and [Mozilla](https://future.mozilla.org).
+`uniffi-bindgen-react-native` is led by James Hugman, with deep collaboration from the [Filament](https://filament.im) engineering team, funded by [Filament](https://filament.im) and [Mozilla](https://future.mozilla.org).
 
 ## License
 
