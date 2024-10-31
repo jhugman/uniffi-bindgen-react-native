@@ -25,10 +25,14 @@ impl OptionalCodeType {
 
 impl CodeType for OptionalCodeType {
     fn type_label(&self, ci: &ComponentInterface) -> String {
-        format!(
-            "{} | undefined",
-            CodeOracle.find(self.inner()).type_label(ci)
-        )
+        let inner = self.inner();
+        let inner_ts = CodeOracle.find(inner).type_label(ci);
+        if !matches!(inner, Type::Optional { .. }) {
+            format!("{inner_ts} | undefined",)
+        } else {
+            // Nested optionals shouldn't degenerate into T | undefined | undefined
+            inner_ts
+        }
     }
 
     fn canonical_name(&self) -> String {

@@ -27,4 +27,22 @@ pub fn identity_array_buffer_forced_read(bytes: Option<Vec<u8>>) -> Option<Vec<u
     bytes
 }
 
+#[uniffi::export]
+pub fn identity_nested_optional(value: Option<Option<String>>) -> Option<Option<String>> {
+    value
+}
+
+#[uniffi::export]
+pub fn match_nested_optional(value: Option<Option<String>>) -> i8 {
+    let Some(inner) = value else {
+        // if value.is_none
+        return 0;
+    };
+    if inner.is_none() {
+        1
+    } else {
+        2
+    }
+}
+
 uniffi::setup_scaffolding!();
