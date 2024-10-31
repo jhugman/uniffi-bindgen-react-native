@@ -21,7 +21,7 @@
 - [Callback interfaces](idioms/callback-interfaces.md)
 - [Promises/Futures](idioms/promises.md)
 - [Async Callback interfaces](idioms/async-callbacks.md)
-
+- [Option and Result](idioms/option-result.md)
 # Contributing
 
 - [Local development](contributing/local-development.md)
