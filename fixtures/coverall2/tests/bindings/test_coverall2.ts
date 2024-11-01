@@ -6,6 +6,8 @@
 import {
   identityArrayBuffer,
   identityArrayBufferForcedRead,
+  identityNestedOptional,
+  matchNestedOptional,
   wellKnownArrayBuffer,
 } from "../../generated/uniffi_coverall2";
 import { test } from "@/asserts";
@@ -145,3 +147,14 @@ function arrayBuffer(numBytes: number): ArrayBuffer {
   const array = Uint8Array.from({ length: numBytes }, (_v, i) => i % 255);
   return array.buffer;
 }
+
+test("Test nested optionals", (t) => {
+  t.assertEqual("foo", identityNestedOptional("foo"));
+  t.assertEqual(undefined, identityNestedOptional(undefined));
+
+  // We can model None…
+  t.assertEqual(0, matchNestedOptional(undefined));
+  // …and Some(Some(_))
+  t.assertEqual(2, matchNestedOptional("foo"));
+  // but not Some(None).
+});
