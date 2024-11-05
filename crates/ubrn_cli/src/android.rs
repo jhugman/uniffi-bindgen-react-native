@@ -67,7 +67,12 @@ impl AndroidConfig {
     }
 
     fn default_platform() -> usize {
-        21
+        // This is minSdkVersion supported for 0.75.4
+        // For 0.76, this increases to 24.
+        // While we still support 0.75.4, we should not raise this.
+        // If users want to raise this, they can change the platform in the
+        // ubrn.config.yaml.
+        23
     }
 
     fn default_directory() -> String {
