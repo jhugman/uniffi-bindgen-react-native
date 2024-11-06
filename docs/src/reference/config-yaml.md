@@ -70,10 +70,10 @@ android:
 	directory: ./android
 	cargoExtras: []
 	targets:
-	- aarch64-linux-android
-	- armv7-linux-androideabi
-	- i686-linux-android
-	- x86_64-linux-android
+	- arm64-v8a
+	- armeabi-v7a
+	- x86
+	- x86_64
 	apiLevel: 21
 	jniLibs: src/main/jniLibs
 	packageName: <DERIVED FROM package.json>
