@@ -11,7 +11,7 @@ pub(crate) mod type_map;
 use std::{fs, str::FromStr};
 
 use anyhow::Result;
-use askama::Template;
+use rinja::Template;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{command, Args};
 use ubrn_common::{mk_dir, CrateMetadata};

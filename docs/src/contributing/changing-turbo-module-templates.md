@@ -2,7 +2,7 @@
 
 In addition to generating the bindings between Hermes and Rust, `uniffi-bindgen-react-native` generates the files needed to run this as a turbo-module. The list of files are [documented elsewhere in this book](../reference/turbo-module-files.md).
 
-Templates are written for [Askama templating library](https://djc.github.io/askama/template_syntax.html).
+Templates are written for [Rinja templating library](https://rinja.readthedocs.io/en/stable/template_syntax.html).
 
 Changing the templates for these files is relatively simple. [This PR is a good example](https://github.com/jhugman/uniffi-bindgen-react-native/pull/112) of adding a file.
 

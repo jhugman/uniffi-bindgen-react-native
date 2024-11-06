@@ -7,7 +7,7 @@ The central workings of a `uniffi-bingen` are its templates.
 - [Typescript templates][ts-templates]
 - [C++ templates][cpp-templates]
 
-Templates are written for [Askama templating library](https://djc.github.io/askama/template_syntax.html).
+Templates are written for [Rinja templating library](https://rinja.readthedocs.io/en/stable/template_syntax.html).
 
 There is a small-ish runtime for both languages:
 

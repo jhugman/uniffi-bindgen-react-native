@@ -62,7 +62,7 @@
 // Internal macro common to method_decl and top_func_decl
 {%- macro func_decl(prefix, func_decl, obj_factory, callable, indent) %}
 {%- call docstring(callable, indent) %}
-{{ prefix }}{% call async(callable) %}{{ func_decl }} {{ callable.name()|fn_name }}(
+{{ prefix }}{% call is_async(callable) %}{{ func_decl }} {{ callable.name()|fn_name }}(
     {%- call arg_list_decl(callable) -%}): {# space #}
 
     {%- call return_type(callable) %}
@@ -237,11 +237,11 @@
     {%- endif %}
 {%- endmacro %}
 
-{%- macro async(func) %}
+{%- macro is_async(func) %}
 {%- if func.is_async() %}async {% endif %}
 {%- endmacro -%}
 
-{%- macro await(func) %}
+{%- macro is_await(func) %}
 {%- if func.is_async() %}await {% endif %}
 {%- endmacro -%}
 
@@ -249,7 +249,7 @@
 {%- if func.throws() %} /*throws*/{% endif %}
 {%- endmacro -%}
 
-{%- macro try(func) %}
+{%- macro is_try(func) %}
 {%- if func.throws() %}/*try*/ {% else %}/*try!*/ {% endif %}
 {%- endmacro -%}
 
