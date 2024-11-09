@@ -165,7 +165,7 @@ create_library() {
     example_type=vanilla
   fi
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
-  npx "create-react-native-library@$BOB_VERSION" \
+  npm_config_yes=true npx "create-react-native-library@$BOB_VERSION" \
     --slug "$PROJECT_SLUG" \
     --description "An automated test" \
     --author-name "James" \
@@ -175,6 +175,7 @@ create_library() {
     --languages cpp \
     --type module-new \
     --example $example_type \
+    --local false \
     "$base" > /dev/null
   exit_dir
 }
