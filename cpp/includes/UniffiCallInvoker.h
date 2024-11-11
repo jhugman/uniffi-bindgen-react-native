@@ -6,6 +6,7 @@
 #pragma once
 #include <ReactCommon/CallInvoker.h>
 #include <condition_variable>
+#include <future>
 #include <jsi/jsi.h>
 #include <memory>
 #include <mutex>
@@ -58,26 +59,19 @@ public:
     if (std::this_thread::get_id() == threadId_) {
       func(rt);
     } else {
-      std::mutex mtx;
-      std::condition_variable cv;
-      bool done = false;
+      std::promise<void> promise;
+      auto future = promise.get_future();
       // The runtime argument was added to CallFunc in
       // https://github.com/facebook/react-native/pull/43375
       //
       // This can be changed once that change is released.
-      // react::CallFunc wrapper = [&func, &mtx, &cv, &done](jsi::Runtime &rt) {
-      std::function<void()> wrapper = [&func, &rt, &mtx, &cv, &done]() {
+      // react::CallFunc wrapper = [&func, &promise](jsi::Runtime &rt) {
+      std::function<void()> wrapper = [&func, &promise, &rt]() {
         func(rt);
-        {
-          std::lock_guard<std::mutex> lock(mtx);
-          done = true;
-        }
-        cv.notify_one();
+        promise.set_value();
       };
       callInvoker_->invokeAsync(std::move(wrapper));
-
-      std::unique_lock<std::mutex> lock(mtx);
-      cv.wait(lock, [&done] { return done; });
+      future.wait();
     }
   }
 
