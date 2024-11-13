@@ -30,7 +30,9 @@ jobs:
 
       - name: Install cargo-ndk (if needed)
         run: |
-          [[ ${{ matrix.runner }} != macos-latest ]] && cargo install cargo-ndk
+          if [[ ${{ matrix.runner }} != macos-latest ]]; then
+            cargo install cargo-ndk
+          fi
 
       - name: Generate & build turbo module
         run: |
