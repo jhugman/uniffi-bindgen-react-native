@@ -189,7 +189,7 @@ create_library() {
 install_dependencies() {
   enter_dir "$PROJECT_DIR"
   # touch yarn.lock
-  yarn || error "Failed to install dependencies"
+  yarn --no-immutable || error "Failed to install dependencies"
   # rm yarn.lock
   exit_dir
 }
@@ -197,7 +197,7 @@ install_dependencies() {
 install_example_dependencies() {
   enter_dir "$PROJECT_DIR/example"
   # touch yarn.lock
-  yarn || error "Failed to install example dependencies"
+  yarn --no-immutable || error "Failed to install example dependencies"
   # rm yarn.lock
   # rm -Rf .yarn
   exit_dir
