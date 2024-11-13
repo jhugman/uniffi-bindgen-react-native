@@ -34,6 +34,11 @@ jobs:
             cargo install cargo-ndk
           fi
 
+      - name: Install Rust toolchains
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-ios-sim' || 'aarch64-linux-android' }}
+
       - name: Generate & build turbo module
         run: |
           ./scripts/test-turbo-modules.sh \
