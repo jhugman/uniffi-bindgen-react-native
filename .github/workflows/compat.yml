@@ -37,8 +37,8 @@ jobs:
         if: ${{ matrix.runner != 'macos-latest' }}
         uses: actions/setup-java@v3
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: "zulu"
+          java-version: "17"
 
       - name: Install Rust toolchains
         uses: dtolnay/rust-toolchain@stable
