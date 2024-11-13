@@ -10,7 +10,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-
   integration-tests-generation:
     strategy:
       matrix:
@@ -24,7 +23,7 @@ jobs:
           - 0.76.1
 
     runs-on: ${{ matrix.runner }}
-    name: "😬 bob ${{ matrix.bob-version }} | rn ${{ matrix.rn-version }} (${{ matrix.runner == 'macos-latest' && 'iOS' || 'Android' }})"
+    name: "😬 bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} (${{ matrix.runner == 'macos-latest' && 'iOS' || 'Android' }})"
 
     steps:
       - uses: actions/checkout@v4
