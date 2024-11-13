@@ -28,11 +28,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install cargo-ndk (if needed)
+      - name: Install cargo-ndk
+        if: ${{ matrix.runner != 'macos-latest' }}
         run: |
-          if [[ ${{ matrix.runner }} != macos-latest ]]; then
-            cargo install cargo-ndk
-          fi
+          cargo install cargo-ndk
+
+      - name: Install JDK
+        if: ${{ matrix.runner != 'macos-latest' }}
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
       - name: Install Rust toolchains
         uses: dtolnay/rust-toolchain@stable
