@@ -1,0 +1,39 @@
+name: Compatibility
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  integration-tests-generation:
+    strategy:
+      matrix:
+        runner:
+          - macos-latest
+          - ubuntu-latest
+        bob-version:
+          - 0.42.2
+        rn-version:
+          - 0.76.0
+          - 0.76.1
+
+    runs-on: ${{ matrix.runner }}
+    name: "😬 Compatibility: bob ${{ matrix.bob-version }} | rn ${{ matrix.rn-version }} (${{ matrix.runner == 'macos-latest' && 'iOS' || 'Android' }})"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate & build turbo module
+        run: |
+          ./scripts/test-turbo-modules.sh \
+            --ubrn-config integration/fixtures/builder-bob/ubrn.config.yaml
+            --builder-bob-version ${{ matrix.bob-version }} \
+            --rn-version ${{ matrix.rn-version }} \
+            --${{ matrix.runner == 'macos-latest' && 'ios' || 'android' }} \
+            ../turbo-module

@@ -169,10 +169,6 @@ create_library() {
     rm -rf "$base" || error "Failed to remove existing directory $base"
   fi
 
-  local example_type
-  if [ "$BOB_VERSION" == "latest" ] ; then
-    example_type=vanilla
-  fi
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx "create-react-native-library@$BOB_VERSION" \
     --react-native-version "$RN_VERSION" \
@@ -184,7 +180,7 @@ create_library() {
     --repo-url "https://github.com/jhugman/$PROJECT_SLUG" \
     --languages cpp \
     --type module-new \
-    --example $example_type \
+    --example vanilla \
     --local false \
     "$base"
   exit_dir
@@ -329,8 +325,8 @@ build_android_example() {
   echo "-- Running ubrn build android"
   "$UBRN_BIN" build android --config "$UBRN_CONFIG" --and-generate --targets aarch64-linux-android
   exit_dir
-  enter_dir "$PROJECT_DIR/example/android"
-  ./gradlew build || error "Failed to build Android example"
+  enter_dir "$PROJECT_DIR/example"
+  yarn build:android || error "Failed to build Android example"
   exit_dir
 }
 
@@ -342,19 +338,9 @@ build_ios_example() {
   enter_dir "$PROJECT_DIR/example/ios"
   echo "pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'" >> Podfile
   pod install || error "Cannot run Podfile"
-
-  # Find the UDID of the first booted device, or fall back to the first available device
-  udid=$(xcrun simctl list --json devices | jq -r '.devices[][] | select(.state == "Booted") | .udid')
-  if [ "$udid" == "null" ]; then
-    udid=$(xcrun simctl list --json devices | jq -r '.devices[][] | select(.isAvailable == true) | .udid' | head -n 1)
-    xcrun simctl boot "$udid"
-  fi
-
-  if [ "$udid" == "null" ]; then
-    error "No available iOS simulator found"
-  fi
-
-  xcodebuild -workspace "${IOS_NAME}Example.xcworkspace" -scheme "${IOS_NAME}Example" -configuration Debug -destination "id=$udid" || error "Failed to build iOS example"
+  exit_dir
+  enter_dir "$PROJECT_DIR/example"
+  yarn build:ios --extra-params "ARCHS=$(uname -m)" || error "Failed to build iOS example"
   exit_dir
 }
 
