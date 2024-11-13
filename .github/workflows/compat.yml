@@ -1,4 +1,4 @@
-name: Compatibility
+name: Compat
 
 on:
   schedule:
