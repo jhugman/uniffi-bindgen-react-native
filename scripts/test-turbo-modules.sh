@@ -8,6 +8,7 @@ reset_args() {
   PROJECT_DIR=my-test-library
   KEEP_ROOT_ON_EXIT=false
   BOB_VERSION=latest
+  RN_VERSION=latest
   PROJECT_SLUG=my-test-library
   FORCE_NEW_DIR=false
   IOS_NAME=MyTestLibrary
@@ -30,6 +31,7 @@ usage() {
   echo "  -i, --ios-name IOS_NAME            Specify the iOS project name (default: MyTestLibrary)."
   echo
   echo "  -u, --builder-bob-version VERSION  Specify the version of builder-bob to use (default: latest)."
+  echo "  -r, --rn-version VERSION           Specify the version of React Native to use (default: latest)."
   echo "  -k, --keep-directory-on-exit       Keep the PROJECT_DIR directory even if an error does not occur."
   echo "  -f, --force-new-directory          If PROJECT_DIR directory exist, remove it first."
   echo "  -h, --help                         Display this help message."
@@ -86,6 +88,10 @@ parse_cli_options() {
     case "$1" in
       -u|--builder-bob-version)
         BOB_VERSION="$2"
+        shift
+        ;;
+      -r|--rn-version)
+        RN_VERSION="$2"
         shift
         ;;
       -s|--slug)
@@ -169,6 +175,7 @@ create_library() {
   fi
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx "create-react-native-library@$BOB_VERSION" \
+    --react-native-version "$RN_VERSION" \
     --slug "$PROJECT_SLUG" \
     --description "An automated test" \
     --author-name "James" \
@@ -179,7 +186,7 @@ create_library() {
     --type module-new \
     --example $example_type \
     --local false \
-    "$base" > /dev/null
+    "$base"
   exit_dir
 }
 
