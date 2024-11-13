@@ -24,7 +24,7 @@ jobs:
           - 0.76.1
 
     runs-on: ${{ matrix.runner }}
-    name: "😬 Compatibility: bob ${{ matrix.bob-version }} | rn ${{ matrix.rn-version }} (${{ matrix.runner == 'macos-latest' && 'iOS' || 'Android' }})"
+    name: "😬 bob ${{ matrix.bob-version }} | rn ${{ matrix.rn-version }} (${{ matrix.runner == 'macos-latest' && 'iOS' || 'Android' }})"
 
     steps:
       - uses: actions/checkout@v4
