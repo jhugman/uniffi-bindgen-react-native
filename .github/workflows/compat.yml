@@ -17,6 +17,7 @@ jobs:
           - macos-latest
           - ubuntu-latest
         bob-version:
+          - 0.42.1
           - 0.42.2
           - 0.42.3
           - 0.43.0
