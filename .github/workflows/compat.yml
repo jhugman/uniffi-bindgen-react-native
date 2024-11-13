@@ -28,6 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install cargo-ndk (if needed)
+        run: |
+          [[ ${{ matrix.runner }} != macos-latest ]] && cargo install cargo-ndk
+
       - name: Generate & build turbo module
         run: |
           ./scripts/test-turbo-modules.sh \
