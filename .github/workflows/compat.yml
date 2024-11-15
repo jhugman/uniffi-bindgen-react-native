@@ -50,6 +50,7 @@ jobs:
       - name: Generate & build turbo module
         run: |
           ./scripts/test-turbo-modules.sh \
+            --slug '@my-org/my-lib'
             --ubrn-config integration/fixtures/compat/ubrn.config.yaml \
             --builder-bob-version ${{ matrix.bob-version }} \
             --rn-version ${{ matrix.rn-version }} \
