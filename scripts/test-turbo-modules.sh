@@ -11,7 +11,6 @@ reset_args() {
   RN_VERSION=latest
   PROJECT_SLUG=my-test-library
   FORCE_NEW_DIR=false
-  IOS_NAME=MyTestLibrary
   SKIP_IOS=true
   SKIP_ANDROID=true
   UBRN_CONFIG=
@@ -28,7 +27,6 @@ usage() {
   echo "  -T, --app-tsx                      Use a App.tsx file."
   echo
   echo "  -s, --slug PROJECT_SLUG            Specify the project slug (default: my-test-library)."
-  echo "  -i, --ios-name IOS_NAME            Specify the iOS project name (default: MyTestLibrary)."
   echo
   echo "  -u, --builder-bob-version VERSION  Specify the version of builder-bob to use (default: latest)."
   echo "  -r, --rn-version VERSION           Specify the version of React Native to use (default: latest)."
@@ -49,7 +47,6 @@ cleanup() {
 diagnostics() {
   echo "-- PROJECT_DIR = $PROJECT_DIR"
   echo "-- PROJECT_SLUG = $PROJECT_SLUG"
-  echo "-- IOS_NAME = $IOS_NAME"
 }
 
 error() {
@@ -96,10 +93,6 @@ parse_cli_options() {
         ;;
       -s|--slug)
         PROJECT_SLUG="$2"
-        shift
-        ;;
-      -i|--ios-name)
-        IOS_NAME="$2"
         shift
         ;;
       -C|--ubrn-config)
@@ -465,7 +458,6 @@ run_for_builder_bob() {
       --builder-bob-version "$builder_bob_version" \
       --slug react-native-dummy-lib-for-ios \
       --ios \
-      --ios-name DummyLibForIos \
       "$working_dir/react-native-dummy-lib-for-ios"
   fi
 
@@ -488,7 +480,6 @@ run_for_builder_bob() {
       --builder-bob-version "$builder_bob_version" \
       --ios \
       --app-tsx "$app_tsx" \
-      --ios-name ReactNativeDummyLibForIos \
       --slug @my-org/react-native-dummy-lib-for-ios \
       "$working_dir/@my-org/react-native-dummy-lib-for-ios"
   fi
