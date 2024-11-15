@@ -23,12 +23,9 @@ jobs:
         rn-version:
           - 0.76.0
           - 0.76.1
-        package-json-mixin:
-          - none
-          - package.codegen-output-dir.json
 
     runs-on: ${{ matrix.runner }}
-    name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / ${{ matrix.package-json-mixin }} / ${{ matrix.runner == 'macos-latest' && 'ios' || 'android' }}"
+    name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / ${{ matrix.runner == 'macos-latest' && 'ios' || 'android' }}"
 
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +53,6 @@ jobs:
             --ubrn-config integration/fixtures/compat/ubrn.config.yaml \
             --builder-bob-version ${{ matrix.bob-version }} \
             --rn-version ${{ matrix.rn-version }} \
-            --packgage-json-mixin integration/fixtures/compat/${{ matrix.package-json-mixin }} \
+            --packgage-json-mixin integration/fixtures/compat/package.json \
             --${{ matrix.runner == 'macos-latest' && 'ios' || 'android' }} \
             ../turbo-module
