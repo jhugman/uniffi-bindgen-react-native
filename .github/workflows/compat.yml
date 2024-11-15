@@ -24,7 +24,7 @@ jobs:
           - 0.76.0
           - 0.76.1
         package-json-mixin:
-          - <none>
+          - none
           - package.codegen-output-dir.json
 
     runs-on: ${{ matrix.runner }}
