@@ -19,10 +19,10 @@ jobs:
         bob-version:
           - 0.42.2
           - 0.42.3
-          - 0.43.0
+          - latest
         rn-version:
           - 0.76.0
-          - 0.76.1
+          - latest
 
     runs-on: ${{ matrix.runner }}
     name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / ${{ matrix.runner == 'macos-latest' && 'ios' || 'android' }}"
