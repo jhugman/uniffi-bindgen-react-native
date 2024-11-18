@@ -470,6 +470,7 @@ mod tests {
                 cargo_extras: ExtraArgs::default(),
                 api_level: 21,
                 package_name: "com.tester".to_string(),
+                codegen_output_dir: "android/generated".to_string(),
             };
             let ios = IOsConfig {
                 directory: "ios".to_string(),
@@ -477,6 +478,7 @@ mod tests {
                 xcodebuild_extras: ExtraArgs::default(),
                 targets: Default::default(),
                 cargo_extras: ExtraArgs::default(),
+                codegen_output_dir: "ios/generated".to_string(),
             };
             let bindings = BindingsConfig {
                 cpp: "cpp/bindings".to_string(),

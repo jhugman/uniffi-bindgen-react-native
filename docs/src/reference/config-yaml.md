@@ -77,6 +77,7 @@ android:
 	apiLevel: 21
 	jniLibs: src/main/jniLibs
 	packageName: <DERIVED FROM package.json>
+	codegenOutputDir: <DERIVED FROM package.json>
 ```
 
 The `directory` is the location of the Android project, relative to the root of the React Native library project.
@@ -91,9 +92,11 @@ The `directory` is the location of the Android project, relative to the root of 
 Reducing the number of targets to build for will speed up the edit-compile-run cycle.
 ```
 
-`packageName` is the name of the Android package that Codegen used to generate the TurboModule. This is derived from the `package.json` file, and can almost always be left.
+`packageName` is the name of the Android package that Codegen used to generate the TurboModule. `codegenOutputDir` is the path under which Codegen stores its generated files. Both are derived from the `package.json` file, and can almost always be left.
 
 To customize the `packageName`, you should edit or add the entry at the path `codegenConfig`/`android`/`javaPackageName` in `package.json`.
+
+To customize the `codegenOutputDir`, you should edit or add the entry at the path `codegenConfig`/`outputDir`/`android` in `package.json`.
 
 ## `ios`
 
@@ -110,6 +113,7 @@ ios:
 	- aarch64-apple-ios-sim
 	xcodebuildExtras: []
 	frameworkName: build/MyFramework
+	codegenOutputDir: <DERIVED FROM package.json>
 ```
 
 
@@ -120,6 +124,10 @@ The `directory` is the location of the iOS project, relative to the root of the 
 `cargoExtras` is a list of extra arguments passed directly to the `cargo build` command.
 
 `xcodebuildExtras` is a list of extra arguments passed directly to the `xcodebuild` command.
+
+`codegenOutputDir` is the path under which Codegen stores its generated files. This is derived from the `package.json` file, and can almost always be left.
+
+To customize the `codegenOutputDir`, you should edit or add the entry at the path `codegenConfig`/`outputDir`/`ios` in `package.json`.
 
 ## `turboModule`
 
