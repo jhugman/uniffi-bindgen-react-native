@@ -14,7 +14,7 @@ reset_args() {
   SKIP_IOS=true
   SKIP_ANDROID=true
   UBRN_CONFIG=
-  PKG_JSON_MIXIN=
+  PACKAGE_JSON_MIXIN=
   APP_TSX=
 }
 
@@ -102,7 +102,7 @@ parse_cli_options() {
         shift
         ;;
       -P|--packgage-json-mixin)
-        PKG_JSON_MIXIN=$(join_paths "$PWD" "$2")
+        PACKAGE_JSON_MIXIN=$(join_paths "$PWD" "$2")
         shift
         ;;
       -T|--app-tsx)
@@ -298,8 +298,8 @@ generate_turbo_module_for_compiling() {
   clean_turbo_modules
   "$UBRN_BIN" checkout      --config "$UBRN_CONFIG"
   cp "$UBRN_CONFIG" ./ubrn.config.yaml
-  if [ -f "$PKG_JSON_MIXIN" ] ; then
-    jq -s '.[0] * .[1]' ./package.json "$PKG_JSON_MIXIN" > ./package.json.new
+  if [ -f "$PACKAGE_JSON_MIXIN" ] ; then
+    jq -s '.[0] * .[1]' ./package.json "$PACKAGE_JSON_MIXIN" > ./package.json.new
     mv ./package.json.new ./package.json
   fi
   if [ -f "$APP_TSX" ] ; then
