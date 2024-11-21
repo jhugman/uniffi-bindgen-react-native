@@ -15,6 +15,7 @@ reset_args() {
   SKIP_ANDROID=true
   UBRN_CONFIG=
   PACKAGE_JSON_MIXIN=
+  REACT_NATIVE_CONFIG=
   APP_TSX=
 }
 
@@ -26,6 +27,7 @@ usage() {
   echo "  -I, --ios                          Build for iOS."
   echo "  -C, --ubrn-config                  Use a ubrn config file."
   echo "  -P, --packgage-json-mixin          Merge another JSON file into package.json"
+  echo "  -R, --react-native-config          Use a react-native.config.js file"
   echo "  -T, --app-tsx                      Use a App.tsx file."
   echo
   echo "  -s, --slug PROJECT_SLUG            Specify the project slug (default: my-test-library)."
@@ -103,6 +105,10 @@ parse_cli_options() {
         ;;
       -P|--packgage-json-mixin)
         PACKAGE_JSON_MIXIN=$(join_paths "$PWD" "$2")
+        shift
+        ;;
+      -R|--react-native-config)
+        REACT_NATIVE_CONFIG=$(join_paths "$PWD" "$2")
         shift
         ;;
       -T|--app-tsx)
@@ -301,6 +307,9 @@ generate_turbo_module_for_compiling() {
   if [ -f "$PACKAGE_JSON_MIXIN" ] ; then
     jq -s '.[0] * .[1]' ./package.json "$PACKAGE_JSON_MIXIN" > ./package.json.new
     mv ./package.json.new ./package.json
+  fi
+  if [ -f "$REACT_NATIVE_CONFIG" ] ; then
+    cp "$REACT_NATIVE_CONFIG" ./react-native.config.js
   fi
   if [ -f "$APP_TSX" ] ; then
     cp "$APP_TSX" ./example/src/App.tsx
