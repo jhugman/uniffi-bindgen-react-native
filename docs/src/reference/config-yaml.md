@@ -98,6 +98,10 @@ To customize the `packageName`, you should edit or add the entry at the path `co
 
 To customize the `codegenOutputDir`, you should edit or add the entry at the path `codegenConfig`/`outputDir`/`android` in `package.json`.
 
+```admonish warning
+Note that for Android the `outputDir` value in `package.json` needs to have a matching entry under `dependency`/`platforms`/`android`/`cmakeListsPath` in `react-native.config.js`. For example, if you set the Android output directory in `package.json` to `android/tmp`, the `cmakeListsPath` value in `react-native.config.js` needs to be set to `tmp/jni/CMakeLists.txt`.
+```
+
 ## `ios`
 
 This is to configure the build steps for the Rust, the bindings, and the turbo-module code for iOS.
@@ -128,6 +132,10 @@ The `directory` is the location of the iOS project, relative to the root of the 
 `codegenOutputDir` is the path under which Codegen stores its generated files. This is derived from the `package.json` file, and can almost always be left.
 
 To customize the `codegenOutputDir`, you should edit or add the entry at the path `codegenConfig`/`outputDir`/`ios` in `package.json`.
+
+```admonish warning
+Note that for Android the `outputDir` value in `package.json` needs to have a matching entry under `dependency`/`platforms`/`android`/`cmakeListsPath` in `react-native.config.js`. For example, if you set the Android output directory in `package.json` to `android/tmp`, the `cmakeListsPath` value in `react-native.config.js` needs to be set to `tmp/jni/CMakeLists.txt`.
+```
 
 ## `turboModule`
 
