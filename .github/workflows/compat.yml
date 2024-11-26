@@ -55,5 +55,6 @@ jobs:
             --builder-bob-version ${{ matrix.bob-version }} \
             --rn-version ${{ matrix.rn-version }} \
             --packgage-json-mixin integration/fixtures/compat/package.json \
+            --react-native-config integration/fixtures/compat/react-native.config.js \
             --${{ matrix.runner == 'macos-latest' && 'ios' || 'android' }} \
             ../turbo-module

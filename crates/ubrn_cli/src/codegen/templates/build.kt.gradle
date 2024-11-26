@@ -117,8 +117,11 @@ android {
     main {
       if (isNewArchitectureEnabled()) {
           java.srcDirs += [
-            "generated/java",
-            "generated/jni"
+            {%- let root = self.project_root() %}
+            {%- let dir = self.config.project.android.codegen_output_dir(root) %}
+            {%- let codegen = self.relative_to(root, dir) %}
+            "{{ codegen }}/java",
+            "{{ codegen }}/jni"
           ]
       }
     }
