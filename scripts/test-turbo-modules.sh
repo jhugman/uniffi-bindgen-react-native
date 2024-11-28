@@ -11,10 +11,11 @@ reset_args() {
   RN_VERSION=latest
   PROJECT_SLUG=my-test-library
   FORCE_NEW_DIR=false
-  IOS_NAME=MyTestLibrary
   SKIP_IOS=true
   SKIP_ANDROID=true
   UBRN_CONFIG=
+  PACKAGE_JSON_MIXIN=
+  REACT_NATIVE_CONFIG=
   APP_TSX=
 }
 
@@ -25,10 +26,11 @@ usage() {
   echo "  -A, --android                      Build for Android."
   echo "  -I, --ios                          Build for iOS."
   echo "  -C, --ubrn-config                  Use a ubrn config file."
+  echo "  -P, --packgage-json-mixin          Merge another JSON file into package.json"
+  echo "  -R, --react-native-config          Use a react-native.config.js file"
   echo "  -T, --app-tsx                      Use a App.tsx file."
   echo
   echo "  -s, --slug PROJECT_SLUG            Specify the project slug (default: my-test-library)."
-  echo "  -i, --ios-name IOS_NAME            Specify the iOS project name (default: MyTestLibrary)."
   echo
   echo "  -u, --builder-bob-version VERSION  Specify the version of builder-bob to use (default: latest)."
   echo "  -r, --rn-version VERSION           Specify the version of React Native to use (default: latest)."
@@ -49,7 +51,6 @@ cleanup() {
 diagnostics() {
   echo "-- PROJECT_DIR = $PROJECT_DIR"
   echo "-- PROJECT_SLUG = $PROJECT_SLUG"
-  echo "-- IOS_NAME = $IOS_NAME"
 }
 
 error() {
@@ -98,12 +99,16 @@ parse_cli_options() {
         PROJECT_SLUG="$2"
         shift
         ;;
-      -i|--ios-name)
-        IOS_NAME="$2"
-        shift
-        ;;
       -C|--ubrn-config)
         UBRN_CONFIG=$(join_paths "$PWD" "$2")
+        shift
+        ;;
+      -P|--packgage-json-mixin)
+        PACKAGE_JSON_MIXIN=$(join_paths "$PWD" "$2")
+        shift
+        ;;
+      -R|--react-native-config)
+        REACT_NATIVE_CONFIG=$(join_paths "$PWD" "$2")
         shift
         ;;
       -T|--app-tsx)
@@ -169,10 +174,6 @@ create_library() {
     rm -rf "$base" || error "Failed to remove existing directory $base"
   fi
 
-  local example_type
-  if [ "$BOB_VERSION" == "latest" ] ; then
-    example_type=vanilla
-  fi
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx "create-react-native-library@$BOB_VERSION" \
     --react-native-version "$RN_VERSION" \
@@ -184,7 +185,7 @@ create_library() {
     --repo-url "https://github.com/jhugman/$PROJECT_SLUG" \
     --languages cpp \
     --type module-new \
-    --example $example_type \
+    --example vanilla \
     --local false \
     "$base"
   exit_dir
@@ -193,7 +194,7 @@ create_library() {
 install_dependencies() {
   enter_dir "$PROJECT_DIR"
   # touch yarn.lock
-  yarn || error "Failed to install dependencies"
+  yarn --no-immutable || error "Failed to install dependencies"
   # rm yarn.lock
   exit_dir
 }
@@ -201,7 +202,7 @@ install_dependencies() {
 install_example_dependencies() {
   enter_dir "$PROJECT_DIR/example"
   # touch yarn.lock
-  yarn || error "Failed to install example dependencies"
+  yarn --no-immutable || error "Failed to install example dependencies"
   # rm yarn.lock
   # rm -Rf .yarn
   exit_dir
@@ -303,6 +304,13 @@ generate_turbo_module_for_compiling() {
   clean_turbo_modules
   "$UBRN_BIN" checkout      --config "$UBRN_CONFIG"
   cp "$UBRN_CONFIG" ./ubrn.config.yaml
+  if [ -f "$PACKAGE_JSON_MIXIN" ] ; then
+    jq -s '.[0] * .[1]' ./package.json "$PACKAGE_JSON_MIXIN" > ./package.json.new
+    mv ./package.json.new ./package.json
+  fi
+  if [ -f "$REACT_NATIVE_CONFIG" ] ; then
+    cp "$REACT_NATIVE_CONFIG" ./react-native.config.js
+  fi
   if [ -f "$APP_TSX" ] ; then
     cp "$APP_TSX" ./example/src/App.tsx
   fi
@@ -329,8 +337,8 @@ build_android_example() {
   echo "-- Running ubrn build android"
   "$UBRN_BIN" build android --config "$UBRN_CONFIG" --and-generate --targets aarch64-linux-android
   exit_dir
-  enter_dir "$PROJECT_DIR/example/android"
-  ./gradlew build || error "Failed to build Android example"
+  enter_dir "$PROJECT_DIR/example"
+  yarn build:android || error "Failed to build Android example"
   exit_dir
 }
 
@@ -342,19 +350,9 @@ build_ios_example() {
   enter_dir "$PROJECT_DIR/example/ios"
   echo "pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'" >> Podfile
   pod install || error "Cannot run Podfile"
-
-  # Find the UDID of the first booted device, or fall back to the first available device
-  udid=$(xcrun simctl list --json devices | jq -r '.devices[][] | select(.state == "Booted") | .udid')
-  if [ "$udid" == "null" ]; then
-    udid=$(xcrun simctl list --json devices | jq -r '.devices[][] | select(.isAvailable == true) | .udid' | head -n 1)
-    xcrun simctl boot "$udid"
-  fi
-
-  if [ "$udid" == "null" ]; then
-    error "No available iOS simulator found"
-  fi
-
-  xcodebuild -workspace "${IOS_NAME}Example.xcworkspace" -scheme "${IOS_NAME}Example" -configuration Debug -destination "id=$udid" || error "Failed to build iOS example"
+  exit_dir
+  enter_dir "$PROJECT_DIR/example"
+  yarn build:ios --extra-params "ARCHS=$(uname -m)" || error "Failed to build iOS example"
   exit_dir
 }
 
@@ -479,7 +477,6 @@ run_for_builder_bob() {
       --builder-bob-version "$builder_bob_version" \
       --slug react-native-dummy-lib-for-ios \
       --ios \
-      --ios-name DummyLibForIos \
       "$working_dir/react-native-dummy-lib-for-ios"
   fi
 
@@ -502,7 +499,6 @@ run_for_builder_bob() {
       --builder-bob-version "$builder_bob_version" \
       --ios \
       --app-tsx "$app_tsx" \
-      --ios-name ReactNativeDummyLibForIos \
       --slug @my-org/react-native-dummy-lib-for-ios \
       "$working_dir/@my-org/react-native-dummy-lib-for-ios"
   fi

@@ -37,6 +37,9 @@ pub(crate) struct IOsConfig {
 
     #[serde(default = "IOsConfig::default_cargo_extras")]
     pub(crate) cargo_extras: ExtraArgs,
+
+    #[serde(default = "IOsConfig::default_codegen_output_dir")]
+    pub(crate) codegen_output_dir: String,
 }
 
 impl IOsConfig {
@@ -74,6 +77,10 @@ impl IOsConfig {
         let args: &[&str] = &["aarch64-apple-ios", sim_target];
         args.iter().map(|s| Target::from_str(s).unwrap()).collect()
     }
+
+    fn default_codegen_output_dir() -> String {
+        workspace::package_json().ios_codegen_output_dir()
+    }
 }
 
 impl Default for IOsConfig {
@@ -85,6 +92,10 @@ impl Default for IOsConfig {
 impl IOsConfig {
     pub(crate) fn directory(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         project_root.join(&self.directory)
+    }
+
+    pub(crate) fn codegen_output_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.codegen_output_dir)
     }
 
     pub(crate) fn framework_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {

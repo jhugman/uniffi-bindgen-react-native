@@ -1,0 +1,8 @@
+{
+  "codegenConfig": {
+    "outputDir": {
+      "ios": "ios/tmp",
+      "android": "android/tmp"
+    }
+  }
+}
