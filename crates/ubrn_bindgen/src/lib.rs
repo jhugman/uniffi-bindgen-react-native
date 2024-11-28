@@ -6,4 +6,4 @@
 mod bindings;
 
 pub use bindings::metadata::ModuleMetadata;
-pub use bindings::{BindingsArgs, OutputArgs, SourceArgs};
+pub use bindings::{AbiFlavor, BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};

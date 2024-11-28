@@ -7,7 +7,7 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{self, Args, Subcommand};
 use std::convert::TryFrom;
-use ubrn_bindgen::{BindingsArgs, OutputArgs, SourceArgs};
+use ubrn_bindgen::{AbiFlavor, BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
 
 use crate::{codegen::TurboModuleArgs, config::ProjectConfig, Platform};
 
@@ -62,6 +62,9 @@ pub(crate) struct GenerateAllArgs {
     #[clap(long)]
     config: Utf8PathBuf,
 
+    #[command(flatten)]
+    switches: SwitchArgs,
+
     /// A path to staticlib file.
     lib_file: Utf8PathBuf,
 }
@@ -98,11 +101,17 @@ impl GenerateAllCommand {
         }
     }
 
+    fn switches(&self) -> SwitchArgs {
+        let flavor = self.platform.as_ref().map_or(AbiFlavor::Jsi, |p| p.into());
+        SwitchArgs { flavor }
+    }
+
     pub(crate) fn run(&self) -> Result<()> {
         let project = self.project_config()?;
         let root = project.project_root();
         let pwd = ubrn_common::pwd()?;
         let lib_file = pwd.join(&self.lib_file);
+        let switches = self.switches();
         let modules = {
             ubrn_common::cd(&project.crate_.crate_dir()?)?;
             let ts_dir = project.bindings.ts_path(root);
@@ -115,6 +124,7 @@ impl GenerateAllCommand {
             }
             let manifest_path = project.crate_.manifest_path()?;
             let bindings = BindingsArgs::new(
+                switches.clone(),
                 SourceArgs::library(&lib_file).with_config(config),
                 OutputArgs::new(&ts_dir, &cpp_dir, false),
             );

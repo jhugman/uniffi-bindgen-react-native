@@ -6,6 +6,7 @@
 
 pub mod metadata;
 pub(crate) mod react_native;
+pub(crate) mod switches;
 pub(crate) mod type_map;
 
 use std::{fs, str::FromStr};
@@ -14,6 +15,7 @@ use anyhow::Result;
 use askama::Template;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{command, Args};
+pub use switches::{AbiFlavor, SwitchArgs};
 use ubrn_common::{mk_dir, CrateMetadata};
 use uniffi_bindgen::cargo_metadata::CrateConfigSupplier;
 
@@ -27,11 +29,17 @@ pub struct BindingsArgs {
     source: SourceArgs,
     #[command(flatten)]
     output: OutputArgs,
+    #[command(flatten)]
+    switches: SwitchArgs,
 }
 
 impl BindingsArgs {
-    pub fn new(source: SourceArgs, output: OutputArgs) -> Self {
-        Self { source, output }
+    pub fn new(switches: SwitchArgs, source: SourceArgs, output: OutputArgs) -> Self {
+        Self {
+            switches,
+            source,
+            output,
+        }
     }
 
     pub fn ts_dir(&self) -> &Utf8Path {
@@ -54,7 +62,7 @@ pub struct OutputArgs {
     ts_dir: Utf8PathBuf,
 
     /// The directory in which to put the generated C++.
-    #[clap(long)]
+    #[clap(long, alias = "abi-dir")]
     cpp_dir: Utf8PathBuf,
 }
 

@@ -6,7 +6,7 @@
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
-use ubrn_bindgen::{BindingsArgs, OutputArgs, SourceArgs};
+use ubrn_bindgen::{BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
 
 #[derive(Args, Debug, Clone)]
 pub(crate) struct GenerateBindingsArg {
@@ -14,7 +14,7 @@ pub(crate) struct GenerateBindingsArg {
     #[clap(long, requires = "cpp_dir")]
     pub(crate) ts_dir: Option<Utf8PathBuf>,
     /// Directory for the generated C++ to put in.
-    #[clap(long, requires = "ts_dir")]
+    #[clap(long, requires = "ts_dir", alias = "abi-dir")]
     pub(crate) cpp_dir: Option<Utf8PathBuf>,
     /// Optional uniffi.toml location
     #[clap(long, requires = "ts_dir")]
@@ -38,11 +38,12 @@ impl GenerateBindingsArg {
         &self,
         library: &Utf8PathBuf,
         manifest_path: &Utf8PathBuf,
+        switches: &SwitchArgs,
     ) -> Result<Vec<Utf8PathBuf>> {
         let output = OutputArgs::new(&self.ts_dir(), &self.cpp_dir(), false);
         let toml = self.uniffi_toml().filter(|file| file.exists());
         let source = SourceArgs::library(library).with_config(toml);
-        let bindings = BindingsArgs::new(source, output);
+        let bindings = BindingsArgs::new(switches.clone(), source, output);
         let modules = bindings.run(Some(manifest_path))?;
         let cpp_dir = bindings.cpp_dir();
         let index = cpp_dir.join("Entrypoint.cpp");

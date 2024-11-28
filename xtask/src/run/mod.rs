@@ -3,15 +3,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-mod cpp_bindings;
-mod generate_bindings;
-mod rust_crate;
-mod typescript;
+pub(crate) mod cpp_bindings;
+pub(crate) mod generate_bindings;
+pub(crate) mod rust_crate;
+pub(crate) mod typescript;
 
 use anyhow::{Ok, Result};
 use camino::Utf8PathBuf;
 use clap::Args;
 use generate_bindings::GenerateBindingsArg;
+use ubrn_bindgen::SwitchArgs;
 use ubrn_common::CrateMetadata;
 
 use crate::bootstrap::{Bootstrap, TestRunnerCmd};
@@ -22,34 +23,37 @@ use self::{cpp_bindings::CppBindingArg, rust_crate::CrateArg, typescript::EntryA
 pub(crate) struct RunCmd {
     /// Clean the crate before starting.
     #[clap(long, short = 'c')]
-    clean: bool,
+    pub(crate) clean: bool,
 
     /// The crate to be bound to hermes
     #[command(flatten)]
-    crate_: Option<CrateArg>,
+    pub(crate) crate_: Option<CrateArg>,
 
     #[clap(long = "cpp", conflicts_with_all = ["ts_dir", "cpp_dir"])]
-    cpp_binding: Option<Utf8PathBuf>,
+    pub(crate) cpp_binding: Option<Utf8PathBuf>,
 
     #[clap(flatten)]
-    generate_bindings: Option<GenerateBindingsArg>,
+    pub(crate) generate_bindings: Option<GenerateBindingsArg>,
+
+    #[clap(flatten)]
+    pub(crate) switches: SwitchArgs,
 
     /// The Javascript or Typescript file.
     #[command(flatten)]
-    js_file: EntryArg,
+    pub(crate) js_file: EntryArg,
 }
 
 impl RunCmd {
     pub(crate) fn run(&self) -> Result<()> {
         TestRunnerCmd.ensure_ready()?;
-        let so_file = self.prepare_library_path()?;
+        let so_file = self.prepare_library_path(&self.switches)?;
 
         let js_file = self.js_file.prepare()?;
         TestRunnerCmd.run(&js_file, so_file.as_ref())?;
         Ok(())
     }
 
-    fn prepare_library_path(&self) -> Result<Option<Utf8PathBuf>> {
+    fn prepare_library_path(&self, switches: &SwitchArgs) -> Result<Option<Utf8PathBuf>> {
         let clean = self.clean;
         let (release, info) = if let Some(crate_) = &self.crate_ {
             (
@@ -77,8 +81,11 @@ impl RunCmd {
                 let crate_lib = crate_.library_path(None, release);
                 let target_dir = crate_.target_dir();
                 let lib_name = crate_.library_name();
-                let cpp_files =
-                    bindings.generate(&crate_lib, &crate_.manifest_path().to_path_buf())?;
+                let cpp_files = bindings.generate(
+                    &crate_lib,
+                    &crate_.manifest_path().to_path_buf(),
+                    switches,
+                )?;
                 let cpp = CppBindingArg::with_files(&cpp_files);
                 let so_file = cpp.compile_with_crate(clean, target_dir, lib_name)?;
                 Ok(Some(so_file))

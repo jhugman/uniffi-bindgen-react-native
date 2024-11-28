@@ -46,6 +46,9 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
+      - name: Run tests for binaries
+        run: cargo test --bins
+
   integration-tests-generation:
     name: 🧩 Integration tests (generation)
     runs-on: ubuntu-latest
