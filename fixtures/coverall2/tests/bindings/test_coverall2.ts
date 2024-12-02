@@ -94,32 +94,97 @@ test("array buffer roundtrip with ArrayBufferView", (t) => {
 });
 
 test("array buffer roundtrip with ArrayBufferView of different sizes", (t) => {
-  function rt(ta: ArrayBuffer, slice: ArrayBuffer) {
-    t.assertEqual(slice, identityArrayBuffer(ta), undefined, abEquals);
+  function rt(viewName: string, ta: ArrayBuffer, slice: ArrayBuffer) {
+    t.assertEqual(
+      slice,
+      identityArrayBuffer(ta),
+      `${viewName} didn't match`,
+      abEquals,
+    );
   }
   const base = arrayBuffer(64);
-  for (const TypedArray of [
-    Uint8Array,
-    Uint16Array,
-    Uint32Array,
-    BigUint64Array,
-    Int8Array,
-    Int16Array,
-    Int32Array,
-    BigInt64Array,
-    Float32Array,
-    Float64Array,
-  ]) {
-    const width = TypedArray.BYTES_PER_ELEMENT;
-    for (let length = width; length < base.byteLength; length += width) {
+  const arrayTypes = [
+    {
+      name: "Uint8Array",
+      bytesPerElement: Uint8Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Uint8Array(ab, byteOffset, length),
+    },
+    {
+      name: "Uint16Array",
+      bytesPerElement: Uint16Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Uint16Array(ab, byteOffset, length),
+    },
+    {
+      name: "Uint32Array",
+      bytesPerElement: Uint32Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Uint32Array(ab, byteOffset, length),
+    },
+    {
+      name: "BigUint64Array",
+      bytesPerElement: BigUint64Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new BigUint64Array(ab, byteOffset, length),
+    },
+    {
+      name: "Int8Array",
+      bytesPerElement: Int8Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Int8Array(ab, byteOffset, length),
+    },
+    {
+      name: "Int16Array",
+      bytesPerElement: Int16Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Int16Array(ab, byteOffset, length),
+    },
+    {
+      name: "Int32Array",
+      bytesPerElement: Int32Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Int32Array(ab, byteOffset, length),
+    },
+    {
+      name: "BigInt64Array",
+      bytesPerElement: BigInt64Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new BigInt64Array(ab, byteOffset, length),
+    },
+    {
+      name: "Float32Array",
+      bytesPerElement: Float32Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Float32Array(ab, byteOffset, length),
+    },
+    {
+      name: "Float64Array",
+      bytesPerElement: Float64Array.BYTES_PER_ELEMENT,
+      new: (ab: ArrayBuffer, byteOffset: number, length: number) =>
+        new Float64Array(ab, byteOffset, length),
+    },
+  ];
+  for (const arrayType of arrayTypes) {
+    const bytesPerElement = arrayType.bytesPerElement;
+    const viewName = arrayType.name;
+    for (
+      let byteLength = bytesPerElement;
+      byteLength < base.byteLength;
+      byteLength += bytesPerElement
+    ) {
       for (
-        let offset = 0;
-        offset + length < base.byteLength;
-        offset += length
+        let byteOffset = 0;
+        byteOffset + byteLength < base.byteLength;
+        byteOffset += byteLength
       ) {
-        const typedArray = new TypedArray(base, offset, length / width);
-        const slice = base.slice(offset, offset + length);
-        rt(typedArray, slice);
+        const typedArray = arrayType.new(
+          base,
+          byteOffset,
+          byteLength / bytesPerElement,
+        );
+        const slice = base.slice(byteOffset, byteOffset + byteLength);
+        rt(viewName, typedArray, slice);
       }
     }
   }
