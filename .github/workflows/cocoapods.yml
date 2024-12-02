@@ -1,0 +1,30 @@
+name: Publish to CocoaPods
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish-cocoapods:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install CocoaPods
+        run: gem install cocoapods
+
+      - name: Lint Podspec
+        run: pod spec lint uniffi-bindgen-react-native.podspec
+
+      - name: Publish to CocoaPods
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+        run: pod trunk push uniffi-bindgen-react-native.podspec
