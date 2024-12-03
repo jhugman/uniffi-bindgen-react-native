@@ -12,12 +12,14 @@ use uniffi_bindgen::{BindingGenerator, Component, GenerationSettings};
 
 use ubrn_common::{fmt, run_cmd_quietly};
 
-use crate::bindings::{
-    gen_cpp::{self, CppBindings},
-    gen_typescript::{self, TsBindings},
-    metadata::ModuleMetadata,
-    type_map::TypeMap,
-    uniffi_toml::ReactNativeConfig,
+use crate::{
+    bindings::{
+        gen_cpp::{self, CppBindings},
+        gen_typescript::{self, TsBindings},
+        metadata::ModuleMetadata,
+        type_map::TypeMap,
+        uniffi_toml::ReactNativeConfig,
+    },
     OutputArgs,
 };
 

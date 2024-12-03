@@ -3,10 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use std::fs;
+
 use anyhow::Result;
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use ubrn_bindgen::{BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
+use ubrn_bindgen::{BindingsArgs, ModuleMetadata, OutputArgs, SourceArgs, SwitchArgs};
 
 #[derive(Args, Debug, Clone)]
 pub(crate) struct GenerateBindingsArg {
@@ -47,11 +49,17 @@ impl GenerateBindingsArg {
         let modules = bindings.run(Some(manifest_path))?;
         let cpp_dir = bindings.cpp_dir();
         let index = cpp_dir.join("Entrypoint.cpp");
-        bindings.render_entrypoint(&index, &modules)?;
+        render_entrypoint(&index, &modules)?;
         Ok(modules
             .iter()
             .map(|m| cpp_dir.join(m.cpp_filename()))
             .chain(vec![index])
             .collect())
     }
+}
+
+fn render_entrypoint(path: &Utf8Path, modules: &Vec<ModuleMetadata>) -> Result<()> {
+    let string = ubrn_bindgen::generate_entrypoint(modules)?;
+    fs::write(path, string)?;
+    Ok(())
 }

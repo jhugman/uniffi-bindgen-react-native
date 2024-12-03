@@ -45,6 +45,6 @@ impl AbiFlavor {
         matches!(self, Self::Jsi)
     }
     pub(crate) fn needs_rust(&self) -> bool {
-        matches!(self, Self::Jsi)
+        !matches!(self, Self::Jsi)
     }
 }

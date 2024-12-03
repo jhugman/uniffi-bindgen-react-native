@@ -67,3 +67,14 @@ impl<'a> CppWrapper<'a> {
         Self { ci, config, module }
     }
 }
+
+pub fn generate_entrypoint(modules: &Vec<ModuleMetadata>) -> Result<String> {
+    let index = EntrypointCpp { modules };
+    Ok(index.render()?)
+}
+
+#[derive(Template)]
+#[template(path = "entrypoint.cpp", escape = "none")]
+struct EntrypointCpp<'a> {
+    modules: &'a Vec<ModuleMetadata>,
+}
