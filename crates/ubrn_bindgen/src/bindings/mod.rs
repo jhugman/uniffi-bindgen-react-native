@@ -5,6 +5,7 @@
  */
 
 pub(crate) mod extensions;
+pub(crate) mod gen_cpp;
 pub(crate) mod gen_typescript;
 pub mod metadata;
 pub(crate) mod react_native;

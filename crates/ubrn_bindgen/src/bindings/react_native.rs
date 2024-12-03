@@ -3,20 +3,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-mod gen_cpp;
 
 use std::fs;
 
-use self::gen_cpp::CppBindings;
-use crate::bindings::gen_typescript::{self, TsBindings};
-use crate::bindings::uniffi_toml::ReactNativeConfig;
 use anyhow::Result;
 use camino::Utf8Path;
-use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{BindingGenerator, Component, GenerationSettings};
 
-use super::{type_map::TypeMap, OutputArgs};
-use crate::bindings::metadata::ModuleMetadata;
+use ubrn_common::{fmt, run_cmd_quietly};
+
+use crate::bindings::{
+    gen_cpp::{self, CppBindings},
+    gen_typescript::{self, TsBindings},
+    metadata::ModuleMetadata,
+    type_map::TypeMap,
+    uniffi_toml::ReactNativeConfig,
+    OutputArgs,
+};
 
 pub(crate) struct ReactNativeBindingGenerator {
     output: OutputArgs,
