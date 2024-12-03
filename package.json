@@ -17,6 +17,9 @@
     "ubrn": "./bin/cli",
     "uniffi-bindgen-react-native": "./bin/cli"
   },
+  "scripts": {
+    "test": "./scripts/run-tests.sh"
+  },
   "devDependencies": {
     "abortcontroller-polyfill": "^1.7.5",
     "metro": "^0.80.8",

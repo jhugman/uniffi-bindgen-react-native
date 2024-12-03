@@ -9,7 +9,7 @@
 
 import * as rust from "../../generated/arithmetic";
 import { test } from "@/asserts";
-import { console } from "@/hermes";
+import "@/polyfills";
 
 const a = BigInt(39);
 const b = BigInt(3);

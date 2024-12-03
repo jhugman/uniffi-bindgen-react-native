@@ -4,6 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+export { URL } from "./hermes";
+
 /**
  * This is used in both the generated code and the test.
  * To get it into the generated typescript, it should be part of a

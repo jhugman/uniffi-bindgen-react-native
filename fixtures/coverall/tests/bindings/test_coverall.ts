@@ -29,7 +29,7 @@ import coverall, {
   Color,
 } from "../../generated/coverall";
 import { test } from "@/asserts";
-import { console } from "@/hermes";
+import "@/polyfills";
 
 // floats should be "close enough".
 const almostEquals = (this_: number, that: number): boolean =>

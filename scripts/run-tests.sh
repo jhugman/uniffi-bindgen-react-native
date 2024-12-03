@@ -2,14 +2,9 @@
 set -e
 root=.
 
-for test in "${root}"/typescript/tests/*.test.ts ; do
-    echo "Running test $test"
-    cargo xtask run "${test}"
-    echo
-done
-
 declare -a selected_fixtures=()
 declare -a excluded_fixtures=()
+flavor="jsi"
 while (( "$#" )); do
   case "$1" in
     '--fixture'|'-f')
@@ -20,11 +15,22 @@ while (( "$#" )); do
        excluded_fixtures+=("$2")
        shift 2
        ;;
+    '--flavor'|'-F')
+       flavor="$2"
+       shift 2
+       ;;
     *)
        echo "Unknown argument: $1"
        exit 1
        ;;
   esac
+done
+
+
+for test in "${root}"/typescript/tests/*.test.ts ; do
+    echo "Running test $test"
+    cargo xtask run "${test}" --flavor "$flavor"
+    echo
 done
 
 if [ ${#selected_fixtures[@]} -eq 0 ]; then
@@ -58,6 +64,7 @@ for fixture in ${fixtures} ; do
         --ts-dir "${ts_dir}" \
         --toml "${config_file}" \
         --crate "${fixture_dir}" \
+        --flavor "$flavor" \
         "${test_file}"
     echo
 done
