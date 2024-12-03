@@ -5,20 +5,22 @@
  */
 mod filters;
 
-use crate::bindings::{
-    metadata::ModuleMetadata,
-    react_native::{
-        ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,
-        FfiTypeExt, ObjectExt,
-    },
-};
+use std::borrow::Borrow;
+
 use anyhow::Result;
 use askama::Template;
-use std::borrow::Borrow;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;
 
-type Config = crate::bindings::react_native::uniffi_toml::CppConfig;
+use crate::bindings::{
+    extensions::{
+        ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,
+        FfiTypeExt, ObjectExt,
+    },
+    metadata::ModuleMetadata,
+};
+
+type Config = crate::bindings::uniffi_toml::CppConfig;
 
 #[derive(Debug, Default)]
 pub(crate) struct CppBindings {

@@ -4,10 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+pub(crate) mod extensions;
+pub(crate) mod gen_typescript;
 pub mod metadata;
 pub(crate) mod react_native;
 pub(crate) mod switches;
 pub(crate) mod type_map;
+pub(crate) mod uniffi_toml;
 
 use std::{fs, str::FromStr};
 

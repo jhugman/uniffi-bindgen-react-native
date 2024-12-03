@@ -26,10 +26,10 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 
-use crate::bindings::metadata::ModuleMetadata;
-use crate::bindings::react_native::{
+use crate::bindings::extensions::{
     ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
 };
+use crate::bindings::metadata::ModuleMetadata;
 use crate::bindings::type_map::TypeMap;
 
 #[derive(Default)]
@@ -38,7 +38,7 @@ pub(crate) struct TsBindings {
     pub(crate) frontend: String,
 }
 
-type Config = crate::bindings::react_native::uniffi_toml::TsConfig;
+type Config = crate::bindings::uniffi_toml::TsConfig;
 
 pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
