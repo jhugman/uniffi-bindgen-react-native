@@ -14,6 +14,7 @@ mod miscellany;
 mod object;
 mod primitives;
 mod record;
+mod util;
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -26,11 +27,15 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 
-use crate::bindings::extensions::{
-    ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
+pub(crate) use self::util::format_directory;
+use crate::bindings::{
+    extensions::{
+        ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
+    },
+    metadata::ModuleMetadata,
+    type_map::TypeMap,
 };
-use crate::bindings::metadata::ModuleMetadata;
-use crate::bindings::type_map::TypeMap;
+use crate::SwitchArgs;
 
 #[derive(Default)]
 pub(crate) struct TsBindings {
@@ -44,12 +49,13 @@ pub(crate) fn generate_bindings(
     ci: &ComponentInterface,
     config: &Config,
     module: &ModuleMetadata,
+    switches: &SwitchArgs,
     type_map: &TypeMap,
 ) -> Result<TsBindings> {
-    let codegen = CodegenWrapper::new(ci, config, module)
+    let codegen = CodegenWrapper::new(ci, config, module, switches)
         .render()
         .context("generating codegen bindings failed")?;
-    let frontend = FrontendWrapper::new(ci, config, module, type_map)
+    let frontend = FrontendWrapper::new(ci, config, module, switches, type_map)
         .render()
         .context("generating frontend javascript failed")?;
 
@@ -63,11 +69,23 @@ struct CodegenWrapper<'a> {
     #[allow(unused)]
     config: &'a Config,
     module: &'a ModuleMetadata,
+    #[allow(unused)]
+    switches: &'a SwitchArgs,
 }
 
 impl<'a> CodegenWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
-        Self { ci, config, module }
+    fn new(
+        ci: &'a ComponentInterface,
+        config: &'a Config,
+        module: &'a ModuleMetadata,
+        switches: &'a SwitchArgs,
+    ) -> Self {
+        Self {
+            ci,
+            config,
+            module,
+            switches,
+        }
     }
 }
 
@@ -75,9 +93,11 @@ impl<'a> CodegenWrapper<'a> {
 #[template(syntax = "ts", escape = "none", path = "wrapper.ts")]
 struct FrontendWrapper<'a> {
     ci: &'a ComponentInterface,
-    module: &'a ModuleMetadata,
     #[allow(unused)]
     config: &'a Config,
+    module: &'a ModuleMetadata,
+    #[allow(unused)]
+    switches: &'a SwitchArgs,
     type_helper_code: String,
     type_imports: BTreeMap<String, BTreeSet<Imported>>,
     exported_converters: BTreeSet<String>,
@@ -89,9 +109,10 @@ impl<'a> FrontendWrapper<'a> {
         ci: &'a ComponentInterface,
         config: &'a Config,
         module: &'a ModuleMetadata,
+        switches: &'a SwitchArgs,
         type_map: &'a TypeMap,
     ) -> Self {
-        let type_renderer = TypeRenderer::new(ci, config, module, type_map);
+        let type_renderer = TypeRenderer::new(ci, config, module, switches, type_map);
         let type_helper_code = type_renderer.render().unwrap();
         let type_imports = type_renderer.imports.into_inner();
         let exported_converters = type_renderer.exported_converters.into_inner();
@@ -100,6 +121,7 @@ impl<'a> FrontendWrapper<'a> {
             module,
             config,
             ci,
+            switches,
             type_helper_code,
             type_imports,
             exported_converters,
@@ -120,6 +142,9 @@ pub struct TypeRenderer<'a> {
     config: &'a Config,
     #[allow(unused)]
     module: &'a ModuleMetadata,
+    #[allow(unused)]
+    switches: &'a SwitchArgs,
+
     // Track imports added with the `add_import()` macro
     imports: RefCell<BTreeMap<String, BTreeSet<Imported>>>,
 
@@ -137,12 +162,14 @@ impl<'a> TypeRenderer<'a> {
         ci: &'a ComponentInterface,
         config: &'a Config,
         module: &'a ModuleMetadata,
+        switches: &'a SwitchArgs,
         type_map: &'a TypeMap,
     ) -> Self {
         Self {
             ci,
             config,
             module,
+            switches,
             imports: RefCell::new(Default::default()),
             exported_converters: RefCell::new(Default::default()),
             imported_converters: RefCell::new(Default::default()),

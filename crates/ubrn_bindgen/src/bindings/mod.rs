@@ -8,6 +8,5 @@ pub(crate) mod extensions;
 pub(crate) mod gen_cpp;
 pub(crate) mod gen_typescript;
 pub(crate) mod metadata;
-pub(crate) mod react_native;
 pub(crate) mod type_map;
 pub(crate) mod uniffi_toml;

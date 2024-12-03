@@ -10,14 +10,6 @@ use serde::{Deserialize, Serialize};
 use uniffi_bindgen::backend::TemplateExpression;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct ReactNativeConfig {
-    #[serde(default, alias = "javascript", alias = "js", alias = "ts")]
-    pub(crate) typescript: TsConfig,
-    #[serde(default)]
-    pub(crate) cpp: CppConfig,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TsConfig {
     #[serde(default)]

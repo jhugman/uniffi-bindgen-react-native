@@ -5,6 +5,7 @@
  */
 mod bindings;
 mod cli;
+mod react_native;
 mod switches;
 
 pub use self::{

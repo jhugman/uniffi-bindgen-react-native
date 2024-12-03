@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod filters;
+mod util;
 
 use std::borrow::Borrow;
 
@@ -12,6 +13,7 @@ use askama::Template;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;
 
+pub(crate) use self::util::format_directory;
 use crate::bindings::{
     extensions::{
         ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,

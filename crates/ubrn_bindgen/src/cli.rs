@@ -11,8 +11,10 @@ use clap::{command, Args};
 use ubrn_common::{mk_dir, CrateMetadata};
 use uniffi_bindgen::cargo_metadata::CrateConfigSupplier;
 
-use super::bindings::{metadata::ModuleMetadata, react_native::ReactNativeBindingGenerator};
-use super::switches::SwitchArgs;
+use super::{
+    bindings::metadata::ModuleMetadata, react_native::ReactNativeBindingGenerator,
+    switches::SwitchArgs,
+};
 
 #[derive(Args, Debug)]
 pub struct BindingsArgs {
@@ -117,8 +119,14 @@ impl BindingsArgs {
 
         mk_dir(&out.ts_dir)?;
         mk_dir(&out.cpp_dir)?;
+        let ts_dir = out.ts_dir.canonicalize_utf8()?;
+        let abi_dir = out.cpp_dir.canonicalize_utf8()?;
 
-        let generator = ReactNativeBindingGenerator::new(out.clone());
+        let generator = ReactNativeBindingGenerator::new(
+            ts_dir.clone(),
+            abi_dir.clone(),
+            self.switches.clone(),
+        );
         let dummy_dir = Utf8PathBuf::from_str(".")?;
 
         let try_format_code = !out.no_format;

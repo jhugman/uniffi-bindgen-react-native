@@ -7,10 +7,9 @@
 use std::fs;
 
 use anyhow::Result;
-use camino::Utf8Path;
+use camino::Utf8PathBuf;
+use serde::{Deserialize, Serialize};
 use uniffi_bindgen::{BindingGenerator, Component, GenerationSettings};
-
-use ubrn_common::{fmt, run_cmd_quietly};
 
 use crate::{
     bindings::{
@@ -18,23 +17,29 @@ use crate::{
         gen_typescript::{self, TsBindings},
         metadata::ModuleMetadata,
         type_map::TypeMap,
-        uniffi_toml::ReactNativeConfig,
+        uniffi_toml::{CppConfig, TsConfig},
     },
-    OutputArgs,
+    switches::SwitchArgs,
 };
 
 pub(crate) struct ReactNativeBindingGenerator {
-    output: OutputArgs,
+    switches: SwitchArgs,
+    ts_dir: Utf8PathBuf,
+    cpp_dir: Utf8PathBuf,
 }
 
 impl ReactNativeBindingGenerator {
-    pub(crate) fn new(output: OutputArgs) -> Self {
-        Self { output }
+    pub(crate) fn new(ts_dir: Utf8PathBuf, cpp_dir: Utf8PathBuf, switches: SwitchArgs) -> Self {
+        Self {
+            ts_dir,
+            cpp_dir,
+            switches,
+        }
     }
 
     pub(crate) fn format_code(&self) -> Result<()> {
-        format_ts(&self.output.ts_dir.canonicalize_utf8()?)?;
-        format_cpp(&self.output.cpp_dir.canonicalize_utf8()?)?;
+        gen_typescript::format_directory(&self.ts_dir)?;
+        gen_cpp::format_directory(&self.cpp_dir)?;
         Ok(())
     }
 }
@@ -63,24 +68,34 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         settings: &GenerationSettings,
         components: &[Component<Self::Config>],
     ) -> Result<()> {
-        let mut type_map = TypeMap::default();
+        let type_map = TypeMap::from(components);
+
+        let out_dir = &self.ts_dir;
         for component in components {
-            type_map.insert_ci(&component.ci);
+            let ci = &component.ci;
+            let module = ModuleMetadata::from(component);
+            let config = &component.config;
+            let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(
+                ci,
+                &config.typescript,
+                &module,
+                &self.switches,
+                &type_map,
+            )?;
+
+            let codegen_path = out_dir.join(module.ts_ffi_filename());
+            fs::write(codegen_path, codegen)?;
+
+            let frontend_path = out_dir.join(module.ts_filename());
+            fs::write(frontend_path, frontend)?;
         }
+
+        let out_dir = &self.cpp_dir;
         for component in components {
             let ci = &component.ci;
             let module: ModuleMetadata = component.into();
             let config = &component.config;
-            let TsBindings { codegen, frontend } =
-                gen_typescript::generate_bindings(ci, &config.typescript, &module, &type_map)?;
 
-            let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
-            let codegen_path = out_dir.join(module.ts_ffi_filename());
-            let frontend_path = out_dir.join(module.ts_filename());
-            fs::write(codegen_path, codegen)?;
-            fs::write(frontend_path, frontend)?;
-
-            let out_dir = &self.output.cpp_dir.canonicalize_utf8()?;
             let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &config.cpp, &module)?;
             let cpp_path = out_dir.join(module.cpp_filename());
             let hpp_path = out_dir.join(module.hpp_filename());
@@ -94,20 +109,10 @@ impl BindingGenerator for ReactNativeBindingGenerator {
     }
 }
 
-fn format_ts(out_dir: &Utf8Path) -> Result<()> {
-    if let Some(mut prettier) = fmt::prettier(out_dir, false)? {
-        run_cmd_quietly(&mut prettier)?
-    } else {
-        eprintln!("No prettier found. Install with `yarn add --dev prettier`");
-    }
-    Ok(())
-}
-
-fn format_cpp(out_dir: &Utf8Path) -> Result<()> {
-    if let Some(mut clang_format) = fmt::clang_format(out_dir, false)? {
-        run_cmd_quietly(&mut clang_format)?
-    } else {
-        eprintln!("Skipping formatting C++. Is clang-format installed?");
-    }
-    Ok(())
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub(crate) struct ReactNativeConfig {
+    #[serde(default, alias = "javascript", alias = "js", alias = "ts")]
+    pub(crate) typescript: TsConfig,
+    #[serde(default)]
+    pub(crate) cpp: CppConfig,
 }
