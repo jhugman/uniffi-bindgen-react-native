@@ -40,7 +40,7 @@ const {
 } = {{ entry.0.1 }}.converters;
 {%- endfor %}
 
-const uniffiIsDebug = (process.env.uniffiIsDebug !== "production" || {{ config.is_debug() }});
+const uniffiIsDebug = (process?.env?.NODE_ENV !== "production" || {{ config.is_debug() }});
 
 {%- call ts::docstring_value(ci.namespace_docstring(), 0) %}
 
