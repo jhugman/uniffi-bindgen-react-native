@@ -134,11 +134,8 @@ impl BindingsArgs {
         let ts_dir = out.ts_dir.canonicalize_utf8()?;
         let abi_dir = out.cpp_dir.canonicalize_utf8()?;
 
-        let generator = ReactNativeBindingGenerator::new(
-            ts_dir.clone(),
-            abi_dir.clone(),
-            self.switches(),
-        );
+        let generator =
+            ReactNativeBindingGenerator::new(ts_dir.clone(), abi_dir.clone(), self.switches());
         let dummy_dir = Utf8PathBuf::from_str(".")?;
 
         let try_format_code = !out.no_format;
