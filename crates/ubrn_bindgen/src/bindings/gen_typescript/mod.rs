@@ -32,7 +32,6 @@ use self::{
     filters::{ffi_converter_name, type_name},
     oracle::CodeOracle,
 };
-
 use crate::{
     bindings::{
         extensions::{
@@ -41,62 +40,47 @@ use crate::{
         metadata::ModuleMetadata,
         type_map::TypeMap,
     },
-    SwitchArgs,
+    switches::SwitchArgs,
 };
 
-#[derive(Default)]
-pub(crate) struct TsBindings {
-    pub(crate) codegen: String,
-    pub(crate) frontend: String,
-}
-
-pub(crate) fn generate_bindings(
+pub(crate) fn generate_api_code(
     ci: &ComponentInterface,
     config: &Config,
     module: &ModuleMetadata,
     switches: &SwitchArgs,
     type_map: &TypeMap,
-) -> Result<TsBindings> {
-    let codegen = CodegenWrapper::new(ci, config, module, switches)
+) -> Result<String> {
+    let types = TypeRenderer::new(ci, config, module, switches, type_map);
+    TsApiWrapper::try_from(types)?
         .render()
-        .context("generating codegen bindings failed")?;
-    let frontend = FrontendWrapper::new(ci, config, module, switches, type_map)
-        .render()
-        .context("generating frontend javascript failed")?;
+        .context("generating frontend typescript failed")
+}
 
-    Ok(TsBindings { codegen, frontend })
+pub(crate) fn generate_lowlevel_code(
+    ci: &ComponentInterface,
+    module: &ModuleMetadata,
+) -> Result<String> {
+    LowlevelTsWrapper::new(ci, module)
+        .render()
+        .context("generating lowlevel typescipt failed")
 }
 
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "wrapper-ffi.ts")]
-struct CodegenWrapper<'a> {
+struct LowlevelTsWrapper<'a> {
     ci: &'a ComponentInterface,
-    #[allow(unused)]
-    config: &'a Config,
     module: &'a ModuleMetadata,
-    #[allow(unused)]
-    switches: &'a SwitchArgs,
 }
 
-impl<'a> CodegenWrapper<'a> {
-    fn new(
-        ci: &'a ComponentInterface,
-        config: &'a Config,
-        module: &'a ModuleMetadata,
-        switches: &'a SwitchArgs,
-    ) -> Self {
-        Self {
-            ci,
-            config,
-            module,
-            switches,
-        }
+impl<'a> LowlevelTsWrapper<'a> {
+    fn new(ci: &'a ComponentInterface, module: &'a ModuleMetadata) -> Self {
+        Self { ci, module }
     }
 }
 
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "wrapper.ts")]
-struct FrontendWrapper<'a> {
+struct TsApiWrapper<'a> {
     ci: &'a ComponentInterface,
     #[allow(unused)]
     config: &'a Config,
@@ -109,20 +93,19 @@ struct FrontendWrapper<'a> {
     imported_converters: BTreeMap<(String, String), BTreeSet<String>>,
 }
 
-impl<'a> FrontendWrapper<'a> {
-    pub fn new(
-        ci: &'a ComponentInterface,
-        config: &'a Config,
-        module: &'a ModuleMetadata,
-        switches: &'a SwitchArgs,
-        type_map: &'a TypeMap,
-    ) -> Self {
-        let type_renderer = TypeRenderer::new(ci, config, module, switches, type_map);
-        let type_helper_code = type_renderer.render().unwrap();
-        let type_imports = type_renderer.imports.into_inner();
-        let exported_converters = type_renderer.exported_converters.into_inner();
-        let imported_converters = type_renderer.imported_converters.into_inner();
-        Self {
+impl<'a> TryFrom<TypeRenderer<'a>> for TsApiWrapper<'a> {
+    type Error = anyhow::Error;
+
+    fn try_from(types: TypeRenderer<'a>) -> Result<Self> {
+        let type_helper_code = types.render()?;
+        let type_imports = types.imports.into_inner();
+        let exported_converters = types.exported_converters.into_inner();
+        let imported_converters = types.imported_converters.into_inner();
+        let module = types.module;
+        let config = types.config;
+        let ci = types.ci;
+        let switches = types.switches;
+        Ok(Self {
             module,
             config,
             ci,
@@ -131,7 +114,7 @@ impl<'a> FrontendWrapper<'a> {
             type_imports,
             exported_converters,
             imported_converters,
-        }
+        })
     }
 }
 
@@ -141,9 +124,8 @@ impl<'a> FrontendWrapper<'a> {
 /// process.  Make sure to only call `render()` once.
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "Types.ts")]
-pub struct TypeRenderer<'a> {
+struct TypeRenderer<'a> {
     ci: &'a ComponentInterface,
-    #[allow(unused)]
     config: &'a Config,
     #[allow(unused)]
     module: &'a ModuleMetadata,

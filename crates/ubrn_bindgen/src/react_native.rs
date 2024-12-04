@@ -12,12 +12,7 @@ use serde::{Deserialize, Serialize};
 use uniffi_bindgen::{BindingGenerator, Component, GenerationSettings};
 
 use crate::{
-    bindings::{
-        gen_cpp::{self, CppBindings},
-        gen_typescript::{self, TsBindings},
-        metadata::ModuleMetadata,
-        type_map::TypeMap,
-    },
+    bindings::{gen_cpp, gen_typescript, metadata::ModuleMetadata, type_map::TypeMap},
     switches::SwitchArgs,
 };
 
@@ -36,9 +31,55 @@ impl ReactNativeBindingGenerator {
         }
     }
 
-    pub(crate) fn format_code(&self) -> Result<()> {
-        gen_typescript::format_directory(&self.ts_dir)?;
-        gen_cpp::format_directory(&self.cpp_dir)?;
+    fn generate_ts(
+        components: &[Component<ReactNativeConfig>],
+        switches: &SwitchArgs,
+        out_dir: &Utf8PathBuf,
+        try_format_code: bool,
+    ) -> std::result::Result<(), anyhow::Error> {
+        let type_map = TypeMap::from(components);
+        for component in components {
+            let module = ModuleMetadata::from(component);
+
+            let api_ts = gen_typescript::generate_api_code(
+                &component.ci,
+                &component.config.typescript,
+                &module,
+                switches,
+                &type_map,
+            )?;
+            let api_ts_path = out_dir.join(module.ts_filename());
+            fs::write(api_ts_path, api_ts)?;
+
+            let lowlevel_ts = gen_typescript::generate_lowlevel_code(&component.ci, &module)?;
+            let lowlevel_ts_path = out_dir.join(module.ts_ffi_filename());
+            fs::write(lowlevel_ts_path, lowlevel_ts)?;
+        }
+        if try_format_code {
+            gen_typescript::format_directory(out_dir)?;
+        }
+        Ok(())
+    }
+
+    fn generate_cpp(
+        components: &[Component<ReactNativeConfig>],
+        out_dir: &Utf8PathBuf,
+        try_format_code: bool,
+    ) -> Result<(), anyhow::Error> {
+        for component in components {
+            let module = ModuleMetadata::from(component);
+
+            let cpp = gen_cpp::generate_cpp(&component.ci, &component.config.cpp, &module)?;
+            let cpp_path = out_dir.join(module.cpp_filename());
+            fs::write(cpp_path, cpp)?;
+
+            let hpp = gen_cpp::generate_hpp(&component.ci, &component.config.cpp, &module)?;
+            let hpp_path = out_dir.join(module.hpp_filename());
+            fs::write(hpp_path, hpp)?;
+        }
+        if try_format_code {
+            gen_cpp::format_directory(out_dir)?;
+        }
         Ok(())
     }
 }
@@ -67,43 +108,13 @@ impl BindingGenerator for ReactNativeBindingGenerator {
         settings: &GenerationSettings,
         components: &[Component<Self::Config>],
     ) -> Result<()> {
-        let type_map = TypeMap::from(components);
-
-        let out_dir = &self.ts_dir;
-        for component in components {
-            let ci = &component.ci;
-            let module = ModuleMetadata::from(component);
-            let config = &component.config;
-            let TsBindings { codegen, frontend } = gen_typescript::generate_bindings(
-                ci,
-                &config.typescript,
-                &module,
-                &self.switches,
-                &type_map,
-            )?;
-
-            let codegen_path = out_dir.join(module.ts_ffi_filename());
-            fs::write(codegen_path, codegen)?;
-
-            let frontend_path = out_dir.join(module.ts_filename());
-            fs::write(frontend_path, frontend)?;
-        }
-
-        let out_dir = &self.cpp_dir;
-        for component in components {
-            let ci = &component.ci;
-            let module: ModuleMetadata = component.into();
-            let config = &component.config;
-
-            let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &config.cpp, &module)?;
-            let cpp_path = out_dir.join(module.cpp_filename());
-            let hpp_path = out_dir.join(module.hpp_filename());
-            fs::write(cpp_path, cpp)?;
-            fs::write(hpp_path, hpp)?;
-        }
-        if settings.try_format_code {
-            self.format_code()?;
-        }
+        Self::generate_ts(
+            components,
+            &self.switches,
+            &self.ts_dir,
+            settings.try_format_code,
+        )?;
+        Self::generate_cpp(components, &self.cpp_dir, settings.try_format_code)?;
         Ok(())
     }
 }

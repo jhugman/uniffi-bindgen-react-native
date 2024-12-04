@@ -23,20 +23,20 @@ use crate::bindings::{
     metadata::ModuleMetadata,
 };
 
-#[derive(Debug, Default)]
-pub(crate) struct CppBindings {
-    pub(crate) hpp: String,
-    pub(crate) cpp: String,
-}
-
-pub(crate) fn generate_bindings(
+pub(crate) fn generate_hpp(
     ci: &ComponentInterface,
     config: &Config,
     module: &ModuleMetadata,
-) -> Result<CppBindings> {
-    let hpp = HppWrapper::new(ci, config, module).render()?;
-    let cpp = CppWrapper::new(ci, config, module).render()?;
-    Ok(CppBindings { hpp, cpp })
+) -> Result<String> {
+    Ok(HppWrapper::new(ci, config, module).render()?)
+}
+
+pub(crate) fn generate_cpp(
+    ci: &ComponentInterface,
+    config: &Config,
+    module: &ModuleMetadata,
+) -> Result<String> {
+    Ok(CppWrapper::new(ci, config, module).render()?)
 }
 
 #[derive(Template)]
