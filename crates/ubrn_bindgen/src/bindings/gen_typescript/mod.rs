@@ -8,6 +8,7 @@ mod oracle;
 
 mod callback_interface;
 mod compounds;
+mod config;
 mod custom;
 mod enum_;
 mod miscellany;
@@ -16,34 +17,38 @@ mod primitives;
 mod record;
 mod util;
 
-use anyhow::{Context, Result};
-use askama::Template;
-use filters::{ffi_converter_name, type_name};
-use heck::ToUpperCamelCase;
-use oracle::CodeOracle;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+use anyhow::{Context, Result};
+use askama::Template;
+use heck::ToUpperCamelCase;
 use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 
-pub(crate) use self::util::format_directory;
-use crate::bindings::{
-    extensions::{
-        ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
-    },
-    metadata::ModuleMetadata,
-    type_map::TypeMap,
+pub(crate) use self::{config::TsConfig as Config, util::format_directory};
+use self::{
+    filters::{ffi_converter_name, type_name},
+    oracle::CodeOracle,
 };
-use crate::SwitchArgs;
+
+use crate::{
+    bindings::{
+        extensions::{
+            ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
+        },
+        metadata::ModuleMetadata,
+        type_map::TypeMap,
+    },
+    SwitchArgs,
+};
 
 #[derive(Default)]
 pub(crate) struct TsBindings {
     pub(crate) codegen: String,
     pub(crate) frontend: String,
 }
-
-type Config = crate::bindings::uniffi_toml::TsConfig;
 
 pub(crate) fn generate_bindings(
     ci: &ComponentInterface,

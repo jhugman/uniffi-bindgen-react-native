@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+mod config;
 mod filters;
 mod util;
 
@@ -13,7 +14,7 @@ use askama::Template;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;
 
-pub(crate) use self::util::format_directory;
+pub(crate) use self::{config::CppConfig as Config, util::format_directory};
 use crate::bindings::{
     extensions::{
         ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,
@@ -21,8 +22,6 @@ use crate::bindings::{
     },
     metadata::ModuleMetadata,
 };
-
-type Config = crate::bindings::uniffi_toml::CppConfig;
 
 #[derive(Debug, Default)]
 pub(crate) struct CppBindings {

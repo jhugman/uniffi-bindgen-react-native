@@ -3,10 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+
 use uniffi_bindgen::backend::TemplateExpression;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -30,10 +30,10 @@ pub(crate) enum LogLevel {
 }
 
 impl LogLevel {
-    fn is_verbose(&self) -> bool {
+    pub(crate) fn is_verbose(&self) -> bool {
         matches!(self, Self::Verbose)
     }
-    fn is_debug(&self) -> bool {
+    pub(crate) fn is_debug(&self) -> bool {
         matches!(self, Self::Debug | Self::Verbose)
     }
 }
@@ -58,7 +58,3 @@ pub(crate) struct CustomTypeConfig {
     #[serde(alias = "lower")]
     pub(crate) from_custom: TemplateExpression,
 }
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CppConfig {}

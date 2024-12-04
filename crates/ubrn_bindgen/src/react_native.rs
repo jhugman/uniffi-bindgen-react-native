@@ -17,7 +17,6 @@ use crate::{
         gen_typescript::{self, TsBindings},
         metadata::ModuleMetadata,
         type_map::TypeMap,
-        uniffi_toml::{CppConfig, TsConfig},
     },
     switches::SwitchArgs,
 };
@@ -112,7 +111,7 @@ impl BindingGenerator for ReactNativeBindingGenerator {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct ReactNativeConfig {
     #[serde(default, alias = "javascript", alias = "js", alias = "ts")]
-    pub(crate) typescript: TsConfig,
+    pub(crate) typescript: gen_typescript::Config,
     #[serde(default)]
-    pub(crate) cpp: CppConfig,
+    pub(crate) cpp: gen_cpp::Config,
 }
