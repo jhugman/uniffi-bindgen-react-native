@@ -62,6 +62,7 @@ pub(crate) struct GenerateAllArgs {
     #[clap(long)]
     config: Utf8PathBuf,
 
+    #[cfg(feature = "wasm")]
     #[command(flatten)]
     switches: SwitchArgs,
 

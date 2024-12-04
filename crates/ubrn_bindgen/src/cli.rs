@@ -22,14 +22,16 @@ pub struct BindingsArgs {
     pub(crate) source: SourceArgs,
     #[command(flatten)]
     pub(crate) output: OutputArgs,
+    #[cfg(feature = "wasm")]
     #[command(flatten)]
-    pub(crate) switches: SwitchArgs,
+    switches: SwitchArgs,
 }
 
 impl BindingsArgs {
-    pub fn new(switches: SwitchArgs, source: SourceArgs, output: OutputArgs) -> Self {
+    pub fn new(_switches: SwitchArgs, source: SourceArgs, output: OutputArgs) -> Self {
         Self {
-            switches,
+            #[cfg(feature = "wasm")]
+            switches: _switches,
             source,
             output,
         }
@@ -41,6 +43,16 @@ impl BindingsArgs {
 
     pub fn cpp_dir(&self) -> &Utf8Path {
         &self.output.cpp_dir
+    }
+
+    #[cfg(not(feature = "wasm"))]
+    pub fn switches(&self) -> SwitchArgs {
+        Default::default()
+    }
+
+    #[cfg(feature = "wasm")]
+    pub fn switches(&self) -> SwitchArgs {
+        self.switches.clone()
     }
 }
 
@@ -125,7 +137,7 @@ impl BindingsArgs {
         let generator = ReactNativeBindingGenerator::new(
             ts_dir.clone(),
             abi_dir.clone(),
-            self.switches.clone(),
+            self.switches(),
         );
         let dummy_dir = Utf8PathBuf::from_str(".")?;
 
