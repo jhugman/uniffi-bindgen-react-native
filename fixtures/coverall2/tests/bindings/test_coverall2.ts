@@ -11,7 +11,7 @@ import {
   wellKnownArrayBuffer,
 } from "../../generated/uniffi_coverall2";
 import { test } from "@/asserts";
-import { console } from "@/hermes";
+import "@/polyfills";
 
 test("well known array buffer returned", (t) => {
   const wellKnown = wellKnownArrayBuffer();

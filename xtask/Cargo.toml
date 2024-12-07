@@ -13,5 +13,5 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
 pathdiff = { workspace = true }
-ubrn_bindgen = { path = "../crates/ubrn_bindgen" }
+ubrn_bindgen = { path = "../crates/ubrn_bindgen", features = ["wasm"] }
 ubrn_common = { path = "../crates/ubrn_common" }

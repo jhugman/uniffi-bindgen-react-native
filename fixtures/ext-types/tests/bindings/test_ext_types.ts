@@ -49,7 +49,8 @@ import module5, {
   UniffiOneType,
 } from "../../generated/uniffi_one_ns";
 
-import { URL, console } from "@/hermes";
+import "@/polyfills";
+import { URL } from "@/converters";
 
 module1.initialize();
 module2.initialize();

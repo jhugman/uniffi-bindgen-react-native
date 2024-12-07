@@ -4,6 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod bindings;
+mod cli;
+mod react_native;
+mod switches;
 
-pub use bindings::metadata::ModuleMetadata;
-pub use bindings::{BindingsArgs, OutputArgs, SourceArgs};
+pub use self::{
+    bindings::{gen_cpp::generate_entrypoint, metadata::ModuleMetadata},
+    cli::{BindingsArgs, OutputArgs, SourceArgs},
+    switches::{AbiFlavor, SwitchArgs},
+};

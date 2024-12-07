@@ -5,7 +5,7 @@
  */
 import { sayAfter } from "../../generated/uniffi_example_futures";
 import { asyncTest } from "@/asserts";
-import { console } from "@/hermes";
+import "@/polyfills";
 
 asyncTest("sayAfter once", async (t): Promise<void> => {
   const result = await sayAfter(BigInt("500"), "World");

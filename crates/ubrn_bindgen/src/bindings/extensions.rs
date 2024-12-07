@@ -3,124 +3,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-mod gen_cpp;
-mod gen_typescript;
-mod uniffi_toml;
+use std::collections::HashMap;
 
-use std::{collections::HashMap, fs};
-
-use anyhow::Result;
-use camino::Utf8Path;
 use extend::ext;
 use heck::{ToLowerCamelCase, ToSnakeCase};
 use topological_sort::TopologicalSort;
-use ubrn_common::{fmt, run_cmd_quietly};
 use uniffi_bindgen::{
     interface::{
         FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
         Function, Method, Object, UniffiTrait,
     },
-    BindingGenerator, Component, ComponentInterface, GenerationSettings,
+    ComponentInterface,
 };
 use uniffi_meta::Type;
-use uniffi_toml::ReactNativeConfig;
-
-use self::{gen_cpp::CppBindings, gen_typescript::TsBindings};
-
-use super::{type_map::TypeMap, OutputArgs};
-use crate::bindings::metadata::ModuleMetadata;
-
-pub(crate) struct ReactNativeBindingGenerator {
-    output: OutputArgs,
-}
-
-impl ReactNativeBindingGenerator {
-    pub(crate) fn new(output: OutputArgs) -> Self {
-        Self { output }
-    }
-
-    pub(crate) fn format_code(&self) -> Result<()> {
-        format_ts(&self.output.ts_dir.canonicalize_utf8()?)?;
-        format_cpp(&self.output.cpp_dir.canonicalize_utf8()?)?;
-        Ok(())
-    }
-}
-
-impl BindingGenerator for ReactNativeBindingGenerator {
-    type Config = ReactNativeConfig;
-
-    fn new_config(&self, root_toml: &toml::value::Value) -> Result<Self::Config> {
-        Ok(match root_toml.get("bindings") {
-            Some(v) => v.clone().try_into()?,
-            None => Default::default(),
-        })
-    }
-
-    fn update_component_configs(
-        &self,
-        _settings: &GenerationSettings,
-        _components: &mut Vec<Component<Self::Config>>,
-    ) -> Result<()> {
-        // NOOP
-        Ok(())
-    }
-
-    fn write_bindings(
-        &self,
-        settings: &GenerationSettings,
-        components: &[Component<Self::Config>],
-    ) -> Result<()> {
-        let mut type_map = TypeMap::default();
-        for component in components {
-            type_map.insert_ci(&component.ci);
-        }
-        for component in components {
-            let ci = &component.ci;
-            let module: ModuleMetadata = component.into();
-            let config = &component.config;
-            let TsBindings { codegen, frontend } =
-                gen_typescript::generate_bindings(ci, &config.typescript, &module, &type_map)?;
-
-            let out_dir = &self.output.ts_dir.canonicalize_utf8()?;
-            let codegen_path = out_dir.join(module.ts_ffi_filename());
-            let frontend_path = out_dir.join(module.ts_filename());
-            fs::write(codegen_path, codegen)?;
-            fs::write(frontend_path, frontend)?;
-
-            let out_dir = &self.output.cpp_dir.canonicalize_utf8()?;
-            let CppBindings { hpp, cpp } = gen_cpp::generate_bindings(ci, &config.cpp, &module)?;
-            let cpp_path = out_dir.join(module.cpp_filename());
-            let hpp_path = out_dir.join(module.hpp_filename());
-            fs::write(cpp_path, cpp)?;
-            fs::write(hpp_path, hpp)?;
-        }
-        if settings.try_format_code {
-            self.format_code()?;
-        }
-        Ok(())
-    }
-}
-
-fn format_ts(out_dir: &Utf8Path) -> Result<()> {
-    if let Some(mut prettier) = fmt::prettier(out_dir, false)? {
-        run_cmd_quietly(&mut prettier)?
-    } else {
-        eprintln!("No prettier found. Install with `yarn add --dev prettier`");
-    }
-    Ok(())
-}
-
-fn format_cpp(out_dir: &Utf8Path) -> Result<()> {
-    if let Some(mut clang_format) = fmt::clang_format(out_dir, false)? {
-        run_cmd_quietly(&mut clang_format)?
-    } else {
-        eprintln!("Skipping formatting C++. Is clang-format installed?");
-    }
-    Ok(())
-}
 
 #[ext]
-impl ComponentInterface {
+pub(crate) impl ComponentInterface {
     fn ffi_function_string_to_arraybuffer(&self) -> FfiFunction {
         let meta = uniffi_meta::FnMetadata {
             module_path: "internal".to_string(),
@@ -357,7 +255,7 @@ fn store_with_name(types: &mut HashMap<String, Type>, type_: &Type) -> String {
 }
 
 #[ext]
-impl Object {
+pub(crate) impl Object {
     fn is_uniffi_trait(t: &UniffiTrait, nm: &str) -> bool {
         match t {
             UniffiTrait::Debug { .. } => nm == "Debug",
@@ -397,7 +295,7 @@ impl Object {
 }
 
 #[ext]
-impl FfiFunction {
+pub(crate) impl FfiFunction {
     fn is_internal(&self) -> bool {
         let name = self.name();
         name.contains("ffi__") && name.contains("_internal_")
@@ -405,7 +303,7 @@ impl FfiFunction {
 }
 
 #[ext]
-impl FfiDefinition {
+pub(crate) impl FfiDefinition {
     fn is_exported(&self) -> bool {
         match self {
             Self::Function(_) => false,
@@ -416,7 +314,7 @@ impl FfiDefinition {
 }
 
 #[ext]
-impl FfiType {
+pub(crate) impl FfiType {
     fn is_callable(&self) -> bool {
         matches!(self, Self::Callback(_))
     }
@@ -458,14 +356,14 @@ impl FfiType {
 }
 
 #[ext]
-impl FfiArgument {
+pub(crate) impl FfiArgument {
     fn is_return(&self) -> bool {
         self.name() == "uniffi_out_return"
     }
 }
 
 #[ext]
-impl FfiCallbackFunction {
+pub(crate) impl FfiCallbackFunction {
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
         let ffi_type = FfiType::Callback(self.name().to_string());
         ffi_type.cpp_namespace(ci)
@@ -516,7 +414,7 @@ fn is_free(nm: &str) -> bool {
 }
 
 #[ext]
-impl FfiStruct {
+pub(crate) impl FfiStruct {
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
         let ffi_type = FfiType::Struct(self.name().to_string());
         ffi_type.cpp_namespace(ci)
@@ -548,7 +446,7 @@ impl FfiStruct {
 }
 
 #[ext]
-impl FfiField {
+pub(crate) impl FfiField {
     fn is_free(&self) -> bool {
         matches!(self.type_(), FfiType::Callback(s) if is_free(&s))
     }
