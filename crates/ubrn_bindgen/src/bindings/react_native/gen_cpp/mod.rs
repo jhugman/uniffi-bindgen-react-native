@@ -13,7 +13,7 @@ use crate::bindings::{
     },
 };
 use anyhow::Result;
-use askama::Template;
+use rinja::Template;
 use std::borrow::Borrow;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;

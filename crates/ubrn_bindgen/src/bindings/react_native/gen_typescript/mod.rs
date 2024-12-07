@@ -16,7 +16,7 @@ mod primitives;
 mod record;
 
 use anyhow::{Context, Result};
-use askama::Template;
+use rinja::Template;
 use filters::{ffi_converter_name, type_name};
 use heck::ToUpperCamelCase;
 use oracle::CodeOracle;
@@ -164,7 +164,7 @@ impl<'a> TypeRenderer<'a> {
     // import { foo } from "uniffi-bindgen-react-native/bar"
     // ```
     //
-    // Returns an empty string so that it can be used inside an askama `{{ }}` block.
+    // Returns an empty string so that it can be used inside a rinja `{{ }}` block.
     fn import_infra(&self, what: &str, _from: &str) -> &str {
         self.add_import(
             Imported::JSType(what.to_owned()),
