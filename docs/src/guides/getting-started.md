@@ -139,7 +139,7 @@ Until then, you need to add the dependency to the app's Podfile, in this case `e
   )
 
 +  # We need to specify this here in the app because we can't add a local dependency within
-+  # the react-native-matrix-rust-sdk
++  # the library package
 +  pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'
 ```
 
