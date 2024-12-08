@@ -40,8 +40,12 @@ const {
 } = {{ entry.0.1 }}.converters;
 {%- endfor %}
 
-// @ts-ignore -- The process global might not be defined
-const uniffiIsDebug = (typeof process !== "object" || typeof process.env !== "object" || process.env.NODE_ENV !== "production" || {{ config.is_debug() }});
+const uniffiIsDebug =
+  // @ts-ignore -- The process global might not be defined
+  typeof process !== "object" ||
+  // @ts-ignore -- The process global might not be defined
+  process?.env?.NODE_ENV !== "production" ||
+  {{ config.is_debug() }};
 
 {%- call ts::docstring_value(ci.namespace_docstring(), 0) %}
 
