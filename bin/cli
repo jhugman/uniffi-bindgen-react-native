@@ -7,4 +7,4 @@
 
 // Launchable shell script.
 // We just invoke the node cjs file.
-import "./cli.cjs";
+require("./cli.cjs");
