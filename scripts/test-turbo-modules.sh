@@ -353,7 +353,11 @@ build_ios_example() {
   "$UBRN_BIN" build ios     --config "$UBRN_CONFIG" --and-generate --targets aarch64-apple-ios-sim
   exit_dir
   enter_dir "$PROJECT_DIR/example/ios"
-  echo "pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'" >> Podfile
+  cat <<HEREDOC >> Podfile
+if ENV['UBRN_INSTALLED_LOCALLY'] != '1' then
+  pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'
+end
+HEREDOC
   pod install || error "Cannot run Podfile"
   exit_dir
   enter_dir "$PROJECT_DIR/example"

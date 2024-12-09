@@ -32,6 +32,9 @@ Pod::Spec.new do |s|
   {%- let bindings = self.relative_to(root, dir) -%}
   s.source_files = "{{ ios }}/**/*.{h,m,mm}", "{{ codegen }}/**/*.{h,m,mm}", "{{ tm }}/**/*.{hpp,cpp,c,h}", "{{ bindings }}/**/*.{hpp,cpp,c,h}"
   s.vendored_frameworks = "{{ framework }}"
+  if ENV['UBRN_INSTALLED_LOCALLY'] != '1' then
+    s.dependency    "uniffi-bindgen-react-native", "{{ self.config.project.ubrn_version() }}"
+  end
 
   # Use install_modules_dependencies helper to install the dependencies if React Native version >=0.71.0.
   # See https://github.com/facebook/react-native/blob/febf6b7f33fdb4904669f99d795eba4c0f95d7bf/scripts/cocoapods/new_architecture.rb#L79.
