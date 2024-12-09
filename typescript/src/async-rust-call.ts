@@ -8,7 +8,7 @@ import { UniffiHandleMap, type UniffiHandle } from "./handle-map";
 import {
   type UniffiErrorHandler,
   type UniffiRustCallStatus,
-  makeRustCall,
+  UniffiRustCaller,
 } from "./rust-call";
 
 const UNIFFI_RUST_FUTURE_POLL_READY = 0;
@@ -50,6 +50,7 @@ type PollFunc = (
  *  future.
  */
 export async function uniffiRustCallAsync<F, T>(
+  rustCaller: UniffiRustCaller,
   rustFutureFunc: () => bigint,
   pollFunc: PollFunc,
   cancelFunc: (rustFuture: bigint) => void,
@@ -92,7 +93,7 @@ export async function uniffiRustCallAsync<F, T>(
 
     // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
-      makeRustCall(
+      rustCaller.makeRustCall(
         (status) => completeFunc(rustFuture, status),
         liftString,
         errorHandler,

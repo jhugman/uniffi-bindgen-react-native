@@ -1,6 +1,6 @@
 {{- self.import_infra_type("UniffiHandle", "handle-map") }}
 {{- self.import_infra_type("UniffiReferenceHolder", "callbacks") }}
-{{- self.import_infra("uniffiCreateCallStatus", "rust-call")}}
+{{- self.import_infra("UniffiRustCaller", "rust-call")}}
 {{- self.import_infra_type("UniffiRustCallStatus", "rust-call")}}
 {{- self.import_infra("RustBuffer", "ffi-types")}}
 
@@ -79,7 +79,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                         returnValue: {{ return_type|ffi_converter_name(self) }}.lower(returnValue),
                         {%- when None %}
                         {%- endmatch %}
-                        callStatus: uniffiCreateCallStatus()
+                        callStatus: uniffiCaller.createCallStatus()
                     }
                 );
             };
@@ -92,6 +92,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                         returnValue: {{ return_type|ffi_default_value }},
                         {%- when None %}
                         {%- endmatch %}
+                        // TODO create callstatus with error.
                         callStatus: { code, errorBuf }
                     }
                 );
@@ -127,7 +128,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
         }
     },
     register: () => {
-        nativeModule().{{ cbi.ffi_init_callback().name() }}(
+        {% call ts::fn_handle(cbi.ffi_init_callback()) %}(
             {{ trait_impl }}.vtable
         );
     },

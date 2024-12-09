@@ -104,7 +104,7 @@ mod cli_test {
             js_file: EntryArg { file, .. },
             generate_bindings:
                 Some(GenerateBindingsArg {
-                    ts_dir, cpp_dir, ..
+                    ts_dir, abi_dir, ..
                 }),
             crate_: Some(CrateArg { crate_dir, .. }),
             switches,
@@ -115,7 +115,7 @@ mod cli_test {
         };
         assert_eq!(file.as_str(), "file.ts");
         assert_eq!(ts_dir.as_deref().map(|f| f.as_str()), Some("ts-dir/"));
-        assert_eq!(cpp_dir.as_deref().map(|f| f.as_str()), Some("cpp-dir/"));
+        assert_eq!(abi_dir.as_deref().map(|f| f.as_str()), Some("cpp-dir/"));
         assert_eq!(crate_dir.as_deref().map(|f| f.as_str()), Some("crate-dir/"));
         assert_eq!(switches.flavor, AbiFlavor::Jsi);
     }
@@ -124,8 +124,8 @@ mod cli_test {
     fn test_run_command_with_wasm() {
         let cmd = parse(&[
             "run",
-            "--cpp-dir",
-            "cpp-dir/",
+            "--abi-dir",
+            "rust-dir/",
             "--ts-dir",
             "ts-dir/",
             "--crate",
@@ -140,7 +140,7 @@ mod cli_test {
             js_file: EntryArg { file, .. },
             generate_bindings:
                 Some(GenerateBindingsArg {
-                    ts_dir, cpp_dir, ..
+                    ts_dir, abi_dir, ..
                 }),
             crate_: Some(CrateArg { crate_dir, .. }),
             switches,
@@ -152,7 +152,7 @@ mod cli_test {
 
         assert_eq!(file.as_str(), "file.ts");
         assert_eq!(ts_dir.as_deref().map(|f| f.as_str()), Some("ts-dir/"));
-        assert_eq!(cpp_dir.as_deref().map(|f| f.as_str()), Some("cpp-dir/"));
+        assert_eq!(abi_dir.as_deref().map(|f| f.as_str()), Some("rust-dir/"));
         assert_eq!(crate_dir.as_deref().map(|f| f.as_str()), Some("crate-dir/"));
         assert_eq!(switches.flavor, AbiFlavor::Wasm);
     }
@@ -177,7 +177,7 @@ mod cli_test {
             js_file: EntryArg { file, .. },
             generate_bindings:
                 Some(GenerateBindingsArg {
-                    ts_dir, cpp_dir, ..
+                    ts_dir, abi_dir, ..
                 }),
             crate_: Some(CrateArg { crate_dir, .. }),
             switches,
@@ -188,7 +188,7 @@ mod cli_test {
         };
         assert_eq!(file.as_str(), "file.ts");
         assert_eq!(ts_dir.as_deref().map(|f| f.as_str()), Some("ts-dir/"));
-        assert_eq!(cpp_dir.as_deref().map(|f| f.as_str()), Some("cpp-dir/"));
+        assert_eq!(abi_dir.as_deref().map(|f| f.as_str()), Some("cpp-dir/"));
         assert_eq!(crate_dir.as_deref().map(|f| f.as_str()), Some("crate-dir/"));
         assert_eq!(switches.flavor, AbiFlavor::Jsi);
     }

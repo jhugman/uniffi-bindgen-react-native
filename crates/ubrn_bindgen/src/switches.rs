@@ -30,16 +30,41 @@ impl SwitchArgs {
 #[derive(Clone, Debug, ValueEnum, PartialEq)]
 pub enum AbiFlavor {
     Jsi,
+    #[cfg(feature = "wasm")]
     Wasm,
+}
+
+impl AbiFlavor {
+    pub fn entrypoint(&self) -> &str {
+        match self {
+            Self::Jsi => "Entrypoint.cpp",
+            #[cfg(feature = "wasm")]
+            Self::Wasm => "src/lib.rs",
+        }
+    }
 }
 
 #[allow(dead_code)]
 impl AbiFlavor {
     pub(crate) fn supports_text_encoder(&self) -> bool {
-        matches!(self, Self::Wasm)
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Wasm)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            false
+        }
     }
     pub(crate) fn supports_finalization_registry(&self) -> bool {
-        matches!(self, Self::Wasm)
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Wasm)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            false
+        }
     }
     pub(crate) fn needs_cpp(&self) -> bool {
         matches!(self, Self::Jsi)

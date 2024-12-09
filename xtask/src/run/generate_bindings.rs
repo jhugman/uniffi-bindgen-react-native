@@ -13,53 +13,68 @@ use ubrn_bindgen::{BindingsArgs, ModuleMetadata, OutputArgs, SourceArgs, SwitchA
 #[derive(Args, Debug, Clone)]
 pub(crate) struct GenerateBindingsArg {
     /// Directory for the generated Typescript to put in.
-    #[clap(long, requires = "cpp_dir")]
+    #[clap(long, requires = "abi_dir")]
     pub(crate) ts_dir: Option<Utf8PathBuf>,
-    /// Directory for the generated C++ to put in.
-    #[clap(long, requires = "ts_dir", alias = "abi-dir")]
-    pub(crate) cpp_dir: Option<Utf8PathBuf>,
+    /// Directory for the generated low-level C++ or Rust to put in.
+    #[clap(long, requires = "ts_dir", alias = "cpp-dir")]
+    pub(crate) abi_dir: Option<Utf8PathBuf>,
     /// Optional uniffi.toml location
     #[clap(long, requires = "ts_dir")]
     pub(crate) toml: Option<Utf8PathBuf>,
 }
 
 impl GenerateBindingsArg {
-    fn ts_dir(&self) -> Utf8PathBuf {
+    pub(crate) fn ts_dir(&self) -> Utf8PathBuf {
         self.ts_dir.clone().unwrap()
     }
 
-    fn cpp_dir(&self) -> Utf8PathBuf {
-        self.cpp_dir.clone().unwrap()
+    pub(crate) fn abi_dir(&self) -> Utf8PathBuf {
+        self.abi_dir.clone().unwrap()
     }
 
     fn uniffi_toml(&self) -> Option<Utf8PathBuf> {
         self.toml.clone()
     }
 
-    pub(crate) fn generate(
+    pub(crate) fn render(
         &self,
         library: &Utf8PathBuf,
         manifest_path: &Utf8PathBuf,
         switches: &SwitchArgs,
-    ) -> Result<Vec<Utf8PathBuf>> {
-        let output = OutputArgs::new(&self.ts_dir(), &self.cpp_dir(), false);
+    ) -> Result<Vec<ModuleMetadata>> {
+        let modules = self.render_into(
+            library,
+            switches,
+            manifest_path,
+            &self.ts_dir(),
+            &self.abi_dir(),
+        )?;
+        Ok(modules)
+    }
+
+    pub(crate) fn render_into(
+        &self,
+        library: &Utf8PathBuf,
+        switches: &SwitchArgs,
+        manifest_path: &Utf8PathBuf,
+        ts_dir: &Utf8PathBuf,
+        cpp_dir: &Utf8PathBuf,
+    ) -> Result<Vec<ModuleMetadata>> {
+        let output = OutputArgs::new(ts_dir, cpp_dir, false);
         let toml = self.uniffi_toml().filter(|file| file.exists());
         let source = SourceArgs::library(library).with_config(toml);
         let bindings = BindingsArgs::new(switches.clone(), source, output);
         let modules = bindings.run(Some(manifest_path))?;
-        let cpp_dir = bindings.cpp_dir();
-        let index = cpp_dir.join("Entrypoint.cpp");
-        render_entrypoint(&index, &modules)?;
-        Ok(modules
-            .iter()
-            .map(|m| cpp_dir.join(m.cpp_filename()))
-            .chain(vec![index])
-            .collect())
+        Ok(modules)
     }
 }
 
-fn render_entrypoint(path: &Utf8Path, modules: &Vec<ModuleMetadata>) -> Result<()> {
-    let string = ubrn_bindgen::generate_entrypoint(modules)?;
+pub(crate) fn render_entrypoint(
+    switches: &SwitchArgs,
+    path: &Utf8Path,
+    modules: &Vec<ModuleMetadata>,
+) -> Result<()> {
+    let string = ubrn_bindgen::generate_entrypoint(switches, modules)?;
     fs::write(path, string)?;
     Ok(())
 }

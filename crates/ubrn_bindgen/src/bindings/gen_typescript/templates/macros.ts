@@ -29,12 +29,12 @@
 {%- macro to_ffi_method_call(obj_factory, func) -%}
     {%- match func.throws_type() -%}
     {%- when Some with (e) -%}
-        {{- self.import_infra("rustCallWithError", "rust-call") }}
-        rustCallWithError(
+        {{- self.import_infra("UniffiRustCaller", "rust-call") }}
+        uniffiCaller.rustCallWithError(
             /*liftError:*/ {{ e|lift_error_fn(self) }},
             /*caller:*/ (callStatus) => {
     {%- else -%}
-        rustCall(
+        uniffiCaller.rustCall(
             /*caller:*/ (callStatus) => {
     {%- endmatch %}
             {%- if func.return_type().is_some() %}
@@ -123,6 +123,7 @@
 {%- macro call_async(obj_factory, callable) -%}
 {{- self.import_infra("uniffiRustCallAsync", "async-rust-call") -}}
         await uniffiRustCallAsync(
+            /*rustCaller:*/ uniffiCaller,
             /*rustFutureFunc:*/ () => {
                 return {% call native_method_handle(callable.ffi_func().name()) %}(
                     {%- if callable.takes_self() %}
@@ -271,6 +272,18 @@ export type {{ type_name }} = InstanceType<
 >;
 {%- endmacro %}
 
+{%- macro fn_handle(func) %}
+{%- call fn_handle_with_name(func.name()) %}
+{%- endmacro %}
+
+{%- macro fn_handle_with_name(name) %}nativeModule().
+{%- call ffi_func_name(name) %}
+{%- endmacro %}
+
+{%- macro ffi_func_name(name) %}ubrn_{{ name }}
+{%- endmacro %}
+
+
 {#
 // Verbose logging.
 #}
@@ -306,10 +319,10 @@ export type {{ type_name }} = InstanceType<
 {%- if config.is_verbose() -%}
 (() => {
     {% call log_call(method_name) %}
-    return nativeModule().{{ method_name }};
+    return {% call fn_handle_with_name(method_name) %};
 })()
 {%- else -%}
-nativeModule().{{ method_name }}
+{% call fn_handle_with_name(method_name) %}
 {%- endif %}
 {%- endmacro %}
 
@@ -330,10 +343,10 @@ nativeModule().{{ method_name }}
 {{- self.import_infra_type("UniffiHandle", "handle-map") }}
 (rustFuture: bigint, cb: UniffiRustFutureContinuationCallback, handle: UniffiHandle): void => {
     {% call log_message("   poll    : ", method_name, "") %}
-    return nativeModule().{{ method_name }}(rustFuture, cb, handle);
+    return {% call fn_handle_with_name(method_name) %}(rustFuture, cb, handle);
 }
 {%- else -%}
-nativeModule().{{ method_name }}
+{% call fn_handle_with_name(method_name) %}
 {%- endif %}
 {%- endmacro %}
 
@@ -341,10 +354,10 @@ nativeModule().{{ method_name }}
 {%- if config.is_verbose() -%}
 (rustFuture: bigint): void => {
     {% call log_message("   cancel  : ", method_name, "") %}
-    return nativeModule().{{ method_name }}(rustFuture);
+    return {% call fn_handle_with_name(method_name) %}(rustFuture);
 }
 {%- else -%}
-nativeModule().{{ method_name }}
+{% call fn_handle_with_name(method_name) %}
 {%- endif %}
 {%- endmacro %}
 
@@ -353,10 +366,10 @@ nativeModule().{{ method_name }}
 {{- self.import_infra_type("UniffiRustCallStatus", "rust-call")}}
 (rustFuture: bigint, status: UniffiRustCallStatus) => {
     {% call log_message("   complete: ", method_name, "") %}
-    return nativeModule().{{ method_name }}(rustFuture, status);
+    return {% call fn_handle_with_name(method_name) %}(rustFuture, status);
 }
 {%- else -%}
-nativeModule().{{ method_name }}
+{% call fn_handle_with_name(method_name) %}
 {%- endif %}
 {%- endmacro %}
 
@@ -364,10 +377,10 @@ nativeModule().{{ method_name }}
 {%- if config.is_verbose() -%}
 (rustFuture: bigint) => {
     {% call log_message("   free    : ", method_name, "") %}
-    return nativeModule().{{ method_name }}(rustFuture);
+    return {% call fn_handle_with_name(method_name) %}(rustFuture);
 }
 {%- else -%}
-nativeModule().{{ method_name }}
+{% call fn_handle_with_name(method_name) %}
 {%- endif %}
 {%- endmacro %}
 

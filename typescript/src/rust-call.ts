@@ -18,38 +18,48 @@ export type UniffiRustCallStatus = {
   code: number;
   errorBuf?: ArrayBuffer;
 };
-export function uniffiCreateCallStatus(): UniffiRustCallStatus {
+export class UniffiRustCaller {
+  constructor(
+    private statusConstructor: () => UniffiRustCallStatus = uniffiCreateCallStatus,
+  ) {}
+
+  rustCall<T>(
+    caller: RustCallFn<T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): T {
+    return this.makeRustCall(caller, liftString);
+  }
+
+  rustCallWithError<T>(
+    errorHandler: UniffiErrorHandler,
+    caller: RustCallFn<T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): T {
+    return this.makeRustCall(caller, liftString, errorHandler);
+  }
+
+  createCallStatus(): UniffiRustCallStatus {
+    return this.statusConstructor();
+  }
+
+  makeRustCall<T>(
+    caller: RustCallFn<T>,
+    liftString: StringLifter,
+    errorHandler?: UniffiErrorHandler,
+  ): T {
+    const callStatus = this.statusConstructor();
+    let returnedVal = caller(callStatus);
+    uniffiCheckCallStatus(callStatus, liftString, errorHandler);
+    return returnedVal;
+  }
+}
+
+function uniffiCreateCallStatus(): UniffiRustCallStatus {
   return { code: CALL_SUCCESS };
 }
 
 export type UniffiErrorHandler = (buffer: ArrayBuffer) => Error;
-type RustCaller<T> = (status: UniffiRustCallStatus) => T;
-
-export function rustCall<T>(
-  caller: RustCaller<T>,
-  liftString: StringLifter = emptyStringLifter,
-): T {
-  return makeRustCall(caller, liftString);
-}
-
-export function rustCallWithError<T>(
-  errorHandler: UniffiErrorHandler,
-  caller: RustCaller<T>,
-  liftString: StringLifter = emptyStringLifter,
-): T {
-  return makeRustCall(caller, liftString, errorHandler);
-}
-
-export function makeRustCall<T>(
-  caller: RustCaller<T>,
-  liftString: StringLifter,
-  errorHandler?: UniffiErrorHandler,
-): T {
-  const callStatus = uniffiCreateCallStatus();
-  let returnedVal = caller(callStatus);
-  uniffiCheckCallStatus(callStatus, liftString, errorHandler);
-  return returnedVal;
-}
+type RustCallFn<T> = (status: UniffiRustCallStatus) => T;
 
 function uniffiCheckCallStatus(
   callStatus: UniffiRustCallStatus,

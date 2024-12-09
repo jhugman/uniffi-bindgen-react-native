@@ -56,13 +56,14 @@ impl TryFrom<Utf8PathBuf> for ProjectConfig {
 pub(crate) enum Platform {
     Android,
     Ios,
-    #[allow(unused)]
+    #[cfg(feature = "wasm")]
     Wasm,
 }
 
 impl From<&Platform> for AbiFlavor {
     fn from(value: &Platform) -> Self {
         match value {
+            #[cfg(feature = "wasm")]
             Platform::Wasm => AbiFlavor::Wasm,
             _ => AbiFlavor::Jsi,
         }

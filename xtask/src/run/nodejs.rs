@@ -20,7 +20,7 @@ impl NodeJs {
             unreachable!("Can't find tsx; this is likely a change in how tsx is packaged");
         };
         let mut cmd = Command::new(tsx);
-        cmd.arg(file);
+        cmd.arg("--experimental-wasm-modules").arg(file);
         ubrn_common::run_cmd(&mut cmd)?;
         Ok(())
     }

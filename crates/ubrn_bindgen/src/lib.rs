@@ -7,9 +7,11 @@ mod bindings;
 mod cli;
 mod react_native;
 mod switches;
+#[cfg(feature = "wasm")]
+mod wasm;
 
 pub use self::{
-    bindings::{gen_cpp::generate_entrypoint, metadata::ModuleMetadata},
+    bindings::{generate_entrypoint, metadata::ModuleMetadata},
     cli::{BindingsArgs, OutputArgs, SourceArgs},
     switches::{AbiFlavor, SwitchArgs},
 };

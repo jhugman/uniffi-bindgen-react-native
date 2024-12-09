@@ -32,7 +32,7 @@ pub(crate) struct RunCmd {
     #[command(flatten)]
     pub(crate) crate_: Option<CrateArg>,
 
-    #[clap(long = "cpp", conflicts_with_all = ["ts_dir", "cpp_dir"])]
+    #[clap(long = "cpp", conflicts_with_all = ["ts_dir", "abi_dir"])]
     pub(crate) cpp_binding: Option<Utf8PathBuf>,
 
     #[clap(flatten)]

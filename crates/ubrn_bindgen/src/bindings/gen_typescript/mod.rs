@@ -41,6 +41,7 @@ use crate::{
         type_map::TypeMap,
     },
     switches::SwitchArgs,
+    AbiFlavor,
 };
 
 pub(crate) fn generate_api_code(
@@ -50,7 +51,8 @@ pub(crate) fn generate_api_code(
     switches: &SwitchArgs,
     type_map: &TypeMap,
 ) -> Result<String> {
-    let types = TypeRenderer::new(ci, config, module, switches, type_map);
+    let flavor = TsFlavorParams::from(&switches.flavor);
+    let types = TypeRenderer::new(ci, config, module, &flavor, type_map);
     TsApiWrapper::try_from(types)?
         .render()
         .context("generating frontend typescript failed")
@@ -63,6 +65,23 @@ pub(crate) fn generate_lowlevel_code(
     LowlevelTsWrapper::new(ci, module)
         .render()
         .context("generating lowlevel typescipt failed")
+}
+
+#[derive(Debug)]
+struct TsFlavorParams<'a> {
+    inner: &'a AbiFlavor,
+}
+
+impl<'a> From<&'a AbiFlavor> for TsFlavorParams<'a> {
+    fn from(flavor: &'a AbiFlavor) -> Self {
+        Self { inner: flavor }
+    }
+}
+
+impl TsFlavorParams<'_> {
+    pub(crate) fn is_jsi(&self) -> bool {
+        matches!(self.inner, &AbiFlavor::Jsi)
+    }
 }
 
 #[derive(Template)]
@@ -86,7 +105,7 @@ struct TsApiWrapper<'a> {
     config: &'a Config,
     module: &'a ModuleMetadata,
     #[allow(unused)]
-    switches: &'a SwitchArgs,
+    flavor: &'a TsFlavorParams<'a>,
     type_helper_code: String,
     type_imports: BTreeMap<String, BTreeSet<Imported>>,
     exported_converters: BTreeSet<String>,
@@ -104,12 +123,12 @@ impl<'a> TryFrom<TypeRenderer<'a>> for TsApiWrapper<'a> {
         let module = types.module;
         let config = types.config;
         let ci = types.ci;
-        let switches = types.switches;
+        let flavor = types.flavor;
         Ok(Self {
             module,
             config,
             ci,
-            switches,
+            flavor,
             type_helper_code,
             type_imports,
             exported_converters,
@@ -130,7 +149,7 @@ struct TypeRenderer<'a> {
     #[allow(unused)]
     module: &'a ModuleMetadata,
     #[allow(unused)]
-    switches: &'a SwitchArgs,
+    flavor: &'a TsFlavorParams<'a>,
 
     // Track imports added with the `add_import()` macro
     imports: RefCell<BTreeMap<String, BTreeSet<Imported>>>,
@@ -149,14 +168,14 @@ impl<'a> TypeRenderer<'a> {
         ci: &'a ComponentInterface,
         config: &'a Config,
         module: &'a ModuleMetadata,
-        switches: &'a SwitchArgs,
+        flavor: &'a TsFlavorParams,
         type_map: &'a TypeMap,
     ) -> Self {
         Self {
             ci,
             config,
             module,
-            switches,
+            flavor,
             imports: RefCell::new(Default::default()),
             exported_converters: RefCell::new(Default::default()),
             imported_converters: RefCell::new(Default::default()),

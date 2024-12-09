@@ -9,11 +9,14 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::{command, Args};
 use ubrn_common::{mk_dir, CrateMetadata};
-use uniffi_bindgen::cargo_metadata::CrateConfigSupplier;
+use uniffi_bindgen::{cargo_metadata::CrateConfigSupplier, BindingGenerator};
 
+#[cfg(feature = "wasm")]
+use super::wasm::WasmBindingGenerator;
 use super::{
-    bindings::metadata::ModuleMetadata, react_native::ReactNativeBindingGenerator,
-    switches::SwitchArgs,
+    bindings::metadata::ModuleMetadata,
+    react_native::ReactNativeBindingGenerator,
+    switches::{AbiFlavor, SwitchArgs},
 };
 
 #[derive(Args, Debug)]
@@ -126,7 +129,6 @@ impl SourceArgs {
 
 impl BindingsArgs {
     pub fn run(&self, manifest_path: Option<&Utf8PathBuf>) -> Result<Vec<ModuleMetadata>> {
-        let input = &self.source;
         let out = &self.output;
 
         mk_dir(&out.ts_dir)?;
@@ -134,8 +136,30 @@ impl BindingsArgs {
         let ts_dir = out.ts_dir.canonicalize_utf8()?;
         let abi_dir = out.cpp_dir.canonicalize_utf8()?;
 
-        let generator =
-            ReactNativeBindingGenerator::new(ts_dir.clone(), abi_dir.clone(), self.switches());
+        let switches = self.switches();
+        let abi_dir = abi_dir.clone();
+        let ts_dir = ts_dir.clone();
+
+        match &switches.flavor {
+            AbiFlavor::Jsi => self.generate_bindings(
+                manifest_path,
+                &ReactNativeBindingGenerator::new(ts_dir, abi_dir, switches),
+            ),
+            #[cfg(feature = "wasm")]
+            AbiFlavor::Wasm => self.generate_bindings(
+                manifest_path,
+                &WasmBindingGenerator::new(ts_dir, abi_dir, switches),
+            ),
+        }
+    }
+
+    fn generate_bindings<Generator: BindingGenerator>(
+        &self,
+        manifest_path: Option<&Utf8PathBuf>,
+        binding_generator: &Generator,
+    ) -> std::result::Result<Vec<ModuleMetadata>, anyhow::Error> {
+        let input = &self.source;
+        let out = &self.output;
         let dummy_dir = Utf8PathBuf::from_str(".")?;
 
         let try_format_code = !out.no_format;
@@ -151,7 +175,7 @@ impl BindingsArgs {
             uniffi_bindgen::library_mode::generate_bindings(
                 &input.source,
                 input.crate_name.clone(),
-                &generator,
+                binding_generator,
                 &config_supplier,
                 input.config.as_deref(),
                 &dummy_dir,
@@ -162,7 +186,7 @@ impl BindingsArgs {
             .collect()
         } else {
             uniffi_bindgen::generate_external_bindings(
-                &generator,
+                binding_generator,
                 input.source.clone(),
                 input.config.as_deref(),
                 Some(&dummy_dir),

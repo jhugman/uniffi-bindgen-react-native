@@ -19,6 +19,11 @@ while (( "$#" )); do
        flavor="$2"
        shift 2
        ;;
+
+    '--debug')
+       set -x
+       shift
+       ;;
     *)
        echo "Unknown argument: $1"
        exit 1
@@ -77,7 +82,7 @@ for fixture in ${fixtures} ; do
     echo "Running fixture ${fixture}"
     rm -Rf "${out_dir}" 2>/dev/null
 
-    cpp_dir="${out_dir}/cpp"
+    cpp_dir="${out_dir}/${flavor}"
     ts_dir="${out_dir}"
     # This command discovers where the lib is, generates the ts, cpp and hpp files,
     # and builds the generated C++ against it and hermes.
@@ -85,7 +90,7 @@ for fixture in ${fixtures} ; do
     # Generate hermes flavoured JS from typescript, and runs the test.
     cargo xtask run \
         --no-cargo \
-        --cpp-dir "${cpp_dir}" \
+        --abi-dir "${cpp_dir}" \
         --ts-dir "${ts_dir}" \
         --toml "${config_file}" \
         --crate "${fixture_dir}" \
