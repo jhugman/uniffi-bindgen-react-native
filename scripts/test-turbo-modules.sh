@@ -174,6 +174,11 @@ create_library() {
     rm -rf "$base" || error "Failed to remove existing directory $base"
   fi
 
+  local type="turbo-module"
+  if [[ "$BOB_VERSION" != "0.45.1" && "$BOB_VERSION" = "`echo -e "0.45.1\n$BOB_VERSION" | sort -V | head -n1`" ]]; then
+    type="module-new"
+  fi
+
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx "create-react-native-library@$BOB_VERSION" \
     --react-native-version "$RN_VERSION" \
@@ -184,7 +189,7 @@ create_library() {
     --author-url "https://nowhere.com/james" \
     --repo-url "https://github.com/jhugman/$PROJECT_SLUG" \
     --languages cpp \
-    --type module-new \
+    --type "$type" \
     --example vanilla \
     --local false \
     "$base"
