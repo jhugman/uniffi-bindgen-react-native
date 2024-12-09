@@ -35,7 +35,7 @@ If run a second time, no overwriting will occur.
 The `manifest-path` is the path relative to the root of the Rust workspace directory. In this case, the manifest is expected to be, relative to your React Native library project: `./rust_modules/my-rust-sdk/crates/my-api/Cargo.tml`.
 
 ```yaml
-crate:
+rust:
 	directory: ./rust
 	manifest-path: crates/my-api/Cargo.toml
 ```
