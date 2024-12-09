@@ -78,12 +78,6 @@ Using `yarn` add the `uniffi-bindgen-react-native` package to your project.
 yarn add uniffi-bindgen-react-native
 ```
 
-```admonish warning title="Pre-release"
-While this is before the first release, we're installing straight from github.
-
-`yarn add uniffi-bindgen-react-native@https://github.com/jhugman/uniffi-bindgen-react-native`
-```
-
 Opening `package.json` add the following:
 
 ```diff
@@ -121,27 +115,6 @@ alias ubrn=$(yarn ubrn --path)
 There is a guide to the `ubrn` command [here][cli].
 
 [cli]: ../reference/commandline.md
-
-
-```admonish warning title="Pre-release"
-While this is before the first release, we're installing straight from local `node_modules`.
-
-After release, the C++ runtime will be published to Cocoa Pods.
-
-Until then, you need to add the dependency to the app's Podfile, in this case `example/ios/Podfile`:
-```
-
-```diff
-  use_react_native!(
-    :path => config[:reactNativePath],
-    # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
-  )
-
-+  # We need to specify this here in the app because we can't add a local dependency within
-+  # the library package
-+  pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'
-```
 
 ## Step 3: Create the `ubrn.config.yaml` file
 
