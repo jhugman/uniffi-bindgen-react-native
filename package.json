@@ -14,8 +14,8 @@
   "type": "module",
   "main": "./typescript/src/index.ts",
   "bin": {
-    "ubrn": "./bin/cli.cjs",
-    "uniffi-bindgen-react-native": "./bin/cli.cjs"
+    "ubrn": "./bin/cli",
+    "uniffi-bindgen-react-native": "./bin/cli"
   },
   "devDependencies": {
     "abortcontroller-polyfill": "^1.7.5",
