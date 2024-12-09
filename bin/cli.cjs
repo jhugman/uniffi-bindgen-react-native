@@ -39,6 +39,12 @@ if (args.length === 1 && args[0] === "--path") {
 // Construct the path to the Cargo.toml file
 const manifestPath = path.join(rootDir, "crates/ubrn_cli/Cargo.toml");
 
+if (!fs.existsSync(path.join(rootDir, "target"))) {
+  console.log(
+    "🤖 Building the uniffi-bindgen-react-native command… this is only needed first time",
+  );
+}
+
 // Run the cargo command
 const command = `cargo run --quiet --manifest-path "${manifestPath}" -- ${args.join(" ")}`;
 try {
