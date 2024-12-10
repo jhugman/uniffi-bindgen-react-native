@@ -102,6 +102,10 @@ impl ProjectConfig {
             trim_react_native(name).to_upper_camel_case()
         }
     }
+
+    pub(crate) fn ubrn_version(&self) -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
 }
 
 impl ProjectConfig {
