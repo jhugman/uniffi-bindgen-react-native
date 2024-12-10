@@ -1,0 +1,28 @@
+namespace callbacks {
+  // `get_sim_cards` is defined via a procmacro.
+};
+
+// This trait is implemented in Rust and in foreign bindings.
+[Trait, WithForeign]
+interface SimCard {
+  string name(); // The name of the carrier/provider.
+};
+
+[Error]
+enum TelephoneError {
+  "Busy",
+  "InternalTelephoneError",
+};
+
+interface Telephone {
+  constructor();
+  [Throws=TelephoneError]
+  string call(SimCard sim, CallAnswerer answerer);
+};
+
+// callback interfaces are discouraged now that foreign code can
+// implement traits, but here's one!
+callback interface CallAnswerer {
+  [Throws=TelephoneError]
+  string answer();
+};

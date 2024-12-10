@@ -1,5 +1,5 @@
 [package]
-name = "uniffi-example-callbacks-deadlock-regression"
+name = "uniffi-example-callbacks"
 edition = "2021"
 version = "0.22.0"
 license = "MPL-2.0"
@@ -7,7 +7,7 @@ publish = false
 
 [lib]
 crate-type = ["lib", "cdylib"]
-name = "uniffi_callbacks"
+name = "callbacks"
 
 [dependencies]
 uniffi = { workspace = true }
