@@ -351,7 +351,10 @@ build_ios_example() {
   enter_dir "$PROJECT_DIR"
   echo "-- Running ubrn build ios"
   "$UBRN_BIN" build ios     --config "$UBRN_CONFIG" --and-generate --targets aarch64-apple-ios-sim
+  # Comment out the dependency from CocoaPods
+  sed -i '' -E 's|s.dependency  *"uniffi-bindgen-react-native"|# &|' ./*.podspec
   exit_dir
+  # Use local version, but added via the Podfile.
   enter_dir "$PROJECT_DIR/example/ios"
   echo "pod 'uniffi-bindgen-react-native', :path => '../../node_modules/uniffi-bindgen-react-native'" >> Podfile
   pod install || error "Cannot run Podfile"
