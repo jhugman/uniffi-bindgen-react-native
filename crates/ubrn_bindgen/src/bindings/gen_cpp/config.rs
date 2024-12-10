@@ -4,8 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-pub(crate) mod extensions;
-pub(crate) mod gen_cpp;
-pub(crate) mod gen_typescript;
-pub(crate) mod metadata;
-pub(crate) mod type_map;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CppConfig {}

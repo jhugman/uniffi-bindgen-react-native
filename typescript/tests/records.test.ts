@@ -5,7 +5,7 @@
  */
 
 import { Asserts, test, xtest } from "../testing/asserts";
-import { console } from "../testing/hermes";
+import "../testing/polyfills";
 import { MyRecord } from "./playground/records";
 
 test("Allow defaults to be missing", (t) => {

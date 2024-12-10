@@ -4,7 +4,7 @@ consoleImport = "@/hermes"
 
 [bindings.typescript.customTypes.Url]
 # Modules that need to be imported
-imports = [ [ "URL", "@/hermes" ] ]
+imports = [ [ "URL", "@/converters" ] ]
 typeName = "URL"
 # Expressions to convert between strings and URLs.
 # The `{}` is substituted for the value.

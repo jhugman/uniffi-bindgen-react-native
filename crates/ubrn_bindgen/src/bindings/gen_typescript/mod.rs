@@ -8,103 +8,113 @@ mod oracle;
 
 mod callback_interface;
 mod compounds;
+mod config;
 mod custom;
 mod enum_;
 mod miscellany;
 mod object;
 mod primitives;
 mod record;
+mod util;
 
-use anyhow::{Context, Result};
-use askama::Template;
-use filters::{ffi_converter_name, type_name};
-use heck::ToUpperCamelCase;
-use oracle::CodeOracle;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+use anyhow::{Context, Result};
+use askama::Template;
+use heck::ToUpperCamelCase;
 use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 
-use crate::bindings::metadata::ModuleMetadata;
-use crate::bindings::react_native::{
-    ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
+pub(crate) use self::{config::TsConfig as Config, util::format_directory};
+use self::{
+    filters::{ffi_converter_name, type_name},
+    oracle::CodeOracle,
 };
-use crate::bindings::type_map::TypeMap;
+use crate::{
+    bindings::{
+        extensions::{
+            ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
+        },
+        metadata::ModuleMetadata,
+        type_map::TypeMap,
+    },
+    switches::SwitchArgs,
+};
 
-#[derive(Default)]
-pub(crate) struct TsBindings {
-    pub(crate) codegen: String,
-    pub(crate) frontend: String,
-}
-
-type Config = crate::bindings::react_native::uniffi_toml::TsConfig;
-
-pub(crate) fn generate_bindings(
+pub(crate) fn generate_api_code(
     ci: &ComponentInterface,
     config: &Config,
     module: &ModuleMetadata,
+    switches: &SwitchArgs,
     type_map: &TypeMap,
-) -> Result<TsBindings> {
-    let codegen = CodegenWrapper::new(ci, config, module)
+) -> Result<String> {
+    let types = TypeRenderer::new(ci, config, module, switches, type_map);
+    TsApiWrapper::try_from(types)?
         .render()
-        .context("generating codegen bindings failed")?;
-    let frontend = FrontendWrapper::new(ci, config, module, type_map)
-        .render()
-        .context("generating frontend javascript failed")?;
+        .context("generating frontend typescript failed")
+}
 
-    Ok(TsBindings { codegen, frontend })
+pub(crate) fn generate_lowlevel_code(
+    ci: &ComponentInterface,
+    module: &ModuleMetadata,
+) -> Result<String> {
+    LowlevelTsWrapper::new(ci, module)
+        .render()
+        .context("generating lowlevel typescipt failed")
 }
 
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "wrapper-ffi.ts")]
-struct CodegenWrapper<'a> {
+struct LowlevelTsWrapper<'a> {
     ci: &'a ComponentInterface,
-    #[allow(unused)]
-    config: &'a Config,
     module: &'a ModuleMetadata,
 }
 
-impl<'a> CodegenWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, config: &'a Config, module: &'a ModuleMetadata) -> Self {
-        Self { ci, config, module }
+impl<'a> LowlevelTsWrapper<'a> {
+    fn new(ci: &'a ComponentInterface, module: &'a ModuleMetadata) -> Self {
+        Self { ci, module }
     }
 }
 
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "wrapper.ts")]
-struct FrontendWrapper<'a> {
+struct TsApiWrapper<'a> {
     ci: &'a ComponentInterface,
-    module: &'a ModuleMetadata,
     #[allow(unused)]
     config: &'a Config,
+    module: &'a ModuleMetadata,
+    #[allow(unused)]
+    switches: &'a SwitchArgs,
     type_helper_code: String,
     type_imports: BTreeMap<String, BTreeSet<Imported>>,
     exported_converters: BTreeSet<String>,
     imported_converters: BTreeMap<(String, String), BTreeSet<String>>,
 }
 
-impl<'a> FrontendWrapper<'a> {
-    pub fn new(
-        ci: &'a ComponentInterface,
-        config: &'a Config,
-        module: &'a ModuleMetadata,
-        type_map: &'a TypeMap,
-    ) -> Self {
-        let type_renderer = TypeRenderer::new(ci, config, module, type_map);
-        let type_helper_code = type_renderer.render().unwrap();
-        let type_imports = type_renderer.imports.into_inner();
-        let exported_converters = type_renderer.exported_converters.into_inner();
-        let imported_converters = type_renderer.imported_converters.into_inner();
-        Self {
+impl<'a> TryFrom<TypeRenderer<'a>> for TsApiWrapper<'a> {
+    type Error = anyhow::Error;
+
+    fn try_from(types: TypeRenderer<'a>) -> Result<Self> {
+        let type_helper_code = types.render()?;
+        let type_imports = types.imports.into_inner();
+        let exported_converters = types.exported_converters.into_inner();
+        let imported_converters = types.imported_converters.into_inner();
+        let module = types.module;
+        let config = types.config;
+        let ci = types.ci;
+        let switches = types.switches;
+        Ok(Self {
             module,
             config,
             ci,
+            switches,
             type_helper_code,
             type_imports,
             exported_converters,
             imported_converters,
-        }
+        })
     }
 }
 
@@ -114,12 +124,14 @@ impl<'a> FrontendWrapper<'a> {
 /// process.  Make sure to only call `render()` once.
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "Types.ts")]
-pub struct TypeRenderer<'a> {
+struct TypeRenderer<'a> {
     ci: &'a ComponentInterface,
-    #[allow(unused)]
     config: &'a Config,
     #[allow(unused)]
     module: &'a ModuleMetadata,
+    #[allow(unused)]
+    switches: &'a SwitchArgs,
+
     // Track imports added with the `add_import()` macro
     imports: RefCell<BTreeMap<String, BTreeSet<Imported>>>,
 
@@ -137,12 +149,14 @@ impl<'a> TypeRenderer<'a> {
         ci: &'a ComponentInterface,
         config: &'a Config,
         module: &'a ModuleMetadata,
+        switches: &'a SwitchArgs,
         type_map: &'a TypeMap,
     ) -> Self {
         Self {
             ci,
             config,
             module,
+            switches,
             imports: RefCell::new(Default::default()),
             exported_converters: RefCell::new(Default::default()),
             imported_converters: RefCell::new(Default::default()),
