@@ -68,7 +68,7 @@ find_git_project_root() {
 
 derive_paths() {
   ROOT=$(find_git_project_root)
-  UBRN_BIN="$ROOT/bin/cli"
+  UBRN_BIN="$ROOT/bin/cli.cjs"
   PWD=$(pwd)
 }
 
