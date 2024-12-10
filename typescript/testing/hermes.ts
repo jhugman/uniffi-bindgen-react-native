@@ -5,7 +5,7 @@
  */
 declare function print(...args: any): void;
 
-class Console {
+export class Console {
   log(...args: any): void {
     print(...args);
   }
@@ -26,8 +26,6 @@ class Console {
     print("🤓", ...args.map(stringify));
   }
 }
-
-export const console = new Console();
 
 export function stringify(a: any): string {
   return JSON.stringify(a, replacer);

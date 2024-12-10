@@ -48,7 +48,7 @@ pub(crate) struct EntryArg {
 }
 
 impl EntryArg {
-    pub(crate) fn prepare(&self) -> Result<Utf8PathBuf> {
+    pub(crate) fn prepare_for_jsi(&self) -> Result<Utf8PathBuf> {
         YarnCmd.ensure_ready()?;
         let file = self.file.canonicalize_utf8()?;
         let stem = file.file_stem().expect("a filename with an extension");

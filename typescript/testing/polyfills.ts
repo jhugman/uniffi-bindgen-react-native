@@ -4,8 +4,25 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import "abortcontroller-polyfill/dist/abortcontroller-polyfill-only";
-import { console } from "./hermes";
+import { Console as HermesConsole, URL as HermesURL } from "./hermes";
 
-(globalThis as any).console = console;
+export type RuntimeContext = "nodejs" | "hermes" | "browser";
+
+export function __runtimeContext(): RuntimeContext {
+  if (globalThis.print !== undefined) {
+    return "hermes";
+  }
+  if (globalThis.document !== undefined) {
+    return "browser";
+  }
+  return "nodejs";
+}
+
+if (globalThis.console === undefined) {
+  (globalThis as any).console = new HermesConsole();
+}
+if (globalThis.URL === undefined) {
+  (globalThis as any).URL = HermesURL;
+}
 
 export default globalThis;

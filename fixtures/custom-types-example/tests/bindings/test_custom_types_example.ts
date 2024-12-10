@@ -11,8 +11,8 @@ import {
   MyEnum_Tags,
   unwrapEnumWrapper,
 } from "../../generated/custom_types";
-import { URL } from "@/hermes";
-import { secondsToDate } from "@/converters";
+import "@/polyfills";
+import { secondsToDate, URL } from "@/converters";
 import { test } from "@/asserts";
 
 /// These tests are worth looking at inconjunction with the uniffi.toml file

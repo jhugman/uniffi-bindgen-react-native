@@ -5,7 +5,7 @@
  */
 use std::collections::HashMap;
 
-use uniffi_bindgen::{interface::Type, ComponentInterface};
+use uniffi_bindgen::{interface::Type, Component, ComponentInterface};
 use uniffi_meta::AsType;
 
 #[derive(Default, Debug)]
@@ -67,5 +67,15 @@ impl TypeMap {
             },
             _ => t,
         }
+    }
+}
+
+impl<T> From<&[Component<T>]> for TypeMap {
+    fn from(components: &[Component<T>]) -> Self {
+        let mut map = Self::default();
+        for component in components {
+            map.insert_ci(&component.ci);
+        }
+        map
     }
 }

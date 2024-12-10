@@ -41,6 +41,10 @@ impl CrateArg {
         }
         Ok(metadata)
     }
+
+    pub(crate) fn profile(&self) -> &str {
+        CrateMetadata::profile(self.release)
+    }
 }
 
 fn cargo_build(metadata: &CrateMetadata, release: bool) -> Result<()> {

@@ -18,7 +18,7 @@ import generated, {
   EventListener,
 } from "../../generated/uniffi_callbacks";
 import { asyncTest, AsyncAsserts } from "@/asserts";
-import { console } from "@/hermes";
+import "@/polyfills";
 
 // This is only needed in tests.
 generated.initialize();
