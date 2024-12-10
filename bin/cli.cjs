@@ -33,7 +33,7 @@ const rootDir = getRootDir();
 
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === "--path") {
-  console.log(`${rootDir}/bin/cli`);
+  console.log(`${rootDir}/bin/cli.cjs`);
   process.exit(0);
 }
 
