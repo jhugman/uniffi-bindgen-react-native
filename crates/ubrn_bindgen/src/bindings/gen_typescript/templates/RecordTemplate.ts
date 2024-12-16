@@ -50,8 +50,8 @@ export const {{ decl_type_name }} = (() => {
 
 const {{ ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};
-    {{- self.import_infra("AbstractFfiConverterArrayBuffer", "ffi-converters") }}
-    class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
+    {{- self.import_infra("AbstractFfiConverterByteArray", "ffi-converters") }}
+    class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
         read(from: RustBuffer): TypeName {
             return {
             {%- for field in rec.fields() %}

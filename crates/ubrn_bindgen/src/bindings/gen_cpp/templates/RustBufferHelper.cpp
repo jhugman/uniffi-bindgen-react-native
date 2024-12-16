@@ -11,17 +11,34 @@ template <> struct Bridging<RustBuffer> {
       );
   }
 
+  static void rustbuffer_free(RustBuffer buf) {
+    RustCallStatus status = { UNIFFI_CALL_STATUS_OK };
+    {{ ci.ffi_rustbuffer_free().name() }}(
+        buf,
+        &status
+    );
+  }
+
+  static RustBuffer rustbuffer_from_bytes(ForeignBytes bytes) {
+    RustCallStatus status = { UNIFFI_CALL_STATUS_OK };
+    return {{ ci.ffi_rustbuffer_from_bytes().name() }}(
+      bytes,
+      &status
+    );
+  }
+
   static RustBuffer fromJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
                            const jsi::Value &value) {
     try {
-      auto bytes = uniffi_jsi::Bridging<ForeignBytes>::fromJs(rt, value);
+      auto buffer = uniffi_jsi::Bridging<jsi::ArrayBuffer>::value_to_arraybuffer(rt, value);
+      auto bytes = ForeignBytes{
+          .len = static_cast<int32_t>(buffer.length(rt)),
+          .data = buffer.data(rt),
+      };
+
       // This buffer is constructed from foreign bytes. Rust scaffolding copies
       // the bytes, to make the RustBuffer.
-      RustCallStatus status = { UNIFFI_CALL_STATUS_OK };
-      auto buf = {{ ci.ffi_rustbuffer_from_bytes().name() }}(
-        bytes,
-        &status
-      );
+      auto buf = rustbuffer_from_bytes(bytes);
       // Once it leaves this function, the buffer is immediately passed back
       // into Rust, where it's used to deserialize into the Rust versions of the
       // arguments. At that point, the copy is destroyed.
@@ -47,15 +64,10 @@ template <> struct Bridging<RustBuffer> {
 
     // Once we have a Javascript version, we no longer need the Rust version, so
     // we can call into Rust to tell it it's okay to free that memory.
-    RustCallStatus status = { UNIFFI_CALL_STATUS_OK };
-
-    {{ ci.ffi_rustbuffer_free().name() }}(
-        buf,
-        &status
-    );
+    rustbuffer_free(buf);
 
     // Finally, return the ArrayBuffer.
-    return jsi::Value(rt, arrayBuffer);
+    return uniffi_jsi::Bridging<jsi::ArrayBuffer>::arraybuffer_to_value(rt, arrayBuffer);;
   }
 };
 

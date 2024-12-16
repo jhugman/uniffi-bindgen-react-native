@@ -140,8 +140,8 @@ export const {{ decl_type_name }} = (() => {
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
-    {{- self.import_infra("AbstractFfiConverterArrayBuffer", "ffi-converters") }}
-    class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
+    {{- self.import_infra("AbstractFfiConverterByteArray", "ffi-converters") }}
+    class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
             {%- for variant in e.variants() %}
