@@ -290,8 +290,8 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::Float32 => quote! { #runtime::Float32 },
             FfiType::Float64 => quote! { #runtime::Float64 },
             FfiType::RustArcPtr(_) => quote! { #runtime::VoidPointer },
-            FfiType::RustBuffer(_external_ffi_metadata) => quote! { #runtime::ForeignBytes },
-            FfiType::ForeignBytes => quote! { #module::ForeignBytes },
+            FfiType::RustBuffer(_) => quote! { #runtime::ForeignBytes },
+            FfiType::ForeignBytes => quote! { #runtime::ForeignBytes },
             FfiType::Callback(_) => quote! { #module::Callback },
             FfiType::Struct(_) => quote! { #module::Struct },
             FfiType::Handle => quote! { #module::Handle },
@@ -302,6 +302,7 @@ impl<'a> ComponentTemplate<'a> {
     }
 
     fn ffi_type_rust(&self, t: &FfiType) -> TokenStream {
+        let uniffi = self.uniffi_ident();
         match t {
             FfiType::UInt8 => quote! { u8 },
             FfiType::Int8 => quote! { i8 },
@@ -313,6 +314,7 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::Int64 => quote! { i64 },
             FfiType::Float32 => quote! { f32 },
             FfiType::Float64 => quote! { f64 },
+            FfiType::RustBuffer(_) => quote! { #uniffi::RustBuffer },
             _ => todo!(),
         }
     }

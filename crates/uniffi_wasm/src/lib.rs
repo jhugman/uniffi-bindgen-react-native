@@ -6,7 +6,9 @@
 pub use wasm_bindgen::prelude::wasm_bindgen as export;
 use wasm_bindgen::prelude::*;
 
-pub use uniffi::RustCallStatus;
+pub mod uniffi {
+    pub use uniffi::{RustBuffer, RustCallStatus};
+}
 
 pub trait IntoRust<HighLevel> {
     fn into_rust(v: HighLevel) -> Self;
