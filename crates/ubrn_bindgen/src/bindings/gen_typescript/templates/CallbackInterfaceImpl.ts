@@ -3,7 +3,6 @@
 {{- self.import_infra_type("UniffiByteArray", "ffi-types")}}
 {{- self.import_infra("UniffiRustCaller", "rust-call")}}
 {{- self.import_infra_type("UniffiRustCallStatus", "rust-call")}}
-{{- self.import_infra("RustBuffer", "ffi-types")}}
 
 {%- let vtable_methods = cbi.vtable_methods() %}
 {%- let trait_impl = format!("uniffiCallbackInterface{}", name) %}
