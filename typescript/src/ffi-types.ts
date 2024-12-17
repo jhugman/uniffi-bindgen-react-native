@@ -5,6 +5,8 @@
  */
 import { UniffiInternalError } from "./errors";
 
+export type UniffiByteArray = Uint8Array;
+
 export class RustBuffer {
   private readOffset: number = 0;
   private writeOffset: number = 0;
@@ -25,12 +27,20 @@ export class RustBuffer {
     return this.withCapacity(0);
   }
 
-  static fromArrayBuffer(buf: ArrayBuffer) {
+  static fromArrayBuffer(buf: ArrayBuffer): RustBuffer {
     return new RustBuffer(buf);
+  }
+
+  static fromByteArray(buf: UniffiByteArray): RustBuffer {
+    return new RustBuffer(buf.buffer);
   }
 
   get length(): number {
     return this.arrayBuffer.byteLength;
+  }
+
+  get byteArray(): UniffiByteArray {
+    return new Uint8Array(this.arrayBuffer);
   }
 
   readBytes(numBytes: number): ArrayBuffer {

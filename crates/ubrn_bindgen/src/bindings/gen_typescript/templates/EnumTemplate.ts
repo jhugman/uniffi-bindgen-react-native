@@ -1,4 +1,4 @@
-{{- self.import_infra("AbstractFfiConverterArrayBuffer", "ffi-converters") -}}
+{{- self.import_infra("AbstractFfiConverterByteArray", "ffi-converters") -}}
 {{- self.import_infra("FfiConverterInt32", "ffi-converters") -}}
 {{- self.import_infra("UniffiInternalError", "errors") -}}
 
@@ -18,7 +18,7 @@ export enum {{ type_name }} {
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
-    class FFIConverter extends AbstractFfiConverterArrayBuffer<TypeName> {
+    class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
                 {%- for variant in e.variants() %}

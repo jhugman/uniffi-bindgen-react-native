@@ -4,19 +4,20 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
+import { type UniffiByteArray } from "./ffi-types";
 
 export const CALL_SUCCESS = 0;
 export const CALL_ERROR = 1;
 export const CALL_UNEXPECTED_ERROR = 2;
 export const CALL_CANCELLED = 3;
 
-type StringLifter = (arrayBuffer: ArrayBuffer) => string;
-const emptyStringLifter = (arrayBuffer: ArrayBuffer) =>
+type StringLifter = (bytes: UniffiByteArray) => string;
+const emptyStringLifter = (bytes: UniffiByteArray) =>
   "An error occurred decoding a string";
 
 export type UniffiRustCallStatus = {
   code: number;
-  errorBuf?: ArrayBuffer;
+  errorBuf?: UniffiByteArray;
 };
 export class UniffiRustCaller {
   constructor(
@@ -58,7 +59,7 @@ function uniffiCreateCallStatus(): UniffiRustCallStatus {
   return { code: CALL_SUCCESS };
 }
 
-export type UniffiErrorHandler = (buffer: ArrayBuffer) => Error;
+export type UniffiErrorHandler = (buffer: UniffiByteArray) => Error;
 type RustCallFn<T> = (status: UniffiRustCallStatus) => T;
 
 function uniffiCheckCallStatus(

@@ -5,6 +5,7 @@
  */
 import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call";
 import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
+import { type UniffiByteArray } from "./ffi-types";
 
 // Some additional data we hold for each in-flight promise.
 type PromiseHelper = {
@@ -23,7 +24,7 @@ const UNIFFI_FOREIGN_FUTURE_HANDLE_MAP = new UniffiHandleMap<PromiseHelper>();
 
 // Some degenerate functions used for default arguments.
 const notExpectedError = (err: any) => false;
-function emptyLowerError<E>(e: E): ArrayBuffer {
+function emptyLowerError<E>(e: E): UniffiByteArray {
   throw new Error("Unreachable");
 }
 
@@ -38,8 +39,11 @@ export type UniffiForeignFuture = {
 export function uniffiTraitInterfaceCallAsync<T>(
   makeCall: (signal: AbortSignal) => Promise<T>,
   handleSuccess: (value: T) => void,
-  handleError: (callStatus: /*i8*/ number, errorBuffer: ArrayBuffer) => void,
-  lowerString: (str: string) => ArrayBuffer,
+  handleError: (
+    callStatus: /*i8*/ number,
+    errorBuffer: UniffiByteArray,
+  ) => void,
+  lowerString: (str: string) => UniffiByteArray,
 ): UniffiForeignFuture {
   return uniffiTraitInterfaceCallAsyncWithError(
     makeCall,
@@ -54,10 +58,13 @@ export function uniffiTraitInterfaceCallAsync<T>(
 export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
   makeCall: (signal: AbortSignal) => Promise<T>,
   handleSuccess: (value: T) => void,
-  handleError: (callStatus: /*i8*/ number, errorBuffer: ArrayBuffer) => void,
+  handleError: (
+    callStatus: /*i8*/ number,
+    errorBuffer: UniffiByteArray,
+  ) => void,
   isErrorType: (error: any) => boolean,
-  lowerError: (error: E) => ArrayBuffer,
-  lowerString: (str: string) => ArrayBuffer,
+  lowerError: (error: E) => UniffiByteArray,
+  lowerString: (str: string) => UniffiByteArray,
 ): UniffiForeignFuture {
   const settledHolder: { settled: boolean } = { settled: false };
   const abortController = new AbortController();

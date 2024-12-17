@@ -21,6 +21,7 @@
 #include "ForeignBytes.h"
 #include "ReferenceHolder.h"
 #include "RustBuffer.h"
+#include "UniffiByteArray.h"
 #include "UniffiCallInvoker.h"
 #include "UniffiRustCallStatus.h"
 #include "UniffiString.h"

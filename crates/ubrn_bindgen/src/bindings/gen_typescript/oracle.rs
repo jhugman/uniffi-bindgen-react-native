@@ -70,7 +70,7 @@ impl CodeOracle {
             FfiType::Float64 => "0.0".to_owned(),
             FfiType::Float32 => "0.0".to_owned(),
             FfiType::RustArcPtr(_) => "null".to_owned(),
-            FfiType::RustBuffer(_) => "/*empty*/ new ArrayBuffer(0)".to_owned(),
+            FfiType::RustBuffer(_) => "/*empty*/ new Uint8Array(0)".to_owned(),
             FfiType::Callback(_) => "null".to_owned(),
             FfiType::RustCallStatus => "uniffiCreateCallStatus()".to_owned(),
             _ => unimplemented!("ffi_default_value: {ffi_type:?}"),
@@ -107,7 +107,7 @@ impl CodeOracle {
     pub(crate) fn ffi_type_label_for_cpp(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
             FfiType::RustArcPtr(_) => "UniffiRustArcPtr".to_string(),
-            FfiType::ForeignBytes => "ArrayBuffer".to_string(),
+            FfiType::ForeignBytes => "Uint8Array".to_string(),
             FfiType::RustBuffer(_) => "string".to_string(),
             _ => self.ffi_type_label(ffi_type),
         }
@@ -123,7 +123,7 @@ impl CodeOracle {
             FfiType::Float64 => "number".to_string(),
             FfiType::Handle => "bigint".to_string(),
             FfiType::RustArcPtr(_) => "bigint".to_string(),
-            FfiType::RustBuffer(_) => "ArrayBuffer".to_string(),
+            FfiType::RustBuffer(_) => "Uint8Array".to_string(),
             FfiType::RustCallStatus => "UniffiRustCallStatus".to_string(),
             FfiType::ForeignBytes => "ForeignBytes".to_string(),
             FfiType::Callback(name) => self.ffi_callback_name(name),

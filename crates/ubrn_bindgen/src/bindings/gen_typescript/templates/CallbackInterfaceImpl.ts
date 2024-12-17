@@ -1,5 +1,6 @@
 {{- self.import_infra_type("UniffiHandle", "handle-map") }}
 {{- self.import_infra_type("UniffiReferenceHolder", "callbacks") }}
+{{- self.import_infra_type("UniffiByteArray", "ffi-types")}}
 {{- self.import_infra("UniffiRustCaller", "rust-call")}}
 {{- self.import_infra_type("UniffiRustCallStatus", "rust-call")}}
 {{- self.import_infra("RustBuffer", "ffi-types")}}
@@ -83,7 +84,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                     }
                 );
             };
-            const uniffiHandleError = (code: number, errorBuf: ArrayBuffer) => {
+            const uniffiHandleError = (code: number, errorBuf: UniffiByteArray) => {
                 uniffiFutureCallback(
                     uniffiCallbackData,
                     /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{

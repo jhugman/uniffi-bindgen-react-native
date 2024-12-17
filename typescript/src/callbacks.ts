@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
-import { RustBuffer } from "./ffi-types";
+import { type UniffiByteArray, RustBuffer } from "./ffi-types";
 import {
   type UniffiHandle,
   UniffiHandleMap,
@@ -47,7 +47,7 @@ export function uniffiTraitInterfaceCall<T>(
   callStatus: UniffiRustCallStatus,
   makeCall: () => T,
   writeReturn: (v: T) => void,
-  lowerString: (s: string) => ArrayBuffer,
+  lowerString: (s: string) => UniffiByteArray,
 ) {
   try {
     writeReturn(makeCall());
@@ -62,8 +62,8 @@ export function uniffiTraitInterfaceCallWithError<T, E extends Error>(
   makeCall: () => T,
   writeReturn: (v: T) => void,
   isErrorType: (e: any) => boolean,
-  lowerError: (err: E) => ArrayBuffer,
-  lowerString: (s: string) => ArrayBuffer,
+  lowerError: (err: E) => UniffiByteArray,
+  lowerString: (s: string) => UniffiByteArray,
 ): void {
   try {
     writeReturn(makeCall());

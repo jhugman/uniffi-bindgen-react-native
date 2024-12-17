@@ -15,7 +15,9 @@ template <> struct Bridging<std::string> {
   static jsi::Value arraybuffer_to_string(jsi::Runtime &rt,
                                           const jsi::Value &value) {
     try {
-      auto buffer = value.asObject(rt).getArrayBuffer(rt);
+      auto buffer =
+          uniffi_jsi::Bridging<jsi::ArrayBuffer>::value_to_arraybuffer(rt,
+                                                                       value);
       auto string =
           jsi::String::createFromUtf8(rt, buffer.data(rt), buffer.length(rt));
       return jsi::Value(rt, string);
@@ -40,7 +42,8 @@ template <> struct Bridging<std::string> {
           std::make_shared<CMutableBuffer>(CMutableBuffer(bytes, len));
       auto arrayBuffer = jsi::ArrayBuffer(rt, payload);
 
-      return jsi::Value(rt, arrayBuffer);
+      return uniffi_jsi::Bridging<jsi::ArrayBuffer>::arraybuffer_to_value(
+          rt, arrayBuffer);
     } catch (const std::logic_error &e) {
       throw jsi::JSError(rt, e.what());
     }

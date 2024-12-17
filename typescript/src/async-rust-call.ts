@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
+import { type UniffiByteArray } from "./ffi-types";
 import { UniffiHandleMap, type UniffiHandle } from "./handle-map";
 import {
   type UniffiErrorHandler,
@@ -57,7 +58,7 @@ export async function uniffiRustCallAsync<F, T>(
   completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
-  liftString: (arrayBuffer: ArrayBuffer) => string,
+  liftString: (bytes: UniffiByteArray) => string,
   asyncOpts?: { signal: AbortSignal },
   errorHandler?: UniffiErrorHandler,
 ): Promise<T> {

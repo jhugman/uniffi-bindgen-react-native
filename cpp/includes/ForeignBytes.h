@@ -12,27 +12,3 @@ struct ForeignBytes {
   int32_t len;
   uint8_t *data;
 };
-
-namespace uniffi_jsi {
-using namespace facebook;
-
-template <> struct Bridging<ForeignBytes> {
-  static ForeignBytes fromJs(jsi::Runtime &rt, const jsi::Value &value) {
-    try {
-      auto buffer = value.asObject(rt).getArrayBuffer(rt);
-      return ForeignBytes{
-          .len = static_cast<int32_t>(buffer.length(rt)),
-          .data = buffer.data(rt),
-      };
-    } catch (const std::logic_error &e) {
-      throw jsi::JSError(rt, e.what());
-    }
-  }
-
-  static jsi::Value toJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
-                         ForeignBytes value) {
-    throw jsi::JSError(rt, "Unreachable ForeignBytes.toJs");
-  }
-};
-
-} // namespace uniffi_jsi
