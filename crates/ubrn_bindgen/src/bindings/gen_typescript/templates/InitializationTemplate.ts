@@ -13,13 +13,13 @@ function uniffiEnsureInitialized() {
     // Get the bindings contract version from our ComponentInterface
     const bindingsContractVersion = {{ ci.uniffi_contract_version() }};
     // Get the scaffolding contract version by calling the into the dylib
-    const scaffoldingContractVersion = nativeModule().{{ ci.ffi_uniffi_contract_version().name() }}();
+    const scaffoldingContractVersion = {% call ts::fn_handle(ci.ffi_uniffi_contract_version()) %}();
     if (bindingsContractVersion !== scaffoldingContractVersion) {
         throw new UniffiInternalError.ContractVersionMismatch(scaffoldingContractVersion, bindingsContractVersion);
     }
 
     {%- for (name, expected_checksum) in ci.iter_checksums() %}
-    if (nativeModule().{{ name }}() !== {{ expected_checksum }}) {
+    if ({% call ts::fn_handle_with_name(name) %}() !== {{ expected_checksum }}) {
         throw new UniffiInternalError.ApiChecksumMismatch("{{ name }}");
     }
     {%- endfor %}

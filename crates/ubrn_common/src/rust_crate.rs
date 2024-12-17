@@ -16,6 +16,7 @@ pub struct CrateMetadata {
     pub(crate) manifest_path: Utf8PathBuf,
     pub(crate) crate_dir: Utf8PathBuf,
     pub(crate) target_dir: Utf8PathBuf,
+    pub(crate) package_name: String,
     pub(crate) library_name: String,
 }
 
@@ -54,6 +55,10 @@ impl CrateMetadata {
 
     pub fn crate_dir(&self) -> &Utf8Path {
         &self.crate_dir
+    }
+
+    pub fn package_name(&self) -> &str {
+        &self.package_name
     }
 
     pub fn library_name(&self) -> &str {
@@ -125,6 +130,10 @@ impl TryFrom<Utf8PathBuf> for CrateMetadata {
     type Error = anyhow::Error;
 
     fn try_from(manifest_path: Utf8PathBuf) -> Result<Self> {
+        if !manifest_path.exists() {
+            anyhow::bail!("Crate manifest doesn't exist");
+        }
+        let manifest_path = manifest_path.canonicalize_utf8()?;
         let (manifest_path, crate_dir) = if !manifest_path.ends_with("Cargo.toml") {
             if !manifest_path.is_dir() {
                 anyhow::bail!("Crate should either be a path to a Cargo.toml or a directory containing a Cargo.toml file");
@@ -137,16 +146,16 @@ impl TryFrom<Utf8PathBuf> for CrateMetadata {
                 .into();
             (manifest_path, crate_dir)
         };
-        if !manifest_path.exists() {
-            anyhow::bail!("Crate manifest doesn't exist");
-        }
         let metadata = Self::cargo_metadata(&manifest_path)?;
 
-        let library_name = guess_library_name(&metadata, &manifest_path.canonicalize_utf8()?);
+        let library_name = guess_library_name(&metadata, &manifest_path);
+        let package_name = find_package_name(&metadata, &manifest_path)
+            .expect("A [package] `name` was not found in the manifest");
         let target_dir = metadata.target_directory;
 
         Ok(Self {
             manifest_path,
+            package_name,
             library_name,
             target_dir,
             crate_dir,

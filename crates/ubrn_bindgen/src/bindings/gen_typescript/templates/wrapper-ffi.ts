@@ -12,7 +12,7 @@ import {
 interface NativeModuleInterface {
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
     {%- let is_internal = func.is_internal() %}
-    {{ func.name() }}(
+    {% call ts::ffi_func_name(func.name()) %}(
       {%- call ts::arg_list_ffi_decl(func) %}):
       {%- match func.return_type() %}{% when Some with (return_type) %} {{ return_type.borrow()|ffi_type_name_for_cpp(is_internal) }}{% when None %} void{% endmatch %};
   {%- endfor %}

@@ -149,9 +149,9 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     },
 
     bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
-        return rustCall(
+        return uniffiCaller.rustCall(
             /*caller:*/ (status) =>
-                nativeModule().{{ obj.ffi_function_bless_pointer().name() }}(p, status),
+                {% call ts::fn_handle(obj.ffi_function_bless_pointer()) %}(p, status),
             /*liftString:*/ FfiConverterString.lift
         );
     },
@@ -165,15 +165,15 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
 
     clonePointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
         const pointer = this.pointer(obj);
-        return rustCall(
-            /*caller:*/ (callStatus) => nativeModule().{{ obj.ffi_object_clone().name() }}(pointer, callStatus),
+        return uniffiCaller.rustCall(
+            /*caller:*/ (callStatus) => {% call ts::fn_handle(obj.ffi_object_clone()) %}(pointer, callStatus),
             /*liftString:*/ FfiConverterString.lift
         );
     },
 
     freePointer(pointer: UnsafeMutableRawPointer): void {
-        rustCall(
-            /*caller:*/ (callStatus) => nativeModule().{{ obj.ffi_object_free().name() }}(pointer, callStatus),
+        uniffiCaller.rustCall(
+            /*caller:*/ (callStatus) => {% call ts::fn_handle(obj.ffi_object_free()) %}(pointer, callStatus),
             /*liftString:*/ FfiConverterString.lift
         );
     },

@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use super::{cpp_bindings::CppBindingArg, RunCmd};
+use super::{cpp_bindings::CppBindingArg, generate_bindings::render_entrypoint, RunCmd};
 use crate::bootstrap::{Bootstrap, TestRunnerCmd};
 use anyhow::{Ok, Result};
 use camino::Utf8PathBuf;
@@ -43,11 +43,18 @@ impl Jsi {
                 let crate_lib = crate_.library_path(None, profile);
                 let target_dir = crate_.target_dir();
                 let lib_name = crate_.library_name();
-                let cpp_files = bindings.generate(
-                    &crate_lib,
-                    &crate_.manifest_path().to_path_buf(),
-                    switches,
-                )?;
+                let modules =
+                    bindings.render(&crate_lib, &crate_.manifest_path().to_path_buf(), switches)?;
+                let abi_dir = bindings.abi_dir();
+                let entrypoint = switches.flavor.entrypoint();
+                let entrypoint_cpp = abi_dir.join(entrypoint);
+                render_entrypoint(switches, &entrypoint_cpp, &modules)?;
+
+                let cpp_files: Vec<_> = modules
+                    .iter()
+                    .map(|m| abi_dir.join(m.cpp_filename()))
+                    .chain(vec![entrypoint_cpp])
+                    .collect();
                 let cpp = CppBindingArg::with_files(&cpp_files);
                 let so_file = cpp.compile_with_crate(clean, target_dir, lib_name)?;
                 Ok(Some(so_file))

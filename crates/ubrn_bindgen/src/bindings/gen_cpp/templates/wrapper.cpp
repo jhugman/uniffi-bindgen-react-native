@@ -65,7 +65,7 @@ extern "C" {
 ) : callInvoker(invoker), props() {
     // Map from Javascript names to the cpp names
     {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
-    {%- let name = func.name() %}
+    {%- let name = func.name()|fmt("ubrn_{}") %}
     props["{{ name }}"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "{{ name }}"),

@@ -3,13 +3,13 @@
 {{- self.import_infra("FfiConverterInt32", "ffi-converters") }}
 {{- self.import_infra_type("FfiConverter", "ffi-converters") }}
 const stringToArrayBuffer = (s: string): ArrayBuffer =>
-    rustCall((status) => nativeModule().{{ ci.ffi_function_string_to_arraybuffer().name() }}(s, status));
+    uniffiCaller.rustCall((status) => {% call ts::fn_handle(ci.ffi_function_string_to_arraybuffer()) %}(s, status));
 
 const arrayBufferToString = (ab: ArrayBuffer): string =>
-    rustCall((status) => nativeModule().{{ ci.ffi_function_arraybuffer_to_string().name() }}(ab, status));
+    uniffiCaller.rustCall((status) => {% call ts::fn_handle(ci.ffi_function_arraybuffer_to_string()) %}(ab, status));
 
 const stringByteLength = (s: string): number =>
-    rustCall((status) => nativeModule().{{ ci.ffi_function_string_to_bytelength().name() }}(s, status));
+    uniffiCaller.rustCall((status) => {% call ts::fn_handle(ci.ffi_function_string_to_bytelength()) %}(s, status));
 
 const FfiConverterString = (() => {
     const lengthConverter = FfiConverterInt32;

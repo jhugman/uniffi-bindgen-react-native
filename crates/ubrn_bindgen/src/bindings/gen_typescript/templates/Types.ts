@@ -1,6 +1,6 @@
 {%- import "macros.ts" as ts %}
 {{- self.import_infra("UniffiInternalError", "errors") -}}
-{{- self.import_infra("rustCall", "rust-call") }}
+{{- self.import_infra("UniffiRustCaller", "rust-call") }}
 
 {%- for func in ci.function_definitions() %}
 {%- include "TopLevelFunctionTemplate.ts" %}
