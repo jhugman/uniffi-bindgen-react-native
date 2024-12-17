@@ -19,7 +19,7 @@ npx create-react-native-library@latest my-rust-lib
 ```admonish warning title="Version drift"
 `create-react-native-library` has changed a few things around recently.
 
-These steps have been tested with `0.35.1` and `0.41.2`, which at time of writing, is the `latest`.
+These steps have been tested with `0.35.1` and `0.42.3`, which at time of writing, is the `latest`.
 
 `react-native` also changes from time to time.
 
@@ -126,12 +126,13 @@ For now, we just want to get started; let's start with an existing Rust crate th
 
 ```yaml
 ---
-name: MyRustLib
 rust:
   repo: https://github.com/ianthetechie/uniffi-starter
   branch: main
   manifestPath: rust/foobar/Cargo.toml
 ```
+
+Save this in a file at the root of your directory, called `ubrn.config.yaml`.
 
 ## Step 4: Checkout the Rust code
 
