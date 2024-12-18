@@ -8,7 +8,7 @@
 {{- self.import_infra("pointerLiteralSymbol", "symbols") -}}
 {{- self.import_infra("uniffiTypeNameSymbol", "symbols") -}}
 
-{%- let obj = ci|get_object_definition(name) %}
+{%- let obj = ci.get_object_definition(name).unwrap() %}
 {%- let protocol_name = obj|type_name(self) %}
 {%- let impl_class_name = obj|decl_type_name(self) %}
 {%- let obj_factory = format!("uniffiType{}ObjectFactory", impl_class_name) %}
