@@ -17,7 +17,7 @@ use uniffi_bindgen::{
 pub(super) fn type_name(
     as_type: &impl AsType,
     types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     let type_ = types.as_type(as_type);
     Ok(type_.as_codetype().type_label(types.ci))
 }
@@ -34,7 +34,7 @@ pub(super) fn ffi_type_name_from_type(
 pub(super) fn decl_type_name(
     as_type: &impl AsType,
     types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     let type_ = types.as_type(as_type);
     Ok(type_.as_codetype().decl_type_label(types.ci))
 }
@@ -42,7 +42,7 @@ pub(super) fn decl_type_name(
 pub(super) fn ffi_converter_name(
     as_type: &impl AsType,
     types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     let type_ = types.as_type(as_type);
     Ok(type_.as_codetype().ffi_converter_name())
 }
@@ -50,7 +50,7 @@ pub(super) fn ffi_converter_name(
 pub(super) fn ffi_error_converter_name(
     as_type: &impl AsType,
     types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     // special handling for types used as errors.
     let type_ = types.as_type(as_type);
     let mut name = type_.as_codetype().ffi_converter_name();
@@ -66,7 +66,7 @@ pub(super) fn ffi_error_converter_name(
 pub(super) fn lower_error_fn(
     as_type: &impl AsType,
     types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     Ok(format!(
         "{ct}.lower.bind({ct})",
         ct = ffi_error_converter_name(as_type, types)?
@@ -76,17 +76,14 @@ pub(super) fn lower_error_fn(
 pub(super) fn lift_error_fn(
     as_type: &impl AsType,
     types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     Ok(format!(
         "{ct}.lift.bind({ct})",
         ct = ffi_error_converter_name(as_type, types)?
     ))
 }
 
-pub(super) fn lift_fn(
-    as_type: &impl AsType,
-    types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+pub(super) fn lift_fn(as_type: &impl AsType, types: &TypeRenderer) -> Result<String, rinja::Error> {
     Ok(format!(
         "{ct}.lift.bind({ct})",
         ct = ffi_converter_name(as_type, types)?
@@ -97,7 +94,7 @@ pub fn render_literal(
     literal: &Literal,
     as_ct: &impl AsType,
     ci: &ComponentInterface,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     Ok(as_ct.as_codetype().literal(literal, ci))
 }
 
@@ -105,7 +102,7 @@ pub fn variant_discr_literal(
     e: &Enum,
     index: &usize,
     ci: &ComponentInterface,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     let literal = e.variant_discr(*index).expect("invalid index");
     let ts_literal = Type::Int32.as_codetype().literal(&literal, ci);
     Ok(match literal {
@@ -136,7 +133,7 @@ pub fn variant_discr_literal(
     })
 }
 
-pub fn ffi_type_name_for_cpp(type_: &FfiType, is_internal: &bool) -> Result<String, askama::Error> {
+pub fn ffi_type_name_for_cpp(type_: &FfiType, is_internal: &bool) -> Result<String, rinja::Error> {
     Ok(if *is_internal {
         CodeOracle.ffi_type_label_for_cpp(type_)
     } else {
@@ -144,52 +141,52 @@ pub fn ffi_type_name_for_cpp(type_: &FfiType, is_internal: &bool) -> Result<Stri
     })
 }
 
-pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
+pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, rinja::Error> {
     Ok(CodeOracle.ffi_type_label(ffi_type))
 }
 
-pub fn ffi_default_value(type_: &FfiType) -> Result<String, askama::Error> {
+pub fn ffi_default_value(type_: &FfiType) -> Result<String, rinja::Error> {
     Ok(CodeOracle.ffi_default_value(type_))
 }
 
 /// Get the idiomatic Typescript rendering of a function name.
-pub fn class_name(nm: &str, ci: &ComponentInterface) -> Result<String, askama::Error> {
+pub fn class_name(nm: &str, ci: &ComponentInterface) -> Result<String, rinja::Error> {
     Ok(CodeOracle.class_name(ci, nm))
 }
 
 /// Get the idiomatic Typescript rendering of a function name.
-pub fn fn_name(nm: &str) -> Result<String, askama::Error> {
+pub fn fn_name(nm: &str) -> Result<String, rinja::Error> {
     Ok(CodeOracle.fn_name(nm))
 }
 
 /// Get the idiomatic Typescript rendering of a variable name.
-pub fn var_name(nm: &str) -> Result<String, askama::Error> {
+pub fn var_name(nm: &str) -> Result<String, rinja::Error> {
     Ok(CodeOracle.var_name(nm))
 }
 
 /// Get the idiomatic Swift rendering of an arguments name.
 /// This is the same as the var name but quoting is not required.
-pub fn arg_name(nm: &str) -> Result<String, askama::Error> {
+pub fn arg_name(nm: &str) -> Result<String, rinja::Error> {
     Ok(CodeOracle.var_name(nm))
 }
 
 /// Get a String representing the name used for an individual enum variant.
-pub fn variant_name(v: &Variant) -> Result<String, askama::Error> {
+pub fn variant_name(v: &Variant) -> Result<String, rinja::Error> {
     Ok(CodeOracle.enum_variant_name(v.name()))
 }
 
 /// Get the idiomatic Typescript rendering of an FFI callback function name
-pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
+pub fn ffi_callback_name(nm: &str) -> Result<String, rinja::Error> {
     Ok(CodeOracle.ffi_callback_name(nm))
 }
 
 /// Get the idiomatic Typescript rendering of an FFI struct name
-pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
+pub fn ffi_struct_name(nm: &str) -> Result<String, rinja::Error> {
     Ok(CodeOracle.ffi_struct_name(nm))
 }
 
 /// Get the idiomatic Typescript rendering of docstring
-pub fn docstring(docstring: &str, spaces: &i32) -> Result<String, askama::Error> {
+pub fn docstring(docstring: &str, spaces: &i32) -> Result<String, rinja::Error> {
     let middle = textwrap::indent(&textwrap::dedent(docstring), " * ");
     let wrapped = format!("/**\n{middle}\n */");
 

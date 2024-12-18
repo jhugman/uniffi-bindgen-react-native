@@ -3,7 +3,7 @@
 export interface {{ protocol_name }} {
     {% for meth in methods.iter() -%}
     {%- call ts::docstring(meth, 4) %}
-    {{ meth.name()|fn_name }}({% call ts::arg_list_protocol(meth) %}) {% call ts::throws(meth) -%}
+    {{ meth.name()|fn_name }}({% call ts::arg_list_protocol(meth) %}) {% call ts::throws_kw(meth) -%}
     : {# space #}
     {%- call ts::return_type(meth) %};
     {%- endfor %}

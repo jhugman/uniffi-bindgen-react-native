@@ -22,8 +22,8 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use anyhow::{Context, Result};
-use askama::Template;
 use heck::ToUpperCamelCase;
+use rinja::Template;
 use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 
@@ -205,7 +205,7 @@ impl<'a> TypeRenderer<'a> {
     // import { foo } from "uniffi-bindgen-react-native/bar"
     // ```
     //
-    // Returns an empty string so that it can be used inside an askama `{{ }}` block.
+    // Returns an empty string so that it can be used inside an rinja `{{ }}` block.
     fn import_infra(&self, what: &str, _from: &str) -> &str {
         self.add_import(
             Imported::JSType(what.to_owned()),

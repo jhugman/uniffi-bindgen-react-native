@@ -62,11 +62,11 @@
 // Internal macro common to method_decl and top_func_decl
 {%- macro func_decl(prefix, func_decl, obj_factory, callable, indent) %}
 {%- call docstring(callable, indent) %}
-{{ prefix }}{% call async(callable) %}{{ func_decl }} {{ callable.name()|fn_name }}(
+{{ prefix }}{% call async_kw(callable) %}{{ func_decl }} {{ callable.name()|fn_name }}(
     {%- call arg_list_decl(callable) -%}): {# space #}
 
     {%- call return_type(callable) %}
-    {%- call throws(callable) %} {
+    {%- call throws_kw(callable) %} {
     {%- call call_body(obj_factory, callable) %}
     }
 {%- endmacro %}
@@ -89,7 +89,7 @@
 {%- macro ctor_decl(obj_factory, callable, indent) %}
 {%- call docstring(callable, indent) %}
     constructor(
-    {%- call arg_list_decl(callable) -%}) {%- call throws(callable) %} {
+    {%- call arg_list_decl(callable) -%}) {%- call throws_kw(callable) %} {
         super();
         const pointer =
             {% call to_ffi_method_call(obj_factory, callable) %};
@@ -238,19 +238,19 @@
     {%- endif %}
 {%- endmacro %}
 
-{%- macro async(func) %}
+{%- macro async_kw(func) %}
 {%- if func.is_async() %}async {% endif %}
 {%- endmacro -%}
 
-{%- macro await(func) %}
+{%- macro await_kw(func) %}
 {%- if func.is_async() %}await {% endif %}
 {%- endmacro -%}
 
-{%- macro throws(func) %}
+{%- macro throws_kw(func) %}
 {%- if func.throws() %} /*throws*/{% endif %}
 {%- endmacro -%}
 
-{%- macro try(func) %}
+{%- macro try_kw(func) %}
 {%- if func.throws() %}/*try*/ {% else %}/*try!*/ {% endif %}
 {%- endmacro -%}
 
