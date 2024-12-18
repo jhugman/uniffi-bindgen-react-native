@@ -240,23 +240,29 @@ impl<'a> TypeRenderer<'a> {
     }
 
     fn import_external_type(&self, external: &impl AsType) -> &str {
-        match external.as_type() {
-            Type::External { namespace, .. } => {
-                let type_ = self.as_type(external);
-                let name = type_name(&type_, self).expect("External types should have type names");
-                match &type_ {
-                    Type::Enum { .. } => self.import_ext(&name, &namespace),
-                    Type::CallbackInterface { .. }
-                    | Type::Custom { .. }
-                    | Type::Object { .. }
-                    | Type::Record { .. } => self.import_ext_type(&name, &namespace),
-                    _ => unreachable!(),
-                };
-                let ffi_converter_name = ffi_converter_name(&type_, self)
-                    .expect("FfiConverter for External type will always exist");
-                self.import_converter(ffi_converter_name, &namespace)
-            }
-            _ => unreachable!(),
+        let type_ = external.as_type();
+        if self.ci.is_external(&type_) {
+            let name = type_name(&type_, self).expect("External types should have type names");
+            let module_path = type_
+                .module_path()
+                .expect("External types will have module paths");
+            let namespace = self
+                .ci
+                .namespace_for_module_path(module_path)
+                .expect("Module path should be mappable to namespace");
+            match &type_ {
+                Type::Enum { .. } => self.import_ext(&name, namespace),
+                Type::CallbackInterface { .. }
+                | Type::Custom { .. }
+                | Type::Object { .. }
+                | Type::Record { .. } => self.import_ext_type(&name, namespace),
+                _ => unreachable!(),
+            };
+            let ffi_converter_name = ffi_converter_name(&type_, self)
+                .expect("FfiConverter for External type will always exist");
+            self.import_converter(ffi_converter_name, namespace)
+        } else {
+            ""
         }
     }
 
@@ -280,7 +286,6 @@ impl<'a> TypeRenderer<'a> {
     fn initialization_fns(&self) -> Vec<String> {
         self.ci
             .iter_sorted_types()
-            .filter(|t| !matches!(t, Type::External { .. }))
             .map(|t| CodeOracle.find(&t))
             .filter_map(|ct| ct.initialization_fn())
             .collect()
