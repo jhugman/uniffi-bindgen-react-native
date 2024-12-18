@@ -135,7 +135,7 @@ export const UniffiInternalError = (() => {
   class ContractVersionMismatch extends Error {
     constructor(rustVersion: any, bindingsVersion: any) {
       super(
-        `Incompatible versions of uniffi were used to build the JS ($${bindingsVersion}) from the Rust (${rustVersion})`,
+        `Incompatible versions of uniffi were used to build the JS (${bindingsVersion}) from the Rust (${rustVersion})`,
       );
     }
   }

@@ -42,7 +42,7 @@ export default getter;
 {%-   endfor %}) => {# space #}
 {%-   if callback.returns_result() %}
 {%-     match callback.arg_return_type() %}
-{%-       when Some(return_type) %}UniffiResult<{{ return_type|ffi_type_name }}>
+{%-       when Some(return_type) %}{{ return_type|ffi_type_name }}
 {%-       when None %}UniffiResult<void>
 {%-     endmatch %}
 {%    else %}void

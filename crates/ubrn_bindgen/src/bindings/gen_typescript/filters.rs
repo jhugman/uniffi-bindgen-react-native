@@ -25,7 +25,7 @@ pub(super) fn type_name(
 pub(super) fn ffi_type_name_from_type(
     as_type: &impl AsType,
     types: &TypeRenderer,
-) -> Result<String, askama::Error> {
+) -> Result<String, rinja::Error> {
     let type_ = types.as_type(as_type);
     let ffi_type = FfiType::from(type_);
     ffi_type_name(&ffi_type)
@@ -57,8 +57,15 @@ pub(super) fn ffi_error_converter_name(
     if matches!(type_, Type::Object { .. }) {
         name.push_str("__as_error")
     }
-    if let Type::External { namespace, .. } = as_type.as_type() {
-        types.import_converter(name.clone(), &namespace);
+    if types.ci.is_external(&type_) {
+        let module_path = type_
+            .module_path()
+            .expect("External type should have a module path");
+        let namespace = types
+            .ci
+            .namespace_for_module_path(module_path)
+            .expect("Module path should map to namespace");
+        types.import_converter(name.clone(), namespace);
     }
     Ok(name)
 }
