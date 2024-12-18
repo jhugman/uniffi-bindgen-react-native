@@ -7,6 +7,7 @@ use anyhow::{Error, Result};
 use camino::Utf8PathBuf;
 use clap::Parser;
 use config::ProjectConfig;
+use ubrn_bindgen::AbiFlavor;
 
 mod android;
 mod building;
@@ -55,4 +56,16 @@ impl TryFrom<Utf8PathBuf> for ProjectConfig {
 pub(crate) enum Platform {
     Android,
     Ios,
+    #[cfg(feature = "wasm")]
+    Wasm,
+}
+
+impl From<&Platform> for AbiFlavor {
+    fn from(value: &Platform) -> Self {
+        match value {
+            #[cfg(feature = "wasm")]
+            Platform::Wasm => AbiFlavor::Wasm,
+            _ => AbiFlavor::Jsi,
+        }
+    }
 }

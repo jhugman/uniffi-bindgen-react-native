@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -32,12 +33,18 @@ const rootDir = getRootDir();
 
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === "--path") {
-  console.log(`${rootDir}/bin/cli`);
+  console.log(`${rootDir}/bin/cli.cjs`);
   process.exit(0);
 }
 
 // Construct the path to the Cargo.toml file
 const manifestPath = path.join(rootDir, "crates/ubrn_cli/Cargo.toml");
+
+if (!fs.existsSync(path.join(rootDir, "target"))) {
+  console.log(
+    "🤖 Building the uniffi-bindgen-react-native command… this is only needed first time",
+  );
+}
 
 // Run the cargo command
 const command = `cargo run --quiet --manifest-path "${manifestPath}" -- ${args.join(" ")}`;

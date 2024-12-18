@@ -37,7 +37,7 @@ impl Bootstrap for YarnCmd {
         let mut cmd = Command::new("yarn");
         run_cmd(
             cmd.current_dir(repository_root()?)
-                .arg("--no-lockfile")
+                .arg("--frozen-lockfile")
                 .arg("--emoji")
                 .arg("true"),
         )

@@ -2,6 +2,30 @@ The `uniffi.toml` file is a toml file used to customize [the generation of C++ a
 
 As of time of writing, only `typescript` bindings generation exposes any options for customization, and only for `customTypes`.
 
+### Logging the FFI
+
+The generated Typescript code can optionally be created to generate logging.
+
+```toml
+[bindings.typescript]
+logLevel = "debug"
+consoleImport = "@/hermes"
+```
+
+`consoleImport` is an optional string which is the location of a module from which a `console` will be imported. This is useful in environments where `console` do not exist.
+
+#### Log level
+
+Possible values:
+
+- `none`: The Uniffi generated Typescript produces no logging.
+- `debug`: The generated Typescript records the call sites of `async` functions.
+- `verbose`: As `debug` but also: all calls into Rust are logged to the console. This can be quite… verbose.
+
+The recording of `async` call sites is also helpful for app development, so `process.env.NODE_ENV !== "production"` is checked at startup of runtime.
+
+When `process.env.NODE_ENV === "production"`, async errors detected by Rust are reported but not with a helpful Typescript stack trace. Recording the call sites has a performance cost so is turned off for production.
+
 ### Typescript custom types
 
 From [the uniffi-rs manual](https://mozilla.github.io/uniffi-rs/latest/udl/custom_types.html):

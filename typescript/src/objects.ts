@@ -5,7 +5,7 @@
  */
 
 import {
-  AbstractFfiConverterArrayBuffer,
+  AbstractFfiConverterByteArray,
   type FfiConverter,
   FfiConverterUInt64,
 } from "./ffi-converters";
@@ -130,9 +130,9 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
 }
 
 /// Due to some mismatches in the ffi converter mechanisms, errors are a RustBuffer holding a pointer
-export class FfiConverterObjectAsError<
-  T,
-> extends AbstractFfiConverterArrayBuffer<UniffiThrownObject<T>> {
+export class FfiConverterObjectAsError<T> extends AbstractFfiConverterByteArray<
+  UniffiThrownObject<T>
+> {
   constructor(
     private typeName: string,
     private innerConverter: FfiConverter<UnsafeMutableRawPointer, T>,

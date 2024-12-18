@@ -5,17 +5,16 @@
  */
 use std::{fs, process::Command};
 
-use crate::{
-    bootstrap::{Bootstrap, YarnCmd},
-    util::{build_root, repository_root},
-};
-
-use anyhow::Result;
-
+use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use pathdiff::diff_utf8_paths;
 use ubrn_common::{find, run_cmd_quietly};
+
+use crate::{
+    bootstrap::{Bootstrap, YarnCmd},
+    util::{build_root, repository_root},
+};
 
 fn typescript_dir() -> Result<Utf8PathBuf> {
     let root = repository_root()?;
@@ -48,9 +47,12 @@ pub(crate) struct EntryArg {
 }
 
 impl EntryArg {
-    pub(crate) fn prepare(&self) -> Result<Utf8PathBuf> {
+    pub(crate) fn prepare_for_jsi(&self) -> Result<Utf8PathBuf> {
         YarnCmd.ensure_ready()?;
-        let file = self.file.canonicalize_utf8()?;
+        let file = self
+            .file
+            .canonicalize_utf8()
+            .context(format!("{} expected, but wasn't there", &self.file))?;
         let stem = file.file_stem().expect("a filename with an extension");
         let name = self.name.as_deref().unwrap_or(stem);
 

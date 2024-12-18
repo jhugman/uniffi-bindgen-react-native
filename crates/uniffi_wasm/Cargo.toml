@@ -1,0 +1,8 @@
+[package]
+name = "uniffi_wasm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uniffi = { workspace = true }
+wasm-bindgen = "0.2.97"

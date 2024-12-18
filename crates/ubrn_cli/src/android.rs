@@ -39,6 +39,9 @@ pub(crate) struct AndroidConfig {
 
     #[serde(default = "AndroidConfig::default_package_name")]
     pub(crate) package_name: String,
+
+    #[serde(default = "AndroidConfig::default_codegen_output_dir")]
+    pub(crate) codegen_output_dir: String,
 }
 
 impl Default for AndroidConfig {
@@ -82,11 +85,19 @@ impl AndroidConfig {
     fn default_jni_libs() -> String {
         "src/main/jniLibs".to_string()
     }
+
+    fn default_codegen_output_dir() -> String {
+        workspace::package_json().android_codegen_output_dir()
+    }
 }
 
 impl AndroidConfig {
     pub(crate) fn directory(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         project_root.join(&self.directory)
+    }
+
+    pub(crate) fn codegen_output_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.codegen_output_dir)
     }
 
     pub(crate) fn jni_libs(&self, project_root: &Utf8Path) -> Utf8PathBuf {

@@ -1,6 +1,6 @@
 {
   "name": "uniffi-bindgen-react-native",
-  "version": "0.28.2-0",
+  "version": "0.28.3-1",
   "description": "Uniffi bindings generator for calling Rust from React Native",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {
@@ -17,6 +17,9 @@
     "ubrn": "./bin/cli.cjs",
     "uniffi-bindgen-react-native": "./bin/cli.cjs"
   },
+  "scripts": {
+    "test": "./scripts/run-tests.sh"
+  },
   "devDependencies": {
     "abortcontroller-polyfill": "^1.7.5",
     "metro": "^0.80.8",
@@ -24,6 +27,8 @@
     "prettier": "^3.2.5",
     "source-licenser": "^2.0.6",
     "tsc-alias": "^1.8.8",
+    "tsx": "^4.19.2",
     "typescript": "^5.4.5"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

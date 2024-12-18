@@ -46,8 +46,11 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
-  integration-tests-generation:
-    name: 🧩 Integration tests (generation)
+      - name: Run tests for binaries
+        run: cargo test --bins
+
+  integration-tests-jsi-bindings:
+    name: 🧩 Integration tests (JSI bindings)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,8 +61,26 @@ jobs:
       - name: Installing hermes and test-runner
         run: cargo xtask bootstrap
 
-      - name: Run tests of generated bindings
+      - name: Run tests of generated JSI bindings
         run: ./scripts/run-tests.sh
+
+  integration-tests-wasm-bindings:
+    name: 🧩 Integration tests (WASM bindings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installing
+        run: cargo xtask bootstrap yarn
+
+      - name: Installing WASM
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Installing wasm-bindgen
+        run: cargo install wasm-bindgen-cli
+
+      - name: Run tests of generated WASM bindings
+        run: ./scripts/run-tests.sh --flavor wasm
 
   integration-tests-checkout:
     name: 🧩 Integration tests (checkout)

@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
-import { RustBuffer } from "./ffi-types";
+import { type UniffiByteArray, RustBuffer } from "./ffi-types";
 
 // https://github.com/mozilla/uniffi-rs/blob/main/docs/manual/src/internals/lifting_and_lowering.md
 export interface FfiConverter<FfiType, TsType> {
@@ -27,17 +27,17 @@ export abstract class FfiConverterPrimitive<T> implements FfiConverter<T, T> {
   abstract allocationSize(value: T): number;
 }
 
-export abstract class AbstractFfiConverterArrayBuffer<TsType>
-  implements FfiConverter<ArrayBuffer, TsType>
+export abstract class AbstractFfiConverterByteArray<TsType>
+  implements FfiConverter<UniffiByteArray, TsType>
 {
-  lift(value: ArrayBuffer): TsType {
-    const buffer = RustBuffer.fromArrayBuffer(value);
+  lift(value: UniffiByteArray): TsType {
+    const buffer = RustBuffer.fromByteArray(value);
     return this.read(buffer);
   }
-  lower(value: TsType): ArrayBuffer {
+  lower(value: TsType): UniffiByteArray {
     const buffer = RustBuffer.withCapacity(this.allocationSize(value));
     this.write(value, buffer);
-    return buffer.arrayBuffer;
+    return buffer.byteArray;
   }
   abstract read(from: RustBuffer): TsType;
   abstract write(value: TsType, into: RustBuffer): void;
@@ -161,7 +161,7 @@ export const FfiConverterDuration = (() => {
   const nanosConverter = FfiConverterUInt32;
   const msPerSecBigInt = BigInt("1000");
   const nanosPerMs = 1e6;
-  class FFIConverter extends AbstractFfiConverterArrayBuffer<UniffiDuration> {
+  class FFIConverter extends AbstractFfiConverterByteArray<UniffiDuration> {
     read(from: RustBuffer): UniffiDuration {
       const secsBigInt = secondsConverter.read(from);
       const nanos = nanosConverter.read(from);
@@ -205,7 +205,7 @@ export const FfiConverterTimestamp = (() => {
     return new Date(ms);
   }
 
-  class FFIConverter extends AbstractFfiConverterArrayBuffer<UniffiTimestamp> {
+  class FFIConverter extends AbstractFfiConverterByteArray<UniffiTimestamp> {
     read(from: RustBuffer): UniffiTimestamp {
       const secsBigInt = secondsConverter.read(from);
       const nanos = nanosConverter.read(from);
@@ -233,7 +233,7 @@ export const FfiConverterTimestamp = (() => {
   return new FFIConverter();
 })();
 
-export class FfiConverterOptional<Item> extends AbstractFfiConverterArrayBuffer<
+export class FfiConverterOptional<Item> extends AbstractFfiConverterByteArray<
   Item | undefined
 > {
   private static flagConverter = FfiConverterBool;
@@ -261,7 +261,7 @@ export class FfiConverterOptional<Item> extends AbstractFfiConverterArrayBuffer<
   }
 }
 
-export class FfiConverterArray<Item> extends AbstractFfiConverterArrayBuffer<
+export class FfiConverterArray<Item> extends AbstractFfiConverterByteArray<
   Array<Item>
 > {
   private static sizeConverter = FfiConverterInt32;
@@ -291,7 +291,7 @@ export class FfiConverterArray<Item> extends AbstractFfiConverterArrayBuffer<
   }
 }
 
-export class FfiConverterMap<K, V> extends AbstractFfiConverterArrayBuffer<
+export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
   Map<K, V>
 > {
   private static sizeConverter = FfiConverterInt32;
@@ -344,7 +344,7 @@ export const FfiConverterArrayBuffer = (() => {
     return value;
   }
   const lengthConverter = FfiConverterInt32;
-  class FFIConverter extends AbstractFfiConverterArrayBuffer<ArrayBuffer> {
+  class FFIConverter extends AbstractFfiConverterByteArray<ArrayBuffer> {
     read(from: RustBuffer): ArrayBuffer {
       const length = lengthConverter.read(from);
       return from.readBytes(length);

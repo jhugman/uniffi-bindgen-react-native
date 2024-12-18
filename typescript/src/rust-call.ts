@@ -4,52 +4,63 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
+import { type UniffiByteArray } from "./ffi-types";
 
 export const CALL_SUCCESS = 0;
 export const CALL_ERROR = 1;
 export const CALL_UNEXPECTED_ERROR = 2;
 export const CALL_CANCELLED = 3;
 
-type StringLifter = (arrayBuffer: ArrayBuffer) => string;
-const emptyStringLifter = (arrayBuffer: ArrayBuffer) =>
+type StringLifter = (bytes: UniffiByteArray) => string;
+const emptyStringLifter = (bytes: UniffiByteArray) =>
   "An error occurred decoding a string";
 
 export type UniffiRustCallStatus = {
   code: number;
-  errorBuf?: ArrayBuffer;
+  errorBuf?: UniffiByteArray;
 };
-export function uniffiCreateCallStatus(): UniffiRustCallStatus {
+export class UniffiRustCaller {
+  constructor(
+    private statusConstructor: () => UniffiRustCallStatus = uniffiCreateCallStatus,
+  ) {}
+
+  rustCall<T>(
+    caller: RustCallFn<T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): T {
+    return this.makeRustCall(caller, liftString);
+  }
+
+  rustCallWithError<T>(
+    errorHandler: UniffiErrorHandler,
+    caller: RustCallFn<T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): T {
+    return this.makeRustCall(caller, liftString, errorHandler);
+  }
+
+  createCallStatus(): UniffiRustCallStatus {
+    return this.statusConstructor();
+  }
+
+  makeRustCall<T>(
+    caller: RustCallFn<T>,
+    liftString: StringLifter,
+    errorHandler?: UniffiErrorHandler,
+  ): T {
+    const callStatus = this.statusConstructor();
+    let returnedVal = caller(callStatus);
+    uniffiCheckCallStatus(callStatus, liftString, errorHandler);
+    return returnedVal;
+  }
+}
+
+function uniffiCreateCallStatus(): UniffiRustCallStatus {
   return { code: CALL_SUCCESS };
 }
 
-export type UniffiErrorHandler = (buffer: ArrayBuffer) => Error;
-type RustCaller<T> = (status: UniffiRustCallStatus) => T;
-
-export function rustCall<T>(
-  caller: RustCaller<T>,
-  liftString: StringLifter = emptyStringLifter,
-): T {
-  return makeRustCall(caller, liftString);
-}
-
-export function rustCallWithError<T>(
-  errorHandler: UniffiErrorHandler,
-  caller: RustCaller<T>,
-  liftString: StringLifter = emptyStringLifter,
-): T {
-  return makeRustCall(caller, liftString, errorHandler);
-}
-
-export function makeRustCall<T>(
-  caller: RustCaller<T>,
-  liftString: StringLifter,
-  errorHandler?: UniffiErrorHandler,
-): T {
-  const callStatus = uniffiCreateCallStatus();
-  let returnedVal = caller(callStatus);
-  uniffiCheckCallStatus(callStatus, liftString, errorHandler);
-  return returnedVal;
-}
+export type UniffiErrorHandler = (buffer: UniffiByteArray) => Error;
+type RustCallFn<T> = (status: UniffiRustCallStatus) => T;
 
 function uniffiCheckCallStatus(
   callStatus: UniffiRustCallStatus,

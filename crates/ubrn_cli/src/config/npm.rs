@@ -47,6 +47,14 @@ impl PackageJson {
         }
     }
 
+    pub(crate) fn android_codegen_output_dir(&self) -> String {
+        self.codegen_config.output_dir.android.clone()
+    }
+
+    pub(crate) fn ios_codegen_output_dir(&self) -> String {
+        self.codegen_config.output_dir.ios.clone()
+    }
+
     pub(crate) fn repo(&self) -> &PackageJsonRepo {
         &self.repository
     }
@@ -69,6 +77,8 @@ pub(crate) struct RnCodegenConfig {
     pub(crate) js_srcs_dir: String,
     #[serde(default)]
     android: RnAndroidCodegenConfig,
+    #[serde(default)]
+    output_dir: RnOutputDirCodegenConfig,
 }
 
 impl Default for RnCodegenConfig {
@@ -81,4 +91,30 @@ impl Default for RnCodegenConfig {
 #[serde(rename_all = "camelCase")]
 struct RnAndroidCodegenConfig {
     java_package_name: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RnOutputDirCodegenConfig {
+    #[serde(default = "default_ios_codegen_output_dir")]
+    ios: String,
+    #[serde(default = "default_android_codegen_output_dir")]
+    android: String,
+}
+
+impl Default for RnOutputDirCodegenConfig {
+    fn default() -> Self {
+        Self {
+            ios: default_ios_codegen_output_dir(),
+            android: default_android_codegen_output_dir(),
+        }
+    }
+}
+
+fn default_android_codegen_output_dir() -> String {
+    "android/generated".to_string()
+}
+
+fn default_ios_codegen_output_dir() -> String {
+    "ios/generated".to_string()
 }

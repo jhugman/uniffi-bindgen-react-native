@@ -4,11 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import { UniffiInternalError } from "./errors";
+import { type UniffiByteArray } from "./ffi-types";
 import { UniffiHandleMap, type UniffiHandle } from "./handle-map";
 import {
   type UniffiErrorHandler,
   type UniffiRustCallStatus,
-  makeRustCall,
+  UniffiRustCaller,
 } from "./rust-call";
 
 const UNIFFI_RUST_FUTURE_POLL_READY = 0;
@@ -50,13 +51,14 @@ type PollFunc = (
  *  future.
  */
 export async function uniffiRustCallAsync<F, T>(
+  rustCaller: UniffiRustCaller,
   rustFutureFunc: () => bigint,
   pollFunc: PollFunc,
   cancelFunc: (rustFuture: bigint) => void,
   completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
-  liftString: (arrayBuffer: ArrayBuffer) => string,
+  liftString: (bytes: UniffiByteArray) => string,
   asyncOpts?: { signal: AbortSignal },
   errorHandler?: UniffiErrorHandler,
 ): Promise<T> {
@@ -92,7 +94,7 @@ export async function uniffiRustCallAsync<F, T>(
 
     // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
-      makeRustCall(
+      rustCaller.makeRustCall(
         (status) => completeFunc(rustFuture, status),
         liftString,
         errorHandler,

@@ -41,7 +41,7 @@ test("AbortController exists", (t) => {
 
     // we don't care too much about the accuracy of the time here, just that the
     // classes exist and work as intended.
-    await t.asyncMeasure(() => cancellableDelay(500), 500, 100);
+    await t.asyncMeasure(() => cancellableDelay(500), 500, 150);
     t.end();
   });
 

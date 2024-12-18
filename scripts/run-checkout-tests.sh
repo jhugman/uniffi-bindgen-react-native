@@ -2,7 +2,7 @@
 
 set -e
 
-ubrn=./bin/cli
+ubrn=./bin/cli.cjs
 
 function clean_up {
   rm -rf rust_modules

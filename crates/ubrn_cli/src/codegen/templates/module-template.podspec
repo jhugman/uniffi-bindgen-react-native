@@ -24,12 +24,15 @@ Pod::Spec.new do |s|
   {%- let framework = self.relative_to(root, dir) %}
   {%- let dir = self.config.project.ios.directory(root) %}
   {%- let ios = self.relative_to(root, dir) %}
+  {%- let dir = self.config.project.ios.codegen_output_dir(root) %}
+  {%- let codegen = self.relative_to(root, dir) %}
   {%- let dir = self.config.project.tm.cpp_path(root) %}
   {%- let tm = self.relative_to(root, dir) %}
   {%- let dir = self.config.project.bindings.cpp_path(root) %}
   {%- let bindings = self.relative_to(root, dir) -%}
-  s.source_files = "{{ ios }}/**/*.{h,m,mm}", "{{ tm }}/**/*.{hpp,cpp,c,h}", "{{ bindings }}/**/*.{hpp,cpp,c,h}"
+  s.source_files = "{{ ios }}/**/*.{h,m,mm}", "{{ codegen }}/**/*.{h,m,mm}", "{{ tm }}/**/*.{hpp,cpp,c,h}", "{{ bindings }}/**/*.{hpp,cpp,c,h}"
   s.vendored_frameworks = "{{ framework }}"
+  s.dependency    "uniffi-bindgen-react-native", "{{ self.config.project.ubrn_version() }}"
 
   # Use install_modules_dependencies helper to install the dependencies if React Native version >=0.71.0.
   # See https://github.com/facebook/react-native/blob/febf6b7f33fdb4904669f99d795eba4c0f95d7bf/scripts/cocoapods/new_architecture.rb#L79.

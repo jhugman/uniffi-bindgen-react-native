@@ -30,6 +30,11 @@ impl ModuleMetadata {
         format!("{}.hpp", self.namespace)
     }
 
+    #[cfg(feature = "wasm")]
+    pub fn rs_filename(&self) -> String {
+        format!("{}.rs", self.namespace)
+    }
+
     pub fn ts(&self) -> String {
         self.namespace.clone()
     }
