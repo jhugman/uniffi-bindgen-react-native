@@ -48,7 +48,7 @@ const {
 const uniffiCaller = new UniffiRustCaller();
 {%- else %}
 const nativeModule = () => wasmBundle;
-const uniffiCaller = new UniffiRustCaller(() => new wasmBundle.CallStatus());
+const uniffiCaller = new UniffiRustCaller(() => new wasmBundle.RustCallStatus());
 {%- endif %}
 
 const uniffiIsDebug =

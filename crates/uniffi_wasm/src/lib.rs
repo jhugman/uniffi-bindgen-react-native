@@ -59,23 +59,24 @@ impl IntoRust<ForeignBytes> for uniffi::RustBuffer {
 
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Default)]
-pub struct CallStatus {
+pub struct RustCallStatus {
     pub code: i8,
     pub error_buf: Option<ForeignBytes>,
 }
 
 #[wasm_bindgen]
-impl CallStatus {
+impl RustCallStatus {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl CallStatus {
-    pub fn copy_into(&mut self, rust: RustCallStatus) {
+impl RustCallStatus {
+    pub fn copy_into(&mut self, rust: uniffi::RustCallStatus) {
         self.code = rust.code as i8;
-        self.error_buf = None;
+        let buf = std::mem::ManuallyDrop::into_inner(rust.error_buf).destroy_into_vec();
+        self.error_buf = Some(buf);
     }
 }
 

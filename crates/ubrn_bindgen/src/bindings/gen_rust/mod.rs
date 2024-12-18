@@ -164,13 +164,18 @@ impl<'a> ComponentTemplate<'a> {
         ident("__module")
     }
 
+    fn uniffi_ident(&self) -> Ident {
+        ident("__uniffi")
+    }
+
     fn prelude(&self, ci: &ComponentInterface) -> TokenStream {
         let runtime_alias_ident = self.runtime_ident();
         let runtime_ident = self.flavor.runtime_module();
         let namespace_ident = ident(ci.namespace());
         let module_ident = self.module_ident();
+        let uniffi_alias_ident = self.uniffi_ident();
         quote! {
-            use #runtime_ident::{self as #runtime_alias_ident, IntoRust};
+            use #runtime_ident::{self as #runtime_alias_ident, uniffi as #uniffi_alias_ident, IntoRust};
             use #namespace_ident as #module_ident;
         }
     }
@@ -187,6 +192,8 @@ impl<'a> ComponentTemplate<'a> {
     fn ffi_function(&mut self, func: &FfiFunction) -> TokenStream {
         let module = self.module_ident();
         let runtime = self.runtime_ident();
+        let uniffi = self.uniffi_ident();
+
         let annotation = quote! { #[#runtime::export] };
         let func_ident = ident(func.name());
         let foreign_func_ident = self.flavor.foreign_ident(func.name());
@@ -227,8 +234,8 @@ impl<'a> ComponentTemplate<'a> {
 
             quote! {
                 #annotation
-                pub fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::CallStatus) #decl_suffix {
-                    let mut #rust_status_ident = #runtime::RustCallStatus::default();
+                pub fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
+                    let mut #rust_status_ident = #uniffi::RustCallStatus::default();
                     #let_value #module::#func_ident(#args_call &mut #rust_status_ident) #call_suffix;
                     #foreign_status_ident.copy_into(#rust_status_ident);
                     #return_value
@@ -295,7 +302,7 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::Callback(_) => quote! { #module::Callback },
             FfiType::Struct(_) => quote! { #module::Struct },
             FfiType::Handle => quote! { #module::Handle },
-            FfiType::RustCallStatus => quote! { #module::RustCallStatus },
+            FfiType::RustCallStatus => quote! { #runtime::RustCallStatus },
             FfiType::Reference(_ffi_type) => todo!(),
             FfiType::VoidPointer => quote! { #runtime::VoidPointer },
         }
