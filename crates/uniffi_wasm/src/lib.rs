@@ -37,6 +37,8 @@ identity_into_rust!(Int8, i8);
 identity_into_rust!(Int16, i16);
 identity_into_rust!(Int32, i32);
 identity_into_rust!(Int64, i64);
+identity_into_rust!(Float32, f32);
+identity_into_rust!(Float64, f64);
 
 pub type VoidPointer = u64;
 impl IntoRust<VoidPointer> for uniffi::VoidPointer {
