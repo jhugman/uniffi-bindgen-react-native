@@ -171,4 +171,4 @@ noOverwrite:
     - CMakeLists.txt
 ```
 
-You can generate the build files once then not overwrite them. Once exclude the files they can be safely edited.
+You can generate the build files once then not overwrite them. Once you excluded the files, they can be safely edited.
