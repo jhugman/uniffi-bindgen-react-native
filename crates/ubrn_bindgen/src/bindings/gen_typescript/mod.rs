@@ -86,6 +86,10 @@ impl TsFlavorParams<'_> {
     pub(crate) fn supports_text_encoder(&self) -> bool {
         !matches!(self.inner, &AbiFlavor::Jsi)
     }
+
+    pub(crate) fn supports_finalization_registry(&self) -> bool {
+        !matches!(self.inner, &AbiFlavor::Jsi)
+    }
 }
 
 #[derive(Template)]

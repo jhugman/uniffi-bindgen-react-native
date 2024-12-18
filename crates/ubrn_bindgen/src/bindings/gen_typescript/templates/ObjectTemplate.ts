@@ -115,10 +115,11 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
      * {@inheritDoc uniffi-bindgen-react-native#UniffiAbstractObject.uniffiDestroy}
      */
     uniffiDestroy(): void {
-        if ((this as any)[destructorGuardSymbol]) {
+        const ptr = (this as any)[destructorGuardSymbol];
+        if (ptr !== undefined) {
             const pointer = {{ obj_factory }}.pointer(this);
             {{ obj_factory }}.freePointer(pointer);
-            this[destructorGuardSymbol].markDestroyed();
+            {{ obj_factory }}.unbless(ptr);
             delete (this as any)[destructorGuardSymbol];
         }
     }
@@ -148,6 +149,24 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
         return instance;
     },
 
+    {% if flavor.supports_finalization_registry() %}
+    registry: new FinalizationRegistry<UnsafeMutableRawPointer>((heldValue) => {
+        {{ obj_factory }}.freePointer(heldValue);
+    }),
+
+    bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
+        const ptr = {
+            p, // make sure this object doesn't get optimized away.
+            markDestroyed: () => undefined,
+        };
+        {{ obj_factory }}.registry.register(ptr, p, ptr);
+        return ptr;
+    },
+
+    unbless(ptr: UniffiRustArcPtr) {
+        {{ obj_factory }}.registry.unregister(ptr);
+    },
+    {%- else %}
     bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
         return uniffiCaller.rustCall(
             /*caller:*/ (status) =>
@@ -155,6 +174,11 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
             /*liftString:*/ FfiConverterString.lift
         );
     },
+
+    unbless(ptr: UniffiRustArcPtr) {
+        ptr.markDestroyed();
+    },
+    {%- endif %}
 
     pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
         if ((obj as any)[destructorGuardSymbol] === undefined) {

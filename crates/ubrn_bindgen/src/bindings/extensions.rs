@@ -300,6 +300,11 @@ pub(crate) impl FfiFunction {
         let name = self.name();
         name.contains("ffi__") && name.contains("_internal_")
     }
+
+    fn is_unsafe(&self) -> bool {
+        let name = self.name();
+        name.contains("_fn_clone_") || name.contains("_fn_free_") || name.contains("_rustbuffer_")
+    }
 }
 
 #[ext]

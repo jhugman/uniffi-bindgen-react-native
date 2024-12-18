@@ -15,7 +15,10 @@ use uniffi_bindgen::{
 };
 
 use crate::{
-    bindings::{extensions::ComponentInterfaceExt, metadata::ModuleMetadata},
+    bindings::{
+        extensions::{ComponentInterfaceExt, FfiFunctionExt},
+        metadata::ModuleMetadata,
+    },
     switches::SwitchArgs,
     AbiFlavor,
 };
@@ -231,10 +234,15 @@ impl<'a> ComponentTemplate<'a> {
             } else {
                 quote! {}
             };
+            let unsafe_ = if func.is_unsafe() {
+                quote! { unsafe }
+            } else {
+                quote! {}
+            };
 
             quote! {
                 #annotation
-                pub fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
+                pub #unsafe_ fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
                     let mut #rust_status_ident = #uniffi::RustCallStatus::default();
                     #let_value #module::#func_ident(#args_call &mut #rust_status_ident) #call_suffix;
                     #foreign_status_ident.copy_into(#rust_status_ident);
@@ -322,6 +330,7 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::Float32 => quote! { f32 },
             FfiType::Float64 => quote! { f64 },
             FfiType::RustBuffer(_) => quote! { #uniffi::RustBuffer },
+            FfiType::RustArcPtr(_) => quote! { #uniffi::VoidPointer },
             _ => todo!(),
         }
     }

@@ -8,6 +8,7 @@ use wasm_bindgen::prelude::*;
 
 pub mod uniffi {
     pub use uniffi::{RustBuffer, RustCallStatus};
+    pub type VoidPointer = *const std::ffi::c_void;
 }
 
 pub trait IntoRust<HighLevel> {
@@ -38,7 +39,7 @@ identity_into_rust!(Int32, i32);
 identity_into_rust!(Int64, i64);
 
 pub type VoidPointer = u64;
-impl IntoRust<VoidPointer> for *const std::ffi::c_void {
+impl IntoRust<VoidPointer> for uniffi::VoidPointer {
     fn into_rust(v: VoidPointer) -> Self {
         v as Self
     }
