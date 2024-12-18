@@ -10,7 +10,7 @@ use crate::bindings::extensions::{ComponentInterfaceExt, FfiTypeExt};
 
 pub fn ffi_type_name_from_js(ffi_type: &FfiType) -> Result<String, rinja::Error> {
     Ok(match ffi_type {
-        FfiType::Reference(inner) => ffi_type_name_from_js(inner)?,
+        FfiType::MutReference(inner) | FfiType::Reference(inner) => ffi_type_name_from_js(inner)?,
         _ => ffi_type_name(ffi_type)?,
     })
 }
@@ -31,7 +31,7 @@ pub fn bridging_namespace(
         | FfiType::RustCallStatus
         | FfiType::Callback(_)
         | FfiType::Struct(_) => ci.cpp_namespace(),
-        FfiType::Reference(inner) => bridging_namespace(inner, ci)?,
+        FfiType::MutReference(inner) | FfiType::Reference(inner) => bridging_namespace(inner, ci)?,
         _ => ffi_type.cpp_namespace(ci),
     })
 }
@@ -65,7 +65,9 @@ pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, rinja::Error> {
         FfiType::Struct(nm) => ffi_struct_name(nm)?,
         FfiType::Handle => "/*handle*/ uint64_t".into(),
         FfiType::RustCallStatus => "RustCallStatus".into(),
-        FfiType::Reference(inner) => format!("{} *", ffi_type_name(inner)?),
+        FfiType::MutReference(inner) | FfiType::Reference(inner) => {
+            format!("{} *", ffi_type_name(inner)?)
+        }
         FfiType::VoidPointer => "void *".into(), // ???
     })
 }
