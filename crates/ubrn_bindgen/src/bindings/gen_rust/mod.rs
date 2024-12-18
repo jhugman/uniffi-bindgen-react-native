@@ -160,15 +160,15 @@ impl<'a> ComponentTemplate<'a> {
     }
 
     fn runtime_ident(&self) -> Ident {
-        ident("__runtime")
+        ident("f")
     }
 
     fn module_ident(&self) -> Ident {
-        ident("__module")
+        ident("r")
     }
 
     fn uniffi_ident(&self) -> Ident {
-        ident("__uniffi")
+        ident("u")
     }
 
     fn prelude(&self, ci: &ComponentInterface) -> TokenStream {
@@ -216,9 +216,9 @@ impl<'a> ComponentTemplate<'a> {
 
         let needs_call_status = func.has_rust_call_status_arg();
         if needs_call_status {
-            let rust_status_ident = ident("__rust_call_status");
-            let foreign_status_ident = ident("__call_status");
-            let return_ident = ident("__return");
+            let rust_status_ident = ident("u_status_");
+            let foreign_status_ident = ident("f_status_");
+            let return_ident = ident("value_");
             let let_value = if has_return {
                 quote! { let #return_ident = }
             } else {
@@ -425,12 +425,12 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[__runtime::export]
-            pub fn ubrn_my_function(__call_status: &mut __runtime::CallStatus) -> __runtime::Int8 {
-                let mut __rust_call_status = __runtime::RustCallStatus::default();
-                let __return = __module::my_function(&mut __rust_call_status).into_js();
-                __call_status.copy_into(__rust_call_status);
-                __return
+            #[f::export]
+            pub fn ubrn_my_function(f_status_: &mut f::RustCallStatus) -> f::Int8 {
+                let mut u_status_ = u::RustCallStatus::default();
+                let value_ = r::my_function(&mut u_status_).into_js();
+                f_status_.copy_into(u_status_);
+                value_
             }
             "
             )
@@ -453,16 +453,12 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[__runtime::export]
-            pub fn ubrn_my_function(
-                num: __runtime::Int32,
-                __call_status: &mut __runtime::CallStatus,
-            ) -> __runtime::Int8 {
-                let mut __rust_call_status = __runtime::RustCallStatus::default();
-                let __return = __module::my_function(i32::into_rust(num), &mut __rust_call_status)
-                    .into_js();
-                __call_status.copy_into(__rust_call_status);
-                __return
+            #[f::export]
+            pub fn ubrn_my_function(num: f::Int32, f_status_: &mut f::RustCallStatus) -> f::Int8 {
+                let mut u_status_ = u::RustCallStatus::default();
+                let value_ = r::my_function(i32::into_rust(num), &mut u_status_).into_js();
+                f_status_.copy_into(u_status_);
+                value_
             }
             "
             )
@@ -485,21 +481,21 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-                #[__runtime::export]
+                #[f::export]
                 pub fn ubrn_my_function(
-                    left: __runtime::Int32,
-                    right: __runtime::Float32,
-                    __call_status: &mut __runtime::CallStatus,
-                ) -> __runtime::Int8 {
-                    let mut __rust_call_status = __runtime::RustCallStatus::default();
-                    let __return = __module::my_function(
+                    left: f::Int32,
+                    right: f::Float32,
+                    f_status_: &mut f::RustCallStatus,
+                ) -> f::Int8 {
+                    let mut u_status_ = u::RustCallStatus::default();
+                    let value_ = r::my_function(
                             i32::into_rust(left),
                             f32::into_rust(right),
-                            &mut __rust_call_status,
+                            &mut u_status_,
                         )
                         .into_js();
-                    __call_status.copy_into(__rust_call_status);
-                    __return
+                    f_status_.copy_into(u_status_);
+                    value_
                 }"
             )
         );
@@ -517,11 +513,11 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[__runtime::export]
-            pub fn ubrn_my_function(__call_status: &mut __runtime::CallStatus) {
-                let mut __rust_call_status = __runtime::RustCallStatus::default();
-                __module::my_function(&mut __rust_call_status);
-                __call_status.copy_into(__rust_call_status);
+            #[f::export]
+            pub fn ubrn_my_function(f_status_: &mut f::RustCallStatus) {
+                let mut u_status_ = u::RustCallStatus::default();
+                r::my_function(&mut u_status_);
+                f_status_.copy_into(u_status_);
             }
             "
             )
