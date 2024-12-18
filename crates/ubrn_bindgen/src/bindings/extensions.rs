@@ -173,7 +173,7 @@ pub(crate) impl ComponentInterface {
     fn iter_sorted_types(&self) -> impl Iterator<Item = Type> {
         let mut graph = TopologicalSort::<String>::new();
         let mut types: HashMap<String, Type> = Default::default();
-        for type_ in self.iter_types() {
+        for type_ in self.iter_local_types() {
             match type_ {
                 Type::Object { name, .. } => {
                     // Objects only rely on a pointer, not the fields backing it.
@@ -236,7 +236,10 @@ pub(crate) impl ComponentInterface {
 
         // I think that types should be empty by now, but we should add the remaining
         // values in to sorted, then return.
-        sorted.into_iter().chain(types.into_values())
+        sorted
+            .into_iter()
+            .chain(types.into_values())
+            .filter(|t| !self.is_external(t))
     }
 }
 
