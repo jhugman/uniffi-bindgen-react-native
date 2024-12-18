@@ -75,3 +75,11 @@ error Failed to build ios project. "xcodebuild" exited with error code '65'. To 
 ```
 
 This can be fixed either by selecting a Simulator rather than a device (it's next to the Play button), or by following the error message and adding a development team in the Signings & Capabilities editor.
+
+### Compiling for iOS gives an error `'UniffiCallInvoker.h' file not found`
+
+We've seen this where there have been problems with the `*.podspec` file for the library.
+
+- if the dependency on `uniffi-bindgen-react-native` isn't listed, it might be the podspec file isn't being generated at all.
+- if the dependency on `uniffi-bindgen-react-native` is listed, check that the app's `Podfile` isn't also depending on `uniffi-bindgen-react-native`. Remove one of these dependencies.
+- there may be multiple podspec files in your library, both of which depending on `uniffi-bindgen-react-native`. The name in the `ubrn.config.yaml` file can be deleted (where the podspec filename is derived from), as it should match the name derived from the `package.json` file.

@@ -162,3 +162,13 @@ In this case, changing the location of the `ts` directory will require changing 
 This list of [glob patterns](https://en.wikipedia.org/wiki/Glob_(programming)) of file that should not be generated or overwritten by the `--and-generate` flag, and the `generate turbo-module` command.
 
 This is useful if you have customized one or more of the generated files, and do not want lose those changes.
+
+For example, if you want to add C++ files to the library, you may want to change the build files.
+
+```yaml
+noOverwrite:
+    - "*.podspec"
+    - CMakeLists.txt
+```
+
+You can generate the build files once then not overwrite them. Once you excluded the files, they can be safely edited.
