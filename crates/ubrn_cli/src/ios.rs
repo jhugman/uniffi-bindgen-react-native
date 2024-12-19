@@ -212,10 +212,9 @@ impl IOsArgs {
             .arg("--manifest-path")
             .arg(manifest_path)
             .arg("--target")
-            .arg(&target.triple);
-        if self.common_args.release {
-            cmd.arg("--release");
-        }
+            .arg(&target.triple)
+            .arg("--profile")
+            .arg(self.common_args.profile());
         cmd.args(cargo_extras.clone());
         run_cmd(cmd.current_dir(rust_dir))?;
         Ok(())

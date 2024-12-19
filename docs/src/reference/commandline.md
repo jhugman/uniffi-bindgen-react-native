@@ -62,6 +62,7 @@ This takes care of the work of compiling the Rust, ready for generating bindings
 - `--and-generate` this runs the `generate all` command immediately after building.
 - `--targets` a comma separated list of targets, specific to each platform. This overrides the values in the config file.
 - `--release` builds a release version of the library.
+- `--profile` uses a specific build profile, overriding --release if necessary
 
 ## `build android`
 
@@ -77,12 +78,17 @@ Options:
   -t, --targets <TARGETS>...
           Comma separated list of targets, that override the values in the `config.yaml` file.
 
-          Android: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android i686-linux-android,
+          Android: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android,
 
-          Synonyms for: arm64-v8a, armeabi-v7a, x86_64, x86
+          Synonyms for: arm64-v8a,armeabi-v7a,x86_64,x86
 
   -r, --release
           Build a release build
+
+  -p, --profile <PROFILE>
+          Use a specific build profile
+
+          This overrides the -r / --release flag if both are specified.
 
       --no-cargo
           If the Rust library has been built for at least one target, then don't re-run cargo build.
@@ -132,9 +138,8 @@ You can find the version you need in your react-native `android/build.gradle` fi
 ## `build ios`
 
 Build the crate for use on an iOS device or simulator.
-```
-Build the crate for use on an iOS device or simulator
 
+```
 Usage: uniffi-bindgen-react-native build ios [OPTIONS] --config <CONFIG>
 
 Options:
@@ -155,10 +160,15 @@ Options:
   -t, --targets <TARGETS>...
           Comma separated list of targets, that override the values in the `config.yaml` file.
 
-          iOS: aarch64-apple-ios, aarch64-apple-ios-sim, x86_64-apple-ios
+          iOS: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
 
   -r, --release
           Build a release build
+
+  -p, --profile <PROFILE>
+          Use a specific build profile
+
+          This overrides the -r / --release flag if both are specified.
 
       --no-cargo
           If the Rust library has been built for at least one target, then don't re-run cargo build.

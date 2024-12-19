@@ -87,6 +87,12 @@ pub(crate) struct CommonBuildArgs {
     #[clap(long, short, default_value = "false")]
     pub(crate) release: bool,
 
+    /// Use a specific build profile
+    ///
+    /// This overrides the -r / --release flag if both are specified.
+    #[clap(long, short)]
+    pub(crate) profile: Option<String>,
+
     /// If the Rust library has been built for at least one target, then
     /// don't re-run cargo build.
     ///
@@ -101,8 +107,8 @@ pub(crate) struct CommonBuildArgs {
 }
 
 impl CommonBuildArgs {
-    pub(crate) fn profile<'a>(&self) -> &'a str {
-        CrateMetadata::profile(self.release)
+    pub(crate) fn profile(&self) -> &str {
+        CrateMetadata::profile(self.profile.as_deref(), self.release)
     }
 }
 
