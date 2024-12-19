@@ -55,7 +55,10 @@ impl CrateArg {
 fn cargo_build(metadata: &CrateMetadata, profile: &str) -> Result<()> {
     let mut cmd = Command::new("cargo");
     cmd.current_dir(metadata.crate_dir());
-    cmd.arg("build").arg("--profile").arg(profile);
+    cmd.arg("build");
+    if profile != "debug" {
+        cmd.arg("--profile").arg(profile);
+    }
     run_cmd_quietly(&mut cmd)?;
     Ok(())
 }

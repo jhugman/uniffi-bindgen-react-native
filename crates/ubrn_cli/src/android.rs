@@ -235,10 +235,10 @@ impl AndroidArgs {
         if self.common_args.profile() != "release" {
             cmd.arg("--no-strip");
         }
-        cmd.arg("--")
-            .arg("build")
-            .arg("--profile")
-            .arg(self.common_args.profile());
+        cmd.arg("--").arg("build");
+        if self.common_args.profile() != "debug" {
+            cmd.arg("--profile").arg(self.common_args.profile());
+        }
         cmd.args(cargo_extras.clone());
         run_cmd(cmd.current_dir(rust_dir))?;
         Ok(target.clone())
