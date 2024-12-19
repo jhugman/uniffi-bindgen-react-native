@@ -236,8 +236,8 @@ impl AndroidArgs {
             cmd.arg("--no-strip");
         }
         cmd.arg("--").arg("build");
-        if self.common_args.profile() != "debug" {
-            cmd.arg("--profile").arg(self.common_args.profile());
+        if profile != "debug" {
+            cmd.args(["--profile", profile]);
         }
         cmd.args(cargo_extras.clone());
         run_cmd(cmd.current_dir(rust_dir))?;
