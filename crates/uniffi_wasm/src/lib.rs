@@ -61,11 +61,11 @@ impl IntoRust<ForeignBytes> for uniffi::RustBuffer {
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen]
 #[derive(Default)]
 pub struct RustCallStatus {
     pub code: i8,
-    pub error_buf: Option<ForeignBytes>,
+    error_buf: Option<ForeignBytes>,
 }
 
 #[wasm_bindgen]
@@ -73,6 +73,11 @@ impl RustCallStatus {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Default::default()
+    }
+
+    #[wasm_bindgen(getter = errorBuf)]
+    pub fn error_buf(self) -> Option<ForeignBytes> {
+        self.error_buf
     }
 }
 

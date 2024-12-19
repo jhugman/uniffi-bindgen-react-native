@@ -72,9 +72,10 @@ function uniffiCheckCallStatus(
       return;
 
     case CALL_ERROR: {
-      if (callStatus.errorBuf) {
+      const errorBuf = callStatus.errorBuf;
+      if (errorBuf) {
         if (errorHandler) {
-          throw errorHandler(callStatus.errorBuf);
+          throw errorHandler(errorBuf);
         }
       }
       throw new UniffiInternalError.UnexpectedRustCallError();
@@ -84,11 +85,10 @@ function uniffiCheckCallStatus(
       // When the rust code sees a panic, it tries to construct a RustBuffer
       // with the message.  But if that code panics, then it just sends back
       // an empty buffer.
-      if (callStatus.errorBuf) {
-        if (callStatus.errorBuf.byteLength > 0) {
-          throw new UniffiInternalError.RustPanic(
-            liftString(callStatus.errorBuf),
-          );
+      const errorBuf = callStatus.errorBuf;
+      if (errorBuf) {
+        if (errorBuf.byteLength > 0) {
+          throw new UniffiInternalError.RustPanic(liftString(errorBuf));
         }
       }
       throw new UniffiInternalError.RustPanic("Rust panic");
