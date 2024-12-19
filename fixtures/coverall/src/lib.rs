@@ -7,7 +7,6 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::SystemTime;
 
 use once_cell::sync::Lazy;
 
@@ -474,10 +473,7 @@ impl Coveralls {
     }
 
     fn add_patch(&self, patch: Arc<Patch>) {
-        let repair = Repair {
-            when: SystemTime::now(),
-            patch,
-        };
+        let repair = Repair { patch };
         let mut repairs = self.repairs.lock().unwrap();
         repairs.push(repair);
     }
@@ -510,7 +506,6 @@ impl Drop for Coveralls {
 
 #[derive(Debug, Clone)]
 pub struct Repair {
-    when: SystemTime,
     patch: Arc<Patch>,
 }
 
