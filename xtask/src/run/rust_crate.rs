@@ -24,7 +24,7 @@ pub(crate) struct CrateArg {
     /// Use a specific build profile
     ///
     /// This overrides the release flag if both are specified.
-    #[clap(long, requires = "crate_dir")]
+    #[clap(long, requires = "crate_dir", conflicts_with_all = ["release"])]
     pub(crate) profile: Option<String>,
 
     /// Do not invoke cargo build.
