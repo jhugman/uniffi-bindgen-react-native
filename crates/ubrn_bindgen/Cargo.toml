@@ -12,6 +12,7 @@ wasm = ["quote", "prettyplease", "syn", "proc-macro2"]
 anyhow = { workspace = true }
 askama = { workspace = true }
 camino = { workspace = true }
+cargo_metadata = { workspace = true }
 clap = { workspace = true }
 heck = { workspace = true }
 paste = { workspace = true }
