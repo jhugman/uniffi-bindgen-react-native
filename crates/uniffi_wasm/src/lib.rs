@@ -6,7 +6,10 @@
 pub use wasm_bindgen::prelude::wasm_bindgen as export;
 use wasm_bindgen::prelude::*;
 
-pub use uniffi::RustCallStatus;
+pub mod uniffi {
+    pub use uniffi::{RustBuffer, RustCallStatus};
+    pub type VoidPointer = *const std::ffi::c_void;
+}
 
 pub trait IntoRust<HighLevel> {
     fn into_rust(v: HighLevel) -> Self;
@@ -34,9 +37,11 @@ identity_into_rust!(Int8, i8);
 identity_into_rust!(Int16, i16);
 identity_into_rust!(Int32, i32);
 identity_into_rust!(Int64, i64);
+identity_into_rust!(Float32, f32);
+identity_into_rust!(Float64, f64);
 
 pub type VoidPointer = u64;
-impl IntoRust<VoidPointer> for *const std::ffi::c_void {
+impl IntoRust<VoidPointer> for uniffi::VoidPointer {
     fn into_rust(v: VoidPointer) -> Self {
         v as Self
     }
@@ -57,23 +62,24 @@ impl IntoRust<ForeignBytes> for uniffi::RustBuffer {
 
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Default)]
-pub struct CallStatus {
+pub struct RustCallStatus {
     pub code: i8,
     pub error_buf: Option<ForeignBytes>,
 }
 
 #[wasm_bindgen]
-impl CallStatus {
+impl RustCallStatus {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl CallStatus {
-    pub fn copy_into(&mut self, rust: RustCallStatus) {
+impl RustCallStatus {
+    pub fn copy_into(&mut self, rust: uniffi::RustCallStatus) {
         self.code = rust.code as i8;
-        self.error_buf = None;
+        let buf = std::mem::ManuallyDrop::into_inner(rust.error_buf).destroy_into_vec();
+        self.error_buf = Some(buf);
     }
 }
 
