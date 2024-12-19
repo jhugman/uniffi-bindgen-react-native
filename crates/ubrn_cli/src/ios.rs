@@ -213,8 +213,9 @@ impl IOsArgs {
             .arg(manifest_path)
             .arg("--target")
             .arg(&target.triple);
-        if self.common_args.release {
-            cmd.arg("--release");
+        let profile = self.common_args.profile();
+        if profile != "debug" {
+            cmd.args(["--profile", profile]);
         }
         cmd.args(cargo_extras.clone());
         run_cmd(cmd.current_dir(rust_dir))?;

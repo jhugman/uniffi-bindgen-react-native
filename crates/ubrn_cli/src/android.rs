@@ -232,12 +232,13 @@ impl AndroidArgs {
             .arg(target.to_string())
             .arg("--platform")
             .arg(format!("{}", api_level));
-        if !self.common_args.release {
+        let profile = self.common_args.profile();
+        if profile != "release" {
             cmd.arg("--no-strip");
         }
         cmd.arg("--").arg("build");
-        if self.common_args.release {
-            cmd.arg("--release");
+        if profile != "debug" {
+            cmd.args(["--profile", profile]);
         }
         cmd.args(cargo_extras.clone());
         run_cmd(cmd.current_dir(rust_dir))?;

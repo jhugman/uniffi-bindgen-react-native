@@ -21,12 +21,8 @@ pub struct CrateMetadata {
 }
 
 impl CrateMetadata {
-    pub fn profile<'a>(release: bool) -> &'a str {
-        if release {
-            "release"
-        } else {
-            "debug"
-        }
+    pub fn profile(profile: Option<&str>, release: bool) -> &str {
+        profile.unwrap_or(if release { "release" } else { "debug" })
     }
 
     pub fn library_path(&self, target: Option<&str>, profile: &str) -> Utf8PathBuf {
