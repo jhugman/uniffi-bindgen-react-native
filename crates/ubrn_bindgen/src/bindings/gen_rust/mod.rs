@@ -298,6 +298,7 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::RustCallStatus => quote! { #module::RustCallStatus },
             FfiType::Reference(_ffi_type) => todo!(),
             FfiType::VoidPointer => quote! { #runtime::VoidPointer },
+            FfiType::MutReference(_) => unimplemented!("ffi_type_foreign for MutReference"),
         }
     }
 
