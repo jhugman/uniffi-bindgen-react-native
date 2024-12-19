@@ -1,5 +1,8 @@
 # Upcoming releases
 
+## ✨ What's New
+* Add `--profile` build argument ([#192](https://github.com/jhugman/uniffi-bindgen-react-native/pull/192))
+
 ## 🦊 What's Changed
 * Switched from passing `ArrayBuffer`s to using `Uint8Array`, to accommodate WASM better. ([#187](https://github.com/jhugman/uniffi-bindgen-react-native/pull/187))
 
