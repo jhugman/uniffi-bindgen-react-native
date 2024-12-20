@@ -40,7 +40,10 @@ impl BuildArgs {
     }
 
     fn generate(&self, lib_file: Utf8PathBuf) -> Result<()> {
-        eprintln!("Generating bindings and turbo module from lib file {}", lib_file);
+        eprintln!(
+            "Generating bindings and turbo module from lib file {}",
+            lib_file
+        );
         GenerateAllCommand::platform_specific(
             lib_file,
             self.cmd.project_config()?,
