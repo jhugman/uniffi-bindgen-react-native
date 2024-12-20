@@ -40,6 +40,7 @@ impl BuildArgs {
     }
 
     fn generate(&self, lib_file: Utf8PathBuf) -> Result<()> {
+        eprintln!("Generating bindings and turbo module from lib file {}", lib_file);
         GenerateAllCommand::platform_specific(
             lib_file,
             self.cmd.project_config()?,
@@ -51,10 +52,12 @@ impl BuildArgs {
 
 impl BuildCmd {
     pub(crate) fn build(&self) -> Result<Utf8PathBuf> {
-        let files = match self {
+        let mut files = match self {
             Self::Android(a) => a.build()?,
             Self::Ios(a) => a.build()?,
         };
+
+        files.sort(); // Sort so that we reproducibly pick the same file below
 
         files
             .first()
