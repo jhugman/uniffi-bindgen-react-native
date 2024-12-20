@@ -1,4 +1,3 @@
-{{- self.import_infra("RustBuffer", "ffi-types") }}
 {{- self.import_infra("uniffiCreateRecord", "records") }}
 
 {%- let rec = ci|get_record_definition(name) %}

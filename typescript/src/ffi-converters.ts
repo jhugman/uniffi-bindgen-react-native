@@ -347,12 +347,12 @@ export const FfiConverterArrayBuffer = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<ArrayBuffer> {
     read(from: RustBuffer): ArrayBuffer {
       const length = lengthConverter.read(from);
-      return from.readBytes(length);
+      return from.readArrayBuffer(length);
     }
     write(value: ArrayBuffer, into: RustBuffer): void {
       const length = value.byteLength;
       lengthConverter.write(length, into);
-      into.writeBytes(unwrapBuffer(value));
+      into.writeByteArray(new Uint8Array(unwrapBuffer(value)));
     }
     allocationSize(value: ArrayBuffer): number {
       return lengthConverter.allocationSize(0) + value.byteLength;
@@ -360,3 +360,46 @@ export const FfiConverterArrayBuffer = (() => {
   }
   return new FFIConverter();
 })();
+
+type StringConverter = {
+  stringToBytes: (s: string) => UniffiByteArray;
+  bytesToString: (ab: UniffiByteArray) => string;
+  stringByteLength: (s: string) => number;
+};
+export function uniffiCreateFfiConverterString(
+  converter: StringConverter,
+): FfiConverter<UniffiByteArray, string> {
+  const lengthConverter = FfiConverterInt32;
+
+  class FFIConverter implements FfiConverter<UniffiByteArray, string> {
+    lift(value: UniffiByteArray): string {
+      return converter.bytesToString(value);
+    }
+    lower(value: string): UniffiByteArray {
+      return converter.stringToBytes(value);
+    }
+    read(from: RustBuffer): string {
+      const length = lengthConverter.read(from);
+      // TODO Currently, RustBufferHelper.cpp is pretty dumb,
+      // and copies all the bytes in the underlying ArrayBuffer.
+      // Making a better shim for Uint8Array would allow us to use
+      // readByteArray here, and eliminate a copy.
+      const bytes = from.readArrayBuffer(length);
+      return converter.bytesToString(new Uint8Array(bytes));
+    }
+    write(value: string, into: RustBuffer): void {
+      // TODO: work on RustBufferHelper.cpp is needed to avoid
+      // the extra copy and use writeByteArray.
+      const buffer = converter.stringToBytes(value).buffer;
+      const numBytes = buffer.byteLength;
+      lengthConverter.write(numBytes, into);
+      into.writeArrayBuffer(buffer);
+    }
+    allocationSize(value: string): number {
+      return (
+        lengthConverter.allocationSize(0) + converter.stringByteLength(value)
+      );
+    }
+  }
+  return new FFIConverter();
+}
