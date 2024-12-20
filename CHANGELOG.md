@@ -5,6 +5,7 @@
 
 ## 🦊 What's Changed
 * Switched from passing `ArrayBuffer`s to using `Uint8Array`, to accommodate WASM better. ([#187](https://github.com/jhugman/uniffi-bindgen-react-native/pull/187))
+* Reproducibly pick the same library file when using `--and-generate` ([#194](https://github.com/jhugman/uniffi-bindgen-react-native/pull/194))
 
 **Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.28.3-1...main
 
