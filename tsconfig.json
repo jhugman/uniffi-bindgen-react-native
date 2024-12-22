@@ -6,6 +6,8 @@
       "uniffi-bindgen-react-native": ["./typescript/src/index"],/* Specify a set of entries that re-map imports to additional lookup locations. */
       "@/*": ["./typescript/testing/*"],
     },
+    "declaration": true,
+    "outDir": "./typescript/dist",                       /* Redirect output structure to the directory. */
     "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
     "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
     "strict": true,                                      /* Enable all strict type-checking options. */

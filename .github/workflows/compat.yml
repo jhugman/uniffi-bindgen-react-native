@@ -47,6 +47,13 @@ jobs:
         with:
           targets: ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-ios-sim' || 'aarch64-linux-android' }}
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "yarn"
+      - run: yarn install
+      - run: yarn build
+
       - name: Generate & build turbo module
         run: |
           ./scripts/test-turbo-modules.sh \
