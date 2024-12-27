@@ -1,4 +1,5 @@
 {%- import "macros.ts" as ts %}
+{{- self.import_infra("RustBuffer", "ffi-types") }}
 {{- self.import_infra("UniffiInternalError", "errors") -}}
 {{- self.import_infra("UniffiRustCaller", "rust-call") }}
 

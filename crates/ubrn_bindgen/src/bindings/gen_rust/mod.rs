@@ -15,7 +15,10 @@ use uniffi_bindgen::{
 };
 
 use crate::{
-    bindings::{extensions::ComponentInterfaceExt, metadata::ModuleMetadata},
+    bindings::{
+        extensions::{ComponentInterfaceExt, FfiFunctionExt},
+        metadata::ModuleMetadata,
+    },
     switches::SwitchArgs,
     AbiFlavor,
 };
@@ -157,11 +160,15 @@ impl<'a> ComponentTemplate<'a> {
     }
 
     fn runtime_ident(&self) -> Ident {
-        ident("__runtime")
+        ident("f")
     }
 
     fn module_ident(&self) -> Ident {
-        ident("__module")
+        ident("r")
+    }
+
+    fn uniffi_ident(&self) -> Ident {
+        ident("u")
     }
 
     fn prelude(&self, ci: &ComponentInterface) -> TokenStream {
@@ -169,8 +176,9 @@ impl<'a> ComponentTemplate<'a> {
         let runtime_ident = self.flavor.runtime_module();
         let namespace_ident = ident(ci.namespace());
         let module_ident = self.module_ident();
+        let uniffi_alias_ident = self.uniffi_ident();
         quote! {
-            use #runtime_ident::{self as #runtime_alias_ident, IntoRust};
+            use #runtime_ident::{self as #runtime_alias_ident, uniffi as #uniffi_alias_ident, IntoRust};
             use #namespace_ident as #module_ident;
         }
     }
@@ -187,6 +195,8 @@ impl<'a> ComponentTemplate<'a> {
     fn ffi_function(&mut self, func: &FfiFunction) -> TokenStream {
         let module = self.module_ident();
         let runtime = self.runtime_ident();
+        let uniffi = self.uniffi_ident();
+
         let annotation = quote! { #[#runtime::export] };
         let func_ident = ident(func.name());
         let foreign_func_ident = self.flavor.foreign_ident(func.name());
@@ -206,9 +216,9 @@ impl<'a> ComponentTemplate<'a> {
 
         let needs_call_status = func.has_rust_call_status_arg();
         if needs_call_status {
-            let rust_status_ident = ident("__rust_call_status");
-            let foreign_status_ident = ident("__call_status");
-            let return_ident = ident("__return");
+            let rust_status_ident = ident("u_status_");
+            let foreign_status_ident = ident("f_status_");
+            let return_ident = ident("value_");
             let let_value = if has_return {
                 quote! { let #return_ident = }
             } else {
@@ -224,11 +234,16 @@ impl<'a> ComponentTemplate<'a> {
             } else {
                 quote! {}
             };
+            let unsafe_ = if func.is_unsafe() {
+                quote! { unsafe }
+            } else {
+                quote! {}
+            };
 
             quote! {
                 #annotation
-                pub fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::CallStatus) #decl_suffix {
-                    let mut #rust_status_ident = #runtime::RustCallStatus::default();
+                pub #unsafe_ fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
+                    let mut #rust_status_ident = #uniffi::RustCallStatus::default();
                     #let_value #module::#func_ident(#args_call &mut #rust_status_ident) #call_suffix;
                     #foreign_status_ident.copy_into(#rust_status_ident);
                     #return_value
@@ -290,18 +305,19 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::Float32 => quote! { #runtime::Float32 },
             FfiType::Float64 => quote! { #runtime::Float64 },
             FfiType::RustArcPtr(_) => quote! { #runtime::VoidPointer },
-            FfiType::RustBuffer(_external_ffi_metadata) => quote! { #runtime::ForeignBytes },
-            FfiType::ForeignBytes => quote! { #module::ForeignBytes },
+            FfiType::RustBuffer(_) => quote! { #runtime::ForeignBytes },
+            FfiType::ForeignBytes => quote! { #runtime::ForeignBytes },
             FfiType::Callback(_) => quote! { #module::Callback },
             FfiType::Struct(_) => quote! { #module::Struct },
             FfiType::Handle => quote! { #module::Handle },
-            FfiType::RustCallStatus => quote! { #module::RustCallStatus },
+            FfiType::RustCallStatus => quote! { #runtime::RustCallStatus },
             FfiType::Reference(_ffi_type) => todo!(),
             FfiType::VoidPointer => quote! { #runtime::VoidPointer },
         }
     }
 
     fn ffi_type_rust(&self, t: &FfiType) -> TokenStream {
+        let uniffi = self.uniffi_ident();
         match t {
             FfiType::UInt8 => quote! { u8 },
             FfiType::Int8 => quote! { i8 },
@@ -313,6 +329,8 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::Int64 => quote! { i64 },
             FfiType::Float32 => quote! { f32 },
             FfiType::Float64 => quote! { f64 },
+            FfiType::RustBuffer(_) => quote! { #uniffi::RustBuffer },
+            FfiType::RustArcPtr(_) => quote! { #uniffi::VoidPointer },
             _ => todo!(),
         }
     }
@@ -407,12 +425,12 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[__runtime::export]
-            pub fn ubrn_my_function(__call_status: &mut __runtime::CallStatus) -> __runtime::Int8 {
-                let mut __rust_call_status = __runtime::RustCallStatus::default();
-                let __return = __module::my_function(&mut __rust_call_status).into_js();
-                __call_status.copy_into(__rust_call_status);
-                __return
+            #[f::export]
+            pub fn ubrn_my_function(f_status_: &mut f::RustCallStatus) -> f::Int8 {
+                let mut u_status_ = u::RustCallStatus::default();
+                let value_ = r::my_function(&mut u_status_).into_js();
+                f_status_.copy_into(u_status_);
+                value_
             }
             "
             )
@@ -435,16 +453,12 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[__runtime::export]
-            pub fn ubrn_my_function(
-                num: __runtime::Int32,
-                __call_status: &mut __runtime::CallStatus,
-            ) -> __runtime::Int8 {
-                let mut __rust_call_status = __runtime::RustCallStatus::default();
-                let __return = __module::my_function(i32::into_rust(num), &mut __rust_call_status)
-                    .into_js();
-                __call_status.copy_into(__rust_call_status);
-                __return
+            #[f::export]
+            pub fn ubrn_my_function(num: f::Int32, f_status_: &mut f::RustCallStatus) -> f::Int8 {
+                let mut u_status_ = u::RustCallStatus::default();
+                let value_ = r::my_function(i32::into_rust(num), &mut u_status_).into_js();
+                f_status_.copy_into(u_status_);
+                value_
             }
             "
             )
@@ -467,21 +481,21 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-                #[__runtime::export]
+                #[f::export]
                 pub fn ubrn_my_function(
-                    left: __runtime::Int32,
-                    right: __runtime::Float32,
-                    __call_status: &mut __runtime::CallStatus,
-                ) -> __runtime::Int8 {
-                    let mut __rust_call_status = __runtime::RustCallStatus::default();
-                    let __return = __module::my_function(
+                    left: f::Int32,
+                    right: f::Float32,
+                    f_status_: &mut f::RustCallStatus,
+                ) -> f::Int8 {
+                    let mut u_status_ = u::RustCallStatus::default();
+                    let value_ = r::my_function(
                             i32::into_rust(left),
                             f32::into_rust(right),
-                            &mut __rust_call_status,
+                            &mut u_status_,
                         )
                         .into_js();
-                    __call_status.copy_into(__rust_call_status);
-                    __return
+                    f_status_.copy_into(u_status_);
+                    value_
                 }"
             )
         );
@@ -499,11 +513,11 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[__runtime::export]
-            pub fn ubrn_my_function(__call_status: &mut __runtime::CallStatus) {
-                let mut __rust_call_status = __runtime::RustCallStatus::default();
-                __module::my_function(&mut __rust_call_status);
-                __call_status.copy_into(__rust_call_status);
+            #[f::export]
+            pub fn ubrn_my_function(f_status_: &mut f::RustCallStatus) {
+                let mut u_status_ = u::RustCallStatus::default();
+                r::my_function(&mut u_status_);
+                f_status_.copy_into(u_status_);
             }
             "
             )

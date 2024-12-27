@@ -56,6 +56,7 @@ export type UnsafeMutableRawPointer = bigint;
  */
 export interface UniffiObjectFactory<T> {
   bless(pointer: UnsafeMutableRawPointer): UniffiRustArcPtr;
+  unbless(ptr: UniffiRustArcPtr): void;
   create(pointer: UnsafeMutableRawPointer): T;
   pointer(obj: T): UnsafeMutableRawPointer;
   clonePointer(obj: T): UnsafeMutableRawPointer;
