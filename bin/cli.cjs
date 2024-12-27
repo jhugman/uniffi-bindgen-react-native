@@ -24,8 +24,10 @@ function getRootDir() {
   }
 
   // Fallback to using require.resolve
-  const resolvedPath = require.resolve("uniffi-bindgen-react-native");
-  return resolvedPath.replace(/\/typescript\/src\/index\.ts$/, "");
+  const resolvedPath = require.resolve(
+    "uniffi-bindgen-react-native/package.json",
+  );
+  return path.dirname(resolvedPath);
 }
 
 // Get the root directory
