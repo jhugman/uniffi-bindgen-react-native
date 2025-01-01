@@ -11,7 +11,6 @@
 {%- let type_name = type_|type_name(self) %}
 {%- let decl_type_name = type_|decl_type_name(self) %}
 {%- let ffi_converter_name = type_|ffi_converter_name(self) %}
-{%- let contains_object_references = ci.item_contains_object_references(type_) %}
 
 {#
  # Map `Type` instances to an include statement for that type.
@@ -85,7 +84,7 @@
 {%- include "EnumTemplate.ts" %}
 {% endif %}
 
-{%- when Type::External{ name, module_path, namespace, kind, tagged } %}
+{%- when Type::External{ name, module_path, namespace, kind, .. } %}
 {%- include "ExternalTemplate.ts" %}
 
 {%- when Type::Object{ name, module_path, imp } %}
