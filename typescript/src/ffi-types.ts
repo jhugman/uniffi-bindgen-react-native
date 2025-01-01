@@ -43,7 +43,7 @@ export class RustBuffer {
     return new Uint8Array(this.arrayBuffer);
   }
 
-  readArrayBuffer(numBytes: number): ArrayBuffer {
+  readArrayBuffer(numBytes: number): ArrayBufferLike {
     const start = this.readOffset;
     const end = this.checkOverflow(start, numBytes);
     const value = this.arrayBuffer.slice(start, end);
@@ -59,7 +59,7 @@ export class RustBuffer {
     return value;
   }
 
-  writeArrayBuffer(buffer: ArrayBuffer) {
+  writeArrayBuffer(buffer: ArrayBufferLike) {
     const start = this.writeOffset;
     const end = this.checkOverflow(start, buffer.byteLength);
 
