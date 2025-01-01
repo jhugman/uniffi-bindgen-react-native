@@ -1,4 +1,4 @@
-{%- let cbi = ci|get_callback_interface_definition(name) %}
+{%- let cbi = ci.get_callback_interface_definition(name).unwrap() %}
 {%- let methods = cbi.methods() %}
 {%- let protocol_name = type_name.clone() %}
 {%- let protocol_docstring = cbi.docstring() %}
