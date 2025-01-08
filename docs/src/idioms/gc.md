@@ -29,7 +29,7 @@ The simplest route for this would be to use a [`FinalizationRegistry`](https://d
 
 Unfortunately, [this is not yet supported by hermes](https://github.com/facebook/hermes/issues/604). ([New issue](https://github.com/facebook/hermes/issues/1440))
 
-Instead, for every Javascript object constructor called, we call create a `DestructibleObject` in C++, that is represented in Javascript but has a [C++ destructor](https://isocpp.org/wiki/faq/dtors).
+Instead, for every Javascript object constructor called, we create a `DestructibleObject` in C++, that is represented in Javascript but has a [C++ destructor](https://isocpp.org/wiki/faq/dtors).
 
 [At the end of this \[C++\] object's lifetime](https://en.cppreference.com/w/cpp/language/destructor), the destructor is called.
 
@@ -59,4 +59,4 @@ const result = new MyObject().uniffiUse((obj) => {
 
 ### Future work
 
-If there is any movement on[ hermes' `FinalizationRegistry` support](https://github.com/facebook/hermes/issues/1440)) we may well consider moving to this method.
+If there is any movement on [hermes' `FinalizationRegistry` support](https://github.com/facebook/hermes/issues/1440), we may well consider moving to this method.
