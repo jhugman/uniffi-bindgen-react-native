@@ -36,7 +36,7 @@ A useful way of organizing this is via the types that can be passed across the F
 |   | Rust | Typescript |   |
 | - | ---- | ---------- | - |
 | [Enums](./enums.md#enums-without-properties)    | `enum` | `enum` | [Flat enums](./enums.md#enums-without-properties)
-| [Tagged Union Types](./enums.md#enums-with-properties)) | `enum` | Tagged unions | [Enums with properties](./enums.md#enums-with-properties)
+| [Tagged Union Types](./enums.md#enums-with-properties) | `enum` | Tagged unions | [Enums with properties](./enums.md#enums-with-properties)
 | [Error enums](./errors.md#enums-as-errors) | `enums` | `Error` | |
 
 ### Struct types
