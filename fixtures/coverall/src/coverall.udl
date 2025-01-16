@@ -207,7 +207,6 @@ interface Coveralls {
 
 // coveralls keep track of their repairs (an interface in a dict)
 dictionary Repair {
-    timestamp when;
     Patch patch;
 };
 

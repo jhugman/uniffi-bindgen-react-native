@@ -39,6 +39,7 @@ identity_into_rust!(Int32, i32);
 identity_into_rust!(Int64, i64);
 identity_into_rust!(Float32, f32);
 identity_into_rust!(Float64, f64);
+pub type Handle = u64;
 
 pub type VoidPointer = u64;
 impl IntoRust<VoidPointer> for uniffi::VoidPointer {
@@ -60,11 +61,11 @@ impl IntoRust<ForeignBytes> for uniffi::RustBuffer {
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen]
 #[derive(Default)]
 pub struct RustCallStatus {
     pub code: i8,
-    pub error_buf: Option<ForeignBytes>,
+    error_buf: Option<ForeignBytes>,
 }
 
 #[wasm_bindgen]
@@ -73,6 +74,11 @@ impl RustCallStatus {
     pub fn new() -> Self {
         Default::default()
     }
+
+    #[wasm_bindgen(getter = errorBuf)]
+    pub fn error_buf(self) -> Option<ForeignBytes> {
+        self.error_buf
+    }
 }
 
 impl RustCallStatus {
@@ -80,21 +86,5 @@ impl RustCallStatus {
         self.code = rust.code as i8;
         let buf = std::mem::ManuallyDrop::into_inner(rust.error_buf).destroy_into_vec();
         self.error_buf = Some(buf);
-    }
-}
-
-#[wasm_bindgen]
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
     }
 }

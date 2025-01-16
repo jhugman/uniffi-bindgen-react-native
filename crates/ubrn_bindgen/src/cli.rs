@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
+use cargo_metadata::Metadata;
 use clap::{command, Args};
 use ubrn_common::{mk_dir, CrateMetadata};
 use uniffi_bindgen::{cargo_metadata::CrateConfigSupplier, BindingGenerator};
@@ -139,15 +140,18 @@ impl BindingsArgs {
         let switches = self.switches();
         let abi_dir = abi_dir.clone();
         let ts_dir = ts_dir.clone();
+        let cwd = Utf8PathBuf::from("Cargo.toml");
+        let manifest_path = manifest_path.unwrap_or(&cwd);
+        let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
 
         match &switches.flavor {
             AbiFlavor::Jsi => self.generate_bindings(
-                manifest_path,
+                metadata,
                 &ReactNativeBindingGenerator::new(ts_dir, abi_dir, switches),
             ),
             #[cfg(feature = "wasm")]
             AbiFlavor::Wasm => self.generate_bindings(
-                manifest_path,
+                metadata,
                 &WasmBindingGenerator::new(ts_dir, abi_dir, switches),
             ),
         }
@@ -155,7 +159,7 @@ impl BindingsArgs {
 
     fn generate_bindings<Generator: BindingGenerator>(
         &self,
-        manifest_path: Option<&Utf8PathBuf>,
+        metadata: Metadata,
         binding_generator: &Generator,
     ) -> std::result::Result<Vec<ModuleMetadata>, anyhow::Error> {
         let input = &self.source;
@@ -164,11 +168,6 @@ impl BindingsArgs {
 
         let try_format_code = !out.no_format;
 
-        let metadata = if let Some(manifest_path) = manifest_path {
-            CrateMetadata::cargo_metadata(manifest_path)?
-        } else {
-            CrateMetadata::cargo_metadata_cwd()?
-        };
         let config_supplier = CrateConfigSupplier::from(metadata);
 
         let configs: Vec<ModuleMetadata> = if input.library_mode {

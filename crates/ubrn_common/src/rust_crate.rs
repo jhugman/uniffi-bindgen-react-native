@@ -88,6 +88,31 @@ impl CrateMetadata {
     }
 }
 
+impl CrateMetadata {
+    pub fn from_metadata(metadata: &Metadata, manifest_path: &Utf8Path) -> Result<Self> {
+        if !manifest_path.exists() {
+            anyhow::bail!("Manifest not found at {manifest_path}");
+        }
+        let manifest_path = manifest_path.canonicalize_utf8()?;
+        let crate_dir = manifest_path
+            .parent()
+            .expect("A valid parent for the crate manifest")
+            .into();
+        let library_name = guess_library_name(metadata, &manifest_path);
+        let package_name = find_package_name(metadata, &manifest_path)
+            .expect("A [package] `name` was not found in the manifest");
+        let target_dir = metadata.target_directory.clone();
+
+        Ok(Self {
+            manifest_path,
+            package_name,
+            library_name,
+            target_dir,
+            crate_dir,
+        })
+    }
+}
+
 pub fn so_extension<'a>(target: Option<&str>) -> &'a str {
     match target {
         Some(t) => so_extension_from_target(t),
@@ -130,32 +155,16 @@ impl TryFrom<Utf8PathBuf> for CrateMetadata {
             anyhow::bail!("Crate manifest doesn't exist");
         }
         let manifest_path = manifest_path.canonicalize_utf8()?;
-        let (manifest_path, crate_dir) = if !manifest_path.ends_with("Cargo.toml") {
+        let manifest_path = if !manifest_path.ends_with("Cargo.toml") {
             if !manifest_path.is_dir() {
                 anyhow::bail!("Crate should either be a path to a Cargo.toml or a directory containing a Cargo.toml file");
             }
-            (manifest_path.join("Cargo.toml"), manifest_path)
+            manifest_path.join("Cargo.toml")
         } else {
-            let crate_dir = manifest_path
-                .parent()
-                .expect("A valid parent for the crate manifest")
-                .into();
-            (manifest_path, crate_dir)
+            manifest_path
         };
         let metadata = Self::cargo_metadata(&manifest_path)?;
-
-        let library_name = guess_library_name(&metadata, &manifest_path);
-        let package_name = find_package_name(&metadata, &manifest_path)
-            .expect("A [package] `name` was not found in the manifest");
-        let target_dir = metadata.target_directory;
-
-        Ok(Self {
-            manifest_path,
-            package_name,
-            library_name,
-            target_dir,
-            crate_dir,
-        })
+        Self::from_metadata(&metadata, &manifest_path)
     }
 }
 
