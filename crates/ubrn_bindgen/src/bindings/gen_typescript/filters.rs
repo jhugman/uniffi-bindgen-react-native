@@ -22,6 +22,15 @@ pub(super) fn type_name(
     Ok(type_.as_codetype().type_label(types.ci))
 }
 
+pub(super) fn ffi_type_name_from_type(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
+    let type_ = types.as_type(as_type);
+    let ffi_type = FfiType::from(type_);
+    ffi_type_name(&ffi_type)
+}
+
 pub(super) fn decl_type_name(
     as_type: &impl AsType,
     types: &TypeRenderer,

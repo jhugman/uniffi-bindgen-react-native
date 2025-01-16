@@ -44,38 +44,41 @@ export class FfiConverterCallback<T> implements FfiConverter<UniffiHandle, T> {
 export type UniffiReferenceHolder<T> = { pointee: T };
 
 export function uniffiTraitInterfaceCall<T>(
-  callStatus: UniffiRustCallStatus,
   makeCall: () => T,
-  writeReturn: (v: T) => void,
+  handleSuccess: (v: T) => void,
+  handleError: (
+    callStatus: /*i8*/ number,
+    errorBuffer: UniffiByteArray,
+  ) => void,
   lowerString: (s: string) => UniffiByteArray,
 ) {
   try {
-    writeReturn(makeCall());
+    handleSuccess(makeCall());
   } catch (e: any) {
-    callStatus.code = CALL_UNEXPECTED_ERROR;
-    callStatus.errorBuf = lowerString(e.toString());
+    handleError(CALL_UNEXPECTED_ERROR, lowerString(e.toString()));
   }
 }
 
 export function uniffiTraitInterfaceCallWithError<T, E extends Error>(
-  callStatus: UniffiRustCallStatus,
   makeCall: () => T,
-  writeReturn: (v: T) => void,
-  isErrorType: (e: any) => boolean,
+  handleSuccess: (v: T) => void,
+  handleError: (
+    callStatus: /*i8*/ number,
+    errorBuffer: UniffiByteArray,
+  ) => void,
+  isErrorType: (e: any) => e is E,
   lowerError: (err: E) => UniffiByteArray,
   lowerString: (s: string) => UniffiByteArray,
 ): void {
   try {
-    writeReturn(makeCall());
+    handleSuccess(makeCall());
   } catch (e: any) {
     // Hermes' prototype chain seems buggy, so we need to make our
     // own arrangements
     if (isErrorType(e)) {
-      callStatus.code = CALL_ERROR;
-      callStatus.errorBuf = lowerError(e as E);
+      handleError(CALL_ERROR, lowerError(e));
     } else {
-      callStatus.code = CALL_UNEXPECTED_ERROR;
-      callStatus.errorBuf = lowerString(e.toString());
+      handleError(CALL_UNEXPECTED_ERROR, lowerString(e.toString()));
     }
   }
 }

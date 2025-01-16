@@ -16,6 +16,7 @@ export * from "./ffi-types";
 export * from "./handle-map";
 export * from "./objects";
 export * from "./records";
+export * from "./result";
 export * from "./rust-call";
 export * from "./symbols";
 export * from "./type-utils";

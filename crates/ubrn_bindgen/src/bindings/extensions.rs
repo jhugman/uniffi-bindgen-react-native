@@ -384,6 +384,13 @@ pub(crate) impl FfiCallbackFunction {
         !self.is_future_callback() || self.name() == "RustFutureContinuationCallback"
     }
 
+    fn returns_result(&self) -> bool {
+        self.is_rust_calling_js()
+            && !self.is_free_callback()
+            && !self.has_rust_call_status_arg()
+            && self.name() != "RustFutureContinuationCallback"
+    }
+
     fn is_free_callback(&self) -> bool {
         is_free(self.name())
     }
@@ -393,15 +400,25 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn arg_return_type(&self) -> Option<FfiType> {
-        let arg = self
-            .arguments()
+        self.arguments()
             .into_iter()
-            .find(|a| a.is_return() && !a.type_().is_void());
-        arg.map(|a| a.type_())
+            .find(|a| a.is_return() && !a.type_().is_void())
+            .map(|a| {
+                let t = a.type_();
+                if let FfiType::Reference(t) = t {
+                    *t
+                } else {
+                    t
+                }
+            })
     }
 
     fn is_blocking(&self) -> bool {
         self.name() != "RustFutureContinuationCallback"
+    }
+
+    fn arguments_no_return(&self) -> impl Iterator<Item = &FfiArgument> {
+        self.arguments().into_iter().filter(|a| !a.is_return())
     }
 }
 

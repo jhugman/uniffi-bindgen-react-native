@@ -7,6 +7,7 @@ import {
   type UniffiRustArcPtr,
   type UniffiRustCallStatus,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
+  type UniffiResult,
  } from 'uniffi-bindgen-react-native';
 
 interface NativeModuleInterface {
@@ -42,10 +43,13 @@ export default getter;
 {%-   if callback.has_rust_call_status_arg() -%}
 {%      if callback.arguments().len() > 0 %}, {% endif %}callStatus: UniffiRustCallStatus
 {%-   endif %}) => {# space #}
-{%-   match callback.return_type() %}
-{%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
-{%-     when None %}void
-{%-   endmatch %};
+{%-   if callback.returns_result() %}
+{%-     match callback.arg_return_type() %}
+{%-       when Some(return_type) %}UniffiResult<{{ return_type|ffi_type_name }}>
+{%-       when None %}UniffiResult<void>
+{%-     endmatch %}
+{%    else %}void
+{%-   endif %};
 {%- when FfiDefinition::Struct(ffi_struct) %}
 {% call exported(ffi_struct) %}type {{ ffi_struct.name()|ffi_struct_name }} = {
   {%- for field in ffi_struct.fields() %}

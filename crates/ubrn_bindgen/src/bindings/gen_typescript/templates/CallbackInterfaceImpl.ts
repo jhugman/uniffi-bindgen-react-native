@@ -2,6 +2,7 @@
 {{- self.import_infra_type("UniffiReferenceHolder", "callbacks") }}
 {{- self.import_infra_type("UniffiByteArray", "ffi-types")}}
 {{- self.import_infra("UniffiRustCaller", "rust-call")}}
+{{- self.import_infra("UniffiResult", "result")}}
 {{- self.import_infra_type("UniffiRustCallStatus", "rust-call")}}
 
 {%- let vtable_methods = cbi.vtable_methods() %}
@@ -38,38 +39,46 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                     { signal }
                     {%- endif %}
                 )
-            }
+            };
             {%- if !meth.is_async() %}
-
-            {% match meth.return_type() %}
+            {#- // Synchronous callback method #}
+            {%- match meth.return_type() %}
             {%- when Some(t) %}
-            const uniffiWriteReturn = (obj: any) => { uniffiOutReturn.pointee = {{ t|ffi_converter_name(self) }}.lower(obj) };
+            const uniffiResult = UniffiResult.ready<{{ t|ffi_type_name_from_type(self) }}>();
+            const uniffiHandleSuccess = (obj: any) => {
+                UniffiResult.writeSuccess(uniffiResult, {{ t|ffi_converter_name(self) }}.lower(obj));
+            };
             {%- when None %}
-            const uniffiWriteReturn = (obj: any) => {};
+            const uniffiResult = UniffiResult.ready<void>();
+            const uniffiHandleSuccess = (obj: any) => {};
             {%- endmatch %}
+            const uniffiHandleError = (code: number, errBuf: UniffiByteArray) => {
+                UniffiResult.writeError(uniffiResult, code, errBuf);
+            };
 
             {%- match meth.throws_type() %}
             {%- when None %}
             {{- self.import_infra("uniffiTraitInterfaceCall", "callbacks") }}
             uniffiTraitInterfaceCall(
-                /*callStatus:*/ uniffiCallStatus,
                 /*makeCall:*/ uniffiMakeCall,
-                /*writeReturn:*/ uniffiWriteReturn,
+                /*handleSuccess:*/ uniffiHandleSuccess,
+                /*handleError:*/ uniffiHandleError,
                 /*lowerString:*/ FfiConverterString.lower
             )
             {%- when Some(error_type) %}
             {{- self.import_infra("uniffiTraitInterfaceCallWithError", "callbacks") }}
             uniffiTraitInterfaceCallWithError(
-                /*callStatus:*/ uniffiCallStatus,
                 /*makeCall:*/ uniffiMakeCall,
-                /*writeReturn:*/ uniffiWriteReturn,
+                /*handleSuccess:*/ uniffiHandleSuccess,
+                /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
                 /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
                 /*lowerString:*/ FfiConverterString.lower
-            )
+            );
             {%- endmatch %}
-            {%- else %} {# // is_async = true #}
-
+            return uniffiResult;
+            {%- else %} {#- // is_async = true #}
+            {#- // Asynchronous callback method #}
             const uniffiHandleSuccess = (returnValue: {% call ts::raw_return_type(meth) %}) => {
                 uniffiFutureCallback(
                     uniffiCallbackData,
@@ -101,24 +110,24 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             {%- match meth.throws_type() %}
             {%- when None %}
             {{- self.import_infra("uniffiTraitInterfaceCallAsync", "async-callbacks") }}
-            let uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
+            const uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
                 /*lowerString:*/ FfiConverterString.lower
-            )
+            );
             {%- when Some(error_type) %}
             {{- self.import_infra("uniffiTraitInterfaceCallAsyncWithError", "async-callbacks") }}
-            let uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
+            const uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
                 /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
                 /*lowerString:*/ FfiConverterString.lower
-            )
+            );
             {%- endmatch %}
-            uniffiOutReturn.pointee = uniffiForeignFuture
+            return UniffiResult.success(uniffiForeignFuture);
             {%- endif %}
         },
         {%- endfor %}
