@@ -17,8 +17,8 @@ use uniffi_bindgen::ComponentInterface;
 pub(crate) use self::{config::CppConfig as Config, util::format_directory};
 use crate::bindings::{
     extensions::{
-        ComponentInterfaceExt, FfiArgumentExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt,
-        FfiTypeExt, ObjectExt,
+        ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFieldExt, FfiStructExt, FfiTypeExt,
+        ObjectExt,
     },
     metadata::ModuleMetadata,
 };

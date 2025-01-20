@@ -43,44 +43,29 @@ namespace {{ ns }} {
 
         // Convert the arguments from Rust, into jsi::Values.
         // We'll use the Bridging class to do this…
-        {%- for arg in callback.arguments() %}
+        {%- for arg in callback.arguments_no_return() %}
         {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
         {%-   let arg_t = arg.type_().borrow()|ffi_type_name_from_js %}
         {%-   let arg_nm = arg.name()|var_name|fmt("js_{}") %}
-        {%-   if arg.is_return() %}
-        // … but we need to take extra care for the return value.
-        // In the typescript we use a dummy object we called a ReferenceHolder.
-        auto {{ arg_nm }} = {{ ci.cpp_namespace_includes() }}::Bridging<ReferenceHolder<{{ arg_t }}>>::jsNew(rt);
-        {%-   else %}
         auto {{ arg_nm }} = {{ arg.type_().borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, {{ arg_nm_rs }});
-        {%-   endif %}
         {%- endfor %}
 
-        {% if callback.has_rust_call_status_arg() -%}
-        // The RustCallStatus is another very simple JS object which will
-        // report errors back to Rust.
-        auto uniffiCallStatus = {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::jsSuccess(rt);
-        {%- endif %}
-
         // Now we are ready to call the callback.
-        // We should be using callInvoker at this point, but for now
-        // we think that there are no threading issues to worry about.
+        // We are already on the JS thread, because this `body` function was
+        // invoked from the CallInvoker.
         try {
             // Getting the callback function
             auto cb = callbackValue->asObject(rt).asFunction(rt);
-            cb.call(rt
-            {%- for arg in callback.arguments() %}
+            auto uniffiResult = cb.call(rt
+            {%- for arg in callback.arguments_no_return() %}
             {%-   let arg_nm = arg.name()|var_name|fmt("js_{}") -%}
                 , {{ arg_nm }}
             {%- endfor %}
-            {%- if callback.has_rust_call_status_arg() -%}
-                , uniffiCallStatus
-            {%- endif %}
             );
 
             {% if callback.has_rust_call_status_arg() -%}
             // Now copy the result back from JS into the RustCallStatus object.
-            {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::copyFromJs(rt, callInvoker, uniffiCallStatus, uniffi_call_status);
+            {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::copyFromJs(rt, callInvoker, uniffiResult, uniffi_call_status);
 
             if (uniffi_call_status->code != UNIFFI_CALL_STATUS_OK) {
                 // The JS callback finished abnormally, so we cannot retrieve the return value.
@@ -93,17 +78,14 @@ namespace {{ ns }} {
             // Finally, we need to copy the return value back into the Rust pointer.
             *rs_uniffiOutReturn =
                 {{ arg_t|bridging_namespace(ci) }}::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(
-                    rt, callInvoker, js_uniffiOutReturn
+                    rt, callInvoker, uniffiResult
                 );
             {%- else %}
             {%- endmatch %}
         } catch (const jsi::JSError &error) {
             std::cout << "Error in callback {{ name }}: "
                     << error.what() << std::endl;
-            {%- if callback.has_rust_call_status_arg() %}
-            {{ ci.cpp_namespace() }}::Bridging<RustCallStatus>::copyFromJs(
-                rt, callInvoker, uniffiCallStatus, uniffi_call_status);
-            {%- endif %}
+            throw error;
         }
     }
 
