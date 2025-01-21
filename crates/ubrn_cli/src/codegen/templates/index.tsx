@@ -2,7 +2,11 @@
 import installer from './{{ self.config.project.codegen_filename() }}';
 
 // Register the rust crate with Hermes
-installer.installRustCrate();
+let rustInstalled = false;
+if (!rustInstalled) {
+  installer.installRustCrate();
+  rustInstalled = true;
+}
 
 // Export the generated bindings to the app.
 {%- let root = self.project_root() %}
@@ -20,9 +24,13 @@ import * as {{ m.ts() }} from './{{ bindings }}/{{ m.ts() }}';
 {%- endfor %}
 
 // Initialize the generated bindings: mostly checksums, but also callbacks.
-{%- for m in self.config.modules %}
-{{ m.ts() }}.default.initialize();
-{%- endfor %}
+let initialized = false;
+if (!initialized) {
+  {%- for m in self.config.modules %}
+  {{ m.ts() }}.default.initialize();
+  {%- endfor %}
+  initialized = true;
+}
 
 // Export the crates as individually namespaced objects.
 export default {
