@@ -2,6 +2,8 @@
 import installer from './{{ self.config.project.codegen_filename() }}';
 
 // Register the rust crate with Hermes
+// - the boolean flag ensures this loads exactly once, even if the JS
+//   code is reloaded (e.g. during development with metro).
 let rustInstalled = false;
 if (!rustInstalled) {
   installer.installRustCrate();
@@ -24,6 +26,8 @@ import * as {{ m.ts() }} from './{{ bindings }}/{{ m.ts() }}';
 {%- endfor %}
 
 // Initialize the generated bindings: mostly checksums, but also callbacks.
+// - the boolean flag ensures this loads exactly once, even if the JS code
+//   is reloaded (e.g. during development with metro).
 let initialized = false;
 if (!initialized) {
   {%- for m in self.config.modules %}
