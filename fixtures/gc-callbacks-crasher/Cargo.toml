@@ -1,0 +1,22 @@
+[package]
+name = "gc-callbacks-crasher"
+edition = "2021"
+version = "0.22.0"
+license = "MPL-2.0"
+publish = false
+
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+async-std = "1.12.0"
+async-trait = "0.1.83"
+thiserror = "1.0"
+uniffi = { workspace = true, features = ["tokio"] }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+uniffi = { workspace = true, features = ["bindgen-tests"] }

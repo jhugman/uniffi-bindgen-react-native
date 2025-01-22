@@ -44,7 +44,7 @@ async function testToMax(max: number, t: AsyncAsserts) {
 }
 
 (async () => {
-  for (let i = 1; i <= 512; i *= 2) {
+  for (let i = 1; i <= 4096; i *= 2) {
     await asyncTest(
       `Full tilt test up to ${i}`,
       async (t) => await testToMax(i, t),
