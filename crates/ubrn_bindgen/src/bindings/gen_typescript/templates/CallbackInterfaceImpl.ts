@@ -15,12 +15,9 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
     vtable: {
         {%- for (ffi_callback, meth) in vtable_methods %}
         {{ meth.name()|fn_name }}: (
-            {%- for arg in ffi_callback.arguments() %}
+            {%- for arg in ffi_callback.arguments_no_return() %}
             {{ arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_type_name }}{% if !loop.last || ffi_callback.has_rust_call_status_arg() %},{% endif %}
             {%- endfor -%}
-            {%- if ffi_callback.has_rust_call_status_arg() %}
-            uniffiCallStatus: UniffiRustCallStatus
-            {%- endif %}
         ) => {
             const uniffiMakeCall = {# space #}
             {%- if meth.is_async() %}

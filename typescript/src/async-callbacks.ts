@@ -29,7 +29,7 @@ function emptyLowerError<E>(e: E): UniffiByteArray {
 }
 
 // Callbacks passed into Rust.
-export type UniffiForeignFutureFree = (handle: bigint) => void;
+type UniffiForeignFutureFree = (handle: bigint) => void;
 
 export type UniffiForeignFuture = {
   handle: bigint;

@@ -3,9 +3,9 @@
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
-  type UniffiReferenceHolder,
-  type UniffiRustArcPtr,
+  type UniffiForeignFuture as RuntimeUniffiForeignFuture,
   type UniffiRustCallStatus,
+  type UniffiRustArcPtr,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
   type UniffiResult,
  } from 'uniffi-bindgen-react-native';
@@ -37,12 +37,9 @@ export default getter;
 {%- match def %}
 {%- when FfiDefinition::CallbackFunction(callback) %}
 {% call exported(callback) %}type {{ callback.name()|ffi_callback_name }} = (
-{%-   for arg in callback.arguments() %}
+{%-   for arg in callback.arguments_no_return() %}
 {{- arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_type_name }}{% if !loop.last %}, {% endif %}
-{%-   endfor %}
-{%-   if callback.has_rust_call_status_arg() -%}
-{%      if callback.arguments().len() > 0 %}, {% endif %}callStatus: UniffiRustCallStatus
-{%-   endif %}) => {# space #}
+{%-   endfor %}) => {# space #}
 {%-   if callback.returns_result() %}
 {%-     match callback.arg_return_type() %}
 {%-       when Some(return_type) %}UniffiResult<{{ return_type|ffi_type_name }}>
@@ -88,6 +85,10 @@ export default getter;
 const isRustFutureContinuationCallbackTypeCompatible: UniffiStructuralEquality<
   RuntimeUniffiRustFutureContinuationCallback,
   UniffiRustFutureContinuationCallback
+> = true;
+const isUniffiForeignFutureTypeCompatible: UniffiStructuralEquality<
+  RuntimeUniffiForeignFuture,
+  UniffiForeignFuture
 > = true;
 
 {%- import "macros.ts" as ts %}
