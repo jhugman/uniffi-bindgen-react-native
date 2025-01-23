@@ -370,25 +370,22 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn is_exported(&self) -> bool {
-        let name = self.name();
-        [
-            "RustFutureContinuationCallback",
-            "CallbackInterfaceFree",
-            "ForeignFutureFree",
-        ]
-        .contains(&name)
-            || !name.starts_with("CallbackInterface")
+        !self.is_user_callback() && !self.is_free_callback()
     }
 
     fn is_rust_calling_js(&self) -> bool {
-        !self.is_future_callback() || self.name() == "RustFutureContinuationCallback"
+        !self.is_future_callback() || self.is_continuation_callback()
     }
 
     fn returns_result(&self) -> bool {
-        self.is_rust_calling_js()
+        !self.is_future_callback()
             && !self.is_free_callback()
             && !self.has_rust_call_status_arg()
-            && self.name() != "RustFutureContinuationCallback"
+            && !self.is_continuation_callback()
+    }
+
+    fn is_continuation_callback(&self) -> bool {
+        is_continuation(self.name())
     }
 
     fn is_free_callback(&self) -> bool {
@@ -397,6 +394,10 @@ pub(crate) impl FfiCallbackFunction {
 
     fn is_future_callback(&self) -> bool {
         is_future(self.name())
+    }
+
+    fn is_user_callback(&self) -> bool {
+        self.name().starts_with("CallbackInterface")
     }
 
     fn arg_return_type(&self) -> Option<FfiType> {
@@ -414,12 +415,22 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn is_blocking(&self) -> bool {
-        !self.is_free_callback() && self.name() != "RustFutureContinuationCallback"
+        // If the callback returns something, or there's any chance of an error
+        // (even unexpected errors), then we should block before returning
+        // control back to Rust.
+        // In practice this means that all user code is blocking, and uniffi internal
+        // code is non-blocking: Future continuation callbacks, and free callback and
+        // free future callbacks.
+        self.arg_return_type().is_some() || self.has_rust_call_status_arg()
     }
 
     fn arguments_no_return(&self) -> impl Iterator<Item = &FfiArgument> {
         self.arguments().into_iter().filter(|a| !a.is_return())
     }
+}
+
+fn is_continuation(nm: &str) -> bool {
+    nm == "RustFutureContinuationCallback"
 }
 
 fn is_future(nm: &str) -> bool {
