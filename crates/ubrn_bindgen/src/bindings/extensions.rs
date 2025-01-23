@@ -414,7 +414,7 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn is_blocking(&self) -> bool {
-        self.name() != "RustFutureContinuationCallback"
+        !self.is_free_callback() && self.name() != "RustFutureContinuationCallback"
     }
 
     fn arguments_no_return(&self) -> impl Iterator<Item = &FfiArgument> {
