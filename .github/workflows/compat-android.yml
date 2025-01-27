@@ -24,6 +24,7 @@ jobs:
     name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / android"
 
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/test-turbo-modules
         with:
           platform: android

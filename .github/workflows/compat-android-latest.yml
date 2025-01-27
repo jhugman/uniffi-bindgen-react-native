@@ -15,6 +15,7 @@ jobs:
     name: "bob latest / rn latest / android"
 
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/test-turbo-modules
         with:
           platform: android
