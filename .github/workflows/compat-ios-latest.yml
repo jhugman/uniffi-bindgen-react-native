@@ -15,7 +15,7 @@ jobs:
     name: "bob latest / rn latest / ios"
 
     steps:
-      - uses: ./.github/actions/compat
+      - uses: ./.github/actions/test-turbo-modules
         with:
           platform: ios
           bobVersion: latest

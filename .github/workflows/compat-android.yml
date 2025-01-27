@@ -24,7 +24,7 @@ jobs:
     name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / android"
 
     steps:
-      - uses: ./.github/actions/compat
+      - uses: ./.github/actions/test-turbo-modules
         with:
           platform: android
           bobVersion: ${{ matrix.bob-version }}

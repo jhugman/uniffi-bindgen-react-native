@@ -24,7 +24,7 @@ jobs:
     name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / ios"
 
     steps:
-      - uses: ./.github/actions/compat
+      - uses: ./.github/actions/test-turbo-modules
         with:
           platform: ios
           bobVersion: ${{ matrix.bob-version }}
