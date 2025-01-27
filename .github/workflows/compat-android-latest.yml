@@ -1,0 +1,22 @@
+name: Compat / Android (latest)
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Once a day at midnight
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    name: "bob latest / rn latest / android"
+
+    steps:
+      - uses: ./.github/actions/compat
+        with:
+          platform: android
+          bobVersion: latest
+          rnVersion: latest

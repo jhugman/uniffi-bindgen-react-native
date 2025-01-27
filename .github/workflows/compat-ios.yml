@@ -1,0 +1,31 @@
+name: Compat / iOS
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Once a day at midnight
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compat:
+    strategy:
+      matrix:
+        bob-version:
+          - 0.43.0
+          - 0.44.3
+          - 0.45.5
+        rn-version:
+          - 0.76.6
+
+    runs-on: macos-latest
+    name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / ios"
+
+    steps:
+      - uses: ./.github/actions/compat
+        with:
+          platform: ios
+          bobVersion: ${{ matrix.bob-version }}
+          rnVersion: ${{ matrix.rn-version }}
