@@ -1,0 +1,23 @@
+name: Compat / iOS (latest)
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Once a day at midnight
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compat:
+    runs-on: macos-latest
+    name: "bob latest / rn latest / ios"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/test-turbo-modules
+        with:
+          platform: ios
+          bobVersion: latest
+          rnVersion: latest

@@ -1,0 +1,32 @@
+name: Compat / Android
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Once a day at midnight
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compat:
+    strategy:
+      matrix:
+        bob-version:
+          - 0.43.0
+          - 0.44.3
+          - 0.45.5
+        rn-version:
+          - 0.76.6
+
+    runs-on: ubuntu-latest
+    name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / android"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/test-turbo-modules
+        with:
+          platform: android
+          bobVersion: ${{ matrix.bob-version }}
+          rnVersion: ${{ matrix.rn-version }}
