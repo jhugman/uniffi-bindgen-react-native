@@ -40,7 +40,7 @@ pub(crate) fn generate_entrypoint(modules: &[ModuleMetadata]) -> Result<String> 
     let mods: TokenStream = modules
         .iter()
         .map(|m| {
-            let namespace = Ident::new(&m.namespace, Span::call_site());
+            let namespace = ident(&m.rs_module());
             quote! { mod #namespace; }
         })
         .collect();
