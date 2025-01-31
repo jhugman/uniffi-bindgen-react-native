@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::fs;
+use std::fs::{self, rename};
 
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -84,6 +84,19 @@ pub fn mk_dir<P: AsRef<Utf8Path>>(dir: P) -> Result<()> {
         fs::create_dir_all(dir)?;
         Ok(())
     }
+}
+
+pub fn mv_files(extension: &str, source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
+    for entry in source.read_dir_utf8()? {
+        let entry = entry?;
+        let path = entry.path();
+        if !entry.file_type()?.is_file() || path.extension() != Some(extension) {
+            continue;
+        }
+        let file_name = path.file_name().expect("Could not get file name from path");
+        rename(path, destination.join(file_name))?
+    }
+    Ok(())
 }
 
 pub fn read_from_file<P, T>(file: P) -> Result<T>

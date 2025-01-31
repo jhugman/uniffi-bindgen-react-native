@@ -11,7 +11,11 @@ use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use heck::ToUpperCamelCase;
 use serde::{Deserialize, Serialize};
-use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
+use ubrn_common::{mk_dir, mv_files, rm_dir, run_cmd, CrateMetadata};
+use uniffi_bindgen::{
+    bindings::SwiftBindingGenerator, cargo_metadata::CrateConfigSupplier,
+    library_mode::generate_bindings,
+};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
@@ -102,6 +106,10 @@ impl IOsConfig {
         let filename = format!("{}.xcframework", self.framework_name);
         project_root.join(filename)
     }
+
+    pub(crate) fn swift_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join("swift")
+    }
 }
 
 #[derive(Args, Debug)]
@@ -124,6 +132,10 @@ pub(crate) struct IOsArgs {
     /// This is useful when adding extra bindings (e.g. Swift) to the project.
     #[clap(long, alias = "no-xcframework")]
     no_xcodebuild: bool,
+
+    /// Generate native Swift Bindings together with the xcframework
+    #[clap(long, conflicts_with_all = ["no_xcodebuild"], default_value = "false")]
+    native_bindings: bool,
 
     /// Comma separated list of targets, that override the values in
     /// the `config.yaml` file.
@@ -172,6 +184,9 @@ impl IOsArgs {
 
         Ok(if !self.no_xcodebuild {
             let target_files = self.lipo_when_necessary(crate_, target_files)?;
+            if self.native_bindings {
+                self.generate_swift_bindings(&config, &target_files)?;
+            }
             self.create_xcframework(&config, &target_files)?;
             target_files
         } else {
@@ -256,6 +271,36 @@ impl IOsArgs {
         Ok(sorted)
     }
 
+    fn generate_swift_bindings(
+        &self,
+        config: &ProjectConfig,
+        target_files: &[Utf8PathBuf],
+    ) -> Result<(), anyhow::Error> {
+        let manifest_path = config.crate_.manifest_path()?;
+        let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
+        let config_supplier = CrateConfigSupplier::from(metadata);
+        let library_path = target_files
+            .first()
+            .context("Need at least one library file to generate Swift bindings")?;
+
+        let out_dir = config.ios.swift_path(config.project_root());
+        if out_dir.exists() {
+            rm_dir(&out_dir)?;
+        }
+        ubrn_common::mk_dir(&out_dir)?;
+
+        generate_bindings(
+            &library_path,
+            None,
+            &SwiftBindingGenerator,
+            &config_supplier,
+            None,
+            &out_dir,
+            false,
+        )?;
+        Ok(())
+    }
+
     fn create_xcframework(
         &self,
         config: &ProjectConfig,
@@ -265,11 +310,22 @@ impl IOsArgs {
         let project_root = config.project_root();
         let ios_dir = ios.directory(project_root);
         ubrn_common::mk_dir(&ios_dir)?;
+        let swift_path = ios.swift_path(project_root);
+        let header_dir = swift_path.join("headers");
+        if self.native_bindings {
+            ubrn_common::mk_dir(&header_dir)?;
+            mv_files("h", &swift_path, &header_dir)?;
+            self.merge_modulemaps(&swift_path, &header_dir.join("module.modulemap"))?;
+        }
         let mut library_args = Vec::new();
         for library in target_files {
             // :eyes: single dash arg.
             library_args.push("-library".to_string());
             library_args.push(library.to_string());
+            if self.native_bindings {
+                library_args.push("-headers".to_string());
+                library_args.push(header_dir.to_string());
+            }
         }
         let framework_path = ios.framework_path(project_root);
         if framework_path.exists() {
@@ -282,6 +338,26 @@ impl IOsArgs {
             .arg(&framework_path)
             .args(ios.xcodebuild_extras.clone());
         run_cmd(cmd.current_dir(ios_dir))?;
+        if self.native_bindings {
+            rm_dir(&header_dir)?;
+        }
+        Ok(())
+    }
+
+    fn merge_modulemaps(&self, dir: &Utf8Path, out_file: &Utf8Path) -> Result<()> {
+        let mut contents = String::new();
+        for entry in dir.read_dir_utf8()? {
+            let entry = entry?;
+            let path = entry.path();
+            if !entry.file_type()?.is_file() || path.extension() != Some("modulemap") {
+                continue;
+            }
+            let chunk = std::fs::read_to_string(path)?;
+            contents.push_str(&chunk);
+            contents.push_str("\n\n");
+            std::fs::remove_file(path)?;
+        }
+        std::fs::write(out_file, contents)?;
         Ok(())
     }
 
