@@ -21,11 +21,11 @@ impl ObjectCodeType {
 impl CodeType for ObjectCodeType {
     // This is the name of the type/interface.
     //
-    // In Kotlin, this is `{class_name}Interface`, and for callback
+    // In Typescript, this is `{class_name}Interface`, and for callback
     // interfaces (when `self.imp.has_callback_interface()`) `{class_name}`.
     //
     fn type_label(&self, ci: &ComponentInterface) -> String {
-        if !self.imp.has_callback_interface() {
+        if !self.imp.is_trait_interface() || ci.is_name_used_as_error(&self.name) {
             format!("{}Interface", CodeOracle.class_name(ci, &self.name))
         } else {
             CodeOracle.class_name(ci, &self.name)
@@ -35,17 +35,17 @@ impl CodeType for ObjectCodeType {
     // This is the name of the implementation class, that implements the interface
     // above.
     //
-    // In Kotlin, this is `{class_name}`, and for callback
+    // In Typescript, this is `{class_name}`, and for callback
     // interfaces (when `self.imp.has_callback_interface()`) `{class_name}Impl`.
     //
     // Unlike other languages, in Typescript it is legal to have the interface/type called the same thing
     // as the implementation class. This is very useful so as avoid extra cognitive burden,
     // and naming collisions.
     fn decl_type_label(&self, ci: &ComponentInterface) -> String {
-        if self.imp.has_callback_interface() {
-            format!("{}Impl", CodeOracle.class_name(ci, &self.name))
-        } else {
+        if !self.imp.is_trait_interface() || ci.is_name_used_as_error(&self.name) {
             CodeOracle.class_name(ci, &self.name)
+        } else {
+            format!("{}Impl", CodeOracle.class_name(ci, &self.name))
         }
     }
 
