@@ -44,6 +44,9 @@ pub(crate) struct IOsConfig {
 
     #[serde(default = "IOsConfig::default_codegen_output_dir")]
     pub(crate) codegen_output_dir: String,
+
+    #[serde(default = "IOsConfig::default_native_bindings_dir")]
+    pub(crate) native_bindings_dir: String,
 }
 
 impl IOsConfig {
@@ -85,6 +88,10 @@ impl IOsConfig {
     fn default_codegen_output_dir() -> String {
         workspace::package_json().ios_codegen_output_dir()
     }
+
+    fn default_native_bindings_dir() -> String {
+        "swift".to_string()
+    }
 }
 
 impl Default for IOsConfig {
@@ -107,8 +114,8 @@ impl IOsConfig {
         project_root.join(filename)
     }
 
-    pub(crate) fn swift_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-        project_root.join("swift")
+    pub(crate) fn native_bindings_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.native_bindings_dir)
     }
 }
 
@@ -183,9 +190,10 @@ impl IOsArgs {
         };
 
         Ok(if !self.no_xcodebuild {
-            let target_files = self.lipo_when_necessary(crate_, target_files)?;
+            let mut target_files = self.lipo_when_necessary(crate_, target_files)?;
+            target_files.sort();
             if self.native_bindings {
-                self.generate_swift_bindings(&config, &target_files)?;
+                self.generate_native_bindings(&config, &target_files)?;
             }
             self.create_xcframework(&config, &target_files)?;
             target_files
@@ -271,7 +279,7 @@ impl IOsArgs {
         Ok(sorted)
     }
 
-    fn generate_swift_bindings(
+    fn generate_native_bindings(
         &self,
         config: &ProjectConfig,
         target_files: &[Utf8PathBuf],
@@ -281,14 +289,12 @@ impl IOsArgs {
         let config_supplier = CrateConfigSupplier::from(metadata);
         let library_path = target_files
             .first()
-            .context("Need at least one library file to generate Swift bindings")?;
-
-        let out_dir = config.ios.swift_path(config.project_root());
+            .context("Need at least one library file to generate native iOS bindings")?;
+        let out_dir = config.ios.native_bindings_dir(config.project_root());
         if out_dir.exists() {
             rm_dir(&out_dir)?;
         }
         ubrn_common::mk_dir(&out_dir)?;
-
         generate_bindings(
             &library_path,
             None,
@@ -310,12 +316,12 @@ impl IOsArgs {
         let project_root = config.project_root();
         let ios_dir = ios.directory(project_root);
         ubrn_common::mk_dir(&ios_dir)?;
-        let swift_path = ios.swift_path(project_root);
-        let header_dir = swift_path.join("headers");
+        let native_bindings_dir = ios.native_bindings_dir(project_root);
+        let header_dir = native_bindings_dir.join("headers");
         if self.native_bindings {
             ubrn_common::mk_dir(&header_dir)?;
-            mv_files("h", &swift_path, &header_dir)?;
-            self.merge_modulemaps(&swift_path, &header_dir.join("module.modulemap"))?;
+            mv_files("h", &native_bindings_dir, &header_dir)?;
+            self.merge_modulemaps(&native_bindings_dir, &header_dir.join("module.modulemap"))?;
         }
         let mut library_args = Vec::new();
         for library in target_files {
