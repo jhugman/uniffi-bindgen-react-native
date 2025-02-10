@@ -30,7 +30,7 @@ Pod::Spec.new do |s|
   {%- let tm = self.relative_to(root, dir) %}
   {%- let dir = self.config.project.bindings.cpp_path(root) %}
   {%- let bindings = self.relative_to(root, dir) -%}
-  s.source_files = "{{ ios }}/**/*.{h,m,mm}", "{{ codegen }}/**/*.{h,m,mm}", "{{ tm }}/**/*.{hpp,cpp,c,h}", "{{ bindings }}/**/*.{hpp,cpp,c,h}"
+  s.source_files = "{{ ios }}/**/*.{h,m,mm,swift}", "{{ codegen }}/**/*.{h,m,mm}", "{{ tm }}/**/*.{hpp,cpp,c,h}", "{{ bindings }}/**/*.{hpp,cpp,c,h}"
   s.vendored_frameworks = "{{ framework }}"
   s.dependency    "uniffi-bindgen-react-native", "{{ self.config.project.ubrn_version() }}"
 

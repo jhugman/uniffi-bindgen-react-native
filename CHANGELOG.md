@@ -1,6 +1,9 @@
 # Upcoming releases
 
 [//]: # (## ✨ What's New)
+
+* Add option to generate native swift bindings ([#214](https://github.com/jhugman/uniffi-bindgen-react-native/pull/214))
+
 [//]: # (## 🦊 What's Changed)
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
