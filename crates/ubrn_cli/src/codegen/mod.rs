@@ -479,7 +479,6 @@ mod tests {
                 targets: Default::default(),
                 cargo_extras: ExtraArgs::default(),
                 codegen_output_dir: "ios/generated".to_string(),
-                native_bindings_dir: "swift".to_string(),
             };
             let bindings = BindingsConfig {
                 cpp: "cpp/bindings".to_string(),
