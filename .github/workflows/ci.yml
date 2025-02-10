@@ -59,7 +59,9 @@ jobs:
         run: sudo apt-get install -y cmake ninja-build
 
       - name: Installing hermes and test-runner
-        run: cargo xtask bootstrap
+        run: |
+          cargo xtask bootstrap hermes --branch rn/0.77-stable
+          cargo xtask bootstrap
 
       - name: Run tests of generated JSI bindings
         run: ./scripts/run-tests.sh
