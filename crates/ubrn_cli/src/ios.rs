@@ -44,9 +44,6 @@ pub(crate) struct IOsConfig {
 
     #[serde(default = "IOsConfig::default_codegen_output_dir")]
     pub(crate) codegen_output_dir: String,
-
-    #[serde(default = "IOsConfig::default_native_bindings_dir")]
-    pub(crate) native_bindings_dir: String,
 }
 
 impl IOsConfig {
@@ -88,10 +85,6 @@ impl IOsConfig {
     fn default_codegen_output_dir() -> String {
         workspace::package_json().ios_codegen_output_dir()
     }
-
-    fn default_native_bindings_dir() -> String {
-        "swift".to_string()
-    }
 }
 
 impl Default for IOsConfig {
@@ -115,7 +108,7 @@ impl IOsConfig {
     }
 
     pub(crate) fn native_bindings_dir(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-        project_root.join(&self.native_bindings_dir)
+        self.directory(project_root).join("swift")
     }
 }
 
