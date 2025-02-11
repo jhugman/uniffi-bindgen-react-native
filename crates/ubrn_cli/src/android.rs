@@ -8,9 +8,13 @@ use std::{collections::HashMap, fmt::Display, fs, process::Command, str::FromStr
 
 use clap::Args;
 
-use anyhow::{Error, Result};
+use anyhow::{Context, Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
+use uniffi_bindgen::{
+    bindings::KotlinBindingGenerator, cargo_metadata::CrateConfigSupplier,
+    library_mode::generate_bindings,
+};
 
 use crate::{
     building::{CommonBuildArgs, ExtraArgs},
@@ -153,6 +157,10 @@ pub(crate) struct AndroidArgs {
     /// Suppress the copying of the Rust library into the JNI library directories.
     #[clap(long = "no-jniLibs")]
     no_jni_libs: bool,
+
+    /// Generate native Kotlin Bindings together with the JNI libraries
+    #[clap(long, conflicts_with_all = ["no_jni_libs"], default_value = "false")]
+    native_bindings: bool,
 }
 
 impl AndroidArgs {
@@ -189,6 +197,9 @@ impl AndroidArgs {
                 &android.jni_libs(project_root),
                 &target_files,
             )?;
+            if self.native_bindings {
+                self.generate_native_bindings(&config, &target_files)?;
+            }
         }
 
         Ok(target_files.into_values().collect())
@@ -281,6 +292,36 @@ impl AndroidArgs {
             println!("cp {library} {dst_lib}");
             fs::copy(library, &dst_lib)?;
         }
+        Ok(())
+    }
+
+    fn generate_native_bindings(
+        &self,
+        config: &ProjectConfig,
+        target_files: &HashMap<Target, Utf8PathBuf>,
+    ) -> Result<(), anyhow::Error> {
+        println!("-- Generating native Kotlin bindings");
+        let manifest_path = config.crate_.manifest_path()?;
+        let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
+        let config_supplier = CrateConfigSupplier::from(metadata);
+        let mut libs = target_files
+            .clone()
+            .into_values()
+            .collect::<Vec<Utf8PathBuf>>();
+        libs.sort();
+        let library_path = libs
+            .first()
+            .context("Need at least one library file to generate native Kotlin bindings")?;
+        let out_dir = config.android.src_main_java_dir(config.project_root());
+        generate_bindings(
+            library_path,
+            None,
+            &KotlinBindingGenerator,
+            &config_supplier,
+            None,
+            &out_dir,
+            false,
+        )?;
         Ok(())
     }
 
