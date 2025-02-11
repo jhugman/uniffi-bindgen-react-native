@@ -3,6 +3,7 @@
 [//]: # (## ✨ What's New)
 
 * Add option to generate native swift bindings ([#214](https://github.com/jhugman/uniffi-bindgen-react-native/pull/214))
+* Add option to generate native kotlin bindings ([#218](https://github.com/jhugman/uniffi-bindgen-react-native/pull/218))
 
 [//]: # (## 🦊 What's Changed)
 [//]: # (## ⚠️ Breaking Changes)
