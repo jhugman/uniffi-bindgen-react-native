@@ -4,7 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use serde::Deserialize;
-use std::{collections::HashMap, fmt::Display, fs, process::Command, str::FromStr};
+use std::{
+    collections::{BTreeSet, HashMap},
+    fmt::Display,
+    fs,
+    process::Command,
+    str::FromStr,
+};
 
 use clap::Args;
 
@@ -304,11 +310,10 @@ impl AndroidArgs {
         let manifest_path = config.crate_.manifest_path()?;
         let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
         let config_supplier = CrateConfigSupplier::from(metadata);
-        let mut libs = target_files
+        let libs = target_files
             .clone()
             .into_values()
-            .collect::<Vec<Utf8PathBuf>>();
-        libs.sort();
+            .collect::<BTreeSet<Utf8PathBuf>>();
         let library_path = libs
             .first()
             .context("Need at least one library file to generate native Kotlin bindings")?;
