@@ -101,6 +101,9 @@ Options:
       --no-jniLibs
           Suppress the copying of the Rust library into the JNI library directories
 
+      --native-bindings
+          Generate native Kotlin Bindings together with the JNI libraries
+
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -156,6 +159,9 @@ Options:
           Does not perform the xcodebuild step to generate the xcframework
 
           The xcframework will need to be generated externally from this tool. This is useful when adding extra bindings (e.g. Swift) to the project.
+
+      --native-bindings
+          Generate native Swift Bindings together with the xcframework
 
   -t, --targets <TARGETS>...
           Comma separated list of targets, that override the values in the `config.yaml` file.
