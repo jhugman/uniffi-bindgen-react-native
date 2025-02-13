@@ -113,6 +113,18 @@ test("Optional callbacks serialized correctly", (t) => {
   rg.uniffiDestroy();
 });
 
+test("Flat errors are propagated correctly, with non-void return", (t) => {
+  const rg = new RustGetters();
+  const callbackInterface = new TypeScriptGetters();
+  t.assertThrows(SimpleError.BadArgument.instanceOf, () =>
+    rg.getString(callbackInterface, BAD_ARGUMENT, true),
+  );
+  t.assertThrows(SimpleError.UnexpectedError.instanceOf, () =>
+    rg.getString(callbackInterface, UNEXPECTED_ERROR, true),
+  );
+  rg.uniffiDestroy();
+});
+
 test("Flat errors are propagated correctly", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();

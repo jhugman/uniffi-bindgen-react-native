@@ -95,6 +95,11 @@ pub(crate) impl ComponentInterface {
             .chain(self.iter_ffi_function_bless_pointer())
     }
 
+    fn iter_ffi_functions_js_to_abi_rust(&self) -> impl Iterator<Item = FfiFunction> {
+        self.iter_ffi_functions_js_to_rust()
+            .chain(self.iter_ffi_functions_init_callback())
+    }
+
     fn iter_ffi_functions_js_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
         let has_async = self.has_async_fns();
         self.iter_ffi_function_definitions().filter(move |f| {
@@ -378,10 +383,7 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn returns_result(&self) -> bool {
-        !self.is_future_callback()
-            && !self.is_free_callback()
-            && !self.has_rust_call_status_arg()
-            && !self.is_continuation_callback()
+        self.is_blocking()
     }
 
     fn is_continuation_callback(&self) -> bool {
@@ -398,6 +400,10 @@ pub(crate) impl FfiCallbackFunction {
 
     fn is_user_callback(&self) -> bool {
         self.name().starts_with("CallbackInterface")
+    }
+
+    fn has_return_out_param(&self) -> bool {
+        self.arguments().into_iter().any(|a| a.is_return())
     }
 
     fn arg_return_type(&self) -> Option<FfiType> {
@@ -421,7 +427,7 @@ pub(crate) impl FfiCallbackFunction {
         // In practice this means that all user code is blocking, and uniffi internal
         // code is non-blocking: Future continuation callbacks, and free callback and
         // free future callbacks.
-        self.arg_return_type().is_some() || self.has_rust_call_status_arg()
+        self.has_return_out_param() || self.has_rust_call_status_arg()
     }
 
     fn arguments_no_return(&self) -> impl Iterator<Item = &FfiArgument> {
