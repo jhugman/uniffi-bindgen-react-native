@@ -12,6 +12,10 @@ pub struct Guid(pub String);
 pub struct Ouid(pub String);
 uniffi::custom_newtype!(Ouid, String);
 
+// Not used directly in this crate.
+pub struct Ouid2(pub String);
+uniffi::custom_newtype!(Ouid2, String);
+
 // This error is represented in the UDL.
 #[derive(Debug, thiserror::Error)]
 pub enum GuidError {
@@ -33,7 +37,7 @@ pub fn get_guid(guid: Option<Guid>) -> Guid {
         Some(guid) => {
             assert!(
                 !guid.0.is_empty(),
-                "our UniffiCustomTypeConverter already checked!"
+                "our custom type converter already checked!"
             );
             guid
         }
@@ -43,13 +47,13 @@ pub fn get_guid(guid: Option<Guid>) -> Guid {
 
 fn try_get_guid(guid: Option<Guid>) -> std::result::Result<Guid, GuidError> {
     // This function itself always returns Ok - but it's declared as a Result
-    // because the UniffiCustomTypeConverter might return the Err as part of
+    // because the custom type converter might return the Err as part of
     // turning the string into the Guid.
     Ok(match guid {
         Some(guid) => {
             assert!(
                 !guid.0.is_empty(),
-                "our UniffiCustomTypeConverter failed to check for an empty GUID"
+                "our custom type converter failed to check for an empty GUID"
             );
             guid
         }
@@ -90,12 +94,10 @@ pub fn run_callback(callback: Box<dyn GuidCallback>) -> Guid {
     callback.run(Guid("callback-test-payload".into()))
 }
 
-impl UniffiCustomTypeConverter for Guid {
-    type Builtin = String;
-
-    // This is a "fixture" rather than an "example", so we are free to do things that don't really
-    // make sense for real apps.
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+uniffi::custom_type!(Guid, String, {
+    try_lift: |val| {
+        // This is a "fixture" rather than an "example", so we are free to do things that don't really
+        // make sense for real apps.
         if val.is_empty() {
             Err(GuidError::TooShort.into())
         } else if val == "unexpected" {
@@ -105,28 +107,13 @@ impl UniffiCustomTypeConverter for Guid {
         } else {
             Ok(Guid(val))
         }
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.0
-    }
-}
+    },
+    lower: |obj| obj.0,
+});
 
 pub struct ANestedGuid(pub Guid);
 
-impl UniffiCustomTypeConverter for ANestedGuid {
-    type Builtin = Guid;
-
-    // This is a "fixture" rather than an "example", so we are free to do things that don't really
-    // make sense for real apps.
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(ANestedGuid(val))
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.0
-    }
-}
+uniffi::custom_newtype!(ANestedGuid, Guid);
 
 #[uniffi::export]
 fn get_nested_guid(nguid: Option<ANestedGuid>) -> ANestedGuid {
