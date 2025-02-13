@@ -233,8 +233,9 @@ impl<'a> ComponentTemplate<'a> {
         let foreign_func_ident = self.flavor.foreign_ident(func.name());
 
         let args = func.arguments();
-        let args_decl = self.arg_list_decl(&args, |t| self.ffi_type_foreign_to_rust(t));
-        let args_call: TokenStream =
+        let js_args_decl = self.arg_list_decl(&args, |t| self.ffi_type_foreign_to_rust(t));
+
+        let args_into_rust: TokenStream =
             self.arg_list_convert(&args, |ident, type_| self.convert_to_rust(ident, type_));
 
         let has_return = func.return_type().is_some();
@@ -266,9 +267,9 @@ impl<'a> ComponentTemplate<'a> {
 
             quote! {
                 #annotation
-                pub fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
+                pub fn #foreign_func_ident(#js_args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
                     let mut #rust_status_ident = #uniffi::RustCallStatus::default();
-                    #let_value unsafe { #func_ident(#args_call &mut #rust_status_ident) };
+                    #let_value unsafe { #func_ident(#args_into_rust &mut #rust_status_ident) };
                     #foreign_status_ident.copy_from(#rust_status_ident);
                     #return_value
                 }
@@ -277,8 +278,8 @@ impl<'a> ComponentTemplate<'a> {
             let semicolon = if_or_default(!has_return, quote! { ; });
             quote! {
                 #annotation
-                pub unsafe fn #foreign_func_ident(#args_decl) #decl_suffix {
-                    #func_ident(#args_call) #call_suffix #semicolon
+                pub unsafe fn #foreign_func_ident(#js_args_decl) #decl_suffix {
+                    #func_ident(#args_into_rust) #call_suffix #semicolon
                 }
             }
         }
@@ -324,26 +325,11 @@ impl<'a> ComponentTemplate<'a> {
             }
         });
 
-        let rs_args_decl: TokenStream = cb
-            .callback()
-            .arguments_no_return()
-            .map(|a| {
-                let ident = ident(a.name());
-                let type_ = self.ffi_type_rust(&a.type_());
-                quote! { #ident: #type_, }
-            })
-            .collect();
+        let args: Vec<_> = cb.callback().arguments_no_return().collect();
+        let rust_args_decl: TokenStream = self.arg_list_decl(&args, |t| self.ffi_type_rust(t));
 
-        // self.arg_list_decl(&args, |t| self.ffi_type_cb_rust(t));
-
-        let js_args: TokenStream = cb
-            .callback()
-            .arguments_no_return()
-            .map(|a| {
-                let ident = ident(a.name());
-                quote! { #ident.into_js(), }
-            })
-            .collect();
+        let args_into_js: TokenStream =
+            self.arg_list_convert(&args, |ident, _| self.convert_to_js(ident));
 
         let return_let = if_or_default(
             cb.callback().has_rust_call_status_arg() || cb.return_type().is_some(),
@@ -379,7 +365,7 @@ impl<'a> ComponentTemplate<'a> {
             }
 
             thread_local! {
-                pub(super) static CALLBACK: #runtime_ident::ForeignCell<#callback_fn_ident> = #runtime_ident::ForeignCell::new();
+                static CALLBACK: #runtime_ident::ForeignCell<#callback_fn_ident> = #runtime_ident::ForeignCell::new();
             }
 
             impl IntoRust<#callback_fn_ident> for FnSig {
@@ -389,10 +375,10 @@ impl<'a> ComponentTemplate<'a> {
                 }
             }
 
-            pub(super) type FnSig = extern "C" fn(#rs_args_decl #return_arg_decl #call_status_arg_decl);
+            pub(super) type FnSig = extern "C" fn(#rust_args_decl #return_arg_decl #call_status_arg_decl);
 
-            extern "C" fn implementation(#rs_args_decl #return_arg_decl #call_status_arg_decl) {
-                #return_let CALLBACK.with(|#cell| #cell.with_value(|#callback| #callback.call(#callback, #js_args)));
+            extern "C" fn implementation(#rust_args_decl #return_arg_decl #call_status_arg_decl) {
+                #return_let CALLBACK.with(|#cell| #cell.with_value(|#callback| #callback.call(#callback, #args_into_js)));
                 #call_status_copy
                 #return_copy
             }
@@ -561,6 +547,10 @@ impl<'a> ComponentTemplate<'a> {
     fn convert_to_rust(&self, ident: Ident, type_: &FfiType) -> TokenStream {
         let rust_type = self.ffi_type_rust(type_);
         quote! { #rust_type::into_rust(#ident), }
+    }
+
+    fn convert_to_js(&self, ident: Ident) -> TokenStream {
+        quote! { #ident.into_js(), }
     }
 
     fn arg_ident(&self, arg: &FfiArgument) -> Ident {
