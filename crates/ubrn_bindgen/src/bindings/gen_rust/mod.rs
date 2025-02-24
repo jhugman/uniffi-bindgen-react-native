@@ -4,22 +4,29 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod config;
+mod extensions;
+mod util;
 
 use anyhow::Result;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 use uniffi_bindgen::{
-    interface::{FfiArgument, FfiCallbackFunction, FfiDefinition, FfiFunction, FfiStruct, FfiType},
+    interface::{FfiArgument, FfiCallbackFunction, FfiFunction, FfiType},
     ComponentInterface,
 };
+use util::{camel_case_ident, ident, if_or_default, if_then_map, map_or_default, snake_case_ident};
 
 use crate::{
-    bindings::{extensions::ComponentInterfaceExt, metadata::ModuleMetadata},
+    bindings::{
+        extensions::{ComponentInterfaceExt as _, FfiCallbackFunctionExt as _},
+        metadata::ModuleMetadata,
+    },
     switches::SwitchArgs,
     AbiFlavor,
 };
 pub(crate) use config::RustConfig as Config;
+use extensions::{ComponentInterfaceExt as _, FfiCallbackFunction2, FfiDefinition2, FfiStruct2};
 
 #[allow(unused_variables)]
 pub(crate) fn generate_rs(
@@ -40,7 +47,7 @@ pub(crate) fn generate_entrypoint(modules: &[ModuleMetadata]) -> Result<String> 
     let mods: TokenStream = modules
         .iter()
         .map(|m| {
-            let namespace = Ident::new(&m.namespace, Span::call_site());
+            let namespace = ident(&m.rs_module());
             quote! { mod #namespace; }
         })
         .collect();
@@ -82,16 +89,8 @@ impl FlavorParams<'_> {
     }
 }
 
-fn if_or_default<T: Default>(flag: bool, then: T) -> T {
-    if flag {
-        then
-    } else {
-        Default::default()
-    }
-}
-
-fn ident(id: &str) -> Ident {
-    Ident::new(id, Span::call_site())
+fn callback_fn_ident() -> Ident {
+    ident("JsCallbackFn")
 }
 
 fn wasm_flavor() -> FlavorParams<'static> {
@@ -146,18 +145,18 @@ impl<'a> ComponentTemplate<'a> {
     fn ci(&mut self, ci: &ComponentInterface) -> TokenStream {
         let prelude = self.prelude(ci);
 
-        // let definitions: TokenStream = ci
-        //     .ffi_definitions()
-        //     .map(|f| self.ffi_definition(&f))
-        //     .collect();
+        let definitions = ci
+            .ffi_definitions2()
+            .map(|f| self.ffi_definition(&f))
+            .collect::<TokenStream>();
 
-        let definitions: TokenStream = ci
-            .iter_ffi_functions_js_to_rust()
+        let ffi_funcs = ci
+            .iter_ffi_functions_js_to_abi_rust()
             .map(|f| self.ffi_function(&f))
-            .collect();
+            .collect::<TokenStream>();
 
         let extern_c: TokenStream = ci
-            .iter_ffi_functions_js_to_rust()
+            .iter_ffi_functions_js_to_abi_rust()
             .map(|f| self.ffi_function_decl_c_abi(&f))
             .collect();
 
@@ -169,12 +168,14 @@ impl<'a> ComponentTemplate<'a> {
                 #extern_c
             }
 
+            #ffi_funcs
+
             #definitions
         }
     }
 
     fn runtime_ident(&self) -> Ident {
-        ident("f")
+        ident("js")
     }
 
     fn uniffi_ident(&self) -> Ident {
@@ -182,22 +183,23 @@ impl<'a> ComponentTemplate<'a> {
     }
 
     fn prelude(&self, ci: &ComponentInterface) -> TokenStream {
-        let runtime_alias_ident = self.runtime_ident();
-        let runtime_ident = self.flavor.runtime_module();
-        let library_ident = ident(ci.crate_name());
-        let uniffi_alias_ident = self.uniffi_ident();
+        let runtime_module_ident = self.flavor.runtime_module();
+        let runtime_ident = self.runtime_ident();
+        let crate_ident = ident(ci.crate_name());
+        let uniffi_ident = self.uniffi_ident();
         quote! {
-            use #runtime_ident::{self as #runtime_alias_ident, uniffi as #uniffi_alias_ident, IntoRust};
-            use #library_ident;
+            use #runtime_module_ident::{self as #runtime_ident, uniffi as #uniffi_ident, IntoJs, IntoRust};
+            #[allow(unused_imports)]
+            use #crate_ident;
+
+            use wasm_bindgen::prelude::wasm_bindgen;
         }
     }
 
-    #[allow(dead_code)]
-    fn ffi_definition(&mut self, definition: &FfiDefinition) -> TokenStream {
+    fn ffi_definition(&mut self, definition: &FfiDefinition2) -> TokenStream {
         match definition {
-            FfiDefinition::Function(f) => self.ffi_function(f),
-            FfiDefinition::CallbackFunction(cb) => self.ffi_callback(cb),
-            FfiDefinition::Struct(s) => self.ffi_struct(s),
+            FfiDefinition2::CallbackFunction(cb) => self.ffi_callback(cb),
+            FfiDefinition2::Struct(s) => self.ffi_struct(s),
         }
     }
 
@@ -205,23 +207,17 @@ impl<'a> ComponentTemplate<'a> {
         let uniffi = self.uniffi_ident();
         let func_ident = ident(func.name());
 
-        let args = func.arguments();
-        let args_decl: TokenStream = args.iter().map(|arg| self.arg_decl_c_abi(arg)).collect();
+        let args_decl = self.arg_list_decl(&func.arguments(), |t| self.ffi_type_rust(t));
 
-        let decl_suffix = if let Some(type_) = func.return_type() {
+        let decl_suffix = map_or_default(func.return_type(), |type_| {
             let return_type = self.ffi_type_rust(type_);
             quote! { -> #return_type }
-        } else {
-            quote! {}
-        };
+        });
 
-        let needs_call_status = func.has_rust_call_status_arg();
-        let call_status = if needs_call_status {
-            let rust_status_ident = ident("u_status_");
+        let call_status = if_then_map(func.has_rust_call_status_arg(), || {
+            let rust_status_ident = ident("status_");
             quote! { #rust_status_ident: &mut #uniffi::RustCallStatus }
-        } else {
-            quote! {}
-        };
+        });
 
         quote! {
             fn #func_ident(#args_decl #call_status) #decl_suffix;
@@ -232,13 +228,14 @@ impl<'a> ComponentTemplate<'a> {
         let runtime = self.runtime_ident();
         let uniffi = self.uniffi_ident();
 
-        let annotation = quote! { #[#runtime::export] };
+        let annotation = quote! { #[wasm_bindgen] };
         let func_ident = ident(func.name());
         let foreign_func_ident = self.flavor.foreign_ident(func.name());
 
         let args = func.arguments();
-        let args_decl: TokenStream = args.iter().map(|arg| self.arg_decl(arg)).collect();
-        let args_call: TokenStream = args.iter().map(|arg| self.arg_to_rust(arg)).collect();
+        let args_decl = self.arg_list_decl(&args, |t| self.ffi_type_foreign_to_rust(t));
+        let args_call: TokenStream =
+            self.arg_list_convert(&args, |ident, type_| self.convert_to_rust(ident, type_));
 
         let has_return = func.return_type().is_some();
 
@@ -256,15 +253,23 @@ impl<'a> ComponentTemplate<'a> {
             let rust_status_ident = ident("u_status_");
             let foreign_status_ident = ident("f_status_");
             let return_ident = ident("value_");
-            let let_value = if_or_default(has_return, quote! { let #return_ident = });
-            let return_value = if_or_default(has_return, quote! { #return_ident });
+            let ArgumentTokens {
+                declaration: let_value,
+                returns: return_value,
+            } = if_or_default(
+                has_return,
+                ArgumentTokens {
+                    declaration: quote! { let #return_ident = },
+                    returns: quote! { #return_ident.into_js() },
+                },
+            );
 
             quote! {
                 #annotation
-                pub unsafe fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
+                pub fn #foreign_func_ident(#args_decl #foreign_status_ident: &mut #runtime::RustCallStatus) #decl_suffix {
                     let mut #rust_status_ident = #uniffi::RustCallStatus::default();
-                    #let_value #func_ident(#args_call &mut #rust_status_ident) #call_suffix;
-                    #foreign_status_ident.copy_into(#rust_status_ident);
+                    #let_value unsafe { #func_ident(#args_call &mut #rust_status_ident) };
+                    #foreign_status_ident.copy_from(#rust_status_ident);
                     #return_value
                 }
             }
@@ -279,36 +284,326 @@ impl<'a> ComponentTemplate<'a> {
         }
     }
 
-    #[allow(dead_code)]
-    fn ffi_callback(&mut self, _cb: &FfiCallbackFunction) -> TokenStream {
-        quote! { /* TODO ffi_callback */}
+    fn ffi_callback(&mut self, cb: &FfiCallbackFunction2) -> TokenStream {
+        let uniffi_ident = self.uniffi_ident();
+        let callback_fn_ident = callback_fn_ident();
+
+        let js_method_decl = self.js_callback_method_decl(&callback_fn_ident, cb.callback());
+
+        let result_ident = ident("uniffi_result_");
+        let return_type = if_then_map(cb.has_return_out_param(), || {
+            let rt = cb.return_type();
+            let rs_ret_ident = ident("rs_return_");
+
+            let rs_return_type = self.ffi_type_rust_out_param(rt.as_ref());
+            let declaration = quote! {
+                #rs_ret_ident: &mut #rs_return_type,
+            };
+
+            let returns = map_or_default(rt.as_ref(), |_| {
+                quote! {
+                    #result_ident.copy_into_return(#rs_ret_ident);
+                }
+            });
+
+            ArgumentTokens {
+                declaration,
+                returns,
+            }
+        });
+
+        let call_status = if_then_map(cb.callback().has_rust_call_status_arg(), || {
+            let rs_call_status = ident("rs_call_status_");
+            ArgumentTokens {
+                declaration: quote! {
+                    #rs_call_status: &mut #uniffi_ident::RustCallStatus,
+                },
+                returns: quote! {
+                    #result_ident.copy_into_status(#rs_call_status);
+                },
+            }
+        });
+
+        let rs_args_decl: TokenStream = cb
+            .callback()
+            .arguments_no_return()
+            .map(|a| {
+                let ident = ident(a.name());
+                let type_ = self.ffi_type_rust(&a.type_());
+                quote! { #ident: #type_, }
+            })
+            .collect();
+
+        // self.arg_list_decl(&args, |t| self.ffi_type_cb_rust(t));
+
+        let js_args: TokenStream = cb
+            .callback()
+            .arguments_no_return()
+            .map(|a| {
+                let ident = ident(a.name());
+                quote! { #ident.into_js(), }
+            })
+            .collect();
+
+        let return_let = if_or_default(
+            cb.callback().has_rust_call_status_arg() || cb.return_type().is_some(),
+            quote! {
+                let #result_ident =
+            },
+        );
+
+        let ArgumentTokens {
+            declaration: call_status_arg_decl,
+            returns: call_status_copy,
+        } = call_status;
+
+        let ArgumentTokens {
+            declaration: return_arg_decl,
+            returns: return_copy,
+        } = return_type;
+
+        let runtime_ident = self.runtime_ident();
+
+        let cell = ident("cell_");
+        let callback = ident("callback_");
+
+        let inner = quote! {
+            use super::*;
+
+            #[wasm_bindgen]
+            extern "C" {
+                #[wasm_bindgen]
+                pub type #callback_fn_ident;
+
+                #js_method_decl
+            }
+
+            thread_local! {
+                pub(super) static CALLBACK: #runtime_ident::ForeignCell<#callback_fn_ident> = #runtime_ident::ForeignCell::new();
+            }
+
+            impl IntoRust<#callback_fn_ident> for FnSig {
+                fn into_rust(callback: #callback_fn_ident) -> Self {
+                    CALLBACK.with(|cell| cell.set(callback));
+                    implementation
+                }
+            }
+
+            pub(super) type FnSig = extern "C" fn(#rs_args_decl #return_arg_decl #call_status_arg_decl);
+
+            extern "C" fn implementation(#rs_args_decl #return_arg_decl #call_status_arg_decl) {
+                #return_let CALLBACK.with(|#cell| #cell.with_value(|#callback| #callback.call(#callback, #js_args)));
+                #call_status_copy
+                #return_copy
+            }
+        };
+
+        let cb_ident = cb.module_ident();
+        let tokens = quote! {
+            #[allow(non_snake_case)]
+            mod #cb_ident {
+                #inner
+            }
+        };
+        formatted(tokens.clone(), true).expect("Failed to generate valid rust for ffi_callback");
+        tokens
     }
 
-    #[allow(dead_code)]
-    fn ffi_struct(&self, _s: &FfiStruct) -> TokenStream {
-        quote! { /* TODO ffi_struct */}
+    fn ffi_struct(&self, st: &FfiStruct2) -> TokenStream {
+        let module_name = st.module_ident();
+        let vtable_rs_fields = st
+            .fields()
+            .map(|f| {
+                let field_name = f.name();
+                let field_type = if st.is_callback_method(field_name) {
+                    let alias_ident = st.method_alias_ident(field_name);
+                    quote! { #alias_ident::FnSig }
+                } else {
+                    self.ffi_type_rust(&f.type_())
+                };
+                let field_name = ident(field_name);
+                quote! { #field_name: #field_type, }
+            })
+            .collect::<TokenStream>();
+
+        // These are methods and properties in the JS "type", annotated with
+        // wasm_bindgen(method) and wasm_bindgen(getter) macros.
+        let vtable_js_fields = st
+            .fields()
+            .map(|field| {
+                let field_name = field.name();
+                let field_ident = ident(field_name);
+                let js_field_ident = camel_case_ident(field_name);
+                if st.is_callback_method(field_name) {
+                    let callback_fn_ident = callback_fn_ident();
+                    let alias_ident = st.method_alias_ident(field_name);
+                    quote! {
+                        #[wasm_bindgen(method, getter, js_name = #js_field_ident)]
+                        fn #field_ident(this: &VTableJs) -> #alias_ident::#callback_fn_ident;
+                    }
+                } else {
+                    let field_type = field.type_();
+                    let type_ = self.ffi_type_foreign_future(&field_type);
+                    quote! {
+                        #[wasm_bindgen(method, getter, js_name = #js_field_ident)]
+                        fn #field_ident(this: &VTableJs) -> #type_;
+                    }
+                }
+            })
+            .collect::<TokenStream>();
+
+        let into_rust_block = {
+            let from_ident = ident("v_");
+            let from_fields = st
+                .fields()
+                .map(|field| {
+                    let field_name = field.name();
+                    let field_ident = ident(field_name);
+                    if st.is_callback_method(field_name) {
+                        let alias_ident = st.method_alias_ident(field_name);
+                        quote! {
+                            #field_ident: #alias_ident::FnSig::into_rust(#from_ident.#field_ident()),
+                        }
+                    } else {
+                        let rust_type = self.ffi_type_rust(&field.type_());
+                        quote! {
+                            #field_ident: #rust_type::into_rust(#from_ident.#field_ident()),
+                        }
+                    }
+                })
+                .collect::<TokenStream>();
+            quote! {
+                impl IntoRust<VTableJs> for VTableRs {
+                    fn into_rust(#from_ident: VTableJs) -> Self {
+                        Self {
+                            #from_fields
+                        }
+                    }
+                }
+            }
+        };
+
+        let use_statements: TokenStream = st
+            .method_names()
+            .map(|name| {
+                let mod_ident = st.method_mod_ident(name);
+                let alias_ident = st.method_alias_ident(name);
+                quote! {
+                    use super::#mod_ident as #alias_ident;
+                }
+            })
+            .collect();
+
+        quote! {
+            mod #module_name {
+                use super::*;
+                #use_statements
+
+                #[wasm_bindgen]
+                extern "C" {
+                    pub type VTableJs;
+
+                    #vtable_js_fields
+                }
+
+                #[repr(C)]
+                pub(super) struct VTableRs {
+                    #vtable_rs_fields
+                }
+
+                #into_rust_block
+            }
+        }
     }
 
-    fn arg_decl(&self, arg: &FfiArgument) -> TokenStream {
+    fn js_callback_method_decl(
+        &self,
+        callback_fn_ident: &Ident,
+        ffi_func: &FfiCallbackFunction,
+    ) -> TokenStream {
+        let args_no_return: Vec<_> = ffi_func.arguments_no_return().collect();
+        let args = self.arg_list_decl(&args_no_return, |t| self.ffi_type_foreign(t));
+        let return_tokens = if_then_map(ffi_func.returns_result(), || {
+            let return_type = self.ffi_type_uniffi_result(ffi_func.arg_return_type().as_ref());
+            quote! { -> #return_type }
+        });
+        quote! {
+            #[wasm_bindgen(method)]
+            pub fn call(this_: &#callback_fn_ident, ctx_: &#callback_fn_ident, #args) #return_tokens;
+        }
+    }
+
+    fn arg_list_decl<F>(&self, args: &[&FfiArgument], func: F) -> TokenStream
+    where
+        F: Fn(&FfiType) -> TokenStream,
+    {
+        args.iter().map(|arg| self.arg_decl(arg, &func)).collect()
+    }
+
+    fn arg_list_convert<F>(&self, args: &[&FfiArgument], func: F) -> TokenStream
+    where
+        F: Fn(Ident, &FfiType) -> TokenStream,
+    {
+        args.iter()
+            .map(|arg| func(ident(arg.name()), &arg.type_()))
+            .collect()
+    }
+
+    fn arg_decl<F>(&self, arg: &FfiArgument, func: F) -> TokenStream
+    where
+        F: Fn(&FfiType) -> TokenStream,
+    {
         let ident = self.arg_ident(arg);
-        let typ = self.ffi_type_foreign(&arg.type_());
+        let typ = func(&arg.type_());
         quote! { #ident: #typ, }
     }
 
-    fn arg_decl_c_abi(&self, arg: &FfiArgument) -> TokenStream {
-        let ident = self.arg_ident(arg);
-        let typ = self.ffi_type_rust(&arg.type_());
-        quote! { #ident: #typ, }
-    }
-
-    fn arg_to_rust(&self, arg: &FfiArgument) -> TokenStream {
-        let ident = self.arg_ident(arg);
-        let rust_type = self.ffi_type_rust(&arg.type_());
+    fn convert_to_rust(&self, ident: Ident, type_: &FfiType) -> TokenStream {
+        let rust_type = self.ffi_type_rust(type_);
         quote! { #rust_type::into_rust(#ident), }
     }
 
     fn arg_ident(&self, arg: &FfiArgument) -> Ident {
         ident(arg.name())
+    }
+
+    fn ffi_type_foreign_to_rust(&self, t: &FfiType) -> TokenStream {
+        match t {
+            FfiType::Reference(t) => self.ffi_type_foreign(t),
+            _ => self.ffi_type_foreign(t),
+        }
+    }
+
+    fn ffi_type_uniffi_result(&self, t: Option<&FfiType>) -> TokenStream {
+        let runtime_ident = self.runtime_ident();
+        if t.is_none() {
+            quote! { #runtime_ident::UniffiResultVoid }
+        } else {
+            match t.unwrap() {
+                FfiType::UInt8 => quote! { #runtime_ident::UniffiResultUInt8 },
+                FfiType::UInt16 => quote! { #runtime_ident::UniffiResultUInt16 },
+                FfiType::UInt32 => quote! { #runtime_ident::UniffiResultUInt32 },
+                FfiType::UInt64 => quote! { #runtime_ident::UniffiResultUInt64 },
+                FfiType::Int8 => quote! { #runtime_ident::UniffiResultInt8 },
+                FfiType::Int16 => quote! { #runtime_ident::UniffiResultInt16 },
+                FfiType::Int32 => quote! { #runtime_ident::UniffiResultInt32 },
+                FfiType::Handle | FfiType::Int64 => quote! { #runtime_ident::UniffiResultInt64 },
+                FfiType::Float32 => quote! { #runtime_ident::UniffiResultFloat32 },
+                FfiType::Float64 => quote! { #runtime_ident::UniffiResultFloat64 },
+                FfiType::RustBuffer(_) | FfiType::ForeignBytes => {
+                    quote! { #runtime_ident::UniffiResultForeignBytes }
+                }
+                FfiType::VoidPointer => quote! { #runtime_ident::UniffiResultVoid },
+                _ => unreachable!("Uniffi doesn't support returning {t:?} from callbacks"),
+            }
+        }
+    }
+
+    fn ffi_type_foreign_future(&self, t: &FfiType) -> TokenStream {
+        match t {
+            FfiType::Reference(t) => self.ffi_type_foreign(t),
+            _ => self.ffi_type_foreign(t),
+        }
     }
 
     fn ffi_type_foreign(&self, t: &FfiType) -> TokenStream {
@@ -330,7 +625,23 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::RustBuffer(_) => quote! { #runtime::ForeignBytes },
             FfiType::RustCallStatus => quote! { #runtime::RustCallStatus },
             FfiType::VoidPointer => quote! { #runtime::VoidPointer },
+            FfiType::Struct(s) => {
+                let mod_ident = snake_case_ident(s);
+                quote! { #mod_ident::VTableJs }
+            }
+            FfiType::Reference(_) => {
+                unreachable!("FfiType::Reference should be unpacked by a wrapper function");
+            }
+
             _ => unimplemented!("ffi_type_foreign for {t:?}"),
+        }
+    }
+
+    fn ffi_type_rust_out_param(&self, t: Option<&FfiType>) -> TokenStream {
+        if let Some(t) = t {
+            self.ffi_type_rust(t)
+        } else {
+            quote! { () }
         }
     }
 
@@ -353,9 +664,23 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::RustBuffer(_) => quote! { #uniffi::RustBuffer },
             FfiType::RustCallStatus => quote! { #uniffi::RustCallStatus },
             FfiType::VoidPointer => quote! { #uniffi::VoidPointer },
+            FfiType::Struct(s) => {
+                let mod_ident = snake_case_ident(s);
+                quote! { #mod_ident::VTableRs }
+            }
+            FfiType::Reference(t) => {
+                let typ = self.ffi_type_rust(t);
+                quote! { std::ptr::NonNull::<#typ> }
+            }
             _ => unimplemented!("ffi_type_rust: {t:?}"),
         }
     }
+}
+
+#[derive(Default)]
+struct ArgumentTokens {
+    declaration: TokenStream,
+    returns: TokenStream,
 }
 
 #[cfg(test)]
@@ -447,14 +772,13 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[f::export]
-            pub unsafe fn ubrn_happy_path_func(f_status_: &mut f::RustCallStatus) -> f::Int8 {
+            #[wasm_bindgen]
+            pub fn ubrn_happy_path_func(f_status_: &mut js::RustCallStatus) -> js::Int8 {
                 let mut u_status_ = u::RustCallStatus::default();
-                let value_ = happy_path_func(&mut u_status_).into_js();
-                f_status_.copy_into(u_status_);
-                value_
-            }
-            "
+                let value_ = unsafe { happy_path_func(&mut u_status_) };
+                f_status_.copy_from(u_status_);
+                value_.into_js()
+            }"
             )
         );
 
@@ -462,7 +786,7 @@ mod unit_tests {
         let string = formatted(output, false)?;
         assert_eq!(
             string.trim(),
-            "fn happy_path_func (u_status_ : & mut u :: RustCallStatus) -> i8 ;"
+            "fn happy_path_func (status_ : & mut u :: RustCallStatus) -> i8 ;"
         );
         Ok(())
     }
@@ -482,17 +806,16 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[f::export]
-            pub unsafe fn ubrn_one_arg_func(
-                num: f::Int32,
-                f_status_: &mut f::RustCallStatus,
-            ) -> f::Int8 {
+            #[wasm_bindgen]
+            pub fn ubrn_one_arg_func(
+                num: js::Int32,
+                f_status_: &mut js::RustCallStatus,
+            ) -> js::Int8 {
                 let mut u_status_ = u::RustCallStatus::default();
-                let value_ = one_arg_func(i32::into_rust(num), &mut u_status_).into_js();
-                f_status_.copy_into(u_status_);
-                value_
-            }
-            "
+                let value_ = unsafe { one_arg_func(i32::into_rust(num), &mut u_status_) };
+                f_status_.copy_from(u_status_);
+                value_.into_js()
+            }"
             )
         );
 
@@ -500,7 +823,7 @@ mod unit_tests {
         let string = formatted(output, false)?;
         assert_eq!(
             string.trim(),
-            "fn one_arg_func (num : i32 , u_status_ : & mut u :: RustCallStatus) -> i8 ;"
+            "fn one_arg_func (num : i32 , status_ : & mut u :: RustCallStatus) -> i8 ;"
         );
         Ok(())
     }
@@ -520,28 +843,25 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-                #[f::export]
-                pub unsafe fn ubrn_two_arg_func(
-                    left: f::Int32,
-                    right: f::Float32,
-                    f_status_: &mut f::RustCallStatus,
-                ) -> f::Int8 {
+                #[wasm_bindgen]
+                pub fn ubrn_two_arg_func(
+                    left: js::Int32,
+                    right: js::Float32,
+                    f_status_: &mut js::RustCallStatus,
+                ) -> js::Int8 {
                     let mut u_status_ = u::RustCallStatus::default();
-                    let value_ = two_arg_func(
-                            i32::into_rust(left),
-                            f32::into_rust(right),
-                            &mut u_status_,
-                        )
-                        .into_js();
-                    f_status_.copy_into(u_status_);
-                    value_
+                    let value_ = unsafe {
+                        two_arg_func(i32::into_rust(left), f32::into_rust(right), &mut u_status_)
+                    };
+                    f_status_.copy_from(u_status_);
+                    value_.into_js()
                 }"
             )
         );
 
         let output = subject.ffi_function_decl_c_abi(&input);
         let string = formatted(output, false)?;
-        assert_eq!(string.trim(), "fn two_arg_func (left : i32 , right : f32 , u_status_ : & mut u :: RustCallStatus) -> i8 ;");
+        assert_eq!(string.trim(), "fn two_arg_func (left : i32 , right : f32 , status_ : & mut u :: RustCallStatus) -> i8 ;");
         Ok(())
     }
 
@@ -556,13 +876,12 @@ mod unit_tests {
             string.trim(),
             trim_indent(
                 "
-            #[f::export]
-            pub unsafe fn ubrn_void_return_func(f_status_: &mut f::RustCallStatus) {
-                let mut u_status_ = u::RustCallStatus::default();
-                void_return_func(&mut u_status_);
-                f_status_.copy_into(u_status_);
-            }
-            "
+                #[wasm_bindgen]
+                pub fn ubrn_void_return_func(f_status_: &mut js::RustCallStatus) {
+                    let mut u_status_ = u::RustCallStatus::default();
+                    unsafe { void_return_func(&mut u_status_) };
+                    f_status_.copy_from(u_status_);
+                }"
             )
         );
 
@@ -570,7 +889,7 @@ mod unit_tests {
         let string = formatted(output, false)?;
         assert_eq!(
             string.trim(),
-            "fn void_return_func (u_status_ : & mut u :: RustCallStatus) ;"
+            "fn void_return_func (status_ : & mut u :: RustCallStatus) ;"
         );
         Ok(())
     }

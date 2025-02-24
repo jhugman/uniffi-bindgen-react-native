@@ -32,7 +32,12 @@ impl ModuleMetadata {
 
     #[cfg(feature = "wasm")]
     pub fn rs_filename(&self) -> String {
-        format!("{}.rs", self.namespace)
+        format!("{}.rs", self.rs_module())
+    }
+
+    #[cfg(feature = "wasm")]
+    pub fn rs_module(&self) -> String {
+        format!("{}_module", self.namespace)
     }
 
     pub fn ts(&self) -> String {
