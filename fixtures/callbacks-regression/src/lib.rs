@@ -4,7 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::{sync::Arc, thread::spawn};
+use std::sync::Arc;
+use ubrn_testing::thread::spawn_task;
 
 uniffi::setup_scaffolding!();
 
@@ -26,7 +27,7 @@ impl EventSource {
     }
     fn start(self: Arc<Self>, message: String, until: i32) {
         let listener = self.listener.clone();
-        spawn(move || {
+        spawn_task(move || {
             for i in 0..until {
                 listener.on_event(message.clone(), i);
             }

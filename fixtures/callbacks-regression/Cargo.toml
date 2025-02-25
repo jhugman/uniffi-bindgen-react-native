@@ -11,7 +11,11 @@ name = "uniffi_callbacks"
 
 [dependencies]
 uniffi = { workspace = true }
+ubrn_testing = { path = "../../crates/ubrn_testing" }
 thiserror = "1.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
