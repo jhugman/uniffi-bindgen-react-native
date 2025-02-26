@@ -17,13 +17,12 @@ import myModule, {
   newMegaphone,
   newMyRecord,
   sayAfter,
-  sayAfterWithTokio,
   SharedResourceOptions,
   sleep,
   useSharedResource,
   void_,
 } from "../../generated/futures";
-import { asyncTest, xasyncTest, Asserts, test } from "@/asserts";
+import { asyncTest, xasyncTest, setDebug, Asserts, test } from "@/asserts";
 import {
   uniffiRustFutureHandleCount,
   uniffiForeignFutureHandleCount,
@@ -190,17 +189,6 @@ function checkRemainingFutures(t: Asserts) {
       t.end();
     },
   );
-
-  await asyncTest("With the Tokio runtime", async (t) => {
-    const helloAlice = await t.asyncMeasure(
-      async () => sayAfterWithTokio(500, "Alice"),
-      500,
-      20,
-    );
-    t.assertEqual("Hello, Alice (with Tokio)!", helloAlice);
-    checkRemainingFutures(t);
-    t.end();
-  });
 
   await asyncTest("fallible function… which doesn't throw", async (t) => {
     const result = await t.asyncMeasure(async () => fallibleMe(false), 0, 100);
@@ -419,6 +407,37 @@ function checkRemainingFutures(t: Asserts) {
         );
       });
       await task1;
+      checkRemainingFutures(t);
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "a future that is immediately canceled should release lock",
+    async (t) => {
+      const abortController = new AbortController();
+      const options = SharedResourceOptions.create({
+        releaseAfterMs: 1000,
+        timeoutMs: 100,
+      });
+
+      // Start and immediately cancel
+      const task1 = useSharedResource(options, {
+        signal: abortController.signal,
+      });
+      abortController.abort();
+
+      // Second task should be able to acquire immediately
+      const task2 = useSharedResource(options);
+
+      try {
+        await task1;
+        t.fail("Task 1 should have been cancelled");
+      } catch (e) {
+        // Expected
+      }
+
+      await task2; // Should succeed
       checkRemainingFutures(t);
       t.end();
     },

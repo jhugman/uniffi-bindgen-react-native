@@ -17,6 +17,11 @@ export class AssertError extends Error {
   }
 }
 
+let isDebugging = false;
+export function setDebug(flag: boolean) {
+  isDebugging = flag;
+}
+
 function isEqual<T>(a: T, b: T): boolean {
   return a === b || a == b || stringify(a) === stringify(b);
 }
@@ -202,11 +207,18 @@ export class AsyncAsserts extends Asserts {
 
 // For running the tests themselves.
 export function test<T>(testName: string, testBlock: (t: Asserts) => T): T {
+  if (isDebugging) {
+    console.info(`-- Starting: ${testName}`);
+  }
   try {
     return testBlock(new Asserts());
   } catch (e) {
     console.error(testName, e);
     throw e;
+  } finally {
+    if (isDebugging) {
+      console.info(`-- Leaving: ${testName}`);
+    }
   }
 }
 
@@ -230,6 +242,9 @@ export async function asyncTest<T>(
   testBlock: (t: AsyncAsserts) => Promise<T>,
   timeout: number = 10000,
 ): Promise<T> {
+  if (isDebugging) {
+    console.info(`-- Starting: ${testName}`);
+  }
   try {
     let asserts = new AsyncAsserts(testName, timeout);
     let v = await testBlock(asserts);
@@ -238,5 +253,9 @@ export async function asyncTest<T>(
   } catch (e) {
     console.error(testName, e);
     throw e;
+  } finally {
+    if (isDebugging) {
+      console.info(`-- Leaving: ${testName}`);
+    }
   }
 }
