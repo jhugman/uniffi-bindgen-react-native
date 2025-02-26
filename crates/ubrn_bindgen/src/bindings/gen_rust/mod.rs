@@ -205,6 +205,7 @@ impl<'a> ComponentTemplate<'a> {
     fn ffi_definition(&mut self, definition: &FfiDefinition2) -> TokenStream {
         match definition {
             FfiDefinition2::CallbackFunction(cb) => self.ffi_callback(cb),
+            FfiDefinition2::FunctionLiteral(cb) => self.ffi_function_literal(cb),
             FfiDefinition2::Struct(s) => self.ffi_struct(s),
         }
     }
@@ -286,6 +287,62 @@ impl<'a> ComponentTemplate<'a> {
                 #annotation
                 pub unsafe fn #foreign_func_ident(#js_args_decl) #decl_suffix {
                     #func_ident(#args_into_rust) #call_suffix #semicolon
+                }
+            }
+        }
+    }
+
+    fn ffi_function_literal(&mut self, cb: &FfiCallbackFunction2) -> TokenStream {
+        let args = cb.callback().arguments();
+        let js_args_decl = self.arg_list_decl(&args, |t| self.ffi_type_foreign_to_rust(t));
+        // callback_data: js::UInt64,
+        // result: foreign_future_struct_i32::VTableJs,
+        let args_into_rust: TokenStream =
+            self.arg_list_convert(&args, |ident, type_| self.convert_to_rust(ident, type_));
+        // u64::into_rust(callback_data),
+        // foreign_future_struct_i32::VTableRs::into_rust(result),
+        let rust_args_decl: TokenStream = self.arg_list_decl(&args, |t| self.ffi_type_rust(t));
+        // callback_data: u64,
+        // result: foreign_future_struct_i32::VTableRs
+
+        let module_ident = cb.module_ident();
+        let js_class = cb.js_module_ident();
+        let callback_fn_ident = callback_fn_ident();
+
+        quote! {
+            mod #module_ident {
+                use super::*;
+
+                #[wasm_bindgen(js_name = #js_class)]
+                pub struct #callback_fn_ident {
+                    callback: FnSig,
+                }
+
+                impl #callback_fn_ident {
+                    fn new(callback: FnSig) -> Self {
+                        Self { callback }
+                    }
+                }
+
+                #[wasm_bindgen(js_class = #js_class)]
+                impl #callback_fn_ident {
+                    #[wasm_bindgen]
+                    pub fn call(&self,
+                        _ctx: &Self,
+                        #js_args_decl
+                    ) {
+                        (self.callback)(#args_into_rust)
+                    }
+                }
+
+                pub(super) type FnSig = extern "C" fn(
+                    #rust_args_decl
+                );
+
+                impl IntoJs<#callback_fn_ident> for FnSig {
+                    fn into_js(self) -> #callback_fn_ident {
+                        #callback_fn_ident::new(self)
+                    }
                 }
             }
         }
@@ -478,6 +535,7 @@ impl<'a> ComponentTemplate<'a> {
         let copy_into_block = if_then_map(st.is_passed_from_js_to_rust(), || {
             quote! {
                 impl VTableJs {
+                    #[allow(unused)]
                     pub(super) fn copy_into_return(self, rust: &mut VTableRs) {
                         *rust = <VTableRs>::into_rust(self);
                     }

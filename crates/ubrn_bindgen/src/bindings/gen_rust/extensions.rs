@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use extend::ext;
-use heck::ToSnakeCase;
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use syn::Ident;
 use uniffi_bindgen::{
     interface::{FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiStruct, FfiType},
@@ -97,7 +97,11 @@ fn ffi_definitions2(
             module_ident: callback.module_ident(),
             callback,
         };
-        definitions.push(FfiDefinition2::CallbackFunction(cb));
+        if cb.callback.is_function_literal() {
+            definitions.push(FfiDefinition2::FunctionLiteral(cb));
+        } else {
+            definitions.push(FfiDefinition2::CallbackFunction(cb));
+        }
     }
     definitions.into_iter()
 }
@@ -111,6 +115,7 @@ impl FfiArgument {
 
 pub(super) enum FfiDefinition2 {
     CallbackFunction(FfiCallbackFunction2),
+    FunctionLiteral(FfiCallbackFunction2),
     Struct(FfiStruct2),
 }
 
@@ -139,11 +144,17 @@ pub(super) impl FfiCallbackFunction {
     fn module_ident(&self) -> Ident {
         snake_case_ident(self.name())
     }
+    fn is_function_literal(&self) -> bool {
+        self.name().starts_with("ForeignFutureComplete")
+    }
 }
 
 impl FfiCallbackFunction2 {
     pub(super) fn module_ident(&self) -> Ident {
         self.module_ident.clone()
+    }
+    pub(super) fn js_module_ident(&self) -> Ident {
+        ident(&self.module_ident.to_string().to_upper_camel_case())
     }
     pub(super) fn return_type(&self) -> Option<FfiType> {
         self.callback.arg_return_type()

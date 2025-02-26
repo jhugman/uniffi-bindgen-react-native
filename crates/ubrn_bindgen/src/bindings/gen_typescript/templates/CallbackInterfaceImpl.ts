@@ -77,7 +77,8 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
             {%- else %} {#- // is_async = true #}
             {#- // Asynchronous callback method #}
             const uniffiHandleSuccess = (returnValue: {% call ts::raw_return_type(meth) %}) => {
-                uniffiFutureCallback(
+                uniffiFutureCallback.call(
+                    uniffiFutureCallback,
                     uniffiCallbackData,
                     /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{
                         {%- match meth.return_type() %}
@@ -90,7 +91,8 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 );
             };
             const uniffiHandleError = (code: number, errorBuf: UniffiByteArray) => {
-                uniffiFutureCallback(
+                uniffiFutureCallback.call(
+                    uniffiFutureCallback,
                     uniffiCallbackData,
                     /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{
                         {%- match meth.return_type().map(FfiType::from) %}
