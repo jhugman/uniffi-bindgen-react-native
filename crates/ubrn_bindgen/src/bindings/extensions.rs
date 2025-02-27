@@ -142,7 +142,7 @@ pub(crate) impl ComponentInterface {
 
     fn iter_ffi_structs_for_free(&self) -> impl Iterator<Item = FfiStruct> {
         self.iter_ffi_structs()
-            .filter(|s| !s.is_future() || s.name() == "ForeignFuture")
+            .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFuture")
     }
 
     fn iter_ffi_definitions_exported_by_ts(&self) -> impl Iterator<Item = FfiDefinition> {
@@ -398,7 +398,7 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn is_future_callback(&self) -> bool {
-        is_future(self.name())
+        self.name().starts_with("ForeignFuture")
     }
 
     fn is_user_callback(&self) -> bool {
@@ -442,10 +442,6 @@ fn is_continuation(nm: &str) -> bool {
     nm == "RustFutureContinuationCallback"
 }
 
-fn is_future(nm: &str) -> bool {
-    nm.starts_with("ForeignFuture") || nm.starts_with("RustFuture")
-}
-
 fn is_free(nm: &str) -> bool {
     nm == "CallbackInterfaceFree" || nm == "ForeignFutureFree"
 }
@@ -466,10 +462,10 @@ pub(crate) impl FfiStruct {
     }
 
     fn is_exported(&self) -> bool {
-        self.is_vtable() || self.is_future()
+        self.is_vtable() || self.is_foreign_future()
     }
 
-    fn is_future(&self) -> bool {
+    fn is_foreign_future(&self) -> bool {
         self.name().starts_with("ForeignFuture")
     }
 
