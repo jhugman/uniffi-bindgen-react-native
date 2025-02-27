@@ -120,13 +120,24 @@ impl CodeFormatter for RustArgs {
             run_cmd_quietly(&mut cmd)?;
         }
         if run_clippy {
-            run_cmd(
-                Command::new("cargo")
-                    .arg("--quiet")
-                    .arg("clippy")
-                    .arg("--all")
-                    .current_dir(root),
-            )?;
+            let mut cmd = Command::new("cargo");
+            cmd.arg("--quiet")
+                .arg("clippy")
+                .arg("--all")
+                .arg("--all-targets")
+                .arg("--no-deps")
+                .arg("--manifest-path")
+                .arg("Cargo.toml")
+                .current_dir(root);
+            if check_only {
+                cmd.env(
+                    "RUSTFLAGS",
+                    "-Dwarnings -Aclippy::empty_line_after_doc_comments",
+                );
+                run_cmd_quietly(&mut cmd)?;
+            } else {
+                run_cmd(&mut cmd)?;
+            }
         }
 
         Ok(())
