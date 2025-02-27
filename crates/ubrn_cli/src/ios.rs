@@ -289,7 +289,7 @@ impl IOsArgs {
         }
         ubrn_common::mk_dir(&out_dir)?;
         generate_bindings(
-            &library_path,
+            library_path,
             None,
             &SwiftBindingGenerator,
             &config_supplier,

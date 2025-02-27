@@ -517,10 +517,7 @@ mod tests {
         );
 
         let project_config = config::ProjectConfig::empty(name, crate_config);
-        let modules = modules
-            .into_iter()
-            .map(|s| ModuleMetadata::new(s))
-            .collect();
+        let modules = modules.iter().map(|s| ModuleMetadata::new(s)).collect();
         let template = TemplateConfig::new(project_config, crate_metadata, modules);
         Ok(Rc::new(template))
     }
