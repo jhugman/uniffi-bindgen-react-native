@@ -4,9 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use anyhow::Result;
-use askama::DynTemplate;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
+use rinja::DynTemplate;
 use std::{cell::OnceCell, collections::BTreeMap, rc::Rc};
 
 use ubrn_bindgen::ModuleMetadata;
@@ -137,7 +137,7 @@ fn render_templates(
 macro_rules! templated_file {
     ($T:ty, $filename:literal) => {
         paste::paste! {
-            #[derive(askama::Template)]
+            #[derive(rinja::Template)]
             #[template(path = $filename, escape = "none")]
             pub(crate) struct $T {
                 #[allow(dead_code)]
