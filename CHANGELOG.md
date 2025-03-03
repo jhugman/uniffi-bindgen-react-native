@@ -1,15 +1,25 @@
 # Upcoming releases
 
+[//]: # (## 🦊 What's Changed)
+[//]: # (## ⚠️ Breaking Changes)
+[//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
+
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.28.3-3...main
+
+---
+# 0.28.3-3
 ## ✨ What's New
 
 * Add option to generate native swift bindings ([#214](https://github.com/jhugman/uniffi-bindgen-react-native/pull/214))
 * Add option to generate native kotlin bindings ([#218](https://github.com/jhugman/uniffi-bindgen-react-native/pull/218))
 
-[//]: # (## 🦊 What's Changed)
-[//]: # (## ⚠️ Breaking Changes)
-[//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
+## 🌏🕸️ WASM!
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.28.3-2...main
+* Added support for synchronous callbacks ([#216](https://github.com/jhugman/uniffi-bindgen-react-native/pull/216)).
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.28.3-2...0.28.3-3
+
 ---
 
 # 0.28.3-2
