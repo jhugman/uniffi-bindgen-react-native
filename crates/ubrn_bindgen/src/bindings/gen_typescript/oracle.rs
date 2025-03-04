@@ -90,13 +90,13 @@ impl CodeOracle {
             | FfiType::Float32
             | FfiType::Float64
             | FfiType::RustBuffer(_) => {
-                format!("UniffiReferenceHolder<{}>", self.ffi_type_label(ffi_type))
+                format!("UniffiResult<{}>", self.ffi_type_label(ffi_type))
             }
             FfiType::Struct(nm) if nm.starts_with("VTableCallbackInterface") => {
                 self.ffi_type_label(ffi_type)
             }
             FfiType::Struct(_) => {
-                format!("UniffiReferenceHolder<{}>", self.ffi_type_label(ffi_type))
+                format!("UniffiResult<{}>", self.ffi_type_label(ffi_type))
             }
             FfiType::RustArcPtr(_) => "PointerByReference".to_owned(),
             // JNA structs default to ByReference
@@ -128,7 +128,9 @@ impl CodeOracle {
             FfiType::ForeignBytes => "ForeignBytes".to_string(),
             FfiType::Callback(name) => self.ffi_callback_name(name),
             FfiType::Struct(name) => self.ffi_struct_name(name),
-            FfiType::Reference(inner) => self.ffi_type_label_by_reference(inner),
+            FfiType::MutReference(inner) | FfiType::Reference(inner) => {
+                self.ffi_type_label_by_reference(inner)
+            }
             FfiType::VoidPointer => "/*pointer*/ bigint".to_string(),
         }
     }
@@ -181,9 +183,6 @@ impl<T: AsType> AsCodeType for T {
                 key_type,
                 value_type,
             } => Box::new(compounds::MapCodeType::new(*key_type, *value_type)),
-            Type::External { .. } => unreachable!(
-                "External types should have been elimintated by going through the TypeRenderer::as_type() method"
-            ),
             Type::Custom { name, .. } => Box::new(custom::CustomCodeType::new(name)),
         }
     }

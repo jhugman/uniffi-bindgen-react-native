@@ -594,6 +594,13 @@ impl<'a> ComponentTemplate<'a> {
                     quote! { #runtime_ident::UniffiResultForeignBytes }
                 }
                 FfiType::VoidPointer => quote! { #runtime_ident::UniffiResultVoid },
+                FfiType::Struct(s) => {
+                    let module_ident = snake_case_ident(s);
+                    quote! { #module_ident::VTableJs }
+                }
+                FfiType::Reference(t) | FfiType::MutReference(t) => {
+                    self.ffi_type_uniffi_result(Some(t))
+                }
                 _ => unreachable!("Uniffi doesn't support returning {t:?} from callbacks"),
             }
         }
@@ -629,19 +636,22 @@ impl<'a> ComponentTemplate<'a> {
                 let mod_ident = snake_case_ident(s);
                 quote! { #mod_ident::VTableJs }
             }
-            FfiType::Reference(_) => {
+            FfiType::Callback(cb) => {
+                let mod_ident = snake_case_ident(cb);
+                let callback_fn_ident = callback_fn_ident();
+                quote! { #mod_ident::#callback_fn_ident }
+            }
+            FfiType::Reference(_) | FfiType::MutReference(_) => {
                 unreachable!("FfiType::Reference should be unpacked by a wrapper function");
             }
-
-            _ => unimplemented!("ffi_type_foreign for {t:?}"),
         }
     }
 
     fn ffi_type_rust_out_param(&self, t: Option<&FfiType>) -> TokenStream {
-        if let Some(t) = t {
-            self.ffi_type_rust(t)
-        } else {
-            quote! { () }
+        match t {
+            Some(FfiType::Reference(t)) | Some(FfiType::MutReference(t)) => self.ffi_type_rust(t),
+            Some(t) => self.ffi_type_rust(t),
+            None => quote! { () },
         }
     }
 
@@ -668,11 +678,14 @@ impl<'a> ComponentTemplate<'a> {
                 let mod_ident = snake_case_ident(s);
                 quote! { #mod_ident::VTableRs }
             }
-            FfiType::Reference(t) => {
+            FfiType::Callback(cb) => {
+                let mod_ident = snake_case_ident(cb);
+                quote! { #mod_ident::FnSig }
+            }
+            FfiType::Reference(t) | FfiType::MutReference(t) => {
                 let typ = self.ffi_type_rust(t);
                 quote! { std::ptr::NonNull::<#typ> }
             }
-            _ => unimplemented!("ffi_type_rust: {t:?}"),
         }
     }
 }

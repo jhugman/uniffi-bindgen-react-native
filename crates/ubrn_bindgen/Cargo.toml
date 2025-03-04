@@ -10,12 +10,12 @@ wasm = ["quote", "prettyplease", "syn", "proc-macro2"]
 
 [dependencies]
 anyhow = { workspace = true }
-askama = { workspace = true }
 camino = { workspace = true }
 cargo_metadata = { workspace = true }
 clap = { workspace = true }
 heck = { workspace = true }
 paste = { workspace = true }
+rinja = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
 ubrn_common = { path = "../ubrn_common" }

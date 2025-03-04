@@ -4,6 +4,11 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+# (## ⚠️ Breaking Changes)
+
+- Upgrade [`uniffi-rs` to version 0.29.0](https://github.com/mozilla/uniffi-rs/blob/main/CHANGELOG.md#v0290-backend-crates-v0290---2025-02-06).
+    - There are several changes users of `uniffi-rs` (and `uniffi-bindgen-react-native`) should be aware; [a migration guide](https://mozilla.github.io/uniffi-rs/latest/Upgrading.html) is provided by the uniffi team.
+    - Switching template engines from `askama` to `rinja`.
 
 **Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.28.3-3...main
 

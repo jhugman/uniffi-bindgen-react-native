@@ -1,6 +1,6 @@
 {{- self.import_infra("uniffiCreateRecord", "records") }}
 
-{%- let rec = ci|get_record_definition(name) %}
+{%- let rec = ci.get_record_definition(name).expect("Record definition not found in this ci") %}
 {%- call ts::docstring(rec, 0) %}
 export type {{ type_name }} = {
     {%- for field in rec.fields() %}

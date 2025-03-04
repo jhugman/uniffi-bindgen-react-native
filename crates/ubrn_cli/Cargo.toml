@@ -14,7 +14,7 @@ wasm = []
 
 [dependencies]
 anyhow = { workspace = true }
-askama = { workspace = true }
+rinja = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
 heck = { workspace = true }
