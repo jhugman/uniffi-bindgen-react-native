@@ -4,6 +4,10 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+## 🌏🕸️ WASM!
+
+- Add support for Promises/Futures ([#221](https://github.com/jhugman/uniffi-bindgen-react-native/pull/221)).
+
 # (## ⚠️ Breaking Changes)
 
 - Upgrade [`uniffi-rs` to version 0.29.0](https://github.com/mozilla/uniffi-rs/blob/main/CHANGELOG.md#v0290-backend-crates-v0290---2025-02-06).

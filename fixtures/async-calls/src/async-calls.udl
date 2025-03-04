@@ -1,0 +1,15 @@
+namespace futures {
+    [Async]
+    boolean always_ready();
+};
+
+interface UdlMegaphone {
+    [Async]
+    constructor();
+
+    [Async, Name="secondary"]
+    constructor();
+
+    [Async]
+    string say_after(u16 ms, string who);
+};

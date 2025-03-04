@@ -21,12 +21,16 @@ pub(super) impl ComponentInterface {
     // This is going to be very difficult to test as FfiStruct and FfiCallbackFunction
     // aren't easily constructable.
     fn ffi_definitions2(&self) -> impl Iterator<Item = FfiDefinition2> {
-        ffi_definitions2(self.ffi_definitions())
+        let has_async_callbacks = self.has_async_callback_interface_definition();
+        let has_async_calls = self.iter_callables().any(|c| c.is_async());
+        ffi_definitions2(self.ffi_definitions(), has_async_calls, has_async_callbacks)
     }
 }
 
 fn ffi_definitions2(
     definitions: impl Iterator<Item = FfiDefinition>,
+    has_async_calls: bool,
+    has_async_callbacks: bool,
 ) -> impl Iterator<Item = FfiDefinition2> {
     let mut callbacks = HashMap::new();
     let mut structs = HashMap::new();
@@ -43,7 +47,7 @@ fn ffi_definitions2(
     }
     let mut definitions = Vec::new();
     for ffi_struct in structs.into_values() {
-        if ffi_struct.is_future() {
+        if !has_async_callbacks && ffi_struct.is_foreign_future() {
             // we will do something different with future callbacks.
             continue;
         }
@@ -81,8 +85,12 @@ fn ffi_definitions2(
             // this is done above.
             continue;
         }
-        if callback.is_future_callback() {
-            // we will do something different with future callbacks.
+        if !has_async_callbacks && callback.is_future_callback() {
+            // We don't need to do anything if we have no async callbacks.
+            continue;
+        }
+        if !has_async_calls && callback.is_continuation_callback() {
+            // We don't need to do anything if we have no async functions or methods.
             continue;
         }
         let cb = FfiCallbackFunction2 {
