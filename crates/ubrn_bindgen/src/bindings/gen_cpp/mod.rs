@@ -11,6 +11,7 @@ use std::borrow::Borrow;
 
 use anyhow::Result;
 use rinja::Template;
+use ubrn_common::CrateMetadata;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;
 
@@ -69,7 +70,10 @@ impl<'a> CppWrapper<'a> {
     }
 }
 
-pub fn generate_entrypoint(modules: &Vec<ModuleMetadata>) -> Result<String> {
+pub fn generate_entrypoint(
+    _crate: &CrateMetadata,
+    modules: &Vec<ModuleMetadata>,
+) -> Result<String> {
     let index = EntrypointCpp { modules };
     Ok(index.render()?)
 }

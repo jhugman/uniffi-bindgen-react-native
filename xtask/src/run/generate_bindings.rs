@@ -9,6 +9,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use ubrn_bindgen::{BindingsArgs, ModuleMetadata, OutputArgs, SourceArgs, SwitchArgs};
+use ubrn_common::CrateMetadata;
 
 #[derive(Args, Debug, Clone)]
 pub(crate) struct GenerateBindingsArg {
@@ -72,9 +73,10 @@ impl GenerateBindingsArg {
 pub(crate) fn render_entrypoint(
     switches: &SwitchArgs,
     path: &Utf8Path,
+    crate_: &CrateMetadata,
     modules: &Vec<ModuleMetadata>,
 ) -> Result<()> {
-    let string = ubrn_bindgen::generate_entrypoint(switches, modules)?;
+    let string = ubrn_bindgen::generate_entrypoint(switches, crate_, modules)?;
     fs::write(path, string)?;
     Ok(())
 }
