@@ -66,7 +66,7 @@ impl Wasm {
                 )?;
 
                 let lib_rs = generated_crate.join(switches.flavor.entrypoint());
-                render_entrypoint(switches, &lib_rs, &modules)?;
+                render_entrypoint(switches, &lib_rs, &crate_, &modules)?;
 
                 let cargo_toml =
                     self.render_cargo_toml(&generated_crate.canonicalize_utf8()?, &crate_)?;

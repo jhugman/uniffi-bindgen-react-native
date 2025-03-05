@@ -48,7 +48,7 @@ impl Jsi {
                 let abi_dir = bindings.abi_dir();
                 let entrypoint = switches.flavor.entrypoint();
                 let entrypoint_cpp = abi_dir.join(entrypoint);
-                render_entrypoint(switches, &entrypoint_cpp, &modules)?;
+                render_entrypoint(switches, &entrypoint_cpp, &crate_, &modules)?;
 
                 let cpp_files: Vec<_> = modules
                     .iter()
