@@ -134,11 +134,11 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 
 // Methods calling directly into the uniffi generated C API of the Rust crate.
 {%- for func in ci.iter_ffi_functions_js_to_rust() %}
-{% call cpp::rust_fn_caller(module_name, func) %}
-{%- endfor %}
-
-{%- for func in ci.iter_ffi_functions_init_callback() %}
-{% call cpp::callback_init(module_name, func) %}
+{%-   if func.is_callback_init() %}
+{%      call cpp::callback_init(module_name, func) %}
+{%-   else %}
+{%      call cpp::rust_fn_caller(module_name, func) %}
+{%-   endif %}
 {%- endfor %}
 
 {%- import "macros.cpp" as cpp %}

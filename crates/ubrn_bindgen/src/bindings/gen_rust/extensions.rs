@@ -185,4 +185,7 @@ impl FfiStruct2 {
     pub(super) fn fields(&self) -> impl Iterator<Item = &FfiField> {
         self.ffi_struct.fields().iter()
     }
+    pub(super) fn is_passed_from_js_to_rust(&self) -> bool {
+        self.ffi_struct.is_foreign_future()
+    }
 }

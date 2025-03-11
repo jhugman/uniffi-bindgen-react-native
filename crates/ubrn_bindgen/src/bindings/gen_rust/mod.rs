@@ -475,6 +475,16 @@ impl<'a> ComponentTemplate<'a> {
             }
         };
 
+        let copy_into_block = if_then_map(st.is_passed_from_js_to_rust(), || {
+            quote! {
+                impl VTableJs {
+                    pub(super) fn copy_into_return(self, rust: &mut VTableRs) {
+                        *rust = <VTableRs>::into_rust(self);
+                    }
+                }
+            }
+        });
+
         let use_statements: TokenStream = st
             .method_names()
             .map(|name| {
@@ -504,6 +514,7 @@ impl<'a> ComponentTemplate<'a> {
                 }
 
                 #into_rust_block
+                #copy_into_block
             }
         }
     }
