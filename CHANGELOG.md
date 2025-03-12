@@ -4,6 +4,10 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+## 🦊 What's Changed
+
+- Hot-reloading: ensure promises resolve after hot reload ([#230](https://github.com/jhugman/uniffi-bindgen-react-native/pull/230)).
+  - Thank you [@matthieugayon](https://github.com/matthieugayon)!
 
 **Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.28.3-3...main
 
