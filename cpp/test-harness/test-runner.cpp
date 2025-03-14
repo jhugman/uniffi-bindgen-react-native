@@ -92,25 +92,34 @@ static RegisterNativesFN loadRegisterNatives(const char *libraryPath) {
 }
 #endif
 
-/// Load all the libraries and call their "registerNatives()" function.
-/// \return true if all libraries were loaded successfully.
-static bool
-loadNativeLibraries(facebook::jsi::Runtime &rt,
-                    std::shared_ptr<facebook::react::CallInvoker> callInvoker,
-                    int argc, char **argv) {
-  try {
-    for (int i = 2; i < argc; i++) {
-      auto func = loadRegisterNatives(argv[i]);
-      if (!func)
-        return false;
-      func(rt, callInvoker);
+static std::shared_ptr<facebook::jsi::Runtime> createRuntime() {
+  auto runtimeConfig = ::hermes::vm::RuntimeConfig::Builder()
+                           .withIntl(false)
+                           .withMicrotaskQueue(true)
+                           .build();
+  return facebook::hermes::makeHermesRuntime(runtimeConfig);
+}
+
+static std::vector<RegisterNativesFN> loadNativeLibraryFunctions(int argc,
+                                                                 char **argv) {
+  std::vector<RegisterNativesFN> functions;
+  for (int i = 2; i < argc; i++) {
+    auto func = loadRegisterNatives(argv[i]);
+    if (!func) {
+      throw std::runtime_error("Failed to load native library");
     }
-  } catch (facebook::jsi::JSIException &e) {
-    // Handle JSI exceptions here.
-    std::cerr << "JSI Exception: " << e.what() << std::endl;
-    return false;
+    functions.push_back(func);
   }
-  return true;
+  return functions;
+}
+
+static void
+registerNativeLibraries(facebook::jsi::Runtime &rt,
+                        std::shared_ptr<facebook::react::CallInvoker> invoker,
+                        const std::vector<RegisterNativesFN> &functions) {
+  for (const auto &func : functions) {
+    func(rt, invoker);
+  }
 }
 
 static double currentTimeMillis() {
@@ -120,7 +129,44 @@ static double currentTimeMillis() {
       .count();
 }
 
-namespace jsi = facebook::jsi;
+static int runEventLoop(facebook::jsi::Runtime &runtime,
+                        std::shared_ptr<uniffi::testing::MyCallInvoker> invoker,
+                        const std::string &jsCode, const char *jsPath) {
+  try {
+    facebook::jsi::Object helpers =
+        runtime
+            .evaluateJavaScript(
+                std::make_unique<facebook::jsi::StringBuffer>(s_jslib),
+                "timers.js.inc")
+            .asObject(runtime);
+    auto peekMacroTask = helpers.getPropertyAsFunction(runtime, "peek");
+    auto runMacroTask = helpers.getPropertyAsFunction(runtime, "run");
+
+    runMacroTask.call(runtime, currentTimeMillis());
+
+    runtime.evaluateJavaScript(
+        std::make_unique<facebook::jsi::StringBuffer>(jsCode), jsPath);
+    invoker->drainTasks(runtime);
+    runtime.drainMicrotasks();
+
+    double nextTimeMs;
+    while ((nextTimeMs = peekMacroTask.call(runtime).getNumber()) >= 0) {
+      double duration = nextTimeMs - currentTimeMillis();
+      if (duration > 0) {
+        invoker->waitForTaskOrTimeout(duration);
+      }
+      invoker->drainTasks(runtime);
+      runtime.drainMicrotasks();
+      runMacroTask.call(runtime, currentTimeMillis());
+      runtime.drainMicrotasks();
+    }
+    return 0;
+  } catch (facebook::jsi::JSError &e) {
+    std::cerr << "JS Exception: " << e.getStack() << std::endl;
+    return 1;
+  }
+}
+
 int main(int argc, char **argv) {
   // If no argument is provided, print usage and exit.
   if (argc < 2) {
@@ -135,79 +181,33 @@ int main(int argc, char **argv) {
   if (!optCode)
     return 1;
 
-  // You can Customize the runtime config here.
-  auto runtimeConfig = ::hermes::vm::RuntimeConfig::Builder()
-                           .withIntl(false)
-                           .withMicrotaskQueue(true)
-                           .build();
-
-  // Create the Hermes runtime.
-  auto runtime = facebook::hermes::makeHermesRuntime(runtimeConfig);
-  auto invoker = std::make_shared<uniffi::testing::MyCallInvoker>(*runtime);
-
-  invoker->invokeAsync([](jsi::Runtime &rt) {
-    std::cout << "-- Starting the hermes event loop" << std::endl;
-  });
-
-  // Register host functions.
-  if (!loadNativeLibraries(*runtime, invoker, argc, argv))
-    return 1;
-
-  int status = 0;
   try {
-    // Register event loop functions and obtain the runMicroTask() helper
-    // function.
-    jsi::Object helpers =
-        runtime
-            ->evaluateJavaScript(std::make_unique<jsi::StringBuffer>(s_jslib),
-                                 "timers.js.inc")
-            .asObject(*runtime);
-    // `peek()` returns the time of the next pending task, or -1 if there is not
-    // one.
-    auto peekMacroTask = helpers.getPropertyAsFunction(*runtime, "peek");
-    // `run(now: number)` looks for the next pending task and runs it.
-    // `now` is the current time in milliseconds.
-    // If no task is ready, the returns immediately.
-    auto runMacroTask = helpers.getPropertyAsFunction(*runtime, "run");
+    auto nativeFunctions = loadNativeLibraryFunctions(argc, argv);
 
-    // There are no pending tasks, but we want to initialize the event loop
-    // current time.
-    runMacroTask.call(*runtime, currentTimeMillis());
+    // Run the test twice
+    for (int i = 0; i < 2; i++) {
+      std::cout << "Running iteration " << (i + 1) << std::endl;
 
-    // Now we're ready to run the JS file.
-    runtime->evaluateJavaScript(
-        std::make_unique<jsi::StringBuffer>(std::move(*optCode)), jsPath);
-    invoker->drainTasks(*runtime);
-    runtime->drainMicrotasks();
+      auto runtime = createRuntime();
+      auto invoker = std::make_shared<uniffi::testing::MyCallInvoker>(*runtime);
 
-    // This is the event loop. Loop while there are pending tasks.
-    // Note that to use invokeAsync() you'll want to use setTimeout() to get
-    // into this loop.
-    double nextTimeMs;
-    while ((nextTimeMs = peekMacroTask.call(*runtime).getNumber()) >= 0) {
-      // If we have to, sleep until the next task is ready.
-      double duration = nextTimeMs - currentTimeMillis();
-      if (duration > 0) {
-        invoker->waitForTaskOrTimeout(duration);
-      }
+      invoker->invokeAsync([i](facebook::jsi::Runtime &rt) {
+        std::cout << "-- Starting the hermes event loop (iteration " << (i + 1)
+                  << ")" << std::endl;
+      });
 
-      // Run ready tasks that came in from invoker.invokeAsync();
-      invoker->drainTasks(*runtime);
-      runtime->drainMicrotasks();
+      registerNativeLibraries(*runtime, invoker, nativeFunctions);
 
-      // Then run the next timer task.
-      runMacroTask.call(*runtime, currentTimeMillis());
-      runtime->drainMicrotasks();
+      int status = runEventLoop(*runtime, invoker, *optCode, jsPath);
+      if (status != 0)
+        return status;
+
+      // Runtime will be destroyed here when shared_ptr goes out of scope
     }
-  } catch (facebook::jsi::JSError &e) {
-    // Handle JS exceptions here.
-    std::cerr << "JS Exception: " << e.getStack() << std::endl;
-    status = 1;
-  } catch (facebook::jsi::JSIException &e) {
-    // Handle JSI exceptions here.
-    std::cerr << "JSI Exception: " << e.what() << std::endl;
-    status = 1;
-  }
 
-  return status;
+    return 0;
+  } catch (facebook::jsi::JSIException &e) {
+    std::cerr << "JSI Exception: " << e.what() << std::endl;
+    return 1;
+  }
 }
