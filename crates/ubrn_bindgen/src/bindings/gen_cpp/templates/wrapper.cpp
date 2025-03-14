@@ -2,6 +2,7 @@
 // Trust me, you don't want to mess with it!
 {%- let namespace = ci.namespace() %}
 {%- let module_name = module.cpp_module() %}
+{%- let registry = ci.cpp_namespace()|fmt("{}::registry") %}
 #include "{{ module.hpp_filename() }}"
 
 #include "UniffiJsiTypes.h"
@@ -29,11 +30,12 @@ extern "C" {
     {%- endfor %}
 }
 
-// This calls into Rust.
-
 {% include "BridgingHelper.cpp" %}
 {% include "RustBufferHelper.cpp" %}
 {% include "RustCallStatusHelper.cpp" %}
+{% include "VTableRegistryHelper.cpp" %}
+
+// This calls into Rust.
 
 {%- for def in ci.ffi_definitions() %}
 {%-   match def %}
@@ -85,7 +87,7 @@ void {{ module_name }}::registerModule(jsi::Runtime &rt, std::shared_ptr<react::
 }
 
 void {{ module_name }}::unregisterModule(jsi::Runtime &rt) {
-    // NOOP
+    {{ registry }}::clearRegistry();
 }
 
 jsi::Value {{ module_name }}::get(jsi::Runtime& rt, const jsi::PropNameID& name) {
