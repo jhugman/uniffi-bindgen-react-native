@@ -89,7 +89,6 @@ for fixture in ${fixtures} ; do
     # Optionally, it could build the crate for us.
     # Generate hermes flavoured JS from typescript, and runs the test.
     cargo xtask run \
-        --no-cargo \
         --abi-dir "${cpp_dir}" \
         --ts-dir "${ts_dir}" \
         --toml "${config_file}" \

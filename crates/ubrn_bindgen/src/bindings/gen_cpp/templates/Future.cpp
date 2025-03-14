@@ -11,12 +11,11 @@ template <> struct Bridging<UniffiRustFutureContinuationCallback> {
     const jsi::Value &value
   ) {
     try {
-      static auto callback = {{ cb_type.borrow()|cpp_namespace(ci) }}::makeCallbackFunction(
+      return {{ cb_type.borrow()|cpp_namespace(ci) }}::makeCallbackFunction(
         rt,
         callInvoker,
         value
       );
-      return callback;
     } catch (const std::logic_error &e) {
       throw jsi::JSError(rt, e.what());
     }

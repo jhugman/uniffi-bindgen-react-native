@@ -78,13 +78,20 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 {%- call cpp_fn_from_js_decl(func) %} {
     {%- let args = func.arguments() %}
     {%- let arg = args.first().unwrap() %}
-    static {{ arg.type_().borrow()|ffi_type_name_from_js }} vtableInstance =
+    auto vtableInstance =
         {{ arg.type_().borrow()|bridging_class(ci) }}::fromJs(
             rt,
             callInvoker,
             args[0]
         );
-    {{ func.name() }}(&vtableInstance);
+
+    std::lock_guard<std::mutex> lock({{ registry }}::vtableMutex);
+    {{ func.name() }}(
+        {{ registry }}::putTable(
+            "{{ arg.type_().borrow()|ffi_type_name_from_js }}",
+            vtableInstance
+        )
+    );
     return jsi::Value::undefined();
 }
 {%- endmacro %}
