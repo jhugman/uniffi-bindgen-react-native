@@ -122,11 +122,7 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
   }
 
   drop(handle: UniffiHandle): T | undefined {
-    if (this.handleMap.has(handle)) {
-      return this.handleMap.remove(handle);
-    } else {
-      return undefined;
-    }
+    return this.handleMap.remove(handle);
   }
 }
 

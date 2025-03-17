@@ -104,7 +104,7 @@ function uniffiForeignFutureFree(handle: UniffiHandle) {
   //
   // This would be where the request from Rust to cancel a JS task would come out.
   // Check if the promise has been settled, and if not, cancel it.
-  if (!helper.settledHolder.settled) {
+  if (helper?.settledHolder.settled === false) {
     helper.abortController.abort();
   }
 }

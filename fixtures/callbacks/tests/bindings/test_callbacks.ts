@@ -78,10 +78,10 @@ test("Boolean values passed between callback interfaces", (t) => {
   rg.uniffiDestroy();
 });
 
-test("List values passed between callback interfaces", (t) => {
+test("String values passed between callback interfaces", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
-  const flag = true;
+  const flag = false;
   for (const v of inputData.string) {
     const expected = callbackInterface.getString(v, flag);
     const observed = rg.getString(callbackInterface, v, flag);
@@ -90,10 +90,10 @@ test("List values passed between callback interfaces", (t) => {
   rg.uniffiDestroy();
 });
 
-test("String values passed between callback interfaces", (t) => {
+test("List values passed between callback interfaces", (t) => {
   const rg = new RustGetters();
   const callbackInterface = new TypeScriptGetters();
-  const flag = true;
+  const flag = false;
   for (const v of inputData.listInt) {
     const expected = callbackInterface.getList(v, flag);
     const observed = rg.getList(callbackInterface, v, flag);
