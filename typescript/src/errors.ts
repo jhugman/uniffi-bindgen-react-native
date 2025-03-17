@@ -129,7 +129,9 @@ export const UniffiInternalError = (() => {
   }
   class UnexpectedStaleHandle extends Error {
     constructor() {
-      super("The object in the handle map has been dropped already");
+      super(
+        "The object is no longer in the handle map, likely because of a hot-reload",
+      );
     }
   }
   class ContractVersionMismatch extends Error {
