@@ -148,7 +148,9 @@ const uniffiFutureContinuationCallback: UniffiRustFutureContinuationCallback = (
   // > callback, some futures will deadlock and our scheduler code might as well.
   //
   // We avoid this by using UniffiCallInvoker::invokeNonBlocking for this callback.
-  resolve(pollResult);
+  if (resolve) {
+    resolve(pollResult);
+  }
 };
 
 // For testing only.
