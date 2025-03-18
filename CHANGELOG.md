@@ -8,6 +8,16 @@
 
 ---
 
+# 0.28.3-5
+
+## 🦊 What's Changed
+
+- Republishing v0.28.3.4 because Cocoapods timeout.
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.28.3-4...0.28.3-5
+
+---
+
 # 0.28.3-4
 ## 🦊 What's Changed
 
