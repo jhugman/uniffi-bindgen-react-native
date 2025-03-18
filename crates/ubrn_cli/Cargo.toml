@@ -1,6 +1,6 @@
 [package]
 name = "uniffi-bindgen-react-native"
-version = "0.28.3-3"
+version = "0.29.0-0"
 edition = "2021"
 
 [[bin]]
