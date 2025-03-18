@@ -10,9 +10,6 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use once_cell::sync::Lazy;
 
-#[cfg(test)]
-mod ffi_buffer_scaffolding_test;
-
 mod traits;
 pub use traits::{
     ancestor_names, get_string_util_traits, get_traits, make_rust_getters, test_getters,
