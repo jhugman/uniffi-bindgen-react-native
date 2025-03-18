@@ -43,33 +43,3 @@ impl AbiFlavor {
         }
     }
 }
-
-#[allow(dead_code)]
-impl AbiFlavor {
-    pub(crate) fn supports_text_encoder(&self) -> bool {
-        #[cfg(feature = "wasm")]
-        {
-            matches!(self, Self::Wasm)
-        }
-        #[cfg(not(feature = "wasm"))]
-        {
-            false
-        }
-    }
-    pub(crate) fn supports_finalization_registry(&self) -> bool {
-        #[cfg(feature = "wasm")]
-        {
-            matches!(self, Self::Wasm)
-        }
-        #[cfg(not(feature = "wasm"))]
-        {
-            false
-        }
-    }
-    pub(crate) fn needs_cpp(&self) -> bool {
-        matches!(self, Self::Jsi)
-    }
-    pub(crate) fn needs_rust(&self) -> bool {
-        !matches!(self, Self::Jsi)
-    }
-}
