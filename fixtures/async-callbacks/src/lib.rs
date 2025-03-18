@@ -4,43 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use ubrn_testing::timer::{TimerFuture, TimerService};
 use futures::future::{AbortHandle, Abortable, Aborted};
-
-// Example of an trait with async methods
-#[uniffi::export]
-#[async_trait::async_trait]
-pub trait SayAfterTrait: Send + Sync {
-    async fn say_after(&self, ms: u16, who: String) -> String;
-}
-
-struct SayAfterImpl1;
-
-struct SayAfterImpl2;
-
-#[async_trait::async_trait]
-impl SayAfterTrait for SayAfterImpl1 {
-    async fn say_after(&self, ms: u16, who: String) -> String {
-        say_after(ms, who).await
-    }
-}
-
-#[async_trait::async_trait]
-impl SayAfterTrait for SayAfterImpl2 {
-    async fn say_after(&self, ms: u16, who: String) -> String {
-        say_after(ms, who).await
-    }
-}
-
-#[uniffi::export]
-fn get_say_after_traits() -> Vec<Arc<dyn SayAfterTrait>> {
-    vec![Arc::new(SayAfterImpl1), Arc::new(SayAfterImpl2)]
-}
+use ubrn_testing::timer::{TimerFuture, TimerService};
 
 // Async callback interface implemented in foreign code
 #[uniffi::export(with_foreign)]
