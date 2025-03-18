@@ -5,14 +5,11 @@
  */
 
 use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, Mutex, MutexGuard},
-    task::{Context, Poll, Waker},
-    thread,
+    sync::Arc,
     time::Duration,
 };
 
+use ubrn_testing::timer::{TimerFuture, TimerService};
 use futures::future::{AbortHandle, Abortable, Aborted};
 
 // Example of an trait with async methods
@@ -103,68 +100,25 @@ async fn try_delay_using_trait(
 #[uniffi::export]
 async fn cancel_delay_using_trait(obj: Arc<dyn AsyncParser>, delay_ms: i32) {
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
-    thread::spawn(move || {
-        // Simulate a different thread aborting the process
-        thread::sleep(Duration::from_millis(1));
-        abort_handle.abort();
-    });
+    let aborter = sleep_then_abort(abort_handle);
+
     let future = Abortable::new(obj.delay(delay_ms), abort_registration);
-    assert_eq!(future.await, Err(Aborted));
+
+    let (_, delay_result) = futures::join!(aborter, future);
+
+    // Check the result of the aborted future
+    assert_eq!(delay_result, Err(Aborted));
 }
 
-/// Non-blocking timer future.
-struct SharedState {
-    completed: bool,
-    waker: Option<Waker>,
-}
-
-pub struct TimerFuture {
-    shared_state: Arc<Mutex<SharedState>>,
-}
-impl Future for TimerFuture {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut shared_state = self.shared_state.lock().unwrap();
-
-        if shared_state.completed {
-            Poll::Ready(())
-        } else {
-            shared_state.waker = Some(cx.waker().clone());
-            Poll::Pending
-        }
-    }
-}
-
-impl TimerFuture {
-    pub fn new(duration: Duration) -> Self {
-        let shared_state = Arc::new(Mutex::new(SharedState {
-            completed: false,
-            waker: None,
-        }));
-
-        let thread_shared_state = shared_state.clone();
-
-        // Let's mimic an event coming from somewhere else, like the system.
-        thread::spawn(move || {
-            thread::sleep(duration);
-
-            let mut shared_state: MutexGuard<_> = thread_shared_state.lock().unwrap();
-            shared_state.completed = true;
-
-            if let Some(waker) = shared_state.waker.take() {
-                waker.wake();
-            }
-        });
-
-        Self { shared_state }
-    }
+async fn sleep_then_abort(abort_handle: AbortHandle) {
+    TimerFuture::sleep(Duration::from_millis(1)).await;
+    abort_handle.abort();
 }
 
 /// Async function that says something after a certain time.
 #[uniffi::export]
 pub async fn say_after(ms: u16, who: String) -> String {
-    TimerFuture::new(Duration::from_millis(ms.into())).await;
+    TimerFuture::sleep(Duration::from_millis(ms.into())).await;
 
     format!("Hello, {who}!")
 }

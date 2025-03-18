@@ -5,19 +5,7 @@
  */
 use std::time::Duration;
 
-use gloo_timers::future::TimeoutFuture;
-
-use super::{TimerFuture, TimerService};
 use crate::{AsyncError, SharedResourceOptions};
-
-impl TimerService for TimerFuture {
-    type Future = TimeoutFuture;
-    fn sleep(duration: Duration) -> Self::Future {
-        let millis = duration.as_millis();
-        let millis = millis.try_into().unwrap();
-        TimeoutFuture::new(millis)
-    }
-}
 
 /// This simulates a shared resource, without using a Mutex, which
 /// in a single-threaded environment deadlocks.
@@ -37,6 +25,7 @@ impl TimerService for TimerFuture {
 pub(crate) async fn acquire_with_timeout(options: SharedResourceOptions) -> Result<(), AsyncError> {
     use once_cell::sync::Lazy;
     use std::sync::atomic::{AtomicBool, Ordering};
+    use ubrn_testing::timer::{TimerFuture, TimerService};
 
     static BUSY: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 

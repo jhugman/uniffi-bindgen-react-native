@@ -43,4 +43,4 @@ mod platform {
     pub use wasm::*;
 }
 
-pub use platform::*;
+pub use self::platform::*;

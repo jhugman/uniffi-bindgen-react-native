@@ -5,7 +5,9 @@
  */
 
 mod platform_specific;
-use platform_specific::{acquire_with_timeout, TimerFuture, TimerService};
+use platform_specific::acquire_with_timeout;
+use ubrn_testing::timer::{TimerFuture, TimerService};
+
 use std::{sync::Arc, time::Duration};
 
 /// Sync function.
