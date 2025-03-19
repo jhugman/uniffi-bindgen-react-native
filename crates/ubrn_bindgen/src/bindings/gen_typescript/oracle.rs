@@ -95,9 +95,7 @@ impl CodeOracle {
             FfiType::Struct(nm) if nm.starts_with("VTableCallbackInterface") => {
                 self.ffi_type_label(ffi_type)
             }
-            FfiType::Struct(_) => {
-                format!("UniffiResult<{}>", self.ffi_type_label(ffi_type))
-            }
+            FfiType::Struct(_) => self.ffi_type_label(ffi_type),
             FfiType::RustArcPtr(_) => "PointerByReference".to_owned(),
             // JNA structs default to ByReference
             _ => panic!("{ffi_type:?} by reference is not implemented"),

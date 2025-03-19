@@ -75,9 +75,18 @@ namespace {{ ns }} {
 
             {% match callback.arg_return_type() -%}
             {%- when Some with (arg_t) %}
+            // return type is {{ arg_t|fmt("{:?}") }}
+            {%- let is_async = arg_t.is_foreign_future() %}
+            {%- let arg_t_label = arg_t|ffi_type_name_from_js %}
             // Finally, we need to copy the return value back into the Rust pointer.
             *rs_uniffiOutReturn =
-                {{ arg_t|bridging_namespace(ci) }}::Bridging<ReferenceHolder<{{ arg_t|ffi_type_name_from_js }}>>::fromJs(
+                {{ arg_t|bridging_namespace(ci) }}::Bridging<
+                {%- if is_async %}
+                    {{ arg_t_label }}
+                {%- else %}
+                    ReferenceHolder<{{ arg_t_label }}>
+                {%- endif %}
+                >::fromJs(
                     rt, callInvoker, uniffiResult
                 );
             {%- else %}

@@ -322,6 +322,14 @@ pub(crate) impl FfiType {
         matches!(self, Self::VoidPointer)
     }
 
+    fn is_foreign_future(&self) -> bool {
+        match self {
+            Self::Struct(s) if s.starts_with("ForeignFuture") => true,
+            Self::MutReference(t) | Self::Reference(t) => t.is_foreign_future(),
+            _ => false,
+        }
+    }
+
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
         match self {
             Self::Int8
