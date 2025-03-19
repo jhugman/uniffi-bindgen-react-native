@@ -101,7 +101,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                         {%- when None %}
                         {%- endmatch %}
                         // TODO create callstatus with error.
-                        callStatus: { code, errorBuf }
+                        callStatus: uniffiCaller.createErrorStatus(code, errorBuf),
                     }
                 );
             };
@@ -126,7 +126,7 @@ const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => vo
                 /*lowerString:*/ FfiConverterString.lower
             );
             {%- endmatch %}
-            return UniffiResult.success(uniffiForeignFuture);
+            return uniffiForeignFuture;
             {%- endif %}
         },
         {%- endfor %}

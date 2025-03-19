@@ -43,6 +43,16 @@ export class UniffiRustCaller {
     return this.statusConstructor();
   }
 
+  createErrorStatus(
+    code: number,
+    errorBuf: UniffiByteArray,
+  ): UniffiRustCallStatus {
+    const status = this.statusConstructor();
+    status.code = code;
+    status.errorBuf = errorBuf;
+    return status;
+  }
+
   makeRustCall<T>(
     caller: RustCallFn<T>,
     liftString: StringLifter,
