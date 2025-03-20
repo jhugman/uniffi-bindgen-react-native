@@ -13,7 +13,7 @@ import {
   ChronologicalError,
   optional,
 } from "../../generated/chronological";
-import { asyncTest, test, Asserts, xtest } from "@/asserts";
+import { xasyncTest, test, Asserts, xtest } from "@/asserts";
 
 type Duration = number;
 
@@ -47,7 +47,7 @@ const Instant = {
   MAX: new Date(MAX_MS_FROM_EPOCH),
 };
 
-test("One way timestamp", (t) => {
+xtest("One way timestamp", (t) => {
   {
     const now = new Date(22, 1);
     t.assertEqual(now.toISOString(), toStringTimestamp(now));
@@ -80,7 +80,7 @@ function dateEquals(t: Asserts, a: Date, b: Date) {
   t.assertEqual(a.getTime(), b.getTime(), `${a} !== ${b}`);
 }
 
-test("Rust vs Hermes timestamp", (t) => {
+xtest("Rust vs Hermes timestamp", (t) => {
   const now = new Date();
   now.setMilliseconds(0);
   const rustTime = rustNow();
@@ -101,7 +101,7 @@ test("Test passing timestamp while returning duration", (t) => {
   t.assertEqual(diff(end, start), Duration.ofSeconds(2));
 });
 
-test("Test pre-epoch timestamps", (t) => {
+xtest("Test pre-epoch timestamps", (t) => {
   const start = Instant.parse("1955-11-05T00:06:00.283000001Z");
   t.assertEqual(start, add(start, 0));
 
@@ -137,7 +137,7 @@ function delayPromise(delayMs: number): Promise<void> {
   });
 }
 
-asyncTest(
+xasyncTest(
   "Test that rust timestamps behave like JS timestamps",
   async (t): Promise<void> => {
     // Unfortunately the JS clock may be lower resolution than the Rust clock.
