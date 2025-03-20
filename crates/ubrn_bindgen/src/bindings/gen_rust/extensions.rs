@@ -22,14 +22,33 @@ pub(super) impl ComponentInterface {
     // aren't easily constructable.
     fn ffi_definitions2(&self) -> impl Iterator<Item = FfiDefinition2> {
         let has_async_callbacks = self.has_async_callback_interface_definition();
-        let has_async_calls = self.iter_callables().any(|c| c.is_async());
-        ffi_definitions2(self.ffi_definitions(), has_async_calls, has_async_callbacks)
+        let has_callbacks = self.has_callbacks();
+        let has_async_calls = self.has_async_calls();
+        ffi_definitions2(
+            self.ffi_definitions(),
+            has_async_calls,
+            has_callbacks,
+            has_async_callbacks,
+        )
+    }
+
+    fn has_callbacks(&self) -> bool {
+        !self.callback_interface_definitions().is_empty()
+            || self
+                .object_definitions()
+                .iter()
+                .any(|o| o.has_callback_interface())
+    }
+
+    fn has_async_calls(&self) -> bool {
+        self.iter_callables().any(|c| c.is_async())
     }
 }
 
 fn ffi_definitions2(
     definitions: impl Iterator<Item = FfiDefinition>,
     has_async_calls: bool,
+    has_callbacks: bool,
     has_async_callbacks: bool,
 ) -> impl Iterator<Item = FfiDefinition2> {
     let mut callbacks = HashMap::new();
@@ -74,6 +93,9 @@ fn ffi_definitions2(
             };
             method_module_idents.insert(field.name().to_string(), module_ident);
         }
+        if ffi_struct.is_vtable() && !has_callbacks {
+            continue;
+        }
         definitions.push(FfiDefinition2::Struct(FfiStruct2 {
             ffi_struct,
             methods: method_module_idents,
@@ -91,6 +113,9 @@ fn ffi_definitions2(
         }
         if !has_async_calls && callback.is_continuation_callback() {
             // We don't need to do anything if we have no async functions or methods.
+            continue;
+        }
+        if !has_callbacks && callback.is_user_callback() {
             continue;
         }
         let cb = FfiCallbackFunction2 {
