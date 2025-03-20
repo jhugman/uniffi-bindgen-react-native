@@ -90,6 +90,9 @@ impl TsFlavorParams<'_> {
     pub(crate) fn supports_finalization_registry(&self) -> bool {
         !matches!(self.inner, &AbiFlavor::Jsi)
     }
+    pub(crate) fn supports_rust_backtrace(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Template)]

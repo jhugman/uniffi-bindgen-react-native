@@ -1,5 +1,5 @@
 [package]
-name = "uniffi-fixtures-async-calls"
+name = "uniffi-fixtures-async-traits"
 version = "0.21.0"
 authors = ["jhugman"]
 edition = "2021"
@@ -7,23 +7,17 @@ license = "MPL-2.0"
 publish = false
 
 [lib]
-name = "uniffi_async_calls"
+name = "async_traits"
 crate-type = ["lib", "cdylib"]
 
-[[bin]]
-name = "uniffi-fixtures-async-calls"
-path = "src/bin.rs"
-
 [dependencies]
+uniffi = { workspace = true, features = ["tokio", "cli"] }
 async-trait = "0.1"
 futures = "0.3"
 thiserror = "1.0"
+tokio = { version = "1.24.1", features = ["time", "sync"] }
 once_cell = "1.18.0"
 ubrn_testing = { path = "../../crates/ubrn_testing" }
-uniffi = { workspace = true, features = ["tokio", "cli"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { version = "1.24.1", features = ["time", "sync"] }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }

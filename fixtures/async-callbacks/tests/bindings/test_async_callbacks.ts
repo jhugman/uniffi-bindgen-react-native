@@ -9,7 +9,6 @@ import myModule, {
   AsyncParser,
   cancelDelayUsingTrait,
   delayUsingTrait,
-  getSayAfterTraits,
   ParserError,
   tryDelayUsingTrait,
   tryFromStringUsingTrait,
@@ -56,24 +55,6 @@ function checkRemainingFutures(t: Asserts) {
 }
 
 (async () => {
-  await asyncTest("Async trait interface methods", async (t) => {
-    const traits = getSayAfterTraits();
-
-    await t.asyncMeasure(
-      async () => {
-        let result1 = await traits[0].sayAfter(300, "Alice");
-        let result2 = await traits[1].sayAfter(200, "Bob");
-
-        t.assertEqual(result1, "Hello, Alice!");
-        t.assertEqual(result2, "Hello, Bob!");
-      },
-      500,
-      100,
-    );
-    checkRemainingFutures(t);
-    t.end();
-  });
-
   // AsyncParser.
   class TsAsyncParser implements AsyncParser {
     constructor(public completedDelays: number = 0) {}

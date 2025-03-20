@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use extend::ext;
-use heck::ToSnakeCase;
+use heck::{ToSnakeCase, ToUpperCamelCase};
 use syn::Ident;
 use uniffi_bindgen::{
     interface::{FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiStruct, FfiType},
@@ -22,14 +22,33 @@ pub(super) impl ComponentInterface {
     // aren't easily constructable.
     fn ffi_definitions2(&self) -> impl Iterator<Item = FfiDefinition2> {
         let has_async_callbacks = self.has_async_callback_interface_definition();
-        let has_async_calls = self.iter_callables().any(|c| c.is_async());
-        ffi_definitions2(self.ffi_definitions(), has_async_calls, has_async_callbacks)
+        let has_callbacks = self.has_callbacks();
+        let has_async_calls = self.has_async_calls();
+        ffi_definitions2(
+            self.ffi_definitions(),
+            has_async_calls,
+            has_callbacks,
+            has_async_callbacks,
+        )
+    }
+
+    fn has_callbacks(&self) -> bool {
+        !self.callback_interface_definitions().is_empty()
+            || self
+                .object_definitions()
+                .iter()
+                .any(|o| o.has_callback_interface())
+    }
+
+    fn has_async_calls(&self) -> bool {
+        self.iter_callables().any(|c| c.is_async())
     }
 }
 
 fn ffi_definitions2(
     definitions: impl Iterator<Item = FfiDefinition>,
     has_async_calls: bool,
+    has_callbacks: bool,
     has_async_callbacks: bool,
 ) -> impl Iterator<Item = FfiDefinition2> {
     let mut callbacks = HashMap::new();
@@ -74,6 +93,9 @@ fn ffi_definitions2(
             };
             method_module_idents.insert(field.name().to_string(), module_ident);
         }
+        if ffi_struct.is_vtable() && !has_callbacks {
+            continue;
+        }
         definitions.push(FfiDefinition2::Struct(FfiStruct2 {
             ffi_struct,
             methods: method_module_idents,
@@ -93,11 +115,18 @@ fn ffi_definitions2(
             // We don't need to do anything if we have no async functions or methods.
             continue;
         }
+        if !has_callbacks && callback.is_user_callback() {
+            continue;
+        }
         let cb = FfiCallbackFunction2 {
             module_ident: callback.module_ident(),
             callback,
         };
-        definitions.push(FfiDefinition2::CallbackFunction(cb));
+        if cb.callback.is_function_literal() {
+            definitions.push(FfiDefinition2::FunctionLiteral(cb));
+        } else {
+            definitions.push(FfiDefinition2::CallbackFunction(cb));
+        }
     }
     definitions.into_iter()
 }
@@ -111,6 +140,7 @@ impl FfiArgument {
 
 pub(super) enum FfiDefinition2 {
     CallbackFunction(FfiCallbackFunction2),
+    FunctionLiteral(FfiCallbackFunction2),
     Struct(FfiStruct2),
 }
 
@@ -139,11 +169,17 @@ pub(super) impl FfiCallbackFunction {
     fn module_ident(&self) -> Ident {
         snake_case_ident(self.name())
     }
+    fn is_function_literal(&self) -> bool {
+        self.name().starts_with("ForeignFutureComplete")
+    }
 }
 
 impl FfiCallbackFunction2 {
     pub(super) fn module_ident(&self) -> Ident {
         self.module_ident.clone()
+    }
+    pub(super) fn js_module_ident(&self) -> Ident {
+        ident(&self.module_ident.to_string().to_upper_camel_case())
     }
     pub(super) fn return_type(&self) -> Option<FfiType> {
         self.callback.arg_return_type()
@@ -184,5 +220,8 @@ impl FfiStruct2 {
 
     pub(super) fn fields(&self) -> impl Iterator<Item = &FfiField> {
         self.ffi_struct.fields().iter()
+    }
+    pub(super) fn is_passed_from_js_to_rust(&self) -> bool {
+        self.ffi_struct.is_foreign_future()
     }
 }

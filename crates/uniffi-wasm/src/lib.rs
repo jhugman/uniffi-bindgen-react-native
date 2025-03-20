@@ -155,6 +155,26 @@ impl RustCallStatus {
     }
 }
 
+// Needed for UniffiForeignFutureStruct* structs which are sent from JS when
+// a foreign callback promise resolves or rejects.
+impl IntoRust<RustCallStatus> for ::uniffi::RustCallStatus {
+    fn into_rust(js: RustCallStatus) -> Self {
+        let code = uniffi::RustCallStatusCode::try_from(js.code)
+            .expect("Unexpected error code. This is likely a bug in UBRN");
+        let bytes = js.error_buf.unwrap_or_default();
+        let error_buf = std::mem::ManuallyDrop::new(uniffi::RustBuffer::from_vec(bytes));
+        ::uniffi::RustCallStatus { error_buf, code }
+    }
+}
+
+impl IntoJs<RustCallStatus> for ::uniffi::RustCallStatus {
+    fn into_js(self) -> RustCallStatus {
+        let mut status = RustCallStatus::new();
+        status.copy_from(self);
+        status
+    }
+}
+
 pub struct ForeignCell<T> {
     inner: RefCell<Option<T>>,
 }

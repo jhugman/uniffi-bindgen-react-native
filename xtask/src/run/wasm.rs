@@ -90,7 +90,7 @@ impl Wasm {
         let src = include_str!("Cargo.template.toml");
         let cargo_toml = generated_crate.join("Cargo.toml");
 
-        let uniffi_wasm_path = repository_root()?.join("crates/uniffi_wasm");
+        let uniffi_wasm_path = repository_root()?.join("crates/uniffi-wasm");
         let cargo_toml_src = src
             .replace("{{crate_name}}", crate_under_test.package_name())
             .replace(

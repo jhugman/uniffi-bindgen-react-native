@@ -91,40 +91,22 @@ pub(crate) impl ComponentInterface {
     fn iter_ffi_functions_js_to_cpp(&self) -> impl Iterator<Item = FfiFunction> {
         self.iter_ffi_functions_js_to_cpp_and_back()
             .chain(self.iter_ffi_functions_js_to_rust())
-            .chain(self.iter_ffi_functions_init_callback())
             .chain(self.iter_ffi_function_bless_pointer())
     }
 
     fn iter_ffi_functions_js_to_abi_rust(&self) -> impl Iterator<Item = FfiFunction> {
         self.iter_ffi_functions_js_to_rust()
-            .chain(self.iter_ffi_functions_init_callback())
     }
 
     fn iter_ffi_functions_js_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
-        let has_async = self.has_async_fns();
+        let has_async_calls = self.iter_callables().any(|c| c.is_async());
         self.iter_ffi_function_definitions().filter(move |f| {
-            let name = f.name();
-            !name.contains("_rustbuffer_")
-                && (has_async || !name.contains("_rust_future_"))
-                && !name.contains("_callback_vtable_")
+            // We don't use RustBuffers directly from Typescript; we pass a Uint8Array to
+            // the C++/WASM Rust, and then copy the bytes into Rust from there.
+            !f.is_rustbuffer()
+            // We don't want the Rust futures helper methods unless we absolutely need them.
+            && (has_async_calls || !f.is_future())
         })
-    }
-
-    fn iter_ffi_functions_cpp_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
-        self.iter_ffi_functions_js_to_rust()
-    }
-
-    fn iter_ffi_functions_init_callback(&self) -> impl Iterator<Item = FfiFunction> {
-        self.callback_interface_definitions()
-            .iter()
-            .map(|cb| cb.ffi_init_callback().clone())
-            .chain(self.object_definitions().iter().filter_map(|obj| {
-                if obj.has_callback_interface() {
-                    Some(obj.ffi_init_callback().clone())
-                } else {
-                    None
-                }
-            }))
     }
 
     fn iter_ffi_function_bless_pointer(&self) -> impl Iterator<Item = FfiFunction> {
@@ -308,6 +290,15 @@ pub(crate) impl FfiFunction {
         let name = self.name();
         name.contains("ffi__") && name.contains("_internal_")
     }
+    fn is_callback_init(&self) -> bool {
+        self.name().contains("_callback_vtable_")
+    }
+    fn is_future(&self) -> bool {
+        self.name().contains("_rust_future_")
+    }
+    fn is_rustbuffer(&self) -> bool {
+        self.name().contains("_rustbuffer_")
+    }
 }
 
 #[ext]
@@ -329,6 +320,14 @@ pub(crate) impl FfiType {
 
     fn is_void(&self) -> bool {
         matches!(self, Self::VoidPointer)
+    }
+
+    fn is_foreign_future(&self) -> bool {
+        match self {
+            Self::Struct(s) if s.starts_with("ForeignFuture") => true,
+            Self::MutReference(t) | Self::Reference(t) => t.is_foreign_future(),
+            _ => false,
+        }
     }
 
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {

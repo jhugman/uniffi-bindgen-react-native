@@ -100,6 +100,9 @@
 
 {%- macro call_body(obj_factory, callable) %}
 {%- if callable.is_async() %}
+{%-   if flavor.supports_rust_backtrace() %}
+    return {# space #}{%- call call_async(obj_factory, callable) %};
+{%-   else %}
     const __stack = uniffiIsDebug ? new Error().stack : undefined;
     try {
         return {# space #}{%- call call_async(obj_factory, callable) %};
@@ -109,6 +112,7 @@
         }
         throw __error;
     }
+{%-  endif %}
 {%- else %}
 {%-     match callable.return_type() -%}
 {%-         when Some with (return_type) %}
