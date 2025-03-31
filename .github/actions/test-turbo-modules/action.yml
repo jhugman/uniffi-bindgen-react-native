@@ -36,7 +36,7 @@ runs:
       shell: bash
       run: |
         ./scripts/test-turbo-modules.sh \
-          --slug '@my-org/my-lib' \
+          --slug '@my-org/react-native-my-lib' \
           --ubrn-config integration/fixtures/compat/ubrn.config.yaml \
           --builder-bob-version ${{ inputs.bobVersion }} \
           --rn-version ${{ inputs.rnVersion }} \
