@@ -60,6 +60,9 @@ fn ffi_definitions2(
             // we will do something different with future callbacks.
             continue;
         }
+        if !has_callbacks && ffi_struct.is_vtable() {
+            continue;
+        }
         let mut method_module_idents = HashMap::new();
         for field in ffi_struct.fields() {
             let FfiType::Callback(name) = &field.type_() else {
@@ -82,9 +85,6 @@ fn ffi_definitions2(
                 callback.module_ident()
             };
             method_module_idents.insert(field.name().to_string(), module_ident);
-        }
-        if ffi_struct.is_vtable() && !has_callbacks {
-            continue;
         }
         definitions.push(FfiDefinition2::Struct(FfiStruct2 {
             ffi_struct,
