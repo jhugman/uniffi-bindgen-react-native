@@ -7,7 +7,7 @@ The file is designed to be easy to start. A **minimal** configuation would be:
 ```yaml
 rust:
   directory: ./rust
-  manifest-file: Cargo.toml
+  manifestPath: Cargo.toml
 ```
 
 Getting started from here would require a command to start the Rust:
@@ -26,20 +26,20 @@ cargo add uniffi
 rust:
 	repo: https://github.com/example/my-rust-sdk
 	branch: main
-	manifest-path: crates/my-api/Cargo.toml
+	manifestPath: crates/my-api/Cargo.toml
 ```
 In this case, the `ubrn checkout` command will clone the given repo with the branch/ref into the `rust_modules` directory of the project. Note that instead of `branch` you can also use `rev` or `ref`.
 
 If run a second time, no overwriting will occur.
 
-The `manifest-path` is the path relative to the root of the Rust workspace directory. In this case, the manifest is expected to be, relative to your React Native library project: `./rust_modules/my-rust-sdk/crates/my-api/Cargo.tml`.
+The `manifestPath` is the path relative to the root of the Rust workspace directory. In this case, the manifest is expected to be, relative to your React Native library project: `./rust_modules/my-rust-sdk/crates/my-api/Cargo.tml`.
 
 ```yaml
 rust:
 	directory: ./rust
-	manifest-path: crates/my-api/Cargo.toml
+	manifestPath: crates/my-api/Cargo.toml
 ```
-In this case, the `./rust` directory tells `ubrn` where the Rust workspace is, relative to your React Native library project. The `manifest-path` is the relative path from the workspace file to the crate which will be used to build bindings.
+In this case, the `./rust` directory tells `ubrn` where the Rust workspace is, relative to your React Native library project. The `manifestPath` is the relative path from the workspace file to the crate which will be used to build bindings.
 
 ## `bindings`
 
