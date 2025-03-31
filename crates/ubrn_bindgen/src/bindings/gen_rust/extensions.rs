@@ -9,12 +9,14 @@ use extend::ext;
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use syn::Ident;
 use uniffi_bindgen::{
-    interface::{FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiStruct, FfiType},
+    interface::{FfiCallbackFunction, FfiDefinition, FfiField, FfiStruct, FfiType},
     ComponentInterface,
 };
 
 use super::{ident, snake_case_ident};
-use crate::bindings::extensions::{FfiCallbackFunctionExt as _, FfiStructExt as _};
+use crate::bindings::extensions::{
+    ComponentInterfaceExt as _, FfiCallbackFunctionExt as _, FfiStructExt as _,
+};
 
 #[ext]
 pub(super) impl ComponentInterface {
@@ -30,18 +32,6 @@ pub(super) impl ComponentInterface {
             has_callbacks,
             has_async_callbacks,
         )
-    }
-
-    fn has_callbacks(&self) -> bool {
-        !self.callback_interface_definitions().is_empty()
-            || self
-                .object_definitions()
-                .iter()
-                .any(|o| o.has_callback_interface())
-    }
-
-    fn has_async_calls(&self) -> bool {
-        self.iter_callables().any(|c| c.is_async())
     }
 }
 
@@ -131,13 +121,6 @@ fn ffi_definitions2(
     definitions.into_iter()
 }
 
-#[ext]
-impl FfiArgument {
-    fn is_return(&self) -> bool {
-        self.name() == "uniffi_out_return"
-    }
-}
-
 pub(super) enum FfiDefinition2 {
     CallbackFunction(FfiCallbackFunction2),
     FunctionLiteral(FfiCallbackFunction2),
@@ -168,9 +151,6 @@ pub(super) impl FfiCallbackFunction {
     }
     fn module_ident(&self) -> Ident {
         snake_case_ident(self.name())
-    }
-    fn is_function_literal(&self) -> bool {
-        self.name().starts_with("ForeignFutureComplete")
     }
 }
 
