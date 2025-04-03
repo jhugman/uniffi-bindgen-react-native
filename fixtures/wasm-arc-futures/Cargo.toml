@@ -1,0 +1,25 @@
+[package]
+name = "uniffi-fixtures-wasm-arc-futures"
+version = "0.21.0"
+authors = ["zzorba"]
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+name = "wasm_arc_futures"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+uniffi = { path = "../../../../../mozilla/uniffi-rs/uniffi", features = ["cli"] }
+# uniffi = { workspace = true, features = ["cli"] }
+async-trait = "0.1"
+ubrn_testing = { path = "../../crates/ubrn_testing" }
+
+[build-dependencies]
+uniffi = { path = "../../../../../mozilla/uniffi-rs/uniffi", features = ["build"] }
+# uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+uniffi = { path = "../../../../../mozilla/uniffi-rs/uniffi", features = ["bindgen-tests"] }
+# uniffi = { workspace = true, features = ["bindgen-tests"] }
