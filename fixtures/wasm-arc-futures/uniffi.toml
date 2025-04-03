@@ -1,3 +1,2 @@
 [bindings.typescript]
 logLevel = "debug"
-consoleImport = "@/hermes"
