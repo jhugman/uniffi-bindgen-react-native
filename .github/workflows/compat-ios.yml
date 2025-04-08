@@ -23,6 +23,7 @@ jobs:
           - 0.49.5
         rn-version:
           - 0.76.6
+      fail-fast: false
 
     runs-on: macos-latest
     name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / ios"
