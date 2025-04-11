@@ -20,7 +20,8 @@ jobs:
           - 0.76.9
           - 0.77.2
           - 0.78.2
-      fail-fast: false
+      # Uncomment to debug failures
+      # fail-fast: false
 
     runs-on: ubuntu-latest
     name: "bob ${{ matrix.bob-version }} / rn ${{ matrix.rn-version }} / android"
