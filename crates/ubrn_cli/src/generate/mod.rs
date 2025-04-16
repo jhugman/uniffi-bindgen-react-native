@@ -3,13 +3,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+mod jsi;
+
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{self, Args, Subcommand};
 use std::convert::TryFrom;
 use ubrn_bindgen::{AbiFlavor, BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
 
-use crate::{codegen::TurboModuleArgs, config::ProjectConfig, Platform};
+use crate::{config::ProjectConfig, Platform};
 
 #[derive(Args, Debug)]
 pub(crate) struct GenerateArgs {
@@ -25,15 +27,16 @@ impl GenerateArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum GenerateCmd {
-    /// Generate just the Typescript and C++ bindings
+    #[clap(hide = true)]
     Bindings(BindingsArgs),
-    /// Generate the TurboModule code to plug the bindings into the app
-    TurboModule(TurboModuleArgs),
-    /// Generate the Bindings and TurboModule code from a library
-    /// file and a YAML config file.
-    ///
-    /// This is the second step of the `--and-generate` option of the build command.
+    #[clap(hide = true)]
+    TurboModule(jsi::TurboModuleArgs),
+    #[clap(hide = true)]
     All(GenerateAllArgs),
+
+    /// Commands to generate the JSI bindings and turbo-module code.
+    #[clap(aliases = ["react-native"])]
+    Jsi(jsi::CmdArg),
 }
 
 impl GenerateCmd {
@@ -50,6 +53,10 @@ impl GenerateCmd {
             Self::All(t) => {
                 let t = GenerateAllCommand::try_from(t)?;
                 t.run()?;
+                Ok(())
+            }
+            Self::Jsi(jsi) => {
+                jsi.run()?;
                 Ok(())
             }
         }
