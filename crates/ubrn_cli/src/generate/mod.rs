@@ -4,6 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod jsi;
+#[cfg(feature = "wasm")]
+mod wasm;
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
@@ -37,6 +39,11 @@ pub(crate) enum GenerateCmd {
     /// Commands to generate the JSI bindings and turbo-module code.
     #[clap(aliases = ["react-native"])]
     Jsi(jsi::CmdArg),
+
+    /// Commands to generate the JSI bindings and turbo-module code.
+    #[cfg(feature = "wasm")]
+    #[clap(aliases = ["web"])]
+    Wasm(wasm::CmdArg),
 }
 
 impl GenerateCmd {
@@ -57,6 +64,10 @@ impl GenerateCmd {
             }
             Self::Jsi(jsi) => {
                 jsi.run()?;
+                Ok(())
+            }
+            Self::Wasm(wasm) => {
+                wasm.run()?;
                 Ok(())
             }
         }
