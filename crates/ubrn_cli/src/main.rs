@@ -16,8 +16,11 @@ mod codegen;
 mod config;
 mod generate;
 mod ios;
+mod jsi;
 mod repo;
 mod rust;
+#[cfg(feature = "wasm")]
+mod wasm;
 mod workspace;
 
 fn main() -> Result<()> {

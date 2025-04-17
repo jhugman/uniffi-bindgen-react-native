@@ -3,9 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-mod jsi;
-#[cfg(feature = "wasm")]
-mod wasm;
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
@@ -13,7 +10,7 @@ use clap::{self, Args, Subcommand};
 use std::convert::TryFrom;
 use ubrn_bindgen::{AbiFlavor, BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
 
-use crate::{config::ProjectConfig, Platform};
+use crate::{config::ProjectConfig, jsi, wasm, Platform};
 
 #[derive(Args, Debug)]
 pub(crate) struct GenerateArgs {
@@ -37,7 +34,7 @@ pub(crate) enum GenerateCmd {
     All(GenerateAllArgs),
 
     /// Commands to generate the JSI bindings and turbo-module code.
-    #[clap(aliases = ["react-native"])]
+    #[clap(aliases = ["react-native", "rn"])]
     Jsi(jsi::CmdArg),
 
     /// Commands to generate the JSI bindings and turbo-module code.
