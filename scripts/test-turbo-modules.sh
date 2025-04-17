@@ -53,6 +53,10 @@ diagnostics() {
   echo "-- PROJECT_SLUG = $PROJECT_SLUG"
 }
 
+info() {
+  echo "-- $*"
+}
+
 error() {
   diagnostics
   echo "❌ Error: $1"
@@ -226,6 +230,15 @@ check_deleted_files() {
   fi
 }
 
+trim_whitespace() {
+  local var="$1"
+  # Remove leading whitespace
+  var="${var#"${var%%[![:space:]]*}"}"
+  # Remove trailing whitespace
+  var="${var%"${var##*[![:space:]]}"}"
+  echo "$var"
+}
+
 check_line_unchanged() {
   local file_pattern="$1"
   local search_string="$2"
@@ -238,9 +251,16 @@ check_line_unchanged() {
     # Get the content of the line containing the search string from the last commit
     last_commit_line=$(git show HEAD:"$file_path" | grep -E "$search_string" || true)
 
+    # Trim whitespace from both lines
+    current_line=$(trim_whitespace "$current_line")
+    last_commit_line=$(trim_whitespace "$last_commit_line")
+
     # Compare the current line with the line from the last commit
     if [ "$current_line" != "$last_commit_line" ]; then
+        info "Removed: $last_commit_line"
+        info "Added  : $current_line"
         error "$file_path: found line with \"$search_string\" to have changed"
+
     fi
   done
 }
@@ -255,8 +275,9 @@ check_lines() {
 
   check_line_unchanged "./android/CMakeLists.txt" "^project"
   check_line_unchanged "./android/CMakeLists.txt" "^add_library.*SHARED"
-  check_line_unchanged "./android/build.gradle" "return rootProject"
-  check_line_unchanged "./android/build.gradle" "libraryName"
+  check_line_unchanged "./android/build.gradle" "jsRootDir ="
+  check_line_unchanged "./android/build.gradle" "libraryName ="
+  check_line_unchanged "./android/build.gradle" "codegenJavaPackageName ="
   check_line_unchanged "./android/src/*/*Package.*" "package"
   check_line_unchanged "./android/src/*/*Package.*" "package"
   check_line_unchanged "./android/src/*/*Module.java" "System.loadLibrary"
@@ -268,11 +289,8 @@ check_lines() {
   check_line_unchanged "./android/cpp-adapter.cpp" "#include \""
   check_line_unchanged "./android/cpp-adapter.cpp" "nativeMultiply"
   check_line_unchanged "./android/cpp-adapter.cpp" "::multiply"
-
-  check_line_unchanged "./ios/*.h" "#import"
-  check_line_unchanged "./ios/*.h" "Spec.h"
+  check_line_unchanged "./ios/*.h" "Spec>"
   check_line_unchanged "./ios/*.h" "<Native"
-  check_line_unchanged "./ios/*.h" "<RCTBridgeModule"
   check_line_unchanged "./ios/*.mm" "#import \""
   check_line_unchanged "./ios/*.mm" "@implementation"
   check_line_unchanged "./ios/*.mm" "::multiply"

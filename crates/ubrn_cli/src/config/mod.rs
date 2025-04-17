@@ -132,7 +132,7 @@ impl ProjectConfig {
     }
 
     pub(crate) fn podspec_filename(&self) -> String {
-        self.cpp_filename()
+        self.module_cpp().to_upper_camel_case()
     }
 
     pub(crate) fn codegen_filename(&self) -> String {
