@@ -248,8 +248,16 @@ check_line_unchanged() {
   for file_path in $files; do
     # Get the current content of the line containing the search string
     current_line=$(grep -E "$search_string" "$file_path" || true)
-    # Get the content of the line containing the search string from the last commit
-    last_commit_line=$(git show HEAD:"$file_path" | grep -E "$search_string" || true)
+
+    # Check if the file exists in git history
+    if git rev-parse --verify HEAD >/dev/null 2>&1 && git ls-files --error-unmatch "$file_path" >/dev/null 2>&1; then
+      # Get the content of the line containing the search string from the last commit
+      last_commit_line=$(git show HEAD:"$file_path" 2>/dev/null | grep -E "$search_string" || true)
+    else
+      # File doesn't exist in git history yet, so we'll skip the comparison
+      info "Skipping git history check for '$file_path' - not in git history yet"
+      continue
+    fi
 
     # Trim whitespace from both lines
     current_line=$(trim_whitespace "$current_line")
