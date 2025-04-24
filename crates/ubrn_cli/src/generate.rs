@@ -10,7 +10,11 @@ use clap::{self, Args, Subcommand};
 use std::convert::TryFrom;
 use ubrn_bindgen::{AbiFlavor, BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
 
-use crate::{config::ProjectConfig, jsi, wasm, Platform};
+use crate::{
+    codegen::{files, get_template_config, render_files},
+    config::ProjectConfig,
+    jsi, wasm, Platform,
+};
 
 #[derive(Args, Debug)]
 pub(crate) struct GenerateArgs {
@@ -149,7 +153,13 @@ impl GenerateAllCommand {
         };
         ubrn_common::cd(&pwd)?;
         let rust_crate = project.crate_.metadata()?;
-        crate::codegen::render_files(self.platform.clone(), project, rust_crate, modules)?;
+        let config = get_template_config(project, rust_crate, modules);
+        let files = if let Some(platform) = &self.platform {
+            files::get_files_for(config.clone(), platform)
+        } else {
+            files::get_files(config.clone())
+        };
+        render_files(config, files.into_iter())?;
         Ok(())
     }
 

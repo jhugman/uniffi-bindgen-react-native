@@ -59,6 +59,7 @@ impl TryFrom<Utf8PathBuf> for ProjectConfig {
 pub(crate) enum Platform {
     Android,
     Ios,
+    #[allow(dead_code)]
     #[cfg(feature = "wasm")]
     Wasm,
 }

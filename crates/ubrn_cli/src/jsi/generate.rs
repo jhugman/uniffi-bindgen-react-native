@@ -9,7 +9,10 @@ use camino::Utf8PathBuf;
 use clap::{Args, Subcommand};
 use ubrn_bindgen::{ModuleMetadata, OutputArgs, SourceArgs, SwitchArgs};
 
-use crate::{codegen::render_files, ProjectConfig};
+use crate::{
+    codegen::{get_template_config, render_files},
+    jsi, ProjectConfig,
+};
 
 #[derive(Args, Debug)]
 pub(crate) struct CmdArg {
@@ -83,7 +86,9 @@ impl TurboModuleArgs {
             .map(|s| ModuleMetadata::new(s))
             .collect();
         let rust_crate = project.crate_.metadata()?;
-        render_files(None, project, rust_crate, modules)?;
+        let config = get_template_config(project, rust_crate, modules);
+        let files = jsi::get_files(config.clone());
+        render_files(config.clone(), files.into_iter())?;
         Ok(())
     }
 }

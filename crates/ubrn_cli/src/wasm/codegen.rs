@@ -3,8 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-mod codegen;
-mod generate;
+use std::rc::Rc;
 
-pub(crate) use codegen::{android, crossplatform, get_files, ios};
-pub(crate) use generate::{CmdArg, TurboModuleArgs};
+use crate::codegen::{RenderedFile, TemplateConfig};
+
+pub(crate) fn get_files(_config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
+    vec![]
+}
