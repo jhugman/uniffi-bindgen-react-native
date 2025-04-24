@@ -12,11 +12,14 @@ import myModule, {
   makeObjectWithCallback,
   simpleCallback,
   SimpleCallback,
+  SimpleObject,
+  throwObject,
 } from "../../generated/wasm_arc_futures";
 import { asyncTest, Asserts, test } from "@/asserts";
 import {
   uniffiRustFutureHandleCount,
   uniffiForeignFutureHandleCount,
+  UniffiThrownObject,
 } from "uniffi-bindgen-react-native";
 import "@/polyfills";
 
@@ -118,6 +121,23 @@ function checkRemainingFutures(t: Asserts) {
     t.assertEqual(previousValue, "alice");
     t.assertEqual(updated, 2);
 
+    checkRemainingFutures(t);
+    t.end();
+  });
+
+  await asyncTest("Object as error", async (t) => {
+    await t.assertThrowsAsync((e: any) => {
+      if (!UniffiThrownObject.instanceOf(e)) {
+        return false;
+      }
+      if (!SimpleObject.hasInner(e)) {
+        return false;
+      }
+      let obj = e.inner;
+      t.assertNotNull(obj);
+      t.assertTrue(SimpleObject.instanceOf(obj));
+      return true;
+    }, throwObject);
     checkRemainingFutures(t);
     t.end();
   });

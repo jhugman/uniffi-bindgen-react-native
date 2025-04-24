@@ -11,15 +11,12 @@ name = "wasm_arc_futures"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-uniffi = { git = "https://github.com/jhugman/uniffi-rs", branch = "jhugman/2417-remove-send-from-wasm32-arc", features = ["cli"] }
-# uniffi = { workspace = true, features = ["cli"] }
+uniffi = { workspace = true, features = ["cli", "wasm-unstable-single-threaded"] }
 async-trait = "0.1"
 ubrn_testing = { path = "../../crates/ubrn_testing" }
 
 [build-dependencies]
-uniffi = { git = "https://github.com/jhugman/uniffi-rs", branch = "jhugman/2417-remove-send-from-wasm32-arc", features = ["build"] }
-# uniffi = { workspace = true, features = ["build"] }
+uniffi = { workspace = true, features = ["build", "wasm-unstable-single-threaded"] }
 
 [dev-dependencies]
-uniffi = { git = "https://github.com/jhugman/uniffi-rs", branch = "jhugman/2417-remove-send-from-wasm32-arc", features = ["bindgen-tests"] }
-# uniffi = { workspace = true, features = ["bindgen-tests"] }
+uniffi = { workspace = true, features = ["bindgen-tests", "wasm-unstable-single-threaded"] }

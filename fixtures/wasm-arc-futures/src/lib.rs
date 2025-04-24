@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -27,7 +28,20 @@ pub struct SimpleObject {
     callbacks: Vec<Box<EventHandlerFn>>,
 }
 
+impl fmt::Debug for SimpleObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SimpleObject")
+    }
+}
+
+impl fmt::Display for SimpleObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl SimpleObject {
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::arc_with_non_send_sync))]
     fn new_with_callback(cb: Box<EventHandlerFn>) -> Arc<Self> {
         Arc::new(SimpleObject {
             inner: Mutex::new("key".to_string()),
@@ -66,6 +80,12 @@ fn from_static() -> Box<EventHandlerFn> {
 #[uniffi::export]
 async fn make_object() -> Arc<SimpleObject> {
     SimpleObject::new_with_callback(from_static())
+}
+
+#[uniffi::export]
+async fn throw_object() -> Result<(), Arc<SimpleObject>> {
+    let obj = make_object().await;
+    Err(obj)
 }
 
 // Simple callback interface object, with a synchronous method.

@@ -10,12 +10,12 @@ crate-type = ["lib", "cdylib"]
 name = "uniffi_error_types"
 
 [dependencies]
-uniffi = { workspace = true }
+uniffi = { workspace = true, features = ["wasm-unstable-single-threaded"] }
 anyhow = "1"
 thiserror = "1.0"
 
 [build-dependencies]
-uniffi = { workspace = true, features = ["build"] }
+uniffi = { workspace = true, features = ["build", "wasm-unstable-single-threaded"] }
 
 [dev-dependencies]
-uniffi = { workspace = true, features = ["bindgen-tests"] }
+uniffi = { workspace = true, features = ["bindgen-tests", "wasm-unstable-single-threaded"] }
