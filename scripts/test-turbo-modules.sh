@@ -26,7 +26,7 @@ usage() {
   echo "  -A, --android                      Build for Android."
   echo "  -I, --ios                          Build for iOS."
   echo "  -C, --ubrn-config                  Use a ubrn config file."
-  echo "  -P, --packgage-json-mixin          Merge another JSON file into package.json"
+  echo "  -P, --package-json-mixin           Merge another JSON file into package.json"
   echo "  -R, --react-native-config          Use a react-native.config.js file"
   echo "  -T, --app-tsx                      Use a App.tsx file."
   echo
@@ -107,7 +107,7 @@ parse_cli_options() {
         UBRN_CONFIG=$(join_paths "$PWD" "$2")
         shift
         ;;
-      -P|--packgage-json-mixin)
+      -P|--package-json-mixin)
         PACKAGE_JSON_MIXIN=$(join_paths "$PWD" "$2")
         shift
         ;;

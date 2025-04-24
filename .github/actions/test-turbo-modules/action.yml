@@ -40,7 +40,7 @@ runs:
           --ubrn-config integration/fixtures/compat/ubrn.config.yaml \
           --builder-bob-version ${{ inputs.bobVersion }} \
           --rn-version ${{ inputs.rnVersion }} \
-          --packgage-json-mixin integration/fixtures/compat/package.json \
+          --package-json-mixin integration/fixtures/compat/package.json \
           --react-native-config integration/fixtures/compat/react-native.config.js \
           ../turbo-module-comparison-testing
 
@@ -52,7 +52,7 @@ runs:
           --ubrn-config integration/fixtures/compat/ubrn.config.yaml \
           --builder-bob-version ${{ inputs.bobVersion }} \
           --rn-version ${{ inputs.rnVersion }} \
-          --packgage-json-mixin integration/fixtures/compat/package.json \
+          --package-json-mixin integration/fixtures/compat/package.json \
           --react-native-config integration/fixtures/compat/react-native.config.js \
           --${{ inputs.platform }} \
           ../turbo-module-for-building
