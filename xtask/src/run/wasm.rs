@@ -90,7 +90,7 @@ impl Wasm {
         let src = include_str!("Cargo.template.toml");
         let cargo_toml = generated_crate.join("Cargo.toml");
 
-        let uniffi_wasm_path = repository_root()?.join("crates/uniffi-wasm");
+        let uniffi_runtime_javascript = repository_root()?.join("crates/uniffi-runtime-javascript");
         let cargo_toml_src = src
             .replace("{{crate_name}}", crate_under_test.package_name())
             .replace(
@@ -100,8 +100,8 @@ impl Wasm {
                     .as_str(),
             )
             .replace(
-                "{{uniffi_wasm_path}}",
-                pathdiff::diff_utf8_paths(uniffi_wasm_path, generated_crate)
+                "{{uniffi_runtime_javascript}}",
+                pathdiff::diff_utf8_paths(uniffi_runtime_javascript, generated_crate)
                     .expect("Should be able to find a relative path")
                     .as_str(),
             );

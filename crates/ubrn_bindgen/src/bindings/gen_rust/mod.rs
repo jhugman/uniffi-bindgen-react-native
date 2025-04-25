@@ -104,7 +104,7 @@ fn callback_fn_ident() -> Ident {
 
 fn wasm_flavor() -> FlavorParams<'static> {
     FlavorParams {
-        runtime_module: "uniffi_wasm",
+        runtime_module: "uniffi_runtime_javascript",
     }
 }
 
