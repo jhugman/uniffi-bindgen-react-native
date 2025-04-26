@@ -26,7 +26,7 @@ usage() {
   echo "  -A, --android                      Build for Android."
   echo "  -I, --ios                          Build for iOS."
   echo "  -C, --ubrn-config                  Use a ubrn config file."
-  echo "  -P, --packgage-json-mixin          Merge another JSON file into package.json"
+  echo "  -P, --package-json-mixin           Merge another JSON file into package.json"
   echo "  -R, --react-native-config          Use a react-native.config.js file"
   echo "  -T, --app-tsx                      Use a App.tsx file."
   echo
@@ -51,6 +51,10 @@ cleanup() {
 diagnostics() {
   echo "-- PROJECT_DIR = $PROJECT_DIR"
   echo "-- PROJECT_SLUG = $PROJECT_SLUG"
+}
+
+info() {
+  echo "-- $*"
 }
 
 error() {
@@ -103,7 +107,7 @@ parse_cli_options() {
         UBRN_CONFIG=$(join_paths "$PWD" "$2")
         shift
         ;;
-      -P|--packgage-json-mixin)
+      -P|--package-json-mixin)
         PACKAGE_JSON_MIXIN=$(join_paths "$PWD" "$2")
         shift
         ;;
@@ -226,6 +230,15 @@ check_deleted_files() {
   fi
 }
 
+trim_whitespace() {
+  local var="$1"
+  # Remove leading whitespace
+  var="${var#"${var%%[![:space:]]*}"}"
+  # Remove trailing whitespace
+  var="${var%"${var##*[![:space:]]}"}"
+  echo "$var"
+}
+
 check_line_unchanged() {
   local file_pattern="$1"
   local search_string="$2"
@@ -235,12 +248,27 @@ check_line_unchanged() {
   for file_path in $files; do
     # Get the current content of the line containing the search string
     current_line=$(grep -E "$search_string" "$file_path" || true)
-    # Get the content of the line containing the search string from the last commit
-    last_commit_line=$(git show HEAD:"$file_path" | grep -E "$search_string" || true)
+
+    # Check if the file exists in git history
+    if git rev-parse --verify HEAD >/dev/null 2>&1 && git ls-files --error-unmatch "$file_path" >/dev/null 2>&1; then
+      # Get the content of the line containing the search string from the last commit
+      last_commit_line=$(git show HEAD:"$file_path" 2>/dev/null | grep -E "$search_string" || true)
+    else
+      # File doesn't exist in git history yet, so we'll skip the comparison
+      info "Skipping git history check for '$file_path' - not in git history yet"
+      continue
+    fi
+
+    # Trim whitespace from both lines
+    current_line=$(trim_whitespace "$current_line")
+    last_commit_line=$(trim_whitespace "$last_commit_line")
 
     # Compare the current line with the line from the last commit
     if [ "$current_line" != "$last_commit_line" ]; then
+        info "Removed: $last_commit_line"
+        info "Added  : $current_line"
         error "$file_path: found line with \"$search_string\" to have changed"
+
     fi
   done
 }
@@ -255,8 +283,9 @@ check_lines() {
 
   check_line_unchanged "./android/CMakeLists.txt" "^project"
   check_line_unchanged "./android/CMakeLists.txt" "^add_library.*SHARED"
-  check_line_unchanged "./android/build.gradle" "return rootProject"
-  check_line_unchanged "./android/build.gradle" "libraryName"
+  check_line_unchanged "./android/build.gradle" "jsRootDir ="
+  check_line_unchanged "./android/build.gradle" "libraryName ="
+  check_line_unchanged "./android/build.gradle" "codegenJavaPackageName ="
   check_line_unchanged "./android/src/*/*Package.*" "package"
   check_line_unchanged "./android/src/*/*Package.*" "package"
   check_line_unchanged "./android/src/*/*Module.java" "System.loadLibrary"
@@ -268,11 +297,8 @@ check_lines() {
   check_line_unchanged "./android/cpp-adapter.cpp" "#include \""
   check_line_unchanged "./android/cpp-adapter.cpp" "nativeMultiply"
   check_line_unchanged "./android/cpp-adapter.cpp" "::multiply"
-
-  check_line_unchanged "./ios/*.h" "#import"
-  check_line_unchanged "./ios/*.h" "Spec.h"
+  check_line_unchanged "./ios/*.h" "Spec>"
   check_line_unchanged "./ios/*.h" "<Native"
-  check_line_unchanged "./ios/*.h" "<RCTBridgeModule"
   check_line_unchanged "./ios/*.mm" "#import \""
   check_line_unchanged "./ios/*.mm" "@implementation"
   check_line_unchanged "./ios/*.mm" "::multiply"

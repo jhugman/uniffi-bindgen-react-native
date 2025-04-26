@@ -32,6 +32,18 @@ runs:
       with:
         targets: ${{ inputs.platform == 'ios' && 'aarch64-apple-ios-sim' || 'aarch64-linux-android' }}
 
+    - name: Comparison test the turbo-module generation
+      shell: bash
+      run: |
+        ./scripts/test-turbo-modules.sh \
+          --slug '@my-org/my-lib' \
+          --ubrn-config integration/fixtures/compat/ubrn.config.yaml \
+          --builder-bob-version ${{ inputs.bobVersion }} \
+          --rn-version ${{ inputs.rnVersion }} \
+          --package-json-mixin integration/fixtures/compat/package.json \
+          --react-native-config integration/fixtures/compat/react-native.config.js \
+          ../turbo-module-comparison-testing
+
     - name: Generate & build turbo module
       shell: bash
       run: |
@@ -40,7 +52,7 @@ runs:
           --ubrn-config integration/fixtures/compat/ubrn.config.yaml \
           --builder-bob-version ${{ inputs.bobVersion }} \
           --rn-version ${{ inputs.rnVersion }} \
-          --packgage-json-mixin integration/fixtures/compat/package.json \
+          --package-json-mixin integration/fixtures/compat/package.json \
           --react-native-config integration/fixtures/compat/react-native.config.js \
           --${{ inputs.platform }} \
-          ../turbo-module
+          ../turbo-module-for-building
