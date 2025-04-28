@@ -1,5 +1,11 @@
 [general]
-dirs = ["src/codegen/templates"]
+dirs = [
+    "templates/fixtures",
+    "templates/jsi/crossplatform",
+    "templates/jsi/android",
+    "templates/jsi/ios",
+    "templates/wasm",
+]
 default_syntax = "none"
 
 [[syntax]]

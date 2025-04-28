@@ -9,7 +9,7 @@ name = "uniffi-bindgen-react-native"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+default = ["wasm"]
 wasm = []
 
 [dependencies]
@@ -22,7 +22,7 @@ paste = { workspace = true }
 pathdiff = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
-ubrn_bindgen = { path = "../ubrn_bindgen" }
+ubrn_bindgen = { path = "../ubrn_bindgen", features = ["wasm"] }
 ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }
 uniffi_meta = { workspace = true }

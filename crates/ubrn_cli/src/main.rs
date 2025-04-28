@@ -16,8 +16,11 @@ mod codegen;
 mod config;
 mod generate;
 mod ios;
+mod jsi;
 mod repo;
 mod rust;
+#[cfg(feature = "wasm")]
+mod wasm;
 mod workspace;
 
 fn main() -> Result<()> {
@@ -56,6 +59,7 @@ impl TryFrom<Utf8PathBuf> for ProjectConfig {
 pub(crate) enum Platform {
     Android,
     Ios,
+    #[allow(dead_code)]
     #[cfg(feature = "wasm")]
     Wasm,
 }
