@@ -139,6 +139,18 @@ pub(crate) impl ComponentInterface {
         "uniffi_jsi".to_string()
     }
 
+    fn has_callbacks(&self) -> bool {
+        !self.callback_interface_definitions().is_empty()
+            || self
+                .object_definitions()
+                .iter()
+                .any(|o| o.has_callback_interface())
+    }
+
+    fn has_async_calls(&self) -> bool {
+        self.iter_callables().any(|c| c.is_async())
+    }
+
     /// We want to control the ordering of definitions in typescript, especially
     /// the FfiConverters which rely on Immediately Invoked Function Expressions (IIFE),
     /// or straight up expressions.
@@ -402,6 +414,10 @@ pub(crate) impl FfiCallbackFunction {
 
     fn is_user_callback(&self) -> bool {
         self.name().starts_with("CallbackInterface")
+    }
+
+    fn is_function_literal(&self) -> bool {
+        self.name().starts_with("ForeignFutureComplete")
     }
 
     fn has_return_out_param(&self) -> bool {
