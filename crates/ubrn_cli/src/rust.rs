@@ -7,10 +7,13 @@
 use serde::Deserialize;
 
 use anyhow::{Error, Result};
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use ubrn_common::CrateMetadata;
 
-use crate::{repo::GitRepoArgs, workspace};
+use crate::{
+    source::{OnDiskArgs, RustSource},
+    workspace,
+};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,39 +54,6 @@ impl CrateConfig {
 
     pub(crate) fn metadata(&self) -> Result<CrateMetadata> {
         self.manifest_path()?.try_into()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum RustSource {
-    OnDisk(OnDiskArgs),
-    GitRepo(GitRepoArgs),
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub(crate) struct OnDiskArgs {
-    #[serde(alias = "rust", alias = "directory")]
-    pub(crate) src: String,
-}
-
-impl RustSource {
-    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
-        Ok(match self {
-            Self::OnDisk(OnDiskArgs { src }) => project_root.join(src),
-            Self::GitRepo(c) => c.directory(project_root)?,
-        })
-    }
-}
-
-impl TryFrom<RustSource> for GitRepoArgs {
-    type Error = Error;
-
-    fn try_from(value: RustSource) -> Result<Self> {
-        match value {
-            RustSource::GitRepo(args) => Ok(args),
-            _ => anyhow::bail!("Nothing to do"),
-        }
     }
 }
 

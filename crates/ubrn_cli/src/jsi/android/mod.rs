@@ -3,11 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-pub(crate) mod android;
-mod codegen;
-pub(crate) mod crossplatform;
-mod generate;
-pub(crate) mod ios;
+pub(crate) mod codegen;
+pub(crate) mod commands;
+pub(crate) mod config;
 
-pub(crate) use codegen::get_files;
-pub(crate) use generate::{CmdArg, TurboModuleArgs};
+pub(crate) use commands::AndroidArgs;
+pub(crate) use config::AndroidConfig;

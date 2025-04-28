@@ -9,16 +9,15 @@ use clap::Parser;
 use config::ProjectConfig;
 use ubrn_bindgen::AbiFlavor;
 
-mod android;
 mod building;
 mod cli;
 mod codegen;
 mod config;
 mod generate;
-mod ios;
 mod jsi;
 mod repo;
 mod rust;
+mod source;
 #[cfg(feature = "wasm")]
 mod wasm;
 mod workspace;

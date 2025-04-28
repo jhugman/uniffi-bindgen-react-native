@@ -139,12 +139,12 @@ pub(crate) mod files {
         let mut files = vec![];
         match platform {
             Platform::Android => {
-                files.extend(jsi::crossplatform::get_files(config.clone()));
-                files.extend(jsi::android::get_files(config.clone()));
+                files.extend(crate::jsi::crossplatform::get_files(config.clone()));
+                files.extend(crate::jsi::android::codegen::get_files(config.clone()));
             }
             Platform::Ios => {
-                files.extend(jsi::crossplatform::get_files(config.clone()));
-                files.extend(jsi::ios::get_files(config.clone()));
+                files.extend(crate::jsi::crossplatform::get_files(config.clone()));
+                files.extend(crate::jsi::ios::codegen::get_files(config.clone()));
             }
             #[cfg(feature = "wasm")]
             Platform::Wasm => {
@@ -157,6 +157,7 @@ pub(crate) mod files {
     pub(crate) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
         let mut files = vec![];
         files.extend(jsi::get_files(config.clone()));
+        #[cfg(feature = "wasm")]
         files.extend(wasm::get_files(config.clone()));
         files
     }
@@ -165,9 +166,10 @@ pub(crate) mod files {
 #[cfg(test)]
 mod tests {
     use crate::{
-        android::AndroidConfig,
-        config::{self, BindingsConfig, TurboModulesConfig},
-        ios::IOsConfig,
+        config::{self, BindingsConfig, ExtraArgs},
+        jsi::android::config::AndroidConfig,
+        jsi::crossplatform::TurboModulesConfig,
+        jsi::ios::config::IOsConfig,
         rust::CrateConfig,
     };
 
@@ -175,8 +177,6 @@ mod tests {
 
     impl ProjectConfig {
         pub(crate) fn empty(name: &str, crate_: CrateConfig) -> Self {
-            use crate::building::ExtraArgs;
-
             let android = AndroidConfig {
                 directory: "android".to_string(),
                 jni_libs: "src/main/jniLibs".to_string(),
