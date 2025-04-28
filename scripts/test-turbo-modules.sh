@@ -13,6 +13,7 @@ reset_args() {
   FORCE_NEW_DIR=false
   SKIP_IOS=true
   SKIP_ANDROID=true
+  SKIP_YARN_PACK=true
   UBRN_CONFIG=
   PACKAGE_JSON_MIXIN=
   REACT_NATIVE_CONFIG=
@@ -36,6 +37,7 @@ usage() {
   echo "  -r, --rn-version VERSION           Specify the version of React Native to use (default: latest)."
   echo "  -k, --keep-directory-on-exit       Keep the PROJECT_DIR directory even if an error does not occur."
   echo "  -f, --force-new-directory          If PROJECT_DIR directory exist, remove it first."
+  echo "  -p, --pack                         Package the library with yarn."
   echo "  -h, --help                         Display this help message."
   echo ""
   echo "Arguments:"
@@ -130,6 +132,9 @@ parse_cli_options() {
         ;;
       -I|--ios)
         SKIP_IOS=false
+        ;;
+      -p|--pack)
+        SKIP_YARN_PACK=false
         ;;
       --debug)
         set -x
@@ -390,11 +395,18 @@ build_ios_example() {
   exit_dir
 }
 
+yarn_pack() {
+  enter_dir "$PROJECT_DIR"
+  echo "-- Running yarn pack"
+  yarn pack || error "Cannot package library"
+  exit_dir
+}
+
 main() {
   parse_cli_options "$@"
   echo "ℹ️  Starting $PROJECT_SLUG"
   create_library
-  if [ "$SKIP_ANDROID" == false ] || [ "$SKIP_IOS" == false ]; then
+  if [ "$SKIP_ANDROID" == false ] || [ "$SKIP_IOS" == false || [ "$SKIP_YARN_PACK" == false ]; then
     generate_turbo_module_for_compiling
     install_dependencies
     install_example_dependencies
@@ -407,6 +419,9 @@ main() {
   fi
   if [ "$SKIP_IOS" == false ]; then
     build_ios_example
+  fi
+  if [ "$SKIP_YARN_PACK" == false ]; then
+    yarn_pack
   fi
   if [ "$KEEP_ROOT_ON_EXIT" == false ] && [ -d "$PROJECT_DIR" ]; then
     cleanup
