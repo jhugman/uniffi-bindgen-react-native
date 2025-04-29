@@ -4,11 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use std::{cell::RefCell, ptr::NonNull};
-pub use wasm_bindgen::prelude::wasm_bindgen as export;
-use wasm_bindgen::prelude::*;
+pub use wasm_bindgen::prelude::*;
 
 pub mod uniffi {
-    pub use uniffi::{RustBuffer, RustCallStatus, RustCallStatusCode, UniffiForeignPointerCell};
+    pub use uniffi_core::{
+        RustBuffer, RustCallStatus, RustCallStatusCode, UniffiForeignPointerCell,
+    };
     pub type VoidPointer = *const std::ffi::c_void;
 }
 
@@ -157,17 +158,17 @@ impl RustCallStatus {
 
 // Needed for UniffiForeignFutureStruct* structs which are sent from JS when
 // a foreign callback promise resolves or rejects.
-impl IntoRust<RustCallStatus> for ::uniffi::RustCallStatus {
+impl IntoRust<RustCallStatus> for uniffi::RustCallStatus {
     fn into_rust(js: RustCallStatus) -> Self {
         let code = uniffi::RustCallStatusCode::try_from(js.code)
             .expect("Unexpected error code. This is likely a bug in UBRN");
         let bytes = js.error_buf.unwrap_or_default();
         let error_buf = std::mem::ManuallyDrop::new(uniffi::RustBuffer::from_vec(bytes));
-        ::uniffi::RustCallStatus { error_buf, code }
+        uniffi::RustCallStatus { error_buf, code }
     }
 }
 
-impl IntoJs<RustCallStatus> for ::uniffi::RustCallStatus {
+impl IntoJs<RustCallStatus> for uniffi::RustCallStatus {
     fn into_js(self) -> RustCallStatus {
         let mut status = RustCallStatus::new();
         status.copy_from(self);
