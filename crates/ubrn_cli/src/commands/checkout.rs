@@ -9,9 +9,19 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use serde::Deserialize;
+
 use ubrn_common::run_cmd;
 
 use crate::{config::ProjectConfig, AsConfig};
+
+#[derive(Debug, Args)]
+pub(crate) struct CheckoutArgs {
+    #[clap(long, conflicts_with_all = ["repo"])]
+    config: Option<Utf8PathBuf>,
+
+    #[clap(flatten)]
+    repo: Option<GitRepoArgs>,
+}
 
 #[derive(Args, Clone, Debug, Deserialize)]
 pub(crate) struct GitRepoArgs {
@@ -27,36 +37,7 @@ impl GitRepoArgs {
     fn default_branch() -> String {
         "main".into()
     }
-}
 
-#[derive(Debug, Args)]
-pub(crate) struct CheckoutArgs {
-    #[clap(long, conflicts_with_all = ["repo"])]
-    config: Option<Utf8PathBuf>,
-
-    #[clap(flatten)]
-    repo: Option<GitRepoArgs>,
-}
-
-impl TryFrom<ProjectConfig> for GitRepoArgs {
-    type Error = anyhow::Error;
-
-    fn try_from(value: ProjectConfig) -> Result<Self> {
-        value.crate_.src.try_into()
-    }
-}
-
-impl AsConfig<GitRepoArgs> for CheckoutArgs {
-    fn config_file(&self) -> Option<Utf8PathBuf> {
-        self.config.clone()
-    }
-
-    fn get(&self) -> Option<GitRepoArgs> {
-        self.repo.clone()
-    }
-}
-
-impl GitRepoArgs {
     pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
         // Use Utf8Path for URL operations is a little bit hacky,
         // but as we only need URL for this operation, we can avoid
@@ -129,5 +110,23 @@ impl GitRepoArgs {
             .arg("checkout")
             .arg(sha);
         run_cmd(&mut cmd)
+    }
+}
+
+impl TryFrom<ProjectConfig> for GitRepoArgs {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ProjectConfig) -> Result<Self> {
+        value.crate_.src.try_into()
+    }
+}
+
+impl AsConfig<GitRepoArgs> for CheckoutArgs {
+    fn config_file(&self) -> Option<Utf8PathBuf> {
+        self.config.clone()
+    }
+
+    fn get(&self) -> Option<GitRepoArgs> {
+        self.repo.clone()
     }
 }

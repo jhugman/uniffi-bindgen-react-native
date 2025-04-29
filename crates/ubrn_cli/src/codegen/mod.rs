@@ -3,10 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use std::{cell::OnceCell, collections::BTreeMap, rc::Rc};
+
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use rinja::DynTemplate;
-use std::{cell::OnceCell, collections::BTreeMap, rc::Rc};
 
 use ubrn_bindgen::ModuleMetadata;
 use ubrn_common::{mk_dir, CrateMetadata};
@@ -157,6 +158,7 @@ pub(crate) mod files {
     pub(crate) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
         let mut files = vec![];
         files.extend(jsi::get_files(config.clone()));
+        #[cfg(feature = "wasm")]
         files.extend(wasm::get_files(config.clone()));
         files
     }
@@ -165,18 +167,17 @@ pub(crate) mod files {
 #[cfg(test)]
 mod tests {
     use crate::{
-        android::AndroidConfig,
-        config::{self, BindingsConfig, TurboModulesConfig},
-        ios::IOsConfig,
-        rust::CrateConfig,
+        config::rust_crate::CrateConfig,
+        config::{self, BindingsConfig, ExtraArgs},
+        jsi::android::config::AndroidConfig,
+        jsi::crossplatform::TurboModulesConfig,
+        jsi::ios::config::IOsConfig,
     };
 
     use super::*;
 
     impl ProjectConfig {
         pub(crate) fn empty(name: &str, crate_: CrateConfig) -> Self {
-            use crate::building::ExtraArgs;
-
             let android = AndroidConfig {
                 directory: "android".to_string(),
                 jni_libs: "src/main/jniLibs".to_string(),

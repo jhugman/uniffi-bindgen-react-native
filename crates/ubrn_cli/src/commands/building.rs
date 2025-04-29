@@ -7,12 +7,12 @@
 use anyhow::{anyhow, Result};
 use camino::Utf8PathBuf;
 use clap::{Args, Subcommand};
-use serde::Deserialize;
+
 use ubrn_common::CrateMetadata;
 
 use crate::{
-    android::AndroidArgs, config::ProjectConfig, generate::GenerateAllCommand, ios::IOsArgs,
-    Platform,
+    commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidArgs,
+    jsi::ios::IOsArgs, Platform,
 };
 
 #[derive(Args, Debug)]
@@ -115,42 +115,6 @@ pub(crate) struct CommonBuildArgs {
 impl CommonBuildArgs {
     pub(crate) fn profile(&self) -> &str {
         CrateMetadata::profile(self.profile.as_deref(), self.release)
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum ExtraArgs {
-    AsList(Vec<String>),
-    AsString(String),
-}
-
-impl IntoIterator for ExtraArgs {
-    type Item = String;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            ExtraArgs::AsList(v) => v.into_iter(),
-            ExtraArgs::AsString(s) => s
-                .split_whitespace()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-                .into_iter(),
-        }
-    }
-}
-
-impl Default for ExtraArgs {
-    fn default() -> Self {
-        Self::AsList(Default::default())
-    }
-}
-
-impl From<&[&str]> for ExtraArgs {
-    fn from(value: &[&str]) -> Self {
-        let vec = value.iter().map(|&s| s.to_string()).collect();
-        ExtraArgs::AsList(vec)
     }
 }
 

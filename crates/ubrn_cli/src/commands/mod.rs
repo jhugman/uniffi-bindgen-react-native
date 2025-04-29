@@ -3,11 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-pub(crate) mod android;
-mod codegen;
-pub(crate) mod crossplatform;
-mod generate;
-pub(crate) mod ios;
 
-pub(crate) use codegen::get_files;
-pub(crate) use generate::{CmdArg, TurboModuleArgs};
+pub(crate) mod building;
+pub(crate) mod checkout;
+pub(crate) mod generate;
+
+pub(crate) use building::BuildArgs;
+pub(crate) use checkout::CheckoutArgs;
+pub(crate) use generate::GenerateArgs;

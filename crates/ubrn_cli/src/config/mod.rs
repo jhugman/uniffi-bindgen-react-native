@@ -4,15 +4,20 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod npm;
+pub(crate) mod rust_crate;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use globset::GlobSet;
 use heck::ToUpperCamelCase;
-pub(crate) use npm::PackageJson;
-
 use serde::Deserialize;
 
-use crate::{android::AndroidConfig, ios::IOsConfig, rust::CrateConfig, workspace};
+pub(crate) use npm::PackageJson;
+
+use crate::{
+    config::rust_crate::CrateConfig,
+    jsi::{android::AndroidConfig, crossplatform::TurboModulesConfig, ios::IOsConfig},
+    workspace,
+};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -191,62 +196,37 @@ impl BindingsConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TurboModulesConfig {
-    #[serde(default = "TurboModulesConfig::default_cpp_dir")]
-    pub(crate) cpp: String,
-    #[serde(default = "TurboModulesConfig::default_ts_dir")]
-    pub(crate) ts: String,
-    #[serde(default = "TurboModulesConfig::default_spec_name", alias = "spec")]
-    pub(crate) spec_name: String,
-
-    #[serde(default = "TurboModulesConfig::default_name")]
-    pub(crate) name: String,
+#[serde(untagged)]
+pub(crate) enum ExtraArgs {
+    AsList(Vec<String>),
+    AsString(String),
 }
 
-impl TurboModulesConfig {
-    fn default_name() -> String {
-        let package_json = workspace::package_json();
-        package_json.codegen().name.clone()
-    }
+impl IntoIterator for ExtraArgs {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
-    fn default_cpp_dir() -> String {
-        "cpp".to_string()
-    }
-
-    fn default_ts_dir() -> String {
-        let package_json = workspace::package_json();
-        package_json.codegen().js_srcs_dir.clone()
-    }
-
-    fn default_spec_name() -> String {
-        let package_json = workspace::package_json();
-        let codegen_name = &package_json.codegen().name;
-        trim(codegen_name)
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            ExtraArgs::AsList(v) => v.into_iter(),
+            ExtraArgs::AsString(s) => s
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .into_iter(),
+        }
     }
 }
 
-impl Default for TurboModulesConfig {
+impl Default for ExtraArgs {
     fn default() -> Self {
-        ubrn_common::default()
+        Self::AsList(Default::default())
     }
 }
 
-impl TurboModulesConfig {
-    pub(crate) fn cpp_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-        project_root.join(&self.cpp)
-    }
-
-    pub(crate) fn ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-        project_root.join(&self.ts)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn spec_name(&self) -> String {
-        self.spec_name.clone()
-    }
-
-    pub(crate) fn name(&self) -> String {
-        self.name.clone()
+impl From<&[&str]> for ExtraArgs {
+    fn from(value: &[&str]) -> Self {
+        let vec = value.iter().map(|&s| s.to_string()).collect();
+        ExtraArgs::AsList(vec)
     }
 }

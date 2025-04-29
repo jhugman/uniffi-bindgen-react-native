@@ -6,19 +6,16 @@
 use anyhow::{Error, Result};
 use camino::Utf8PathBuf;
 use clap::Parser;
-use config::ProjectConfig;
+
 use ubrn_bindgen::AbiFlavor;
 
-mod android;
-mod building;
+use config::ProjectConfig;
+
 mod cli;
 mod codegen;
+mod commands;
 mod config;
-mod generate;
-mod ios;
 mod jsi;
-mod repo;
-mod rust;
 #[cfg(feature = "wasm")]
 mod wasm;
 mod workspace;
