@@ -5,13 +5,13 @@
  */
 use std::rc::Rc;
 
-use crate::codegen::RenderedFile;
-use crate::codegen::TemplateConfig;
+use crate::codegen::{RenderedFile, TemplateConfig};
+use crate::jsi::{android, crossplatform, ios};
 
 pub(crate) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>> {
     let mut files = Vec::new();
-    files.extend(crate::jsi::crossplatform::get_files(config.clone()));
-    files.extend(crate::jsi::ios::codegen::get_files(config.clone()));
-    files.extend(crate::jsi::android::codegen::get_files(config.clone()));
+    files.extend(crossplatform::get_files(config.clone()));
+    files.extend(ios::get_files(config.clone()));
+    files.extend(android::get_files(config.clone()));
     files
 }

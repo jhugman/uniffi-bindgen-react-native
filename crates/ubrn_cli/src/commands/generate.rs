@@ -4,10 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+use std::convert::TryFrom;
+
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{self, Args, Subcommand};
-use std::convert::TryFrom;
+
 use ubrn_bindgen::{AbiFlavor, BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
 
 use crate::{
@@ -30,6 +32,9 @@ impl GenerateArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum GenerateCmd {
+    /// Commands which re-direct to the jsi version.
+    ///
+    /// These are now deprecated and so hidden.
     #[clap(hide = true)]
     Bindings(BindingsArgs),
     #[clap(hide = true)]

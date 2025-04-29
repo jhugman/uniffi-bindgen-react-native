@@ -406,7 +406,7 @@ main() {
   parse_cli_options "$@"
   echo "ℹ️  Starting $PROJECT_SLUG"
   create_library
-  if [ "$SKIP_ANDROID" == false ] || [ "$SKIP_IOS" == false || [ "$SKIP_YARN_PACK" == false ]; then
+  if [ "$SKIP_ANDROID" == false ] || [ "$SKIP_IOS" == false ] || [ "$SKIP_YARN_PACK" == false ]; then
     generate_turbo_module_for_compiling
     install_dependencies
     install_example_dependencies

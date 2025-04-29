@@ -139,12 +139,12 @@ pub(crate) mod files {
         let mut files = vec![];
         match platform {
             Platform::Android => {
-                files.extend(crate::jsi::crossplatform::get_files(config.clone()));
-                files.extend(crate::jsi::android::codegen::get_files(config.clone()));
+                files.extend(jsi::crossplatform::get_files(config.clone()));
+                files.extend(jsi::android::get_files(config.clone()));
             }
             Platform::Ios => {
-                files.extend(crate::jsi::crossplatform::get_files(config.clone()));
-                files.extend(crate::jsi::ios::codegen::get_files(config.clone()));
+                files.extend(jsi::crossplatform::get_files(config.clone()));
+                files.extend(jsi::ios::get_files(config.clone()));
             }
             #[cfg(feature = "wasm")]
             Platform::Wasm => {
@@ -166,11 +166,11 @@ pub(crate) mod files {
 #[cfg(test)]
 mod tests {
     use crate::{
+        config::rust_crate::CrateConfig,
         config::{self, BindingsConfig, ExtraArgs},
         jsi::android::config::AndroidConfig,
         jsi::crossplatform::TurboModulesConfig,
         jsi::ios::config::IOsConfig,
-        rust::CrateConfig,
     };
 
     use super::*;

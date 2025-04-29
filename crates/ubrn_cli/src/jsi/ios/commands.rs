@@ -16,10 +16,9 @@ use uniffi_bindgen::{
 };
 
 use crate::{
-    building::CommonBuildArgs,
-    config::{ExtraArgs, ProjectConfig},
+    commands::building::CommonBuildArgs,
+    config::{rust_crate::CrateConfig, ExtraArgs, ProjectConfig},
     jsi::ios::config::{Platform, Target},
-    rust::CrateConfig,
 };
 
 #[derive(Args, Debug)]

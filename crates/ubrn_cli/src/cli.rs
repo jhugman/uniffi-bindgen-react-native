@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use crate::{
-    building::BuildArgs, generate::GenerateArgs, repo::CheckoutArgs, source::GitRepoArgs,
+    commands::{checkout::GitRepoArgs, BuildArgs, CheckoutArgs, GenerateArgs},
     workspace, AsConfig,
 };
 use anyhow::Result;

@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod npm;
+pub(crate) mod rust_crate;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use globset::GlobSet;
@@ -15,8 +16,8 @@ use serde::Deserialize;
 pub(crate) use npm::PackageJson;
 
 use crate::{
+    config::rust_crate::CrateConfig,
     jsi::{android::AndroidConfig, crossplatform::TurboModulesConfig, ios::IOsConfig},
-    rust::CrateConfig,
     workspace,
 };
 

@@ -4,16 +4,48 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use serde::Deserialize;
+use std::convert::TryFrom;
 
 use anyhow::{Error, Result};
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
+use serde::Deserialize;
+
 use ubrn_common::CrateMetadata;
 
-use crate::{
-    source::{OnDiskArgs, RustSource},
-    workspace,
-};
+use crate::{commands::checkout::GitRepoArgs, workspace};
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum RustSource {
+    OnDisk(OnDiskArgs),
+    GitRepo(GitRepoArgs),
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct OnDiskArgs {
+    #[serde(alias = "rust", alias = "directory")]
+    pub(crate) src: String,
+}
+
+impl RustSource {
+    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
+        Ok(match self {
+            Self::OnDisk(OnDiskArgs { src }) => project_root.join(src),
+            Self::GitRepo(c) => c.directory(project_root)?,
+        })
+    }
+}
+
+impl TryFrom<RustSource> for GitRepoArgs {
+    type Error = Error;
+
+    fn try_from(value: RustSource) -> Result<Self> {
+        match value {
+            RustSource::GitRepo(args) => Ok(args),
+            _ => anyhow::bail!("Not a Git repository source"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

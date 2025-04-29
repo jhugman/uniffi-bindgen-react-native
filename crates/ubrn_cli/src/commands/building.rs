@@ -7,10 +7,11 @@
 use anyhow::{anyhow, Result};
 use camino::Utf8PathBuf;
 use clap::{Args, Subcommand};
+
 use ubrn_common::CrateMetadata;
 
 use crate::{
-    config::ProjectConfig, generate::GenerateAllCommand, jsi::android::AndroidArgs,
+    commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidArgs,
     jsi::ios::IOsArgs, Platform,
 };
 

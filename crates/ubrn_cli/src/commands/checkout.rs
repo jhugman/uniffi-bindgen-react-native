@@ -3,26 +3,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-
 use std::process::Command;
 
-use anyhow::{Error, Result};
+use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use serde::Deserialize;
+
 use ubrn_common::run_cmd;
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum RustSource {
-    OnDisk(OnDiskArgs),
-    GitRepo(GitRepoArgs),
-}
+use crate::{config::ProjectConfig, AsConfig};
 
-#[derive(Clone, Debug, Deserialize)]
-pub(crate) struct OnDiskArgs {
-    #[serde(alias = "rust", alias = "directory")]
-    pub(crate) src: String,
+#[derive(Debug, Args)]
+pub(crate) struct CheckoutArgs {
+    #[clap(long, conflicts_with_all = ["repo"])]
+    config: Option<Utf8PathBuf>,
+
+    #[clap(flatten)]
+    repo: Option<GitRepoArgs>,
 }
 
 #[derive(Args, Clone, Debug, Deserialize)]
@@ -115,22 +113,20 @@ impl GitRepoArgs {
     }
 }
 
-impl RustSource {
-    pub(crate) fn directory(&self, project_root: &Utf8Path) -> Result<Utf8PathBuf> {
-        Ok(match self {
-            Self::OnDisk(OnDiskArgs { src }) => project_root.join(src),
-            Self::GitRepo(c) => c.directory(project_root)?,
-        })
+impl TryFrom<ProjectConfig> for GitRepoArgs {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ProjectConfig) -> Result<Self> {
+        value.crate_.src.try_into()
     }
 }
 
-impl TryFrom<RustSource> for GitRepoArgs {
-    type Error = Error;
+impl AsConfig<GitRepoArgs> for CheckoutArgs {
+    fn config_file(&self) -> Option<Utf8PathBuf> {
+        self.config.clone()
+    }
 
-    fn try_from(value: RustSource) -> Result<Self> {
-        match value {
-            RustSource::GitRepo(args) => Ok(args),
-            _ => anyhow::bail!("Not a Git repository source"),
-        }
+    fn get(&self) -> Option<GitRepoArgs> {
+        self.repo.clone()
     }
 }

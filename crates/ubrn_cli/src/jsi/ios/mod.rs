@@ -7,5 +7,6 @@ pub(crate) mod codegen;
 pub(crate) mod commands;
 pub(crate) mod config;
 
+pub(crate) use codegen::get_files;
 pub(crate) use commands::IOsArgs;
 pub(crate) use config::IOsConfig;
