@@ -9,8 +9,6 @@ pub(crate) mod rust_crate;
 use camino::{Utf8Path, Utf8PathBuf};
 use globset::GlobSet;
 use heck::ToUpperCamelCase;
-pub(crate) use npm::PackageJson;
-
 use serde::Deserialize;
 
 pub(crate) use npm::PackageJson;

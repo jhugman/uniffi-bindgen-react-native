@@ -3,12 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+
 use crate::{
     commands::{checkout::GitRepoArgs, BuildArgs, CheckoutArgs, GenerateArgs},
     workspace, AsConfig,
 };
-use anyhow::Result;
-use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 pub(crate) struct CliArgs {

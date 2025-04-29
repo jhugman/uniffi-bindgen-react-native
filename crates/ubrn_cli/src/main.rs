@@ -6,7 +6,7 @@
 use anyhow::{Error, Result};
 use camino::Utf8PathBuf;
 use clap::Parser;
-use config::ProjectConfig;
+
 use ubrn_bindgen::AbiFlavor;
 
 use config::ProjectConfig;

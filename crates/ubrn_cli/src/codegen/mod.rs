@@ -3,10 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use std::{cell::OnceCell, collections::BTreeMap, rc::Rc};
+
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use rinja::DynTemplate;
-use std::{cell::OnceCell, collections::BTreeMap, rc::Rc};
 
 use ubrn_bindgen::ModuleMetadata;
 use ubrn_common::{mk_dir, CrateMetadata};
