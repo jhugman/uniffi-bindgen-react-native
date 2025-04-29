@@ -48,10 +48,12 @@ type NumberType = number | bigint;
 class FfiConverterNumber<
   T extends NumberType,
 > extends FfiConverterPrimitive<T> {
+  // These fields should be private, but Typescript doesn't allow
+  // that because of the way they are exposed.
   constructor(
-    private reader: (view: DataView) => T,
-    private writer: (view: DataView, value: T) => void,
-    private byteSize: number,
+    public reader: (view: DataView) => T,
+    public writer: (view: DataView, value: T) => void,
+    public byteSize: number,
   ) {
     super();
   }
