@@ -8,5 +8,5 @@ pub(crate) mod commands;
 pub(crate) mod config;
 
 pub(crate) use codegen::get_files;
-pub(crate) use commands::AndroidArgs;
+pub(crate) use commands::AndroidBuildArgs;
 pub(crate) use config::AndroidConfig;

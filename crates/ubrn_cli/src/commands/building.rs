@@ -11,8 +11,8 @@ use clap::{Args, Subcommand};
 use ubrn_common::CrateMetadata;
 
 use crate::{
-    commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidArgs,
-    jsi::ios::IOsArgs, Platform,
+    commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidBuildArgs,
+    jsi::ios::IosBuildArgs, Platform,
 };
 
 #[derive(Args, Debug)]
@@ -24,9 +24,9 @@ pub(crate) struct BuildArgs {
 #[derive(Subcommand, Debug)]
 pub(crate) enum BuildCmd {
     /// Build the crate for use on an Android device or emulator
-    Android(AndroidArgs),
+    Android(AndroidBuildArgs),
     /// Build the crate for use on an iOS device or simulator
-    Ios(IOsArgs),
+    Ios(IosBuildArgs),
 }
 
 impl BuildArgs {

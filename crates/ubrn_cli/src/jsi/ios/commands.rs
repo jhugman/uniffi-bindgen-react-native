@@ -22,7 +22,7 @@ use crate::{
 };
 
 #[derive(Args, Debug)]
-pub(crate) struct IOsArgs {
+pub(crate) struct IosBuildArgs {
     /// The configuration file for this build
     #[clap(long)]
     config: Utf8PathBuf,
@@ -58,7 +58,7 @@ pub(crate) struct IOsArgs {
     pub(crate) common_args: CommonBuildArgs,
 }
 
-impl IOsArgs {
+impl IosBuildArgs {
     pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
         let config = self.project_config()?;
         let crate_ = &config.crate_;
