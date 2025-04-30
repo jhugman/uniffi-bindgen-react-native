@@ -357,7 +357,12 @@ impl<'a> ComponentTemplate<'a> {
         let result_ident = ident("uniffi_result_");
         let return_type = if_then_map(cb.has_return_out_param(), || {
             let rt = cb.return_type();
-            let rs_ret_ident = ident("rs_return_");
+            let rs_ret_name = if rt.is_some() {
+                "rs_return_"
+            } else {
+                "_rs_return"
+            };
+            let rs_ret_ident = ident(rs_ret_name);
 
             let rs_return_type = self.ffi_type_rust_out_param(rt.as_ref());
             let declaration = quote! {
@@ -448,8 +453,14 @@ impl<'a> ComponentTemplate<'a> {
         };
 
         let cb_ident = cb.module_ident();
+        let non_snake_case = if_or_default(
+            cb.callback().is_free_callback(),
+            quote! {
+                #[allow(non_snake_case)]
+            },
+        );
         let tokens = quote! {
-            #[allow(non_snake_case)]
+            #non_snake_case
             mod #cb_ident {
                 #inner
             }

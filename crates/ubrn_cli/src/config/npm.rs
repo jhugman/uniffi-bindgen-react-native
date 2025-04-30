@@ -15,6 +15,8 @@ use super::{trim, trim_react_native};
 #[allow(dead_code)]
 pub(crate) struct PackageJson {
     name: String,
+    #[serde(default)]
+    version: Option<String>,
     repository: PackageJsonRepo,
     react_native: Option<String>,
     main: Option<String>,
@@ -28,6 +30,10 @@ impl PackageJson {
 
     pub(crate) fn name(&self) -> String {
         trim(&self.name)
+    }
+
+    pub(crate) fn version(&self) -> Option<String> {
+        self.version.clone()
     }
 
     pub(crate) fn android_package_name(&self) -> String {

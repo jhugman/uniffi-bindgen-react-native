@@ -213,6 +213,7 @@ mod tests {
 
             Self {
                 name: name.to_string(),
+                project_version: "0.1.0".to_string(),
                 repository,
                 crate_,
                 android,

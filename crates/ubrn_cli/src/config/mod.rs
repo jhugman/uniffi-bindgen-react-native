@@ -25,6 +25,9 @@ pub(crate) struct ProjectConfig {
     #[serde(default = "ProjectConfig::default_name")]
     pub(crate) name: String,
 
+    #[serde(default = "ProjectConfig::default_version", alias = "version")]
+    pub(crate) project_version: String,
+
     #[serde(default = "ProjectConfig::default_repository")]
     pub(crate) repository: String,
 
@@ -62,6 +65,12 @@ impl ProjectConfig {
         let package_json = workspace::package_json();
         let url = &package_json.repo().url;
         url.trim_start_matches("git+").to_string()
+    }
+    fn default_version() -> String {
+        let package_json = workspace::package_json();
+        package_json
+            .version()
+            .unwrap_or_else(|| "0.1.0".to_string())
     }
 }
 
@@ -114,6 +123,10 @@ impl ProjectConfig {
 
     pub(crate) fn ubrn_version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()
+    }
+
+    pub(crate) fn project_version(&self) -> String {
+        self.project_version.clone()
     }
 }
 

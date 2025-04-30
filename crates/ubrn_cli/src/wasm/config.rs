@@ -24,6 +24,13 @@ pub(crate) struct WasmConfig {
     #[serde(default = "WasmConfig::default_wasm_crate_name")]
     pub(crate) wasm_crate_name: String,
 
+    #[serde(default)]
+    pub(crate) features: Option<Vec<String>>,
+
+    /// Has this crate been added to a workspace. Default is false.
+    #[serde(default = "WasmConfig::default_is_workspace")]
+    pub(crate) workspace: bool,
+
     #[allow(unused)]
     #[serde(default = "WasmConfig::default_targets")]
     pub(crate) targets: Vec<Target>,
@@ -52,6 +59,9 @@ impl WasmConfig {
     fn default_cargo_extras() -> ExtraArgs {
         let args: &[&str] = &[];
         args.into()
+    }
+    fn default_is_workspace() -> bool {
+        false
     }
 }
 
