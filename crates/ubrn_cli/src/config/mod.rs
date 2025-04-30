@@ -37,6 +37,10 @@ pub(crate) struct ProjectConfig {
     #[serde(default)]
     pub(crate) ios: IOsConfig,
 
+    #[cfg(feature = "wasm")]
+    #[serde(default)]
+    pub(crate) wasm: crate::wasm::WasmConfig,
+
     #[serde(default)]
     pub(crate) bindings: BindingsConfig,
 

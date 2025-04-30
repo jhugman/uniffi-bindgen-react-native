@@ -208,12 +208,17 @@ mod tests {
             };
             let repository = format!("https://github.com/user/{name}");
 
+            #[cfg(feature = "wasm")]
+            let wasm = crate::wasm::WasmConfig::default();
+
             Self {
                 name: name.to_string(),
                 repository,
                 crate_,
                 android,
                 ios,
+                #[cfg(feature = "wasm")]
+                wasm,
                 bindings,
                 tm,
                 exclude_files: Default::default(),
