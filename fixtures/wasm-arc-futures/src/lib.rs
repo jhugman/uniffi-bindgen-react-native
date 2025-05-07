@@ -117,9 +117,17 @@ async fn make_object_with_callback(callback: Arc<dyn SimpleCallback>) -> Arc<Sim
 
 // An async callback interface; the async foreign trait will be
 // a Send and Sync, so this shouldn't be testing anything new.
+#[cfg(target_arch = "wasm32")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait(?Send)]
+pub trait AsyncCallback {
+    async fn on_update(&self, previous: String, current: String);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
-pub trait AsyncCallback: Sync + Send {
+pub trait AsyncCallback: Send + Sync {
     async fn on_update(&self, previous: String, current: String);
 }
 
@@ -144,25 +152,36 @@ async fn make_object_with_async_callback(callback: Arc<dyn AsyncCallback>) -> Ar
 }
 
 // Rust only trait
-// #[uniffi::export]
-// #[async_trait::async_trait]
-// pub trait RustCallback: Sync + Send {
-//     async fn on_update(&self, previous: String, current: String);
-// }
+#[cfg(not(target_arch = "wasm32"))]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait RustCallback: Sync + Send {
+    async fn on_update(&self, previous: String, current: String) -> String;
+}
 
-// struct NoopRustCallback;
-// #[async_trait::async_trait]
-// impl RustCallback for NoopRustCallback {
-//   async fn on_update(&self, _previous: String, _current: String) {
-//     use std::time::Duration;
-//     use ubrn_testing::timer::{TimerFuture, TimerService};
-//     TimerFuture::sleep(Duration::from_millis(200)).await;
-//   }
-// }
+#[cfg(target_arch = "wasm32")]
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait(?Send)]
+pub trait RustCallback {
+    async fn on_update(&self, previous: String, current: String) -> String;
+}
 
-// #[uniffi::export]
-// async fn rust_callback() -> Arc<dyn RustCallback> {
-//   Arc::new(NoopRustCallback)
-// }
+struct NoopRustCallback;
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+impl RustCallback for NoopRustCallback {
+    async fn on_update(&self, previous: String, current: String) -> String {
+        use std::time::Duration;
+        use ubrn_testing::timer::{TimerFuture, TimerService};
+        TimerFuture::sleep(Duration::from_millis(200)).await;
+        format!("{previous} -> {current}")
+    }
+}
+
+#[uniffi::export]
+async fn rust_callback() -> Arc<dyn RustCallback> {
+    Arc::new(NoopRustCallback)
+}
 
 uniffi::setup_scaffolding!();

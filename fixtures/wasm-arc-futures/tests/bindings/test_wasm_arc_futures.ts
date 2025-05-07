@@ -10,6 +10,7 @@ import myModule, {
   makeObject,
   makeObjectWithAsyncCallback,
   makeObjectWithCallback,
+  rustCallback,
   simpleCallback,
   SimpleCallback,
   SimpleObject,
@@ -138,6 +139,17 @@ function checkRemainingFutures(t: Asserts) {
       t.assertTrue(SimpleObject.instanceOf(obj));
       return true;
     }, throwObject);
+    checkRemainingFutures(t);
+    t.end();
+  });
+
+  await asyncTest("Async callbacks", async (t) => {
+    const cb = await rustCallback();
+    const r1 = await cb.onUpdate("old", "new");
+    t.assertEqual(r1, "old -> new");
+
+    const r2 = await cb.onUpdate("OLD", "NEW");
+    t.assertEqual(r2, "OLD -> NEW");
     checkRemainingFutures(t);
     t.end();
   });
