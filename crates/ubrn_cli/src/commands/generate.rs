@@ -10,7 +10,7 @@ use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::{self, Args, Subcommand};
 
-use ubrn_bindgen::{AbiFlavor, BindingsArgs, OutputArgs, SourceArgs, SwitchArgs};
+use ubrn_bindgen::{AbiFlavor, BindingsArgs, ModuleMetadata, SwitchArgs};
 
 use crate::{
     codegen::{files, get_template_config, render_files},
@@ -46,7 +46,7 @@ pub(crate) enum GenerateCmd {
     #[clap(aliases = ["react-native", "rn"])]
     Jsi(jsi::CmdArg),
 
-    /// Commands to generate the JSI bindings and turbo-module code.
+    /// Commands to generate a WASM crate.
     #[cfg(feature = "wasm")]
     #[clap(aliases = ["web"])]
     Wasm(wasm::CmdArg),
@@ -132,44 +132,55 @@ impl GenerateAllCommand {
     }
 
     pub(crate) fn run(&self) -> Result<()> {
-        let project = self.project_config()?;
-        let root = project.project_root();
         let pwd = ubrn_common::pwd()?;
         let lib_file = pwd.join(&self.lib_file);
-        let switches = self.switches();
-        let modules = {
-            ubrn_common::cd(&project.crate_.crate_dir()?)?;
-            let ts_dir = project.bindings.ts_path(root);
-            let cpp_dir = project.bindings.cpp_path(root);
-            let config = project.bindings.uniffi_toml_path(root);
-            if let Some(ref file) = config {
-                if !file.exists() {
-                    anyhow::bail!("uniffi.toml file {:?} does not exist. Either delete the uniffiToml property or supply a file", file)
-                }
-            }
-            let manifest_path = project.crate_.manifest_path()?;
-            let bindings = BindingsArgs::new(
-                switches.clone(),
-                SourceArgs::library(&lib_file).with_config(config),
-                OutputArgs::new(&ts_dir, &cpp_dir, false),
-            );
 
-            bindings.run(Some(&manifest_path))?
-        };
-        ubrn_common::cd(&pwd)?;
-        let rust_crate = project.crate_.metadata()?;
-        let config = get_template_config(project, rust_crate, modules);
-        let files = if let Some(platform) = &self.platform {
-            files::get_files_for(config.clone(), platform)
-        } else {
-            files::get_files(config.clone())
-        };
-        render_files(config, files.into_iter())?;
+        // Step 1: Generate bindings
+        let modules = self.generate_bindings(&lib_file)?;
+
+        // Step 2: Generate template files
+        self.generate_template_files(modules)?;
+
         Ok(())
     }
 
-    fn project_config(&self) -> Result<ProjectConfig> {
-        Ok(self.project_config.clone())
+    fn generate_bindings(&self, lib_file: &Utf8PathBuf) -> Result<Vec<ModuleMetadata>> {
+        let project = &self.project_config;
+        let switches = self.switches();
+        let pwd = ubrn_common::pwd()?;
+        let bindings = self.create_bindings_command(lib_file, project, switches)?;
+
+        ubrn_common::cd(&project.crate_.crate_dir()?)?;
+        let manifest_path = project.crate_.manifest_path()?;
+        let modules = bindings.run(Some(&manifest_path))?;
+        ubrn_common::cd(&pwd)?;
+
+        Ok(modules)
+    }
+
+    fn create_bindings_command(
+        &self,
+        lib_file: &Utf8PathBuf,
+        project: &ProjectConfig,
+        switches: SwitchArgs,
+    ) -> Result<BindingsArgs, anyhow::Error> {
+        Ok(match self.platform {
+            Some(Platform::Wasm) => wasm::bindings(project, switches, lib_file)?,
+            _ => jsi::bindings(project, switches, lib_file)?,
+        })
+    }
+
+    fn generate_template_files(&self, modules: Vec<ModuleMetadata>) -> Result<()> {
+        let project = &self.project_config;
+        let rust_crate = project.crate_.metadata()?;
+        let config = get_template_config(project.clone(), rust_crate, modules);
+
+        let files = match &self.platform {
+            Some(platform) => files::get_files_for(config.clone(), platform),
+            None => files::get_files(config.clone()),
+        };
+
+        render_files(config, files.into_iter())
     }
 }
 

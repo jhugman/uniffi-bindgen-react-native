@@ -12,7 +12,7 @@ use ubrn_common::CrateMetadata;
 
 use crate::{
     commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidBuildArgs,
-    jsi::ios::IosBuildArgs, Platform,
+    jsi::ios::IosBuildArgs, wasm::WebBuildArgs, Platform,
 };
 
 #[derive(Args, Debug)]
@@ -27,6 +27,8 @@ pub(crate) enum BuildCmd {
     Android(AndroidBuildArgs),
     /// Build the crate for use on an iOS device or simulator
     Ios(IosBuildArgs),
+    /// Build the crate for use in a web page
+    Web(WebBuildArgs),
 }
 
 impl BuildArgs {
@@ -49,7 +51,9 @@ impl BuildArgs {
             self.cmd.project_config()?,
             Platform::from(&self.cmd),
         )
-        .run()
+        .run()?;
+
+        self.cmd.then_build()
     }
 }
 
@@ -58,6 +62,7 @@ impl BuildCmd {
         let mut files = match self {
             Self::Android(a) => a.build()?,
             Self::Ios(a) => a.build()?,
+            Self::Web(a) => a.build()?,
         };
 
         files.sort(); // Sort so that we reproducibly pick the same file below
@@ -72,6 +77,7 @@ impl BuildCmd {
         match self {
             Self::Android(a) => a.project_config(),
             Self::Ios(a) => a.project_config(),
+            Self::Web(a) => a.project_config(),
         }
     }
 
@@ -79,11 +85,19 @@ impl BuildCmd {
         match self {
             Self::Android(a) => &a.common_args,
             Self::Ios(a) => &a.common_args,
+            Self::Web(a) => &a.common_args,
         }
     }
 
     pub(crate) fn and_generate(&self) -> bool {
         self.common_args().and_generate
+    }
+
+    pub(crate) fn then_build(&self) -> Result<()> {
+        if let Self::Web(a) = self {
+            a.then_build()?
+        }
+        Ok(())
     }
 }
 
@@ -123,6 +137,7 @@ impl From<&BuildCmd> for Platform {
         match value {
             BuildCmd::Android(..) => Self::Android,
             BuildCmd::Ios(..) => Self::Ios,
+            BuildCmd::Web(..) => Self::Wasm,
         }
     }
 }

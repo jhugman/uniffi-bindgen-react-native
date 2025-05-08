@@ -35,9 +35,11 @@ pub(crate) struct WasmConfig {
     #[serde(default = "WasmConfig::default_targets")]
     pub(crate) targets: Vec<Target>,
 
-    #[allow(unused)]
     #[serde(default = "WasmConfig::default_cargo_extras")]
     pub(crate) cargo_extras: ExtraArgs,
+
+    #[serde(default = "WasmConfig::default_wasm_bindgen_extras")]
+    pub(crate) wasm_bindgen_extras: ExtraArgs,
 }
 
 impl Default for WasmConfig {
@@ -57,6 +59,10 @@ impl WasmConfig {
         vec![Target::Wasm32UnknownUnknown]
     }
     fn default_cargo_extras() -> ExtraArgs {
+        let args: &[&str] = &[];
+        args.into()
+    }
+    fn default_wasm_bindgen_extras() -> ExtraArgs {
         let args: &[&str] = &[];
         args.into()
     }

@@ -16,6 +16,7 @@ pub(crate) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>>
     vec![
         WasmCargoToml::rc_new(config.clone()),
         WasmLibRs::rc_new(config.clone()),
+        IndexWebTs::rc_new(config.clone()),
     ]
 }
 
@@ -49,5 +50,13 @@ impl WasmLibRs {
             flavor: AbiFlavor::Wasm,
         };
         generate_entrypoint(&switches, &self.config.rust_crate, &self.config.modules).unwrap()
+    }
+}
+
+templated_file!(IndexWebTs, "index.web.ts");
+impl RenderedFile for IndexWebTs {
+    fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        let filename = "index.web.ts";
+        self.config.project.tm.ts_path(project_root).join(filename)
     }
 }

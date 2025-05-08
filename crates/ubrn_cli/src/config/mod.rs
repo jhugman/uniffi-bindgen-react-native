@@ -41,7 +41,7 @@ pub(crate) struct ProjectConfig {
     pub(crate) ios: IOsConfig,
 
     #[cfg(feature = "wasm")]
-    #[serde(default)]
+    #[serde(default, alias = "web")]
     pub(crate) wasm: crate::wasm::WasmConfig,
 
     #[serde(default)]
