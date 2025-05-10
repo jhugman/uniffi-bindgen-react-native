@@ -1,10 +1,10 @@
-use std::{fs, process::Command};
-
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use std::process::Command;
+
 use anyhow::{Context, Ok, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use ubrn_common::{run_cmd_quietly, CrateMetadata};
@@ -106,7 +106,7 @@ impl Wasm {
                     .as_str(),
             );
 
-        fs::write(&cargo_toml, cargo_toml_src)?;
+        ubrn_common::write_file(&cargo_toml, cargo_toml_src)?;
         Ok(cargo_toml)
     }
 

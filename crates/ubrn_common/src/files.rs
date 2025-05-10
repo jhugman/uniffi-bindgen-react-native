@@ -3,11 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::fs::{self, rename};
+use std::fs;
 
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Deserialize;
+
+use crate::testing::is_recording_enabled;
 
 /// Finds a file in the given directory.
 ///
@@ -72,7 +74,30 @@ pub fn rm_dir<P: AsRef<Utf8Path>>(dir: P) -> Result<()> {
     Ok(())
 }
 
+pub fn rm_file<P: AsRef<Utf8Path>>(file: P) -> Result<()> {
+    if file.as_ref().exists() {
+        fs::remove_file(file.as_ref())?;
+    }
+    Ok(())
+}
+
+pub fn cp_file<P: AsRef<Utf8Path>, D: AsRef<Utf8Path>>(src: P, dst: D) -> Result<()> {
+    if is_recording_enabled() {
+        return Ok(());
+    }
+    let src = src.as_ref();
+    let dst = dst.as_ref();
+    if !src.exists() {
+        bail!("File {src} does not exist");
+    }
+    fs::copy(src, dst).with_context(|| format!("Failed to copy {src} to {dst}"))?;
+    Ok(())
+}
+
 pub fn mk_dir<P: AsRef<Utf8Path>>(dir: P) -> Result<()> {
+    if is_recording_enabled() {
+        return Ok(());
+    }
     let dir = pwd()?.join(dir);
     if dir.exists() {
         if dir.is_dir() {
@@ -87,6 +112,9 @@ pub fn mk_dir<P: AsRef<Utf8Path>>(dir: P) -> Result<()> {
 }
 
 pub fn mv_files(extension: &str, source: &Utf8Path, destination: &Utf8Path) -> Result<()> {
+    if is_recording_enabled() {
+        return Ok(());
+    }
     for entry in source.read_dir_utf8()? {
         let entry = entry?;
         let path = entry.path();
@@ -94,7 +122,7 @@ pub fn mv_files(extension: &str, source: &Utf8Path, destination: &Utf8Path) -> R
             continue;
         }
         let file_name = path.file_name().expect("Could not get file name from path");
-        rename(path, destination.join(file_name))?
+        fs::rename(path, destination.join(file_name))?
     }
     Ok(())
 }
@@ -119,10 +147,37 @@ where
     })
 }
 
+pub fn read_to_string<P>(file: P) -> Result<String>
+where
+    P: AsRef<Utf8Path>,
+{
+    let file = file.as_ref();
+    if !file.exists() {
+        if is_recording_enabled() {
+            return Ok(format!("Dummy contents of {file}\n"));
+        }
+        anyhow::bail!("File {file} does not exist");
+    }
+    fs::read_to_string(file).with_context(|| format!("Failed to read from {file:?}"))
+}
+
 fn is_yaml<P>(file: P) -> bool
 where
     P: AsRef<Utf8Path>,
 {
     let ext = file.as_ref().extension().unwrap_or_default();
     ext == "yaml" || ext == "yml"
+}
+
+pub fn write_file<P: AsRef<Utf8Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
+    let path = path.as_ref();
+
+    // If we're in recording mode, don't actually write the file
+    if is_recording_enabled() {
+        crate::testing::record_file(path, &contents);
+        return Ok(());
+    }
+
+    fs::write(path, contents).with_context(|| format!("Failed to write to {path}"))?;
+    Ok(())
 }

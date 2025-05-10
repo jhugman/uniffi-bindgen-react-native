@@ -84,7 +84,7 @@ pub(crate) fn render_files(
         }
         let parent = path.parent().expect("Parent for path");
         mk_dir(parent)?;
-        std::fs::write(path, contents)?;
+        ubrn_common::write_file(path, contents)?;
     }
 
     Ok(())

@@ -76,7 +76,7 @@ impl EntryArg {
             let root = diff_utf8_paths(root, dir).expect("A path between the file and the repo");
             let contents = fs::read_to_string(template_file)?;
             let contents = contents.replace("{{repository_root}}", root.as_str());
-            fs::write(&tsconfig, contents)?;
+            ubrn_common::write_file(&tsconfig, contents)?;
         }
 
         let outdir = ts_out_dir()?.join(bundle_name);

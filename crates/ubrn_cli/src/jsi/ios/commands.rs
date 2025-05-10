@@ -265,7 +265,7 @@ impl IosBuildArgs {
             contents.push_str("\n\n");
             std::fs::remove_file(path)?;
         }
-        std::fs::write(out_file, contents)?;
+        ubrn_common::write_file(out_file, contents)?;
         Ok(())
     }
 
