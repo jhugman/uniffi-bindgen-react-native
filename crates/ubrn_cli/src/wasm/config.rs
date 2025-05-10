@@ -53,7 +53,7 @@ impl WasmConfig {
         workspace::package_json().name()
     }
     fn default_manifest_path() -> String {
-        "wasm/generated/Cargo.toml".to_string()
+        "rust_modules/wasm/Cargo.toml".to_string()
     }
     fn default_targets() -> Vec<Target> {
         vec![Target::Wasm32UnknownUnknown]
