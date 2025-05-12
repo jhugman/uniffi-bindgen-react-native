@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{fs, process::Command};
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -74,7 +74,7 @@ impl EntryArg {
         if use_template_tsconfig {
             let template_file = typescript_dir()?.join("tsconfig.template.json");
             let root = diff_utf8_paths(root, dir).expect("A path between the file and the repo");
-            let contents = fs::read_to_string(template_file)?;
+            let contents = ubrn_common::read_to_string(template_file)?;
             let contents = contents.replace("{{repository_root}}", root.as_str());
             ubrn_common::write_file(&tsconfig, contents)?;
         }
@@ -82,7 +82,7 @@ impl EntryArg {
         let outdir = ts_out_dir()?.join(bundle_name);
         let result = self.compile_ts(&outdir, dir, &tsconfig);
         if use_template_tsconfig {
-            fs::remove_file(tsconfig)?;
+            ubrn_common::rm_file(tsconfig)?;
         }
         result?;
         let entry = find(&outdir, &format!("{stem}.js")).expect("just made this js file");
@@ -91,7 +91,7 @@ impl EntryArg {
 
     pub(crate) fn bundle(&self, file: &Utf8Path, bundle_name: &str) -> Result<Utf8PathBuf> {
         let dir = bundles_dir()?;
-        fs::create_dir_all(&dir)?;
+        ubrn_common::mk_dir(&dir)?;
 
         let bundle_path = dir.join(format!("{bundle_name}.bundle.js"));
 

@@ -5,14 +5,13 @@
  */
 use std::{
     collections::{BTreeSet, HashMap},
-    fs,
     process::Command,
 };
 
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use ubrn_common::{mk_dir, rm_dir, run_cmd, CrateMetadata};
+use ubrn_common::{cp_file, mk_dir, rm_dir, run_cmd, CrateMetadata};
 use uniffi_bindgen::{
     bindings::KotlinBindingGenerator, cargo_metadata::CrateConfigSupplier,
     library_mode::generate_bindings,
@@ -180,7 +179,7 @@ impl AndroidBuildArgs {
 
             let dst_lib = dst_dir.join(metadata.library_file(Some(target.triple())));
             println!("cp {library} {dst_lib}");
-            fs::copy(library, &dst_lib)?;
+            cp_file(library, &dst_lib)?;
         }
         Ok(())
     }
