@@ -7,3 +7,4 @@ mod command_tests;
 mod file_shim_str_tests;
 mod file_shim_tests;
 mod file_tests;
+mod fixture_tests;
