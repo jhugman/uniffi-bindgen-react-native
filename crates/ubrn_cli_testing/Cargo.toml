@@ -11,3 +11,6 @@ description = "Testing utilities for UBRN CLI tools"
 anyhow = "1.0"
 camino = { workspace = true }
 ubrn_common = { path = "../ubrn_common" }
+
+[dev-dependencies]
+tempfile = "3.8"

@@ -4,4 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod command_tests;
+mod file_shim_str_tests;
+mod file_shim_tests;
 mod file_tests;

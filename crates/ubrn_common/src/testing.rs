@@ -3,9 +3,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{cell::RefCell, path::PathBuf, process::Command};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, process::Command};
 
 use camino::Utf8Path;
+
+/// Represents a file shim that can be either a file path or string content
+#[derive(Debug, Clone)]
+pub enum ShimSource {
+    /// A file path to read from
+    FilePath(String),
+    /// Direct string content
+    StringContent(String),
+}
 
 thread_local! {
     // Track whether we're recording commands instead of running them
@@ -16,6 +25,9 @@ thread_local! {
 
     // Store the recorded file writes
     static RECORDED_FILES: RefCell<Vec<RecordedFile>> = const { RefCell::new(Vec::new()) };
+
+    // Store file shims - mapping from file suffixes to replacement sources
+    static FILE_SHIMS: RefCell<HashMap<String, ShimSource>> = RefCell::new(HashMap::new());
 }
 
 /// A record of a command that would have been executed
@@ -133,4 +145,46 @@ pub fn clear_recorded_files() {
     RECORDED_FILES.with(|files| {
         files.borrow_mut().clear();
     });
+}
+
+/// Register a file shim - redirect file operations with a specific suffix to a different path
+pub fn shim_file<P1: AsRef<Utf8Path>, P2: AsRef<Utf8Path>>(file_suffix: P1, replacement_path: P2) {
+    FILE_SHIMS.with(|shims| {
+        shims.borrow_mut().insert(
+            file_suffix.as_ref().to_string(),
+            ShimSource::FilePath(replacement_path.as_ref().to_string()),
+        );
+    });
+}
+
+/// Register a string content shim - provide direct string content for file operations with a specific suffix
+pub fn shim_file_str<P: AsRef<Utf8Path>, S: Into<String>>(file_suffix: P, content: S) {
+    FILE_SHIMS.with(|shims| {
+        shims.borrow_mut().insert(
+            file_suffix.as_ref().to_string(),
+            ShimSource::StringContent(content.into()),
+        );
+    });
+}
+
+/// Clear all file shims
+pub fn clear_file_shims() {
+    FILE_SHIMS.with(|shims| {
+        shims.borrow_mut().clear();
+    });
+}
+
+/// Get the replacement source for a file if a shim exists
+pub(crate) fn get_shimmed_path(file_path: &Utf8Path) -> Option<ShimSource> {
+    let file_path_str = file_path.to_string();
+
+    // Find a matching file suffix in the shims
+    FILE_SHIMS.with(|shims| {
+        for (suffix, source) in shims.borrow().iter() {
+            if file_path_str.ends_with(suffix) {
+                return Some(source.clone());
+            }
+        }
+        None
+    })
 }

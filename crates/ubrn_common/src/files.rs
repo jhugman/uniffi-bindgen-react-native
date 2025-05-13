@@ -148,12 +148,30 @@ where
     P: AsRef<Utf8Path>,
 {
     let file = file.as_ref();
-    if !file.exists() {
-        if is_recording_enabled() {
-            return Ok(format!("Dummy contents of {file}\n"));
+
+    // If we're recording and a file shim exists, use it instead of the actual file
+    if is_recording_enabled() {
+        if let Some(shim_source) = crate::testing::get_shimmed_path(file) {
+            match shim_source {
+                crate::testing::ShimSource::FilePath(path) => {
+                    let replacement_path = Utf8Path::new(&path);
+                    if replacement_path.exists() {
+                        return fs::read_to_string(replacement_path).with_context(|| {
+                            format!("Failed to read from shimmed file {replacement_path:?}")
+                        });
+                    }
+                }
+                crate::testing::ShimSource::StringContent(content) => {
+                    // Return string content directly
+                    return Ok(content);
+                }
+            }
         }
+    }
+    if !file.exists() {
         anyhow::bail!("File {file} does not exist");
     }
+
     fs::read_to_string(file).with_context(|| format!("Failed to read from {file:?}"))
 }
 

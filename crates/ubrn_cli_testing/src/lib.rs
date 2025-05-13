@@ -18,3 +18,4 @@ pub use command_assertions::{assert_commands, commands_match};
 pub use file::File;
 pub use file_assertions::{assert_files, files_match};
 pub use recording::{start_recording, stop_recording};
+pub use ubrn_common::{shim_file, shim_file_str};
