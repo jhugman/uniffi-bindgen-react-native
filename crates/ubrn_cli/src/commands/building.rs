@@ -28,6 +28,8 @@ pub(crate) enum BuildCmd {
     /// Build the crate for use on an iOS device or simulator
     Ios(IosBuildArgs),
     /// Build the crate for use in a web page
+    #[cfg(feature = "wasm")]
+    #[clap(aliases = ["wasm"])]
     Web(WebBuildArgs),
 }
 
@@ -81,21 +83,19 @@ impl BuildCmd {
         }
     }
 
-    fn common_args(&self) -> &CommonBuildArgs {
-        match self {
-            Self::Android(a) => &a.common_args,
-            Self::Ios(a) => &a.common_args,
-            Self::Web(a) => &a.common_args,
-        }
-    }
-
     pub(crate) fn and_generate(&self) -> bool {
-        self.common_args().and_generate
+        match self {
+            Self::Android(a) => a.common_args.and_generate,
+            Self::Ios(a) => a.common_args.and_generate,
+            Self::Web(a) => !a.no_generate,
+        }
     }
 
     pub(crate) fn then_build(&self) -> Result<()> {
         if let Self::Web(a) = self {
-            a.then_build()?
+            if !a.no_wasm_pack {
+                a.then_build()?
+            }
         }
         Ok(())
     }

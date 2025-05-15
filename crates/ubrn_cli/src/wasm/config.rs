@@ -35,6 +35,9 @@ pub(crate) struct WasmConfig {
     #[serde(default = "WasmConfig::default_targets")]
     pub(crate) targets: Vec<Target>,
 
+    #[serde(default)]
+    pub(crate) target: WasmTarget,
+
     #[serde(default = "WasmConfig::default_cargo_extras")]
     pub(crate) cargo_extras: ExtraArgs,
 
@@ -86,7 +89,6 @@ impl WasmConfig {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug, Deserialize, Default, Clone, Hash, PartialEq, Eq)]
 pub enum Target {
     #[default]
@@ -113,11 +115,47 @@ impl Display for Target {
     }
 }
 
-#[allow(unused)]
 impl Target {
     pub fn triple(&self) -> &'static str {
         match self {
             Self::Wasm32UnknownUnknown => "wasm32-unknown-unknown",
         }
+    }
+}
+
+#[derive(Debug, Deserialize, Default, Clone, Hash, PartialEq, Eq)]
+pub enum WasmTarget {
+    Bundler,
+    Nodejs,
+    #[default]
+    Web,
+    NoModules,
+    Deno,
+}
+
+impl FromStr for WasmTarget {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "bundler" => Self::Bundler,
+            "nodejs" => Self::Nodejs,
+            "web" => Self::Web,
+            "no-modules" => Self::NoModules,
+            "deno" => Self::Deno,
+            _ => return Err(anyhow::anyhow!("Unsupported target: '{s}'")),
+        })
+    }
+}
+
+impl Display for WasmTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Bundler => "bundler",
+            Self::Nodejs => "nodejs",
+            Self::Web => "web",
+            Self::NoModules => "no-modules",
+            Self::Deno => "deno",
+        })
     }
 }

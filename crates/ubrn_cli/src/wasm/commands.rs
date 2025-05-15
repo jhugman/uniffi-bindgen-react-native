@@ -10,7 +10,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use ubrn_common::{run_cmd, CrateMetadata};
 
-use super::config::Target;
+use super::config::{Target, WasmTarget};
 use crate::{
     commands::building::CommonBuildArgs,
     config::{ExtraArgs, ProjectConfig},
@@ -21,6 +21,22 @@ pub(crate) struct WebBuildArgs {
     /// The configuration file for this build
     #[clap(long)]
     config: Utf8PathBuf,
+
+    /// Opts out of generating the bindings and wasm-crate.
+    #[clap(long, conflicts_with_all = ["and_generate"])]
+    pub(crate) no_generate: bool,
+
+    /// Opts out of generating running wasm-pack on the generated wasm-crate.
+    #[clap(long, conflicts_with_all = ["no_generate"])]
+    pub(crate) no_wasm_pack: bool,
+
+    /// Target passed to wasm-pack/wasm-bindgen.
+    ///
+    /// Overrides the setting in the config file.
+    ///
+    /// If that is missing, then defualt to "web".
+    #[clap(long, conflicts_with_all = ["no_generate", "no_wasm_pack"])]
+    target: Option<WasmTarget>,
 
     #[clap(flatten)]
     pub(crate) common_args: CommonBuildArgs,
@@ -42,6 +58,7 @@ impl WebBuildArgs {
 
     pub(crate) fn then_build(&self) -> Result<()> {
         let config = self.project_config()?;
+        let target = config.wasm.targets.first().cloned().unwrap_or_default();
         let project_root = config.project_root();
         let wasm_crate = {
             let manifest_path = config.wasm.manifest_path(project_root);
@@ -49,17 +66,20 @@ impl WebBuildArgs {
             self.cargo_build_wasm(
                 &manifest_path,
                 &config.wasm.cargo_extras,
-                &Target::Wasm32UnknownUnknown,
+                &target,
                 &crate_dir,
             )?;
             CrateMetadata::try_from(manifest_path.to_path_buf())?
         };
-        let library_path = wasm_crate.library_path(
-            Some(Target::Wasm32UnknownUnknown.triple()),
-            self.common_args.profile(),
-        );
+        let library_path =
+            wasm_crate.library_path(Some(target.triple()), self.common_args.profile());
+        let target = self
+            .target
+            .clone()
+            .unwrap_or_else(|| config.wasm.target.clone());
         self.wasm_bindgen(
             &library_path,
+            &target,
             &config.wasm.wasm_bindgen_extras,
             &config.bindings.ts_path(project_root).join("wasm-bindgen"),
         )?;
@@ -116,12 +136,13 @@ impl WebBuildArgs {
     fn wasm_bindgen(
         &self,
         library_path: &Utf8Path,
+        target: &WasmTarget,
         wasm_bindgen_extras: &ExtraArgs,
         out_dir: &Utf8Path,
     ) -> Result<()> {
         let mut cmd = Command::new("wasm-bindgen");
         cmd.arg("--target")
-            .arg("bundler")
+            .arg(target.to_string())
             .arg("--omit-default-module-path")
             .arg("--out-name")
             .arg("index")
