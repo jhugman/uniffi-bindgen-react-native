@@ -125,6 +125,7 @@ impl ProjectConfig {
         env!("CARGO_PKG_VERSION").to_string()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn project_version(&self) -> String {
         self.project_version.clone()
     }

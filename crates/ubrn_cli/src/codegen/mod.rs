@@ -131,7 +131,9 @@ pub(crate) mod files {
     use std::rc::Rc;
 
     use super::{RenderedFile, TemplateConfig};
-    use crate::{jsi, wasm, Platform};
+    #[cfg(feature = "wasm")]
+    use crate::wasm;
+    use crate::{jsi, Platform};
 
     pub(crate) fn get_files_for(
         config: Rc<TemplateConfig>,

@@ -110,6 +110,7 @@ impl CrateConfig {
         Ok(dir.into())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn crate_dir_relative(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         let manifest = self
             .src

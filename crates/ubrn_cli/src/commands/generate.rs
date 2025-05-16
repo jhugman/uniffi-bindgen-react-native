@@ -12,10 +12,12 @@ use clap::{self, Args, Subcommand};
 
 use ubrn_bindgen::{AbiFlavor, BindingsArgs, ModuleMetadata, SwitchArgs};
 
+#[cfg(feature = "wasm")]
+use crate::wasm;
 use crate::{
     codegen::{files, get_template_config, render_files},
     config::ProjectConfig,
-    jsi, wasm, Platform,
+    jsi, Platform,
 };
 
 #[derive(Args, Debug)]
@@ -72,6 +74,7 @@ impl GenerateCmd {
                 jsi.run()?;
                 Ok(())
             }
+            #[cfg(feature = "wasm")]
             Self::Wasm(wasm) => {
                 wasm.run()?;
                 Ok(())
@@ -165,6 +168,7 @@ impl GenerateAllCommand {
         switches: SwitchArgs,
     ) -> Result<BindingsArgs, anyhow::Error> {
         Ok(match self.platform {
+            #[cfg(feature = "wasm")]
             Some(Platform::Wasm) => wasm::bindings(project, switches, lib_file)?,
             _ => jsi::bindings(project, switches, lib_file)?,
         })
