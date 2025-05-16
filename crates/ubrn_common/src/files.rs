@@ -151,6 +151,7 @@ where
 
     // If we're recording and a file shim exists, use it instead of the actual file
     if is_recording_enabled() {
+        eprintln!("Recording mode is enabled, using shimmed file");
         if let Some(shim_source) = crate::testing::get_shimmed_path(file) {
             match shim_source {
                 crate::testing::ShimSource::FilePath(path) => {
@@ -159,6 +160,8 @@ where
                         return fs::read_to_string(replacement_path).with_context(|| {
                             format!("Failed to read from shimmed file {replacement_path:?}")
                         });
+                    } else {
+                        anyhow::bail!("Shimmed file {replacement_path} does not exist");
                     }
                 }
                 crate::testing::ShimSource::StringContent(content) => {

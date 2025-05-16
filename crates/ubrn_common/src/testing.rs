@@ -181,6 +181,7 @@ pub(crate) fn get_shimmed_path(file_path: &Utf8Path) -> Option<ShimSource> {
     // Find a matching file suffix in the shims
     FILE_SHIMS.with(|shims| {
         for (suffix, source) in shims.borrow().iter() {
+            println!("Checking shim for suffix: {suffix} for {file_path_str}");
             if file_path_str.ends_with(suffix) {
                 return Some(source.clone());
             }
