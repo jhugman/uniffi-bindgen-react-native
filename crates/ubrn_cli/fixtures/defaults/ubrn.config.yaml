@@ -1,4 +1,3 @@
 rust:
-  repo: https://github.com/ianthetechie/uniffi-starter
-  branch: main
-  manifestPath: rust/foobar/Cargo.toml
+  directory: rust/shim
+  manifestPath: Cargo.toml

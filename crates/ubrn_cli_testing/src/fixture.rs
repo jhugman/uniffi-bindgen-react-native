@@ -32,13 +32,13 @@ use crate::recording::{start_recording, stop_recording};
 /// # Example
 ///
 /// ```no_run
-/// use ubrn_cli_testing::{with_fixture, Command, assert_commands, run_cli, shim_file};
+/// use ubrn_cli_testing::{with_fixture, Command, assert_commands, run_cli, shim_path};
 /// use camino::Utf8PathBuf;
 ///
 /// fn test_build_command() -> anyhow::Result<()> {
 ///     with_fixture(Utf8PathBuf::from("path/to/project"), "fixtures/my-fixture", |fixture_dir| {
 ///         // Set up file shims
-///         shim_file("package.json", fixture_dir.join("basic/package.json"));
+///         shim_path("package.json", fixture_dir.join("basic/package.json"));
 ///
 ///         // Run the command under test
 ///         run_cli("build ios --and-generate --config ubrn.config.yaml")?;
@@ -79,81 +79,4 @@ where
     env::set_current_dir(current_dir)?;
 
     result
-}
-
-/// Find the root directory of the project.
-///
-/// This function looks for a Cargo.toml file in the current directory and its parent directories.
-/// It returns the directory containing the first Cargo.toml file found.
-///
-/// # Returns
-///
-/// Returns a `Result` with the root directory path.
-///
-/// # Errors
-///
-/// Returns an error if no Cargo.toml file is found.
-pub fn find_project_root() -> Result<Utf8PathBuf> {
-    let current_dir = env::current_dir()?;
-    let mut dir = current_dir.as_path();
-
-    loop {
-        let cargo_toml = dir.join("Cargo.toml");
-        if cargo_toml.exists() {
-            return Ok(Utf8PathBuf::try_from(dir.to_path_buf())?);
-        }
-
-        if let Some(parent) = dir.parent() {
-            dir = parent;
-        } else {
-            return Err(anyhow::anyhow!(
-                "Could not find Cargo.toml in any parent directory"
-            ));
-        }
-    }
-}
-
-/// Run a test with a specific fixture, automatically finding the project root.
-///
-/// This function is similar to `with_fixture`, but it automatically finds the project root
-/// by looking for a Cargo.toml file in the current directory or its parents.
-///
-/// # Arguments
-///
-/// * `fixture_name` - The name/path of the fixture under test
-/// * `test_fn` - The test function to run
-///
-/// # Returns
-///
-/// Returns the result of the test function
-///
-/// # Example
-///
-/// ```no_run
-/// use ubrn_cli_testing::{with_project_fixture, Command, assert_commands, run_cli, shim_file};
-///
-/// fn test_build_command() -> anyhow::Result<()> {
-///     with_project_fixture("fixtures/my-fixture", |fixture_dir| {
-///         // Set up file shims
-///         shim_file("package.json", fixture_dir.join("basic/package.json"));
-///
-///         // Run the command under test
-///         run_cli("build ios --and-generate --config ubrn.config.yaml")?;
-///
-///         // Assert the expected commands were executed
-///         assert_commands(&[
-///             Command::new("xcodebuild")
-///                 .arg_pair_suffix("-xcframework", ".xcframework")
-///         ]);
-///
-///         Ok(())
-///     })
-/// }
-/// ```
-pub fn with_project_fixture<F, T>(fixture_name: &str, test_fn: F) -> Result<T>
-where
-    F: FnOnce(Utf8PathBuf) -> Result<T>,
-{
-    let root_dir = find_project_root()?;
-    with_fixture(root_dir, fixture_name, test_fn)
 }

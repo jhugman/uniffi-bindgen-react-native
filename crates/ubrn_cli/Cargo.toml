@@ -22,18 +22,18 @@ anyhow = { workspace = true }
 rinja = { workspace = true }
 camino = { workspace = true }
 clap = { workspace = true }
+extend = { workspace = true }
+globset = { version = "0.4.14", features = ["serde1"] }
 heck = { workspace = true }
 paste = { workspace = true }
 pathdiff = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
+topological-sort = "0.2.2"
 ubrn_bindgen = { path = "../ubrn_bindgen", features = ["wasm"] }
 ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }
 uniffi_meta = { workspace = true }
-extend = "1.2.0"
-topological-sort = "0.2.2"
-globset = { version = "0.4.14", features = ["serde1"] }
 
 [dev-dependencies]
 ubrn_cli_testing = { path = "../ubrn_cli_testing" }

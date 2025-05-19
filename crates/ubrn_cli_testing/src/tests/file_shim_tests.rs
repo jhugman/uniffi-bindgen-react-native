@@ -8,7 +8,7 @@ use std::fs;
 use camino::Utf8PathBuf;
 use ubrn_common::read_to_string;
 
-use crate::{shim_file, start_recording, stop_recording};
+use crate::{shim_path, start_recording, stop_recording};
 
 #[test]
 fn test_file_shim() -> anyhow::Result<()> {
@@ -25,7 +25,7 @@ fn test_file_shim() -> anyhow::Result<()> {
 
     // Start recording and set up shim
     start_recording();
-    shim_file("source.txt", &target_path);
+    shim_path("source.txt", &target_path);
 
     // Read source file - should give us target content
     let content = read_to_string(&source_path)?;
@@ -57,7 +57,7 @@ fn test_file_shim_with_suffix() -> anyhow::Result<()> {
 
     // Start recording and set up shim
     start_recording();
-    shim_file("package.json", &target_path);
+    shim_path("package.json", &target_path);
 
     // Read source file - should give us target content
     let content = read_to_string(&source_path)?;
@@ -76,7 +76,7 @@ fn test_non_existent_shim_path() -> anyhow::Result<()> {
     start_recording();
 
     // Shim to a non-existent file
-    shim_file("config.json", "/path/that/does/not/exist.json");
+    shim_path("config.json", "/path/that/does/not/exist.json");
 
     // Read a non-existent file that matches the shim
     let content = read_to_string("/some/path/config.json");

@@ -20,6 +20,6 @@ pub use command::Command;
 pub use command_assertions::{assert_commands, commands_match};
 pub use file::File;
 pub use file_assertions::{assert_files, files_match};
-pub use fixture::{find_project_root, with_fixture, with_project_fixture};
+pub use fixture::with_fixture;
 pub use recording::{start_recording, stop_recording};
-pub use ubrn_common::{shim_file, shim_file_str};
+pub use ubrn_common::{shim_file_str, shim_path};

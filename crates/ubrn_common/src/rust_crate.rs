@@ -9,7 +9,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use cargo_metadata::{Metadata, MetadataCommand};
 
-use crate::run_cmd_quietly;
+use crate::{path_or_shim, run_cmd_quietly};
 
 #[derive(Debug, Clone)]
 pub struct CrateMetadata {
@@ -157,6 +157,7 @@ impl TryFrom<Utf8PathBuf> for CrateMetadata {
     type Error = anyhow::Error;
 
     fn try_from(manifest_path: Utf8PathBuf) -> Result<Self> {
+        let manifest_path = path_or_shim(&manifest_path)?;
         if !manifest_path.exists() {
             anyhow::bail!("Crate manifest doesn't exist");
         }

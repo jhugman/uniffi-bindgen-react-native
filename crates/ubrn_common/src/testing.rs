@@ -124,8 +124,10 @@ pub(crate) fn record_file<P: AsRef<Utf8Path>, C: AsRef<[u8]>>(path: P, contents:
 
     // Try to convert the content to a string
     if let Ok(content) = std::str::from_utf8(contents.as_ref()) {
+        let path = path.as_ref().to_string();
+        println!("Recording file: {path}");
         let record = RecordedFile {
-            path: path.as_ref().to_string(),
+            path,
             content: content.to_string(),
         };
 
@@ -148,7 +150,7 @@ pub fn clear_recorded_files() {
 }
 
 /// Register a file shim - redirect file operations with a specific suffix to a different path
-pub fn shim_file<P1: AsRef<Utf8Path>, P2: AsRef<Utf8Path>>(file_suffix: P1, replacement_path: P2) {
+pub fn shim_path<P1: AsRef<Utf8Path>, P2: AsRef<Utf8Path>>(file_suffix: P1, replacement_path: P2) {
     FILE_SHIMS.with(|shims| {
         shims.borrow_mut().insert(
             file_suffix.as_ref().to_string(),
@@ -181,7 +183,6 @@ pub(crate) fn get_shimmed_path(file_path: &Utf8Path) -> Option<ShimSource> {
     // Find a matching file suffix in the shims
     FILE_SHIMS.with(|shims| {
         for (suffix, source) in shims.borrow().iter() {
-            println!("Checking shim for suffix: {suffix} for {file_path_str}");
             if file_path_str.ends_with(suffix) {
                 return Some(source.clone());
             }

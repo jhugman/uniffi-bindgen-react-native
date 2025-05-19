@@ -119,7 +119,6 @@ impl IosBuildArgs {
 
             // Now we need to get the path to the lib.a file, to feed to xcodebuild.
             let library = metadata.library_path(Some(&target.triple), self.common_args.profile());
-            metadata.library_path_exists(&library)?;
             target_files.insert(target.clone(), library);
         }
         Ok(target_files)

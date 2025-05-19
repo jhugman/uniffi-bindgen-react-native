@@ -16,7 +16,7 @@ use crate::testing::is_recording_enabled;
 /// If None exists, then search in the parent directory, recursively until it is found.
 /// If None is found, then return None.
 pub fn resolve<P: AsRef<Utf8Path>>(directory: P, file_suffix: &str) -> Result<Option<Utf8PathBuf>> {
-    let full_path = directory.as_ref().canonicalize_utf8()?;
+    let full_path = directory.as_ref().canonicalize_utf8_or_shim()?;
     resolve_from_canonical(full_path, file_suffix)
 }
 
@@ -63,6 +63,7 @@ pub fn pwd() -> Result<Utf8PathBuf> {
 }
 
 pub fn cd(dir: &Utf8Path) -> Result<()> {
+    let dir = path_or_shim(dir)?;
     std::env::set_current_dir(dir)?;
     Ok(())
 }
@@ -151,7 +152,6 @@ where
 
     // If we're recording and a file shim exists, use it instead of the actual file
     if is_recording_enabled() {
-        eprintln!("Recording mode is enabled, using shimmed file");
         if let Some(shim_source) = crate::testing::get_shimmed_path(file) {
             match shim_source {
                 crate::testing::ShimSource::FilePath(path) => {
@@ -197,4 +197,35 @@ pub fn write_file<P: AsRef<Utf8Path>, C: AsRef<[u8]>>(path: P, contents: C) -> R
 
     fs::write(path, contents).with_context(|| format!("Failed to write to {path}"))?;
     Ok(())
+}
+
+pub fn path_or_shim(file_path: &Utf8Path) -> Result<Utf8PathBuf> {
+    use crate::testing::{get_shimmed_path, ShimSource};
+    Ok(if !is_recording_enabled() || file_path.exists() {
+        file_path.to_path_buf()
+    } else {
+        match get_shimmed_path(file_path) {
+            Some(ShimSource::FilePath(path)) => Utf8PathBuf::from(path),
+            Some(_) => anyhow::bail!("File at {file_path} is shimmed, but the path is not"),
+            None => anyhow::bail!("File at {file_path} doesn't exist and isn't shimmed"),
+        }
+    })
+}
+
+#[extend::ext]
+pub impl Utf8Path {
+    fn canonicalize_utf8_or_shim(&self) -> Result<Utf8PathBuf> {
+        Ok(if is_recording_enabled() {
+            self.to_path_buf()
+        } else {
+            self.canonicalize_utf8()?
+        })
+    }
+}
+
+#[extend::ext]
+pub impl Utf8PathBuf {
+    fn canonicalize_utf8_or_shim(&self) -> Result<Utf8PathBuf> {
+        self.as_path().canonicalize_utf8_or_shim()
+    }
 }

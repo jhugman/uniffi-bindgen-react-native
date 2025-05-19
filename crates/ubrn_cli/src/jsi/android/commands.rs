@@ -110,7 +110,6 @@ impl AndroidBuildArgs {
             let target =
                 self.cargo_build(target, &manifest_path, cargo_extras, api_level, &rust_dir)?;
             let library = metadata.library_path(Some(target.triple()), profile);
-            metadata.library_path_exists(&library)?;
             target_files.insert(target, library);
         }
         Ok(target_files)
