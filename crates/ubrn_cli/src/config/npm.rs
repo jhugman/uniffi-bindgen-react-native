@@ -20,6 +20,7 @@ pub(crate) struct PackageJson {
     repository: PackageJsonRepo,
     react_native: Option<String>,
     main: Option<String>,
+    #[serde(default)]
     codegen_config: RnCodegenConfig,
 }
 
@@ -79,7 +80,9 @@ pub(crate) struct PackageJsonRepo {
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
 pub(crate) struct RnCodegenConfig {
+    #[serde(default = "RnCodegenConfig::default_name")]
     pub(crate) name: String,
+    #[serde(default = "RnCodegenConfig::default_js_src_dir")]
     pub(crate) js_srcs_dir: String,
     #[serde(default)]
     android: RnAndroidCodegenConfig,
@@ -90,6 +93,15 @@ pub(crate) struct RnCodegenConfig {
 impl Default for RnCodegenConfig {
     fn default() -> Self {
         ubrn_common::default()
+    }
+}
+
+impl RnCodegenConfig {
+    fn default_js_src_dir() -> String {
+        "src".to_string()
+    }
+    fn default_name() -> String {
+        "RNNativeModuleSpec".to_string()
     }
 }
 
