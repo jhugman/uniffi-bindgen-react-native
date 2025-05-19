@@ -43,6 +43,9 @@ pub(crate) struct WasmConfig {
 
     #[serde(default = "WasmConfig::default_wasm_bindgen_extras")]
     pub(crate) wasm_bindgen_extras: ExtraArgs,
+
+    #[serde(default = "WasmConfig::default_runtime_version")]
+    pub(crate) runtime_version: String,
 }
 
 impl Default for WasmConfig {
@@ -72,6 +75,9 @@ impl WasmConfig {
     fn default_is_workspace() -> bool {
         false
     }
+    fn default_runtime_version() -> String {
+        format!("={}", env!("CARGO_PKG_VERSION"))
+    }
 }
 
 impl WasmConfig {
@@ -86,6 +92,9 @@ impl WasmConfig {
             .parent()
             .unwrap_or(&Utf8PathBuf::new())
             .into()
+    }
+    pub(crate) fn runtime_version(&self) -> String {
+        self.runtime_version.clone()
     }
 }
 

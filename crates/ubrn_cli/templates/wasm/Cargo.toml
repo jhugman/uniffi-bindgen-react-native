@@ -27,7 +27,7 @@ default = ["console_error_panic_hook"]
 # uniffi-runtime-javascript crate.
 # cargo is smart enough to do this if we don't put any further restrictions
 # on it.
-uniffi-runtime-javascript = { version = "={{ runtime_version() }}", features = ["wasm32"] }
+uniffi-runtime-javascript = { version = "{{ runtime_version() }}", features = ["wasm32"] }
 wasm-bindgen = "*"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
