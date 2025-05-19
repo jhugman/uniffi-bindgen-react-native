@@ -4,11 +4,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, path::Path};
 
 use anyhow::{Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use ubrn_common::CrateMetadata;
 
@@ -54,6 +54,7 @@ pub(crate) struct CrateConfig {
     pub(crate) project_root: Utf8PathBuf,
 
     #[serde(default = "CrateConfig::default_manifest_path")]
+    #[serde(deserialize_with = "CrateConfig::validate_manifest_path")]
     pub(crate) manifest_path: String,
     #[serde(flatten)]
     pub(crate) src: RustSource,
@@ -66,6 +67,31 @@ impl CrateConfig {
 
     fn default_manifest_path() -> String {
         "Cargo.toml".to_string()
+    }
+
+    pub(crate) fn validate_manifest_path<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path_str = String::deserialize(deserializer)?;
+
+        // Validate the path ends with Cargo.toml
+        if !path_str.ends_with("Cargo.toml") {
+            return Err(serde::de::Error::custom(format!(
+                "Manifest path must end with 'Cargo.toml': {}",
+                path_str
+            )));
+        }
+
+        // Validate that the path doesn't contain invalid characters
+        if Path::new(&path_str).file_name().is_none() {
+            return Err(serde::de::Error::custom(format!(
+                "Invalid manifest path: {}",
+                path_str
+            )));
+        }
+
+        Ok(path_str)
     }
 }
 
@@ -82,6 +108,17 @@ impl CrateConfig {
         let manifest = self.manifest_path()?;
         let dir = manifest.parent().unwrap();
         Ok(dir.into())
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn crate_dir_relative(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        let manifest = self
+            .src
+            .directory(project_root)
+            .unwrap()
+            .join(&self.manifest_path);
+        let crate_dir = manifest.parent().expect("Expect a parent here");
+        crate_dir.into()
     }
 
     pub(crate) fn metadata(&self) -> Result<CrateMetadata> {

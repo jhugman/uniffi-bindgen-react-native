@@ -10,9 +10,11 @@ use clap::{Args, Subcommand};
 
 use ubrn_common::CrateMetadata;
 
+#[cfg(feature = "wasm")]
+use crate::wasm::WebBuildArgs;
 use crate::{
-    commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidArgs,
-    jsi::ios::IOsArgs, Platform,
+    commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidBuildArgs,
+    jsi::ios::IosBuildArgs, Platform,
 };
 
 #[derive(Args, Debug)]
@@ -24,9 +26,13 @@ pub(crate) struct BuildArgs {
 #[derive(Subcommand, Debug)]
 pub(crate) enum BuildCmd {
     /// Build the crate for use on an Android device or emulator
-    Android(AndroidArgs),
+    Android(AndroidBuildArgs),
     /// Build the crate for use on an iOS device or simulator
-    Ios(IOsArgs),
+    Ios(IosBuildArgs),
+    /// Build the crate for use in a web page
+    #[cfg(feature = "wasm")]
+    #[clap(aliases = ["wasm"])]
+    Web(WebBuildArgs),
 }
 
 impl BuildArgs {
@@ -49,7 +55,9 @@ impl BuildArgs {
             self.cmd.project_config()?,
             Platform::from(&self.cmd),
         )
-        .run()
+        .run()?;
+
+        self.cmd.then_build()
     }
 }
 
@@ -58,6 +66,8 @@ impl BuildCmd {
         let mut files = match self {
             Self::Android(a) => a.build()?,
             Self::Ios(a) => a.build()?,
+            #[cfg(feature = "wasm")]
+            Self::Web(a) => a.build()?,
         };
 
         files.sort(); // Sort so that we reproducibly pick the same file below
@@ -72,18 +82,33 @@ impl BuildCmd {
         match self {
             Self::Android(a) => a.project_config(),
             Self::Ios(a) => a.project_config(),
-        }
-    }
-
-    fn common_args(&self) -> &CommonBuildArgs {
-        match self {
-            Self::Android(a) => &a.common_args,
-            Self::Ios(a) => &a.common_args,
+            #[cfg(feature = "wasm")]
+            Self::Web(a) => a.project_config(),
         }
     }
 
     pub(crate) fn and_generate(&self) -> bool {
-        self.common_args().and_generate
+        match self {
+            Self::Android(a) => a.common_args.and_generate,
+            Self::Ios(a) => a.common_args.and_generate,
+            #[cfg(feature = "wasm")]
+            Self::Web(a) => !a.no_generate,
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    pub(crate) fn then_build(&self) -> Result<()> {
+        if let Self::Web(a) = self {
+            if !a.no_wasm_pack {
+                a.then_build()?
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "wasm"))]
+    pub(crate) fn then_build(&self) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -123,6 +148,8 @@ impl From<&BuildCmd> for Platform {
         match value {
             BuildCmd::Android(..) => Self::Android,
             BuildCmd::Ios(..) => Self::Ios,
+            #[cfg(feature = "wasm")]
+            BuildCmd::Web(..) => Self::Wasm,
         }
     }
 }

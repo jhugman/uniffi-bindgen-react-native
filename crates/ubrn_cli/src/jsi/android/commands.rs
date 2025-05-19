@@ -25,7 +25,7 @@ use crate::{
 };
 
 #[derive(Args, Debug)]
-pub(crate) struct AndroidArgs {
+pub(crate) struct AndroidBuildArgs {
     /// The configuration file for this build
     #[clap(long)]
     config: Utf8PathBuf,
@@ -53,7 +53,7 @@ pub(crate) struct AndroidArgs {
     native_bindings: bool,
 }
 
-impl AndroidArgs {
+impl AndroidBuildArgs {
     pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
         let config: ProjectConfig = self.project_config()?;
         let android = &config.android;

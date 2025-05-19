@@ -131,7 +131,9 @@ pub(crate) mod files {
     use std::rc::Rc;
 
     use super::{RenderedFile, TemplateConfig};
-    use crate::{jsi, wasm, Platform};
+    #[cfg(feature = "wasm")]
+    use crate::wasm;
+    use crate::{jsi, Platform};
 
     pub(crate) fn get_files_for(
         config: Rc<TemplateConfig>,
@@ -208,12 +210,18 @@ mod tests {
             };
             let repository = format!("https://github.com/user/{name}");
 
+            #[cfg(feature = "wasm")]
+            let wasm = crate::wasm::WasmConfig::default();
+
             Self {
                 name: name.to_string(),
+                project_version: "0.1.0".to_string(),
                 repository,
                 crate_,
                 android,
                 ios,
+                #[cfg(feature = "wasm")]
+                wasm,
                 bindings,
                 tm,
                 exclude_files: Default::default(),

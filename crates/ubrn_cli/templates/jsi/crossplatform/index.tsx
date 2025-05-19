@@ -36,6 +36,13 @@ if (!initialized) {
   initialized = true;
 }
 
+// This provides parity with the index.web.ts version of this file.
+// The web version relies on an asynchronous fetch, which this doesn't
+// need, so we just no-op.
+export async function uniffiInitAsync() {
+  // NOOP.
+}
+
 // Export the crates as individually namespaced objects.
 export default {
 {%- for m in self.config.modules %}
