@@ -28,7 +28,7 @@ impl RenderedFile for WasmCargoToml {
 }
 impl WasmCargoToml {
     fn runtime_version(&self) -> String {
-        env!("CARGO_PKG_VERSION").to_string()
+        self.config.project.wasm.runtime_version()
     }
 }
 
