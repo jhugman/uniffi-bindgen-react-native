@@ -1,5 +1,5 @@
 {
-  "name": "dummy-lib",
+  "name": "default-fixture",
   "version": "0.1.0",
   "description": "An automated test",
   "default": "./src/index.web.ts",
@@ -143,11 +143,11 @@
     ]
   },
   "codegenConfig": {
-    "name": "DummyLibSpec",
+    "name": "DefaultFixtureSpec",
     "type": "modules",
     "jsSrcsDir": "src",
     "android": {
-      "javaPackageName": "com.dummylib"
+      "javaPackageName": "com.defaultfixture"
     }
   },
   "create-react-native-library": {
