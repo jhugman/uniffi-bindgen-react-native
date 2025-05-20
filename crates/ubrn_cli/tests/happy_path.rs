@@ -31,7 +31,7 @@ fn run_cli(command_line: impl Display) -> Result<()> {
     args.run()
 }
 
-fn cargo_buld(fixture_name: &str, target: &str) -> Result<CrateMetadata> {
+fn cargo_build(fixture_name: &str, target: &str) -> Result<CrateMetadata> {
     let mut command = std::process::Command::new("cargo");
     let fixture = integration_fixtures_dir().join(fixture_name);
     let manifest_path = fixture.join("Cargo.toml");
@@ -48,7 +48,7 @@ fn cargo_buld(fixture_name: &str, target: &str) -> Result<CrateMetadata> {
 #[test]
 fn test_build_command_ios() -> Result<()> {
     let target = "aarch64-apple-ios";
-    let target_crate = cargo_buld("arithmetic", target)?;
+    let target_crate = cargo_build("arithmetic", target)?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "happy-path", |_fixture_dir| {
         // Set up file shims
@@ -131,7 +131,7 @@ fn test_build_command_ios() -> Result<()> {
 #[test]
 fn test_build_command_android() -> Result<()> {
     let target = "aarch64-apple-ios";
-    let target_crate = cargo_buld("arithmetic", target)?;
+    let target_crate = cargo_build("arithmetic", target)?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "happy-path", |_fixture_dir| {
         // Set up file shims
@@ -184,6 +184,8 @@ fn test_build_command_android() -> Result<()> {
                 .arg("--no-strip")
                 .arg("--")
                 .arg("build"),
+            Command::new("prettier"),
+            Command::new("clang-format"),
         ]);
 
         assert_files(&[
@@ -233,6 +235,67 @@ fn test_build_command_android() -> Result<()> {
             // This is the AndroidManifest which tells the android app about this package.
             File::new("android/src/main/AndroidManifest.xml")
                 .contains("package=\"com.defaultfixture\""),
+        ]);
+
+        Ok(())
+    })
+}
+
+#[test]
+fn test_build_command_web() -> Result<()> {
+    let target = "aarch64-apple-ios";
+    let target_crate = cargo_build("arithmetic", target)?;
+    let fixtures_dir = fixtures_dir();
+    with_fixture(fixtures_dir.clone(), "happy-path", |_fixture_dir| {
+        // Set up file shims
+        shim_path("package.json", fixtures_dir.join("defaults/package.json"));
+        shim_path(
+            "ubrn.config.yaml",
+            fixtures_dir.join("defaults/ubrn.config.yaml"),
+        );
+        shim_path("rust/shim/Cargo.toml", target_crate.manifest_path());
+        shim_path("rust/shim", target_crate.project_root());
+
+        shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(Some(target), "debug"),
+        );
+
+        // Run the command under test
+        run_cli("ubrn build web --config ubrn.config.yaml")?;
+
+        // Assert the expected commands were executed
+        assert_commands(&[
+            Command::new("cargo")
+                .arg("build")
+                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml"),
+            Command::new("prettier"),
+            Command::new("cargo")
+                .arg("build")
+                .arg_pair_suffix("--manifest-path", "rust_modules/wasm/Cargo.toml")
+                .arg_pair("--target", "wasm32-unknown-unknown"),
+            Command::new("wasm-bindgen")
+                .arg_pair("--target", "web")
+                .arg("--omit-default-module-path")
+                .arg_pair("--out-name", "index")
+                .arg_pair_suffix("--out-dir", "src/generated/wasm-bindgen"),
+        ]);
+
+        assert_files(&[
+            // This is the entry point to the module. It calls into the generated installRustCrate()
+            // method.
+            File::new("src/index.web.ts")
+                .contains("import * as arithmetic from './generated/arithmetic'")
+                .contains("export * from './generated/arithmetic'")
+                .contains("arithmetic.default.initialize()"),
+            // Finally, the bindings. We have tested the content of these in other tests.
+            File::new("src/generated/arithmetic.ts"),
+            File::new("rust_modules/wasm/src/lib.rs"),
+            File::new("rust_modules/wasm/src/arithmetic_module.rs"),
+            File::new("rust_modules/wasm/Cargo.toml")
+                .contains("[workspace]")
+                .contains("uniffi-example-arithmetic = { path = \"../../rust/shim\" }"),
         ]);
 
         Ok(())

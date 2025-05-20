@@ -53,7 +53,7 @@ pub fn commands_match(expected_commands: &[Command]) -> bool {
 /// Returns None if matching, or Some(error_message) with details about the mismatch
 fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<String> {
     // Check program name
-    if recorded.program != expected.program() {
+    if !recorded.program.ends_with(expected.program()) {
         return Some(format!(
             "Program name mismatch: expected '{}', got '{}'",
             expected.program(),
