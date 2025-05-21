@@ -99,6 +99,7 @@ impl WasmConfig {
 }
 
 #[derive(Debug, Deserialize, Default, Clone, Hash, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
 pub enum Target {
     #[default]
     #[serde(rename = "wasm32-unknown-unknown")]
@@ -133,6 +134,7 @@ impl Target {
 }
 
 #[derive(Debug, Deserialize, Default, Clone, Hash, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
 pub enum WasmTarget {
     Bundler,
     Nodejs,
@@ -140,6 +142,7 @@ pub enum WasmTarget {
     Web,
     NoModules,
     Deno,
+    ExperimentalNodejsModule,
 }
 
 impl FromStr for WasmTarget {
@@ -152,6 +155,7 @@ impl FromStr for WasmTarget {
             "web" => Self::Web,
             "no-modules" => Self::NoModules,
             "deno" => Self::Deno,
+            "experimental-nodejs-module" => Self::ExperimentalNodejsModule,
             _ => return Err(anyhow::anyhow!("Unsupported target: '{s}'")),
         })
     }
@@ -165,6 +169,7 @@ impl Display for WasmTarget {
             Self::Web => "web",
             Self::NoModules => "no-modules",
             Self::Deno => "deno",
+            Self::ExperimentalNodejsModule => "experimental-nodejs-module",
         })
     }
 }
