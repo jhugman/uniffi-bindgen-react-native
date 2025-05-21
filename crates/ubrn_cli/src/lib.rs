@@ -13,6 +13,8 @@ pub(crate) mod jsi;
 pub(crate) mod wasm;
 pub(crate) mod workspace;
 
+pub mod test_utils;
+
 pub use anyhow::{Error, Result};
 pub use camino::Utf8PathBuf;
 
