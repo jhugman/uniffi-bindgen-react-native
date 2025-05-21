@@ -14,14 +14,11 @@ export * from './{{ bindings }}/{{ m.ts() }}';
 import * as {{ m.ts() }} from './{{ bindings }}/{{ m.ts() }}';
 {%- endfor %}
 
-import { initSync } from "./{{ bindings }}/wasm-bindgen/index.js";
+import initAsync from "./{{ bindings }}/wasm-bindgen/index.js";
 import wasmPath from "./{{ bindings }}/wasm-bindgen/index_bg.wasm";
 
 export async function uniffiInitAsync() {
-  const response = await fetch(wasmPath);
-  const module = await response.arrayBuffer();
-
-  initSync({ module });
+  await initAsync({ module_or_path: wasmPath })
 
   // Initialize the generated bindings: mostly checksums, but also callbacks.
   // - the boolean flag ensures this loads exactly once, even if the JS code

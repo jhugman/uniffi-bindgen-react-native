@@ -196,6 +196,7 @@ impl<'a> ComponentTemplate<'a> {
         let runtime_ident = self.runtime_ident();
         let uniffi_ident = self.uniffi_ident();
         quote! {
+            #[allow(unused_imports)]
             use #runtime_module_ident::{self as #runtime_ident, uniffi as #uniffi_ident, IntoJs, IntoRust};
 
             use wasm_bindgen::prelude::wasm_bindgen;
