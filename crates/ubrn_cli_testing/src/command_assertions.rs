@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use ubrn_common::{get_recorded_commands, RecordedCommand};
+use ubrn_common::{get_recorded_commands, Command as RecordedCommand};
 
 use crate::{command::ArgMatcher, Command};
 
@@ -14,7 +14,7 @@ fn check_commands(expected_commands: &[Command]) -> Result<(), String> {
     // If we have fewer recorded commands than expected, fail immediately
     if recorded.len() < expected_commands.len() {
         return Err(format!(
-            "Expected {} commands but only {} were recorded.\nExpected: {:?}\nRecorded: {:?}",
+            "Expected {} commands but only {} were recorded.\nExpected: {:?}\nObserved: {:?}",
             expected_commands.len(),
             recorded.len(),
             expected_commands,
@@ -25,7 +25,7 @@ fn check_commands(expected_commands: &[Command]) -> Result<(), String> {
     for (i, expected) in expected_commands.iter().enumerate() {
         if let Some(mismatch) = command_mismatch(&recorded[i], expected) {
             return Err(format!(
-                "Command mismatch at position {}:\n{}\nExpected: {:?}\nRecorded: {:?}",
+                "Command mismatch at position {}:\n{}\nExpected: {:?}\nObserved: {:?}",
                 i, mismatch, expected, recorded[i]
             ));
         }

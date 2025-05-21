@@ -30,7 +30,7 @@ pub fn run_cli(command_line: impl Display) -> Result<()> {
     args.run()
 }
 
-pub fn cargo_build(fixture_name: &str, target: &str) -> Result<CrateMetadata> {
+pub fn cargo_build(fixture_name: &str) -> Result<CrateMetadata> {
     let mut command = std::process::Command::new("cargo");
     let fixture = integration_fixtures_dir().join(fixture_name);
     let manifest_path = fixture.join("Cargo.toml");
@@ -38,8 +38,7 @@ pub fn cargo_build(fixture_name: &str, target: &str) -> Result<CrateMetadata> {
         command
             .arg("build")
             .arg("--manifest-path")
-            .arg(&manifest_path)
-            .args(["--target", target]),
+            .arg(&manifest_path),
     )?;
     CrateMetadata::try_from(manifest_path)
 }

@@ -10,8 +10,7 @@ use ubrn_cli_testing::{assert_commands, assert_files, shim_path, with_fixture, C
 
 #[test]
 fn test_happy_path_ios() -> Result<()> {
-    let target = "aarch64-apple-ios";
-    let target_crate = cargo_build("arithmetic", target)?;
+    let target_crate = cargo_build("arithmetic")?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
         // Set up file shims
@@ -24,11 +23,11 @@ fn test_happy_path_ios() -> Result<()> {
         shim_path("rust/shim", target_crate.project_root());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(Some(target), "debug"),
+            target_crate.library_path(None, "debug"),
         );
 
         // Run the command under test
-        run_cli("ubrn build ios --and-generate --config ubrn.config.yaml")?;
+        run_cli("ubrn build ios --and-generate --config ubrn.config.yaml --targets aarch64-apple-ios,x86_64-apple-ios")?;
 
         // Assert the expected commands were executed
         assert_commands(&[
@@ -39,11 +38,11 @@ fn test_happy_path_ios() -> Result<()> {
             Command::new("cargo")
                 .arg("build")
                 .arg_pair_suffix("--manifest-path", "arithmetic/Cargo.toml")
-                .arg_pair("--target", "aarch64-apple-ios-sim"),
+                .arg_pair("--target", "x86_64-apple-ios"),
             Command::new("xcodebuild")
                 .arg("-create-xcframework")
                 .arg_pair_suffix("-library", "aarch64-apple-ios/debug/libarithmetical.a")
-                .arg_pair_suffix("-library", "aarch64-apple-ios-sim/debug/libarithmetical.a")
+                .arg_pair_suffix("-library", "x86_64-apple-ios/debug/libarithmetical.a")
                 .arg_pair_suffix("-output", "DefaultFixtureFramework.xcframework"),
         ]);
 
@@ -93,8 +92,7 @@ fn test_happy_path_ios() -> Result<()> {
 
 #[test]
 fn test_happy_path_android() -> Result<()> {
-    let target = "aarch64-apple-ios";
-    let target_crate = cargo_build("arithmetic", target)?;
+    let target_crate = cargo_build("arithmetic")?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
         // Set up file shims
@@ -107,7 +105,7 @@ fn test_happy_path_android() -> Result<()> {
         shim_path("rust/shim", target_crate.project_root());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(Some(target), "debug"),
+            target_crate.library_path(None, "debug"),
         );
 
         // Run the command under test
@@ -206,8 +204,7 @@ fn test_happy_path_android() -> Result<()> {
 
 #[test]
 fn test_happy_path_web() -> Result<()> {
-    let target = "aarch64-apple-ios";
-    let target_crate = cargo_build("arithmetic", target)?;
+    let target_crate = cargo_build("arithmetic")?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
         // Set up file shims
@@ -222,7 +219,7 @@ fn test_happy_path_web() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(Some(target), "debug"),
+            target_crate.library_path(None, "debug"),
         );
 
         // Run the command under test

@@ -11,8 +11,7 @@ use ubrn_cli_testing::{assert_commands, assert_files, shim_path, with_fixture, C
 
 #[test]
 fn test_release() -> Result<()> {
-    let target = "aarch64-apple-ios";
-    let target_crate = cargo_build("arithmetic", target)?;
+    let target_crate = cargo_build("arithmetic")?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
         // Set up file shims
@@ -27,7 +26,7 @@ fn test_release() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(Some(target), "debug"),
+            target_crate.library_path(None, "debug"),
         );
 
         // Run the command under test
@@ -58,8 +57,8 @@ fn test_release() -> Result<()> {
 
 #[test]
 fn test_monorepo() -> Result<()> {
-    let target = "aarch64-apple-ios"; // Still using this target for initial build
-    let target_crate = cargo_build("arithmetic", target)?;
+    // Still using this target for initial build
+    let target_crate = cargo_build("arithmetic")?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
         // Set up file shims
@@ -77,7 +76,7 @@ fn test_monorepo() -> Result<()> {
         );
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(Some(target), "debug"),
+            target_crate.library_path(None, "debug"),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -114,8 +113,8 @@ fn test_monorepo() -> Result<()> {
 
 #[test]
 fn test_multi_features() -> Result<()> {
-    let target = "aarch64-apple-ios"; // Still using this target for initial build
-    let target_crate = cargo_build("arithmetic", target)?;
+    // Still using this target for initial build
+    let target_crate = cargo_build("arithmetic")?;
     let fixtures_dir = fixtures_dir();
     with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
         // Set up file shims
@@ -133,7 +132,7 @@ fn test_multi_features() -> Result<()> {
         );
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(Some(target), "debug"),
+            target_crate.library_path(None, "debug"),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;

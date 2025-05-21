@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{cell::RefCell, collections::HashMap, path::PathBuf, process::Command};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf};
 
 use camino::Utf8Path;
 
@@ -21,7 +21,7 @@ thread_local! {
     static RECORDING_MODE: RefCell<bool> = const { RefCell::new(false) };
 
     // Store the recorded commands
-    static RECORDED_COMMANDS: RefCell<Vec<RecordedCommand>> = const { RefCell::new(Vec::new()) };
+    static RECORDED_COMMANDS: RefCell<Vec<Command>> = const { RefCell::new(Vec::new()) };
 
     // Store the recorded file writes
     static RECORDED_FILES: RefCell<Vec<RecordedFile>> = const { RefCell::new(Vec::new()) };
@@ -32,7 +32,7 @@ thread_local! {
 
 /// A record of a command that would have been executed
 #[derive(Debug, Clone)]
-pub struct RecordedCommand {
+pub struct Command {
     /// The executable name (like "cargo", "npm", etc.)
     pub program: String,
 
@@ -53,9 +53,9 @@ pub struct RecordedFile {
     pub content: String,
 }
 
-impl RecordedCommand {
-    /// Create a new RecordedCommand from a std::process::Command
-    fn from_command(cmd: &Command) -> Self {
+impl Command {
+    /// Create a new Command from a std::process::Command
+    fn from_command(cmd: &std::process::Command) -> Self {
         // Extract program name
         let program = cmd.get_program().to_string_lossy().to_string();
 
@@ -68,7 +68,7 @@ impl RecordedCommand {
         // Extract working directory if set
         let current_dir = cmd.get_current_dir().map(|p| p.to_path_buf());
 
-        RecordedCommand {
+        Command {
             program,
             args,
             current_dir,
@@ -96,15 +96,15 @@ pub(crate) fn is_recording_enabled() -> bool {
 }
 
 /// Record a command instead of executing it
-pub(crate) fn record_command(cmd: &Command) {
-    let record = RecordedCommand::from_command(cmd);
+pub(crate) fn record_command(cmd: &std::process::Command) {
+    let record = Command::from_command(cmd);
     RECORDED_COMMANDS.with(|commands| {
         commands.borrow_mut().push(record);
     });
 }
 
 /// Get all recorded commands
-pub fn get_recorded_commands() -> Vec<RecordedCommand> {
+pub fn get_recorded_commands() -> Vec<Command> {
     RECORDED_COMMANDS.with(|commands| commands.borrow().clone())
 }
 
