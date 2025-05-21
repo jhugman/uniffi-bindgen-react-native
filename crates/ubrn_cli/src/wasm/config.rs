@@ -46,6 +46,9 @@ pub(crate) struct WasmConfig {
 
     #[serde(default = "WasmConfig::default_runtime_version")]
     pub(crate) runtime_version: String,
+
+    #[serde(alias = "ts", alias = "typescript")]
+    pub(crate) ts_bindings: Option<String>,
 }
 
 impl Default for WasmConfig {

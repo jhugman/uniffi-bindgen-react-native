@@ -24,7 +24,7 @@ pub(crate) fn bindings(
     }
     let source = SourceArgs::library(lib_file).with_config(config);
 
-    let ts_dir = project.bindings.ts_path(root);
+    let ts_dir = project.wasm_bindings_ts_path(root);
     let rust_src_dir = project.wasm.crate_dir(root).join("src");
     Ok(BindingsArgs::new(
         switches,

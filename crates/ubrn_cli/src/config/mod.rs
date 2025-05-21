@@ -169,6 +169,14 @@ impl ProjectConfig {
     pub(crate) fn exclude_files(&self) -> &GlobSet {
         &self.exclude_files
     }
+
+    pub(crate) fn wasm_bindings_ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.wasm
+            .ts_bindings
+            .as_deref()
+            .map(|ts| project_root.join(ts))
+            .unwrap_or_else(|| self.bindings.ts_path(project_root))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
