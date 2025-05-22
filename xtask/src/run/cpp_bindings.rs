@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{fs, process::Command};
+use std::process::Command;
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -58,7 +58,7 @@ impl CppBindingArg {
         if clean {
             rm_dir(&build_dir)?;
         }
-        fs::create_dir_all(&build_dir)?;
+        ubrn_common::mk_dir(&build_dir)?;
 
         let src_dir = TestRunnerCmd::hermes_rust_extension_src_dir()?;
 
@@ -102,7 +102,7 @@ impl CppBindingArg {
         if clean {
             rm_dir(&build_dir)?;
         }
-        fs::create_dir_all(&build_dir)?;
+        ubrn_common::mk_dir(&build_dir)?;
 
         let src_dir = TestRunnerCmd::hermes_extension_src_dir()?;
 

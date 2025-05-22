@@ -3,10 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use clap::Parser;
-use ubrn_cli::{cli, Result};
-
-fn main() -> Result<()> {
-    let args = cli::CliArgs::parse();
-    args.run()
-}
+mod command_tests;
+mod file_shim_str_tests;
+mod file_shim_tests;
+mod file_tests;
+mod fixture_tests;

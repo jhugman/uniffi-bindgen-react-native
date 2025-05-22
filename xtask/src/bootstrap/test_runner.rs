@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{fs, process::Command};
+use std::process::Command;
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
@@ -75,7 +75,7 @@ impl Bootstrap for TestRunnerCmd {
 
         let src_dir = TestRunnerCmd::src_dir()?;
 
-        fs::create_dir_all(&dir)?;
+        ubrn_common::mk_dir(&dir)?;
 
         let mut cmd = Command::new("cmake");
         cmd.current_dir(&dir)

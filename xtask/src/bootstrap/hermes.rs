@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{fs, process::Command};
+use std::process::Command;
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
@@ -52,7 +52,7 @@ impl HermesCmd {
         }
         let parent = dir.parent().expect("Hermes directory has no parent");
 
-        fs::create_dir_all(parent)?;
+        ubrn_common::mk_dir(parent)?;
         let repo = format!("https://github.com/{}.git", self.repo);
 
         run_cmd(
@@ -85,7 +85,7 @@ impl Bootstrap for HermesCmd {
         let src = Self::src_dir()?;
         let dir = Self::build_dir()?;
 
-        fs::create_dir_all(&dir)?;
+        ubrn_common::mk_dir(&dir)?;
 
         let mut cmd = Command::new("cmake");
         run_cmd(

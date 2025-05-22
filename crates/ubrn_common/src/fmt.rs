@@ -12,6 +12,10 @@ use crate::{file_paths, resolve};
 
 pub fn clang_format<P: AsRef<Utf8Path>>(path: P, check_only: bool) -> Result<Option<Command>> {
     if which("clang-format").is_err() {
+        use crate::testing::{is_recording_enabled, record_command};
+        if is_recording_enabled() {
+            record_command(&Command::new("clang-format"));
+        }
         return Ok(None);
     }
 
@@ -42,6 +46,10 @@ pub fn prettier<P: AsRef<Utf8Path>>(out_dir: P, check_only: bool) -> Result<Opti
         cmd.arg(".").current_dir(out_dir.as_ref());
         Some(cmd)
     } else {
+        use crate::testing::{is_recording_enabled, record_command};
+        if is_recording_enabled() {
+            record_command(&Command::new("prettier"));
+        }
         None
     })
 }

@@ -8,8 +8,10 @@ mod files;
 pub mod fmt;
 mod rust_crate;
 mod serde;
+mod testing;
 
 pub use commands::*;
 pub use files::*;
 pub use rust_crate::*;
 pub use serde::*;
+pub use testing::*;

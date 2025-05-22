@@ -119,7 +119,6 @@ impl IosBuildArgs {
 
             // Now we need to get the path to the lib.a file, to feed to xcodebuild.
             let library = metadata.library_path(Some(&target.triple), self.common_args.profile());
-            metadata.library_path_exists(&library)?;
             target_files.insert(target.clone(), library);
         }
         Ok(target_files)
@@ -260,12 +259,12 @@ impl IosBuildArgs {
             if !entry.file_type()?.is_file() || path.extension() != Some("modulemap") {
                 continue;
             }
-            let chunk = std::fs::read_to_string(path)?;
+            let chunk = ubrn_common::read_to_string(path)?;
             contents.push_str(&chunk);
             contents.push_str("\n\n");
-            std::fs::remove_file(path)?;
+            ubrn_common::rm_file(path)?;
         }
-        std::fs::write(out_file, contents)?;
+        ubrn_common::write_file(out_file, contents)?;
         Ok(())
     }
 

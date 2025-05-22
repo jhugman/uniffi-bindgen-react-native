@@ -33,8 +33,8 @@ impl TemplateConfig {
             let project_root = self.project.project_root();
             let gradle_file = BuildGradle::new(self.clone()).path(project_root);
             if gradle_file.exists() {
-                let file =
-                    std::fs::read_to_string(gradle_file).expect("Cannot read build.gradle file");
+                let file = ubrn_common::read_to_string(gradle_file)
+                    .expect("Cannot read build.gradle file");
                 file.contains("kotlin")
             } else {
                 // assume that if the user blew away the gradle file,

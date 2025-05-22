@@ -4,8 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::fs;
-
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
@@ -49,11 +47,11 @@ impl ReactNativeBindingGenerator {
                 &type_map,
             )?;
             let api_ts_path = out_dir.join(module.ts_filename());
-            fs::write(api_ts_path, api_ts)?;
+            ubrn_common::write_file(api_ts_path, api_ts)?;
 
             let lowlevel_ts = gen_typescript::generate_lowlevel_code(&component.ci, &module)?;
             let lowlevel_ts_path = out_dir.join(module.ts_ffi_filename());
-            fs::write(lowlevel_ts_path, lowlevel_ts)?;
+            ubrn_common::write_file(lowlevel_ts_path, lowlevel_ts)?;
         }
         if try_format_code {
             gen_typescript::format_directory(out_dir)?;
@@ -71,11 +69,11 @@ impl ReactNativeBindingGenerator {
 
             let cpp = gen_cpp::generate_cpp(&component.ci, &component.config.cpp, &module)?;
             let cpp_path = out_dir.join(module.cpp_filename());
-            fs::write(cpp_path, cpp)?;
+            ubrn_common::write_file(cpp_path, cpp)?;
 
             let hpp = gen_cpp::generate_hpp(&component.ci, &component.config.cpp, &module)?;
             let hpp_path = out_dir.join(module.hpp_filename());
-            fs::write(hpp_path, hpp)?;
+            ubrn_common::write_file(hpp_path, hpp)?;
         }
         if try_format_code {
             gen_cpp::format_directory(out_dir)?;

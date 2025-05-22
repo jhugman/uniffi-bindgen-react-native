@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::fs;
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -77,6 +76,6 @@ pub(crate) fn render_entrypoint(
     modules: &Vec<ModuleMetadata>,
 ) -> Result<()> {
     let string = ubrn_bindgen::generate_entrypoint(switches, crate_, modules)?;
-    fs::write(path, string)?;
+    ubrn_common::write_file(path, string)?;
     Ok(())
 }

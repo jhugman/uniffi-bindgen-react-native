@@ -13,17 +13,17 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 cargo_metadata = { workspace = true }
 clap = { workspace = true }
+extend = { workspace = true }
 heck = { workspace = true }
 paste = { workspace = true }
 rinja = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
+toml = "0.5"
+topological-sort = "0.2.2"
 ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }
 uniffi_meta = { workspace = true }
-extend = "1.2.0"
-topological-sort = "0.2.2"
-toml = "0.5"
 
 [dependencies.quote]
 version = "1.0"

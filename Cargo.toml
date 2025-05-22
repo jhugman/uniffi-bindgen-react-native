@@ -12,6 +12,7 @@ anyhow = "1"
 camino = "1.1.6"
 cargo_metadata = "0.15"
 clap = { version = "4.5.4", features = ["derive"] }
+extend = "1.2.0"
 heck = "0.5.0"
 paste = "1.0.14"
 pathdiff = { version = "0.2.1", features = ["camino"] }
