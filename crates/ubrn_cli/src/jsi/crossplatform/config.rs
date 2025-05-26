@@ -6,7 +6,7 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Deserialize;
 
-use crate::workspace;
+use crate::{config::ProjectConfig, workspace};
 
 // Define our own trim function since it's private in config module
 fn trim(name: &str) -> String {
@@ -25,6 +25,9 @@ pub(crate) struct TurboModulesConfig {
 
     #[serde(default = "TurboModulesConfig::default_name")]
     pub(crate) name: String,
+    #[serde(default = "TurboModulesConfig::default_entrypoint")]
+    #[serde(deserialize_with = "ProjectConfig::relative_path")]
+    pub(crate) entrypoint: String,
 }
 
 impl TurboModulesConfig {
@@ -47,6 +50,13 @@ impl TurboModulesConfig {
         let codegen_name = &package_json.codegen().name;
         trim(codegen_name)
     }
+
+    fn default_entrypoint() -> String {
+        let package_json = workspace::package_json();
+        package_json
+            .rn_entrypoint()
+            .unwrap_or_else(|| "src/index.tsx".to_string())
+    }
 }
 
 impl Default for TurboModulesConfig {
@@ -62,6 +72,14 @@ impl TurboModulesConfig {
 
     pub(crate) fn ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         project_root.join(&self.ts)
+    }
+
+    pub(crate) fn entrypoint(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        let entrypoint = self
+            .entrypoint
+            .strip_prefix("./")
+            .unwrap_or(&self.entrypoint);
+        project_root.join(entrypoint)
     }
 
     #[allow(dead_code)]

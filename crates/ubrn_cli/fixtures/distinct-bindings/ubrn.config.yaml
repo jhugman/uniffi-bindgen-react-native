@@ -1,0 +1,5 @@
+rust:
+  directory: rust/shim
+  manifestPath: Cargo.toml
+web:
+  tsBindings: ./web-src/bindings

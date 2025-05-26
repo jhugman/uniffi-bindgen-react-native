@@ -14,8 +14,8 @@ export * from './{{ bindings }}/{{ m.ts() }}';
 import * as {{ m.ts() }} from './{{ bindings }}/{{ m.ts() }}';
 {%- endfor %}
 
-import initAsync from "./{{ bindings }}/wasm-bindgen/index.js";
-import wasmPath from "./{{ bindings }}/wasm-bindgen/index_bg.wasm";
+import initAsync from './{{ bindings }}/wasm-bindgen/index.js';
+import wasmPath from './{{ bindings }}/wasm-bindgen/index_bg.wasm';
 
 export async function uniffiInitAsync() {
   await initAsync({ module_or_path: wasmPath })

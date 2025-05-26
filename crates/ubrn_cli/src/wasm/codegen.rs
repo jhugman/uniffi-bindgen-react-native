@@ -56,7 +56,6 @@ impl WasmLibRs {
 templated_file!(IndexWebTs, "index.web.ts");
 impl RenderedFile for IndexWebTs {
     fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-        let filename = "index.web.ts";
-        self.config.project.tm.ts_path(project_root).join(filename)
+        self.config.project.wasm.entrypoint(project_root)
     }
 }

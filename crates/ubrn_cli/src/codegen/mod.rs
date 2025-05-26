@@ -207,6 +207,7 @@ mod tests {
                 cpp: "cpp".to_string(),
                 ts: "src".to_string(),
                 spec_name: "MyRustCrate".to_string(),
+                entrypoint: "index.react-native.tsx".to_string(),
             };
             let repository = format!("https://github.com/user/{name}");
 

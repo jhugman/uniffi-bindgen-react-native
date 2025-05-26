@@ -10,7 +10,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use serde::Deserialize;
 
 use crate::{
-    config::{rust_crate::CrateConfig, ExtraArgs},
+    config::{rust_crate::CrateConfig, ExtraArgs, ProjectConfig},
     workspace,
 };
 
@@ -48,7 +48,13 @@ pub(crate) struct WasmConfig {
     pub(crate) runtime_version: String,
 
     #[serde(alias = "ts", alias = "typescript")]
+    #[serde(deserialize_with = "ProjectConfig::opt_relative_path")]
+    #[serde(default)]
     pub(crate) ts_bindings: Option<String>,
+
+    #[serde(default = "WasmConfig::default_entrypoint")]
+    #[serde(deserialize_with = "ProjectConfig::relative_path")]
+    pub(crate) entrypoint: String,
 }
 
 impl Default for WasmConfig {
@@ -81,6 +87,12 @@ impl WasmConfig {
     fn default_runtime_version() -> String {
         format!("={}", env!("CARGO_PKG_VERSION"))
     }
+    fn default_entrypoint() -> String {
+        let package_json = workspace::package_json();
+        package_json
+            .browser_entrypoint()
+            .unwrap_or_else(|| "src/index.web.ts".to_string())
+    }
 }
 
 impl WasmConfig {
@@ -98,6 +110,9 @@ impl WasmConfig {
     }
     pub(crate) fn runtime_version(&self) -> String {
         self.runtime_version.clone()
+    }
+    pub(crate) fn entrypoint(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        project_root.join(&self.entrypoint)
     }
 }
 
