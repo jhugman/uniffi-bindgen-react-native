@@ -10,7 +10,7 @@ use anyhow::{Error, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Deserializer};
 
-use ubrn_common::CrateMetadata;
+use ubrn_common::{path_or_shim, CrateMetadata};
 
 use crate::{commands::checkout::GitRepoArgs, workspace};
 
@@ -101,7 +101,8 @@ impl CrateConfig {
     }
 
     pub(crate) fn manifest_path(&self) -> Result<Utf8PathBuf> {
-        Ok(self.directory()?.join(&self.manifest_path))
+        let manifest_path = path_or_shim(&self.directory()?.join(&self.manifest_path))?;
+        Ok(manifest_path)
     }
 
     pub(crate) fn crate_dir(&self) -> Result<Utf8PathBuf> {

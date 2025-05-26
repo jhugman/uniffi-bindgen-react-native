@@ -4,8 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use std::fs;
-
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
@@ -49,7 +47,7 @@ impl WasmBindingGenerator {
                 &type_map,
             )?;
             let api_ts_path = out_dir.join(module.ts_filename());
-            fs::write(api_ts_path, api_ts)?;
+            ubrn_common::write_file(api_ts_path, api_ts)?;
         }
         if try_format_code {
             gen_typescript::format_directory(out_dir)?;
@@ -74,7 +72,7 @@ impl WasmBindingGenerator {
                 try_format_code,
             )?;
             let rs_path = out_dir.join(module.rs_filename());
-            fs::write(rs_path, rs_code)?;
+            ubrn_common::write_file(rs_path, rs_code)?;
         }
         Ok(())
     }

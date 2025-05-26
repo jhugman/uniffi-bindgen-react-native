@@ -12,9 +12,15 @@ use crate::{
 };
 
 #[derive(Parser)]
-pub(crate) struct CliArgs {
+pub struct CliArgs {
     #[command(subcommand)]
     pub(crate) cmd: CliCmd,
+}
+
+impl CliArgs {
+    pub fn run(&self) -> Result<()> {
+        self.cmd.run()
+    }
 }
 
 #[derive(Debug, Subcommand)]

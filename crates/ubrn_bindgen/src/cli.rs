@@ -9,7 +9,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use cargo_metadata::Metadata;
 use clap::{command, Args};
-use ubrn_common::{mk_dir, CrateMetadata};
+use ubrn_common::{mk_dir, path_or_shim, CrateMetadata, Utf8PathBufExt as _};
 use uniffi_bindgen::{cargo_metadata::CrateConfigSupplier, BindingGenerator};
 
 #[cfg(feature = "wasm")]
@@ -134,8 +134,8 @@ impl BindingsArgs {
 
         mk_dir(&out.ts_dir)?;
         mk_dir(&out.cpp_dir)?;
-        let ts_dir = out.ts_dir.canonicalize_utf8()?;
-        let abi_dir = out.cpp_dir.canonicalize_utf8()?;
+        let ts_dir = out.ts_dir.canonicalize_utf8_or_shim()?;
+        let abi_dir = out.cpp_dir.canonicalize_utf8_or_shim()?;
 
         let switches = self.switches();
         let abi_dir = abi_dir.clone();
@@ -172,7 +172,7 @@ impl BindingsArgs {
 
         let configs: Vec<ModuleMetadata> = if input.library_mode {
             uniffi_bindgen::library_mode::generate_bindings(
-                &input.source,
+                &path_or_shim(&input.source)?,
                 input.crate_name.clone(),
                 binding_generator,
                 &config_supplier,

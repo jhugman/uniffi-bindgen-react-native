@@ -1,0 +1,8 @@
+rust:
+  directory: rust/shim
+  manifestPath: Cargo.toml
+web:
+  manifestPath: rust/crates/wasm-crate/Cargo.toml
+  features:
+    - wasm32_only
+    - some_feature

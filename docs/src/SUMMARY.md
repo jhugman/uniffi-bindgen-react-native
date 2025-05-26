@@ -28,6 +28,7 @@
 - [Turbo-module Templates: Adding or changing](contributing/changing-turbo-module-templates.md)
 - [Documentation: Contributing or reviewing](contributing/documentation.md)
 - [Typescript or C++ templates: Changing](contributing/changing-bindings-templates.md)
+- [Unit Testing the command line](contributing/testing_the_command_line.md)
 - [Cutting a Release](./contributing/cutting-a-release.md)
 
 # Reference
