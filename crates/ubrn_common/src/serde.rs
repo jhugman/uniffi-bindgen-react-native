@@ -13,5 +13,5 @@ where
     T: DeserializeOwned,
 {
     let empty = serde_json::Value::Object(Default::default());
-    serde_json::from_value(empty).unwrap_or_else(|_| panic!("Failed to create default"))
+    serde_json::from_value(empty).unwrap_or_else(|e| panic!("Failed to create default: {e:?}"))
 }

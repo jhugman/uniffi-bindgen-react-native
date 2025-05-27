@@ -41,8 +41,7 @@ impl RenderedFile for TMCpp {
 templated_file!(IndexTsx, "index.tsx");
 impl RenderedFile for IndexTsx {
     fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
-        let filename = "index.tsx";
-        self.config.project.tm.ts_path(project_root).join(filename)
+        self.config.project.tm.entrypoint(project_root)
     }
 }
 

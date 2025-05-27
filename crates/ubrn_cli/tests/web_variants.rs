@@ -156,3 +156,101 @@ fn test_multi_features() -> Result<()> {
         Ok(())
     })
 }
+
+/// Here we want to put the bindings in a distinct place to the React Native.
+/// We're need to add the tsBindings property to the web object in the ubrn.config.yaml.
+/// We're also going to use this test to show we're taking the entrypoint from
+/// browser property of package.json.
+#[test]
+fn test_distinct_bindings() -> Result<()> {
+    // Still using this target for initial build
+    let target_crate = cargo_build("arithmetic")?;
+    let fixtures_dir = fixtures_dir();
+    with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
+        // Set up file shims
+        shim_path(
+            "package.json",
+            fixtures_dir.join("distinct-bindings/package.json"),
+        );
+        shim_path(
+            "ubrn.config.yaml",
+            fixtures_dir.join("distinct-bindings/ubrn.config.yaml"),
+        );
+        shim_path("rust/shim/Cargo.toml", target_crate.manifest_path());
+        shim_path("rust/shim", target_crate.project_root());
+
+        shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(None, "debug"),
+        );
+
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(None, "debug"),
+        );
+
+        run_cli("ubrn build web --config ubrn.config.yaml")?;
+
+        assert_files(&[
+            // Bindings are set in ubrn.config.yaml, as the web/tsBindings property
+            File::new("web-src/bindings/arithmetic.ts"),
+            // Entrypoint is set in either: ubrn.config.yaml as web/entrypoint,
+            // or in package.json/browser.
+            File::new("web-src/index.ts")
+                .contains("import * as arithmetic from './bindings/arithmetic';")
+                .contains("import initAsync from './bindings/wasm-bindgen/index.js';")
+                .contains("import wasmPath from './bindings/wasm-bindgen/index_bg.wasm';"),
+        ]);
+
+        Ok(())
+    })
+}
+
+/// This is similar to the above, but: we're overriding both tsBindings and
+/// entrypoint in the ubrn.config.yaml file.
+#[test]
+fn test_override_entrypoint_in_config_yaml() -> Result<()> {
+    // Still using this target for initial build
+    let target_crate = cargo_build("arithmetic")?;
+    let fixtures_dir = fixtures_dir();
+    with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
+        // Set up file shims
+        shim_path(
+            "package.json",
+            fixtures_dir.join("distinct-bindings/package.json"),
+        );
+        shim_path(
+            "ubrn.config.yaml",
+            fixtures_dir.join("distinct-bindings/ubrn-with-entrypoint.config.yaml"),
+        );
+        shim_path("rust/shim/Cargo.toml", target_crate.manifest_path());
+        shim_path("rust/shim", target_crate.project_root());
+
+        shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(None, "debug"),
+        );
+
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(None, "debug"),
+        );
+
+        run_cli("ubrn build web --config ubrn.config.yaml")?;
+
+        assert_files(&[
+            // Bindings are set in ubrn.config.yaml, as the web/tsBindings property
+            File::new("bindings/wasm/arithmetic.ts"),
+            // Entrypoint is set in either: ubrn.config.yaml as web/entrypoint,
+            // or in package.json/browser.
+            File::new("entrypoints/web.ts")
+                .contains("import * as arithmetic from './../bindings/wasm/arithmetic';")
+                .contains("import initAsync from './../bindings/wasm/wasm-bindgen/index.js';")
+                .contains("import wasmPath from './../bindings/wasm/wasm-bindgen/index_bg.wasm';"),
+        ]);
+
+        Ok(())
+    })
+}

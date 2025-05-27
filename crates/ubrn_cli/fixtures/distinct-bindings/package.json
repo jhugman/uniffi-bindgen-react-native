@@ -1,0 +1,36 @@
+{
+  "name": "default-fixture",
+  "version": "0.1.0",
+  "description": "An automated test",
+  "default": "./web-src/index.ts",
+  "browser": "./web-src/index.ts",
+  "react-native": "./src/index.tsx",
+  "scripts": {
+    "example": "yarn workspace dummy-lib-example",
+    "test": "jest",
+    "typecheck": "tsc",
+    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
+    "prepare": "bob build",
+    "release": "release-it"
+  },
+  "keywords": [
+    "react-native",
+    "ios",
+    "android"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/dummy-lib.git"
+  },
+  "author": "James <noop@nomail.com> (https://nowhere.com/james)",
+  "license": "MIT",
+  "packageManager": "yarn@3.6.1",
+  "prettier": {
+    "quoteProps": "consistent",
+    "singleQuote": true,
+    "tabWidth": 2,
+    "trailingComma": "es5",
+    "useTabs": false
+  }
+}

@@ -9,7 +9,7 @@ pub(crate) mod rust_crate;
 use camino::{Utf8Path, Utf8PathBuf};
 use globset::GlobSet;
 use heck::ToUpperCamelCase;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 pub(crate) use npm::PackageJson;
 
@@ -87,6 +87,13 @@ fn strip_prefix<'a>(name: &'a str, prefix: &str) -> &'a str {
     name.strip_prefix(prefix).unwrap_or(name)
 }
 
+fn strip_dot_prefix(path_str: String) -> String {
+    path_str
+        .strip_prefix("./")
+        .map(str::to_string)
+        .unwrap_or(path_str)
+}
+
 pub(crate) fn trim_react_native(name: &str) -> String {
     strip_prefix(strip_prefix(name, "ReactNative"), "react-native")
         .trim_matches('-')
@@ -129,6 +136,21 @@ impl ProjectConfig {
     pub(crate) fn project_version(&self) -> String {
         self.project_version.clone()
     }
+
+    pub(crate) fn opt_relative_path<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(<Option<String>>::deserialize(deserializer)?.map(strip_dot_prefix))
+    }
+
+    pub(crate) fn relative_path<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path_str = String::deserialize(deserializer)?;
+        Ok(strip_dot_prefix(path_str))
+    }
 }
 
 impl ProjectConfig {
@@ -169,14 +191,24 @@ impl ProjectConfig {
     pub(crate) fn exclude_files(&self) -> &GlobSet {
         &self.exclude_files
     }
+
+    pub(crate) fn wasm_bindings_ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.wasm
+            .ts_bindings
+            .as_deref()
+            .map(|ts| project_root.join(ts))
+            .unwrap_or_else(|| self.bindings.ts_path(project_root))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BindingsConfig {
     #[serde(default = "BindingsConfig::default_cpp_dir")]
+    #[serde(deserialize_with = "ProjectConfig::relative_path")]
     pub(crate) cpp: String,
     #[serde(default = "BindingsConfig::default_ts_dir")]
+    #[serde(deserialize_with = "ProjectConfig::relative_path")]
     pub(crate) ts: String,
 
     #[serde(default)]
