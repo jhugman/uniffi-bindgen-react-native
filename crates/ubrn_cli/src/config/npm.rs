@@ -21,12 +21,10 @@ pub(crate) struct PackageJson {
     #[serde(default)]
     #[serde(deserialize_with = "ProjectConfig::opt_relative_path")]
     browser: Option<String>,
+    #[serde(alias = "react-native")]
     #[serde(default)]
     #[serde(deserialize_with = "ProjectConfig::opt_relative_path")]
     react_native: Option<String>,
-    #[serde(default)]
-    #[serde(deserialize_with = "ProjectConfig::opt_relative_path")]
-    main: Option<String>,
     #[serde(default)]
     codegen_config: RnCodegenConfig,
 }
@@ -78,11 +76,11 @@ impl PackageJson {
     }
 
     pub(crate) fn rn_entrypoint(&self) -> Option<String> {
-        self.react_native.as_ref().or(self.main.as_ref()).cloned()
+        self.react_native.as_ref().cloned()
     }
 
     pub(crate) fn browser_entrypoint(&self) -> Option<String> {
-        self.browser.as_ref().or(self.main.as_ref()).cloned()
+        self.browser.as_ref().cloned()
     }
 }
 

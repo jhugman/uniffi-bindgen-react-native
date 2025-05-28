@@ -168,6 +168,20 @@ exit_dir() {
   popd >/dev/null || error "Cannot exit directory"
 }
 
+# Returns true if first version is less than or equal to second version
+version_lte() {
+  # $1 is the version we're checking if it's less than or equal to $2
+  # Returns 0 (true) if $1 <= $2, otherwise 1 (false)
+  [[ "$1" = "$(echo -e "$1\n$2" | sort -V | head -n1)" ]]
+}
+
+# Returns true if first version is strictly less than second version
+version_lt() {
+  # $1 is the version we're checking if it's less than $2
+  # Returns 0 (true) if $1 < $2, otherwise 1 (false)
+  [[ "$1" != "$2" ]] && version_lte "$1" "$2"
+}
+
 create_library() {
   local directory
   local base
@@ -184,12 +198,18 @@ create_library() {
   fi
 
   local type="turbo-module"
-  if [[ "$BOB_VERSION" != "0.45.1" && "$BOB_VERSION" = "`echo -e "0.45.1\n$BOB_VERSION" | sort -V | head -n1`" ]]; then
+  if version_lt "$BOB_VERSION" "0.45.1"; then
     type="module-new"
   fi
 
+  # On a patch release, change the languages from cpp to kotlin-objc.
+  local languages="kotlin-objc"
+  if version_lt "$BOB_VERSION" "0.49.8"; then
+    languages="cpp"
+  fi
+
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
-  npm_config_yes=true npx "create-react-native-library@$BOB_VERSION" \
+  npm_config_yes=true npx create-react-native-library@$BOB_VERSION \
     --react-native-version "$RN_VERSION" \
     --slug "$PROJECT_SLUG" \
     --description "An automated test" \
@@ -197,7 +217,7 @@ create_library() {
     --author-email "noop@nomail.com" \
     --author-url "https://nowhere.com/james" \
     --repo-url "https://github.com/jhugman/$PROJECT_SLUG" \
-    --languages cpp \
+    --languages "$languages" \
     --type "$type" \
     --example vanilla \
     --local false \
@@ -306,7 +326,7 @@ check_lines() {
   check_line_unchanged "./ios/*.h" "<Native"
   check_line_unchanged "./ios/*.mm" "#import \""
   check_line_unchanged "./ios/*.mm" "@implementation"
-  check_line_unchanged "./ios/*.mm" "::multiply"
+  check_line_unchanged "./ios/*.mm" "multiply:"
   check_line_unchanged "./*.podspec" "s.name"
 }
 
@@ -320,7 +340,7 @@ generate_turbo_module_for_diffing() {
   echo "-- Running ubrn checkout"
   "$UBRN_BIN" checkout --config "$UBRN_CONFIG" 2>/dev/null
   echo "-- Running ubrn generate turbo-module"
-  "$UBRN_BIN" generate turbo-module --config "$UBRN_CONFIG" fake_module
+  "$UBRN_BIN" generate jsi turbo-module --config "$UBRN_CONFIG" fake_module
 
   local jvm_lang
   if [ "$BOB_VERSION" == "latest" ] ; then
