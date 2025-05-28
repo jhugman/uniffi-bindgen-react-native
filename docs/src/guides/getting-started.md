@@ -129,7 +129,7 @@ For now, we just want to get started; let's start with an existing Rust crate th
 rust:
   repo: https://github.com/jhugman/uniffi-starter.git
   branch: jhugman/bump-uniffi-to-0.29
-  manifestPath: foobar/Cargo.toml
+  manifestPath: rust/foobar/Cargo.toml
 ```
 
 Save this in a file at the root of your directory, called `ubrn.config.yaml`.
