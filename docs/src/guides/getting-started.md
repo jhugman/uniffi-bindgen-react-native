@@ -127,8 +127,8 @@ For now, we just want to get started; let's start with an existing Rust crate th
 ```yaml
 ---
 rust:
-  repo: https://github.com/ianthetechie/uniffi-starter
-  branch: main
+  repo: https://github.com/jhugman/uniffi-starter.git
+  branch: jhugman/bump-uniffi-to-0.29
   manifestPath: rust/foobar/Cargo.toml
 ```
 
