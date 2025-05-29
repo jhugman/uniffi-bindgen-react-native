@@ -17,10 +17,9 @@ execute_process(
     OUTPUT_VARIABLE UNIFFI_BINDGEN_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-string(REGEX
-  REPLACE "/package\\.json$" ""
-  UNIFFI_BINDGEN_PATH ${UNIFFI_BINDGEN_PATH}
-)
+# Get the directory; get_filename_component and cmake_path will normalize
+# paths with Windows path separators.
+get_filename_component(UNIFFI_BINDGEN_PATH "${UNIFFI_BINDGEN_PATH}" DIRECTORY)
 
 # Specifies a path to native header files.
 include_directories(
