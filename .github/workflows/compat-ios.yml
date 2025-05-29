@@ -2,7 +2,7 @@ name: Compat / iOS
 
 on:
   schedule:
-    - cron: "0 0 * * *" # Once a day at midnight
+    - cron: "0 0 * * 1" # Once a week at midnight on Monday
   pull_request:
     branches: ["main"]
 
@@ -14,10 +14,8 @@ jobs:
     strategy:
       matrix:
         bob-version:
-          - 0.48.9
-          - 0.49.5
+          - 0.49.10
         rn-version:
-          - 0.76.9
           - 0.77.2
           - 0.78.2
       # Uncomment to debug failures
