@@ -22,6 +22,10 @@ default = []
         {%- endfor -%}
     ]
     {%- else %}
+    {%- endmatch %}
+    {%- match config.project.wasm.default_features %}
+    {%- when Some(flag) %}, default-features = {{ flag }}
+    {%- else %}
     {%- endmatch %} }
 # We want to ensure that the version of wasm-bindgen is selected by the
 # uniffi-runtime-javascript crate.

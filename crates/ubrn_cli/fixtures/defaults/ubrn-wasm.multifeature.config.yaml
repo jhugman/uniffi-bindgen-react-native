@@ -6,3 +6,4 @@ web:
   features:
     - wasm32_only
     - some_feature
+  defaultFeatures: false

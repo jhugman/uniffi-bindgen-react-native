@@ -31,6 +31,9 @@ pub(crate) struct WasmConfig {
     #[serde(default)]
     pub(crate) features: Option<Vec<String>>,
 
+    #[serde(default)]
+    pub(crate) default_features: Option<bool>,
+
     /// Has this crate been added to a workspace. Default is false.
     #[serde(default = "WasmConfig::default_is_workspace")]
     pub(crate) workspace: bool,

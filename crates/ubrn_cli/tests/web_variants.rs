@@ -142,14 +142,15 @@ fn test_multi_features() -> Result<()> {
             Command::new("cargo")
                 .arg("build")
                 .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
-                .arg_pair("--features", "wasm32_only,some_feature"),
+                .arg_pair("--features", "wasm32_only,some_feature")
+                .arg("--no-default-features"),
             // other commands elided.
         ]);
 
         assert_files(&[
             File::new("rust/crates/wasm-crate/Cargo.toml")
                 .contains("[workspace]")
-                .contains("uniffi-example-arithmetic = { path = \"../../shim\", features = [\"wasm32_only\", \"some_feature\"] }"),
+                .contains("uniffi-example-arithmetic = { path = \"../../shim\", features = [\"wasm32_only\", \"some_feature\"], default-features = false }"),
             // other files elided.
         ]);
 
