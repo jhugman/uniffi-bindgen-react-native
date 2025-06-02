@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "ubrn:android": "ubrn build android --and-generate --config ubrn.config.yaml",
+    "ubrn:ios": "ubrn build ios --and-generate --config ubrn.config.yaml",
+    "ubrn:web": "ubrn build web --config ubrn.config.yaml"
+  },
   "codegenConfig": {
     "outputDir": {
       "ios": "ios/tmp",

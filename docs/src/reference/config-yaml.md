@@ -172,7 +172,7 @@ The boolean `workspace` controls if the wasm crate is part of [an existing Rust 
 
 `entrypoint` is the filepath of the file which loads and exports the bindings. By default this is taken from the `browser` property of `package.json`, or `src/index.web.ts` if that is missing.
 
-`tsBindings` is the directory where the typescript bindings are generated. This overrides the [`bindings`/`ts`][#bindings] directory.
+`tsBindings` is the directory where the typescript bindings are generated. This overrides the [`bindings`/`ts`](#bindings) directory.
 
 ```admonish warning
 Uniffi is unable to process WASM files directly, so has to use a `lib.a` file built for the build environment.

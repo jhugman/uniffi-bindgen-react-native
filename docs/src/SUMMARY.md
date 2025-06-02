@@ -4,9 +4,20 @@
 
 # Getting started
 
-- [Before you start](guides/pre-installation.md)
-- [Step by step: Make your first library project](guides/getting-started.md)
-  - [Troubleshooting](guides/troubleshooting.md)
+## React Native
+
+- [Before you start](guides/rn/pre-installation.md)
+- [Step by step: Make your first library project](guides/rn/getting-started.md)
+  - [Troubleshooting](guides/rn/troubleshooting.md)
+
+## WASM
+
+- [Before you start](guides/web/pre-installation.md)
+- [Step by step: Make your first library project](guides/web/getting-started.md)
+  - [Troubleshooting](guides/web/troubleshooting.md)
+
+# Guides
+
 - [Publishing your library project](guides/publishing.md)
 - [Working with multiple crates in one library](guides/megazords.md)
 
@@ -22,12 +33,14 @@
 - [Promises/Futures](idioms/promises.md)
 - [Async Callback interfaces](idioms/async-callbacks.md)
 - [Option and Result](idioms/option-result.md)
+- [Threading](idioms/threading.md)
+
 # Contributing
 
 - [Local development](contributing/local-development.md)
-- [Turbo-module Templates: Adding or changing](contributing/changing-turbo-module-templates.md)
+- [Turbo-module and WASM crate templates: Adding or changing](contributing/changing-turbo-module-templates.md)
 - [Documentation: Contributing or reviewing](contributing/documentation.md)
-- [Typescript or C++ templates: Changing](contributing/changing-bindings-templates.md)
+- [Typescript, C++, WASM crate bindings templates: Changing](contributing/changing-bindings-templates.md)
 - [Unit Testing the command line](contributing/testing_the_command_line.md)
 - [Cutting a Release](./contributing/cutting-a-release.md)
 
