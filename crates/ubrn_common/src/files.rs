@@ -138,6 +138,8 @@ where
     Ok(if is_yaml(file) {
         serde_yaml::from_str(&s)
             .with_context(|| format!("Failed to read {file:?} as valid YAML"))?
+    } else if is_toml(file) {
+        toml::from_str(&s).with_context(|| format!("Failed to read {file:?} as valid TOML"))?
     } else {
         serde_json::from_str(&s)
             .with_context(|| format!("Failed to read {file:?} as valid YAML or JSON"))?
@@ -184,6 +186,14 @@ where
 {
     let ext = file.as_ref().extension().unwrap_or_default();
     ext == "yaml" || ext == "yml"
+}
+
+fn is_toml<P>(file: P) -> bool
+where
+    P: AsRef<Utf8Path>,
+{
+    let ext = file.as_ref().extension().unwrap_or_default();
+    ext == "toml"
 }
 
 pub fn write_file<P: AsRef<Utf8Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {

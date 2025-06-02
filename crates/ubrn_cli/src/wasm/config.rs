@@ -21,6 +21,10 @@ pub(crate) struct WasmConfig {
     #[serde(deserialize_with = "CrateConfig::validate_manifest_path")]
     pub(crate) manifest_path: String,
 
+    #[serde(default)]
+    #[serde(deserialize_with = "ProjectConfig::opt_relative_path")]
+    pub(crate) manifest_patch_file: Option<String>,
+
     #[serde(default = "WasmConfig::default_wasm_crate_name")]
     pub(crate) wasm_crate_name: String,
 

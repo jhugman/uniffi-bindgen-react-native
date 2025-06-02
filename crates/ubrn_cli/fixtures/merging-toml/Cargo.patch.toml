@@ -1,0 +1,9 @@
+[dependencies]
+foo = "PATCHED"
+uniffi-example-arithmetic = { no-default-features = true }
+wasm-bindgen = "PATCHED"
+zzz = "PATCHED"
+
+
+[patch]
+patch = { patch = "patch" }
