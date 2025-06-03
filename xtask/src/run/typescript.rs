@@ -82,19 +82,24 @@ impl EntryArg {
 }
 
 pub(crate) fn typecheck_ts(file: &Utf8Path) -> Result<()> {
-    run_tsc(file, tsc_typecheck)?;
+    run_tsc(file, "ES2021", tsc_typecheck)?;
     Ok(())
 }
 
 pub(crate) fn compile_ts(file: &Utf8Path, stem: &str, bundle_name: &str) -> Result<Utf8PathBuf> {
     let outdir = ts_out_dir()?.join(bundle_name);
-    let compile_ts = |dir: &Utf8Path, tsconfig: &Utf8Path| tsc_compile(&outdir, dir, tsconfig);
-    run_tsc(file, compile_ts)?;
+    run_tsc(file, "es5", |dir: &Utf8Path, tsconfig: &Utf8Path| {
+        tsc_compile(&outdir, dir, tsconfig)
+    })?;
     let entry = find(&outdir, &format!("{stem}.js")).expect("just made this js file");
     Ok(entry)
 }
 
-fn run_tsc(file: &Utf8Path, func: impl FnOnce(&Utf8Path, &Utf8Path) -> Result<()>) -> Result<()> {
+fn run_tsc(
+    file: &Utf8Path,
+    target: &str,
+    func: impl FnOnce(&Utf8Path, &Utf8Path) -> Result<()>,
+) -> Result<()> {
     let dir = file.parent().expect("a parent directory for the file");
     let tsconfig = dir.join("tsconfig.json");
     let use_template_tsconfig = !tsconfig.exists();
@@ -103,7 +108,9 @@ fn run_tsc(file: &Utf8Path, func: impl FnOnce(&Utf8Path, &Utf8Path) -> Result<()
         let template_file = typescript_dir()?.join("tsconfig.template.json");
         let root = diff_utf8_paths(root, dir).expect("A path between the file and the repo");
         let contents = ubrn_common::read_to_string(template_file)?;
-        let contents = contents.replace("{{repository_root}}", root.as_str());
+        let contents = contents
+            .replace("{{repository_root}}", root.as_str())
+            .replace("{{target}}", target);
         ubrn_common::write_file(&tsconfig, contents)?;
     }
     let result = func(dir, &tsconfig);

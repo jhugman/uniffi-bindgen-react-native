@@ -140,7 +140,14 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
     {%- endif %}
 }
 
-const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
+const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = (() => {
+    {% if flavor.supports_finalization_registry() %}
+    /// <reference lib="es2021" />
+    const registry = typeof FinalizationRegistry !== 'undefined' ? new FinalizationRegistry<UnsafeMutableRawPointer>((heldValue: UnsafeMutableRawPointer) => {
+        {{ obj_factory }}.freePointer(heldValue);
+    }) : null;
+    {% endif %}
+    return {
     create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
         const instance = Object.create({{ impl_class_name }}.prototype);
         instance[pointerLiteralSymbol] = pointer;
@@ -150,21 +157,21 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     },
 
     {% if flavor.supports_finalization_registry() %}
-    registry: new FinalizationRegistry<UnsafeMutableRawPointer>((heldValue) => {
-        {{ obj_factory }}.freePointer(heldValue);
-    }),
-
     bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
         const ptr = {
             p, // make sure this object doesn't get optimized away.
             markDestroyed: () => undefined,
         };
-        {{ obj_factory }}.registry.register(ptr, p, ptr);
+        if (registry) {
+            registry.register(ptr, p, ptr);
+        }
         return ptr;
     },
 
     unbless(ptr: UniffiRustArcPtr) {
-        {{ obj_factory }}.registry.unregister(ptr);
+        if (registry) {
+            registry.unregister(ptr);
+        }
     },
     {%- else %}
     bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
@@ -205,7 +212,7 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = {
     isConcreteType(obj: any): obj is {{ type_name }} {
         return obj[destructorGuardSymbol] && obj[uniffiTypeNameSymbol] === "{{ impl_class_name }}";
     },
-};
+}})();
 
 {%- if !obj.has_callback_interface() %}
 // FfiConverter for {{ type_name }}
