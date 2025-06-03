@@ -232,7 +232,7 @@ Options:
 
           Overrides the setting in the config file.
 
-          If that is missing, then defualt to "web".
+          If that is missing, then default to "web".
 
   -r, --release
           Build a release build

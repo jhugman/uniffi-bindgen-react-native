@@ -190,7 +190,7 @@ This won't happen with the `uniffi-starter` library, however a common error is t
 
 Building for Web will:
 
-1. Build the Rust crate for you machine
+1. Build the Rust crate for your machine
 1. Use the built library file to generate
    - a WASM crate
    - Typescript bindings
