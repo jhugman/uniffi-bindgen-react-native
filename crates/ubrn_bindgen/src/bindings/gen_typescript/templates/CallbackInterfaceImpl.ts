@@ -9,7 +9,7 @@
 {%- let trait_impl = format!("uniffiCallbackInterface{}", name) %}
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
-const {{ trait_impl }}: { vtable: {{ vtable|ffi_type_name }}; register: () => void; } = {
+const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_name }}{% else %}any{% endif %}; register: () => void; } = {
     // Create the VTable using a series of closures.
     // ts automatically converts these into C callback functions.
     vtable: {
