@@ -11,10 +11,13 @@ use camino::Utf8Path;
 
 use crate::bootstrap::YarnCmd;
 
+use super::typescript::typecheck_ts;
+
 pub(crate) struct NodeJs;
 
 impl NodeJs {
     pub(crate) fn tsx(&self, file: &Utf8Path) -> Result<()> {
+        typecheck_ts(file)?;
         let node_modules = YarnCmd::node_modules()?;
         let Some(tsx) = ubrn_common::find(node_modules, ".bin/tsx") else {
             unreachable!("Can't find tsx; this is likely a change in how tsx is packaged");
