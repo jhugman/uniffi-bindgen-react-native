@@ -45,7 +45,7 @@ const {
 {%- endfor %}
 
 {%- if flavor.is_jsi() %}
-const uniffiCaller = new UniffiRustCaller();
+const uniffiCaller = new UniffiRustCaller(() => ({ code: 0 }));
 {%- else %}
 const nativeModule = () => wasmBundle;
 const uniffiCaller = new UniffiRustCaller(() => new wasmBundle.RustCallStatus());
