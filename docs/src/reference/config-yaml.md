@@ -141,24 +141,30 @@ This section can be omitted entirely, as sensible defaults are provided. If you 
 
 ```yaml
 web:
-	manifestPath: rust_modules/wasm/Cargo.toml
-	wasmCrateName: <DERIVED FROM package.json>
-	features: []
-	workspace: false
-	runtimeVersion: <DERIVED FROM UBRN>
-	cargoExtras: []
-	target: web
-	wasmBindgenExtras: []
-	entrypoint: <DERIVED FROM package.json> or "src/index.web.ts"
-	tsBindings: <SAME AS bindings/ts>
+    manifestPath: rust_modules/wasm/Cargo.toml
+    manifestPatchFile: null
+    wasmCrateName: <DERIVED FROM package.json>
+    features: []
+    defaultFeatures: true
+    workspace: false
+    runtimeVersion: <DERIVED FROM UBRN>
+    cargoExtras: []
+    target: web
+    wasmBindgenExtras: []
+    entrypoint: <DERIVED FROM package.json> or "src/index.web.ts"
+    tsBindings: <SAME AS bindings/ts>
 
 ```
 
 The `manifestPath` is the path to the generated wasm-crate. The location of paths for the `generate wasm wasm-crate` and for the rust files for `generate wasm bindings` are derived from this path.
 
+The `manifestPatchFile` is a path to a TOML file that will be used to patch merge on top of the generated wasm-crate `Cargo.toml`. This is extremely useful when customizing the manifest. e.g. when [overriding dependencies](https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html) in the target crate.
+
 The `wasmCrateName` is the name of the wasm-crate, derived from the `package.json` `name` property.
 
 The `features` array is used to build the target crate, _and_ then added to the wasm crate's `Cargo.toml`.
+
+The `defaultFeatures` flag pairs with the `features` array: it is used to build the target crate (toggling the `--no-default-features` command line option) and then added to the wasm crate's `Cargo.toml`, as `default-features`.
 
 The boolean `workspace` controls if the wasm crate is part of [an existing Rust workspace](https://doc.rust-lang.org/cargo/reference/workspaces.html). The default value assumes that the target crate doesn't know anything about the wasm-crate, so the wasm-crate is in its own workspace. If the target crate is in a workspace, and that can be changed, then this setting can be changed to `true`. Tip: [`members` can contain globs](https://doc.rust-lang.org/cargo/reference/workspaces.html#:~:text=the%20members%20list%20also%20supports%20globs) to point to crates that don't yet exist.
 
