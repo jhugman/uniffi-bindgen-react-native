@@ -107,4 +107,10 @@
 {%- include "ExternalTemplate.ts" %}
 {%- endfor %}
 
+{%- if !flavor.is_jsi() %}
+
+{% include "CallbackRuntime.ts" %}
+
+{%- endif %}
+
 {% include "InitializationTemplate.ts" %}
