@@ -1,0 +1,10 @@
+{
+  "name": "default-fixture",
+  "version": "0.1.0",
+  "description": "An automated test",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/dummy-lib.git"
+  },
+  "author": "James <noop@nomail.com> (https://nowhere.com/james)"
+}

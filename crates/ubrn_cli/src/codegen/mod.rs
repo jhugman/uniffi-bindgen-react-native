@@ -31,6 +31,10 @@ pub(crate) trait RenderedFile: DynTemplate {
     fn filter_by(&self) -> bool {
         true
     }
+    /// Optional hook to transform the text after rendered from the Askama template.
+    fn transform_str(&self, _project_root: &Utf8Path, contents: String) -> Result<String> {
+        Ok(contents)
+    }
 }
 
 pub(crate) struct TemplateConfig {
@@ -98,7 +102,7 @@ fn render_templates(
     for f in files {
         let text = f.dyn_render()?;
         let path = f.path(project_root);
-        map.insert(path, text);
+        map.insert(path, f.transform_str(project_root, text)?);
     }
     Ok(map)
 }

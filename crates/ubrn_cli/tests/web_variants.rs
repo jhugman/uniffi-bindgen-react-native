@@ -142,14 +142,15 @@ fn test_multi_features() -> Result<()> {
             Command::new("cargo")
                 .arg("build")
                 .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
-                .arg_pair("--features", "wasm32_only,some_feature"),
+                .arg_pair("--features", "wasm32_only,some_feature")
+                .arg("--no-default-features"),
             // other commands elided.
         ]);
 
         assert_files(&[
             File::new("rust/crates/wasm-crate/Cargo.toml")
                 .contains("[workspace]")
-                .contains("uniffi-example-arithmetic = { path = \"../../shim\", features = [\"wasm32_only\", \"some_feature\"] }"),
+                .contains("uniffi-example-arithmetic = { path = \"../../shim\", features = [\"wasm32_only\", \"some_feature\"], default-features = false }"),
             // other files elided.
         ]);
 
@@ -249,6 +250,59 @@ fn test_override_entrypoint_in_config_yaml() -> Result<()> {
                 .contains("import * as arithmetic from './../bindings/wasm/arithmetic';")
                 .contains("import initAsync from './../bindings/wasm/wasm-bindgen/index.js';")
                 .contains("import wasmPath from './../bindings/wasm/wasm-bindgen/index_bg.wasm';"),
+        ]);
+
+        Ok(())
+    })
+}
+
+/// This is similar to the above, but: we're overriding both tsBindings and
+/// entrypoint in the ubrn.config.yaml file.
+#[test]
+fn test_merged_cargo_toml_patch() -> Result<()> {
+    // Still using this target for initial build
+    let target_crate = cargo_build("arithmetic")?;
+    let fixtures_dir = fixtures_dir();
+    with_fixture(fixtures_dir.clone(), "merging-toml", |_fixture_dir| {
+        // Set up file shims
+        shim_path(
+            "package.json",
+            fixtures_dir.join("merging-toml/package.json"),
+        );
+        shim_path(
+            "ubrn.config.yaml",
+            fixtures_dir.join("merging-toml/ubrn.config.yaml"),
+        );
+
+        shim_path(
+            "Cargo.patch.toml",
+            fixtures_dir.join("merging-toml/Cargo.patch.toml"),
+        );
+        shim_path("rust/shim/Cargo.toml", target_crate.manifest_path());
+        shim_path("rust/shim", target_crate.project_root());
+
+        shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(None, "debug"),
+        );
+
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(None, "debug"),
+        );
+
+        run_cli("ubrn build web --config ubrn.config.yaml")?;
+
+        assert_files(&[
+            // Bindings are set in ubrn.config.yaml, as the web/tsBindings property
+            File::new("rust_modules/wasm/Cargo.toml")
+                .contains("[dependencies]")
+                .contains(
+                    "[dependencies.uniffi-example-arithmetic]\nno-default-features = true\npath =",
+                )
+                .contains("wasm-bindgen = \"PATCHED\"")
+                .contains("zzz = \"PATCHED\""),
         ]);
 
         Ok(())

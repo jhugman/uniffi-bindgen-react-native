@@ -1,0 +1,6 @@
+rust:
+  directory: rust/shim
+  manifestPath: Cargo.toml
+web:
+  manifestPath: rust_modules/wasm/Cargo.toml
+  manifestPatchFile: config/Cargo.patch.toml

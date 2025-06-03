@@ -28,7 +28,9 @@ heck = { workspace = true }
 paste = { workspace = true }
 pathdiff = { workspace = true }
 serde = { workspace = true }
+serde-toml-merge = "0.3.9"
 textwrap = "0.16.1"
+toml = { workspace = true, features = ["display"] }
 topological-sort = "0.2.2"
 ubrn_bindgen = { path = "../ubrn_bindgen", features = ["wasm"] }
 ubrn_common = { path = "../ubrn_common" }

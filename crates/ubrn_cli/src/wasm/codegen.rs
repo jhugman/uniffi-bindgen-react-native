@@ -5,6 +5,7 @@
  */
 use std::rc::Rc;
 
+use anyhow::{anyhow, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 
 use ubrn_bindgen::{generate_entrypoint, AbiFlavor, SwitchArgs};
@@ -24,6 +25,21 @@ templated_file!(WasmCargoToml, "Cargo.toml");
 impl RenderedFile for WasmCargoToml {
     fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         self.config.project.wasm.manifest_path(project_root)
+    }
+    fn transform_str(&self, project_root: &Utf8Path, contents: String) -> Result<String> {
+        Ok(
+            if let Some(patch_file) = &self.config.project.wasm.manifest_patch_file {
+                use toml::to_string;
+                let path = project_root.join(patch_file);
+                let patch: toml::Value = ubrn_common::read_from_file(&path)?;
+                let rendered: toml::Value = toml::from_str(&contents)?;
+                let merged: toml::Value = serde_toml_merge::merge(rendered, patch)
+                    .map_err(|e| anyhow!("TOML merge error: {e}"))?;
+                to_string(&merged)?
+            } else {
+                contents
+            },
+        )
     }
 }
 impl WasmCargoToml {

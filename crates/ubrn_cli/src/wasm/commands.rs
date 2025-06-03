@@ -10,7 +10,10 @@ use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use ubrn_common::{run_cmd, CrateMetadata};
 
-use super::config::{Target, WasmTarget};
+use super::{
+    config::{Target, WasmTarget},
+    WasmConfig,
+};
 use crate::{
     commands::building::CommonBuildArgs,
     config::{ExtraArgs, ProjectConfig},
@@ -46,11 +49,7 @@ impl WebBuildArgs {
     pub(crate) fn build(&self) -> Result<Vec<Utf8PathBuf>> {
         let config = self.project_config()?;
         let crate_ = &config.crate_;
-        self.cargo_build(
-            &crate_.manifest_path()?,
-            config.wasm.features.as_deref(),
-            &crate_.crate_dir()?,
-        )?;
+        self.cargo_build(&crate_.manifest_path()?, &config.wasm, &crate_.crate_dir()?)?;
         let metadata = crate_.metadata()?;
         let library_path = metadata.library_path(None, "debug");
         Ok(vec![library_path])
@@ -95,7 +94,7 @@ impl WebBuildArgs {
     fn cargo_build(
         &self,
         manifest_path: &Utf8Path,
-        features: Option<&[String]>,
+        wasm_config: &WasmConfig,
         rust_dir: &Utf8Path,
     ) -> Result<()> {
         println!("Compiling for wasm32 manifest at {manifest_path}");
@@ -104,8 +103,15 @@ impl WebBuildArgs {
             .arg("--manifest-path")
             .arg(manifest_path)
             .current_dir(rust_dir);
-        if let Some(features) = features {
+        if let Some(features) = &wasm_config.features {
             cmd.arg("--features").arg(features.join(","));
+        }
+        if let Some(default_features) = &wasm_config.default_features {
+            if *default_features {
+                cmd.arg("--default-features");
+            } else {
+                cmd.arg("--no-default-features");
+            }
         }
         run_cmd(&mut cmd)?;
         Ok(())
