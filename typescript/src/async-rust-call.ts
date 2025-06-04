@@ -50,12 +50,12 @@ type PollFunc = (
  * @param freeFunc is finally called with the Rust future handle to drop the now complete Rust
  *  future.
  */
-export async function uniffiRustCallAsync<F, T>(
-  rustCaller: UniffiRustCaller,
+export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
+  rustCaller: UniffiRustCaller<S>,
   rustFutureFunc: () => bigint,
   pollFunc: PollFunc,
   cancelFunc: (rustFuture: bigint) => void,
-  completeFunc: (rustFuture: bigint, status: UniffiRustCallStatus) => F,
+  completeFunc: (rustFuture: bigint, status: S) => F,
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
   liftString: (bytes: UniffiByteArray) => string,

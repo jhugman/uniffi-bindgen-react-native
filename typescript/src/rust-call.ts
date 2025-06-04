@@ -19,13 +19,11 @@ export type UniffiRustCallStatus = {
   code: number;
   errorBuf?: UniffiByteArray;
 };
-export class UniffiRustCaller {
-  constructor(
-    private statusConstructor: () => UniffiRustCallStatus = uniffiCreateCallStatus,
-  ) {}
+export class UniffiRustCaller<Status extends UniffiRustCallStatus> {
+  constructor(private statusConstructor: () => Status) {}
 
   rustCall<T>(
-    caller: RustCallFn<T>,
+    caller: RustCallFn<Status, T>,
     liftString: StringLifter = emptyStringLifter,
   ): T {
     return this.makeRustCall(caller, liftString);
@@ -33,20 +31,17 @@ export class UniffiRustCaller {
 
   rustCallWithError<T>(
     errorHandler: UniffiErrorHandler,
-    caller: RustCallFn<T>,
+    caller: RustCallFn<Status, T>,
     liftString: StringLifter = emptyStringLifter,
   ): T {
     return this.makeRustCall(caller, liftString, errorHandler);
   }
 
-  createCallStatus(): UniffiRustCallStatus {
+  createCallStatus(): Status {
     return this.statusConstructor();
   }
 
-  createErrorStatus(
-    code: number,
-    errorBuf: UniffiByteArray,
-  ): UniffiRustCallStatus {
+  createErrorStatus(code: number, errorBuf: UniffiByteArray): Status {
     const status = this.statusConstructor();
     status.code = code;
     status.errorBuf = errorBuf;
@@ -54,7 +49,7 @@ export class UniffiRustCaller {
   }
 
   makeRustCall<T>(
-    caller: RustCallFn<T>,
+    caller: RustCallFn<Status, T>,
     liftString: StringLifter,
     errorHandler?: UniffiErrorHandler,
   ): T {
@@ -70,7 +65,7 @@ function uniffiCreateCallStatus(): UniffiRustCallStatus {
 }
 
 export type UniffiErrorHandler = (buffer: UniffiByteArray) => Error;
-type RustCallFn<T> = (status: UniffiRustCallStatus) => T;
+type RustCallFn<S, T> = (status: S) => T;
 
 function uniffiCheckCallStatus(
   callStatus: UniffiRustCallStatus,

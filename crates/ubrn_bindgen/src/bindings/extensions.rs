@@ -131,6 +131,22 @@ pub(crate) impl ComponentInterface {
         self.ffi_definitions().filter(|d| d.is_exported())
     }
 
+    fn iter_ffi_callback_literals(&self) -> impl Iterator<Item = FfiCallbackFunction> {
+        self.ffi_definitions().filter_map(|d| match d {
+            FfiDefinition::CallbackFunction(cb) if cb.is_function_literal() => Some(cb),
+            _ => None,
+        })
+    }
+
+    fn iter_ffi_structs_for_callbacks(&self) -> impl Iterator<Item = FfiStruct> {
+        self.ffi_definitions().filter_map(|d| match d {
+            FfiDefinition::Struct(st) if st.is_foreign_future() && st.name() != "ForeignFuture" => {
+                Some(st)
+            }
+            _ => None,
+        })
+    }
+
     fn cpp_namespace(&self) -> String {
         format!("uniffi::{}", self.namespace().to_snake_case())
     }
@@ -149,6 +165,10 @@ pub(crate) impl ComponentInterface {
 
     fn has_async_calls(&self) -> bool {
         self.iter_callables().any(|c| c.is_async())
+    }
+
+    fn has_async_callbacks(&self) -> bool {
+        self.has_async_callback_interface_definition()
     }
 
     /// We want to control the ordering of definitions in typescript, especially
