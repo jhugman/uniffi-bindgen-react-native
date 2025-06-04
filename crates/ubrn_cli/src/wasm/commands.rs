@@ -15,15 +15,14 @@ use super::{
     WasmConfig,
 };
 use crate::{
-    commands::building::CommonBuildArgs,
+    commands::{building::CommonBuildArgs, ConfigArgs},
     config::{ExtraArgs, ProjectConfig},
 };
 
 #[derive(Args, Debug)]
 pub(crate) struct WebBuildArgs {
-    /// The configuration file for this build
-    #[clap(long)]
-    config: Utf8PathBuf,
+    #[clap(flatten)]
+    config: ConfigArgs,
 
     /// Opts out of generating the bindings and wasm-crate.
     #[clap(long, conflicts_with_all = ["and_generate"])]

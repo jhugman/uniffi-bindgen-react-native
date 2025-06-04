@@ -14,23 +14,33 @@ use ubrn_common::run_cmd;
 
 use crate::{config::ProjectConfig, AsConfig};
 
+use super::ConfigArgs;
+
 #[derive(Debug, Args)]
 pub(crate) struct CheckoutArgs {
     #[clap(long, conflicts_with_all = ["repo"])]
     config: Option<Utf8PathBuf>,
 
     #[clap(flatten)]
-    repo: Option<GitRepoArgs>,
+    repo: Option<RepoArgs>,
 }
 
-#[derive(Args, Clone, Debug, Deserialize)]
-pub(crate) struct GitRepoArgs {
+#[derive(Args, Clone, Debug)]
+struct RepoArgs {
     /// The repository where to get the crate
-    pub(crate) repo: String,
+    repo: Option<String>,
     /// The branch or tag which to checkout
     #[clap(long, default_value = "main")]
+    branch: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct GitRepoArgs {
+    /// The repository where to get the crate
+    repo: String,
+    /// The branch or tag which to checkout
     #[serde(alias = "rev", alias = "ref", default = "GitRepoArgs::default_branch")]
-    pub(crate) branch: String,
+    branch: String,
 }
 
 impl GitRepoArgs {
@@ -122,11 +132,14 @@ impl TryFrom<ProjectConfig> for GitRepoArgs {
 }
 
 impl AsConfig<GitRepoArgs> for CheckoutArgs {
-    fn config_file(&self) -> Option<Utf8PathBuf> {
-        self.config.clone()
+    fn config_file(&self) -> ConfigArgs {
+        ConfigArgs::new(self.config.clone())
     }
 
     fn get(&self) -> Option<GitRepoArgs> {
-        self.repo.clone()
+        let args = self.repo.clone()?;
+        let branch = args.branch;
+        let repo = args.repo?;
+        Some(GitRepoArgs { repo, branch })
     }
 }
