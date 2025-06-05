@@ -16,16 +16,15 @@ use uniffi_bindgen::{
 };
 
 use crate::{
-    commands::building::CommonBuildArgs,
+    commands::{building::CommonBuildArgs, ConfigArgs},
     config::{rust_crate::CrateConfig, ExtraArgs, ProjectConfig},
     jsi::ios::config::{Platform, Target},
 };
 
 #[derive(Args, Debug)]
 pub(crate) struct IosBuildArgs {
-    /// The configuration file for this build
-    #[clap(long)]
-    config: Utf8PathBuf,
+    #[clap(flatten)]
+    config: ConfigArgs,
 
     /// Only build for the simulator
     #[clap(long, default_value = "false")]

@@ -18,6 +18,7 @@ pub mod test_utils;
 pub use anyhow::{Error, Result};
 pub use camino::Utf8PathBuf;
 
+use commands::ConfigArgs;
 use config::ProjectConfig;
 use ubrn_bindgen::AbiFlavor;
 
@@ -26,17 +27,15 @@ pub(crate) trait AsConfig<T>
 where
     T: TryFrom<ProjectConfig, Error = Error>,
 {
-    fn config_file(&self) -> Option<Utf8PathBuf>;
+    fn config_file(&self) -> ConfigArgs;
     fn get(&self) -> Option<T>;
 
     fn as_config(&self) -> Result<T> {
         if let Some(t) = self.get() {
             Ok(t)
-        } else if let Some(f) = self.config_file() {
-            let config: ProjectConfig = f.try_into()?;
-            config.try_into()
         } else {
-            anyhow::bail!("Could not find a suitable value")
+            let config = ProjectConfig::try_from(self.config_file())?;
+            T::try_from(config)
         }
     }
 }

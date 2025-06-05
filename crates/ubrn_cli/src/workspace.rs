@@ -8,20 +8,25 @@ use camino::Utf8PathBuf;
 
 use crate::config::PackageJson;
 
-fn package_json_file() -> Result<Utf8PathBuf> {
+fn find_file_in_parents(file_suffix: &str) -> Result<Utf8PathBuf> {
     let pwd = ubrn_common::pwd()?;
-
-    let package_json = ubrn_common::resolve(pwd, "package.json")?;
-    Ok(package_json.expect("Must be run under a directory containing a package.json file"))
+    Ok(match ubrn_common::resolve(pwd, file_suffix)? {
+        Some(file) => file,
+        _ => anyhow::bail!("{file_suffix} can't be found in current directory"),
+    })
 }
 
 pub(crate) fn package_json() -> PackageJson {
-    let file = package_json_file().expect("Cannot file package.json");
+    let file = find_file_in_parents("package.json").expect("Cannot find package.json");
     ubrn_common::read_from_file(file).expect("Cannot load package.json")
 }
 
 pub(crate) fn project_root() -> Result<Utf8PathBuf> {
-    let package_json = package_json_file()?;
+    let package_json = find_file_in_parents("package.json")?;
     let dir = package_json.parent().expect("Must be a directory");
     Ok(dir.into())
+}
+
+pub(crate) fn ubrn_config_yaml() -> Result<Utf8PathBuf> {
+    find_file_in_parents("ubrn.config.yaml")
 }

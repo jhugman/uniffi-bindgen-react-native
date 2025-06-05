@@ -4,10 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+mod args;
 pub(crate) mod building;
 pub(crate) mod checkout;
 pub(crate) mod generate;
 
+pub(crate) use args::ConfigArgs;
 pub(crate) use building::BuildArgs;
 pub(crate) use checkout::CheckoutArgs;
 pub(crate) use generate::GenerateArgs;

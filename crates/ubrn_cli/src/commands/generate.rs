@@ -20,6 +20,8 @@ use crate::{
     jsi, Platform,
 };
 
+use super::ConfigArgs;
+
 #[derive(Args, Debug)]
 pub(crate) struct GenerateArgs {
     #[clap(subcommand)]
@@ -85,9 +87,8 @@ impl GenerateCmd {
 
 #[derive(Args, Debug)]
 pub(crate) struct GenerateAllArgs {
-    /// The configuration file for this project
-    #[clap(long)]
-    config: Utf8PathBuf,
+    #[clap(flatten)]
+    config: ConfigArgs,
 
     #[cfg(feature = "wasm")]
     #[command(flatten)]

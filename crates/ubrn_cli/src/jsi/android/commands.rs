@@ -18,16 +18,15 @@ use uniffi_bindgen::{
 };
 
 use crate::{
-    commands::building::CommonBuildArgs,
+    commands::{building::CommonBuildArgs, ConfigArgs},
     config::{rust_crate::CrateConfig, ExtraArgs, ProjectConfig},
     jsi::android::config::Target,
 };
 
 #[derive(Args, Debug)]
 pub(crate) struct AndroidBuildArgs {
-    /// The configuration file for this build
-    #[clap(long)]
-    config: Utf8PathBuf,
+    #[clap(flatten)]
+    config: ConfigArgs,
 
     /// Comma separated list of targets, that override the values in the
     /// `config.yaml` file.
