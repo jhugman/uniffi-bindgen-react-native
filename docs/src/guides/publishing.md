@@ -33,7 +33,7 @@ In either case, it's good practice to run `npm pack --dry-run` and verify the pa
 
 If asking your users to compile Rust source is acceptable, then adding a `postinstall` script to `package.json` may be enough.
 
-If you've kept the scripts from the [Getting Started guide](./getting-started.md#step-2-add-uniffi-bindgen-react-native-to-the-project), then adding:
+If you've kept the scripts from the [Getting Started guide](./rn/getting-started.md#step-2-add-uniffi-bindgen-react-native-to-the-project), then adding:
 
 ```diff
 scripts: {
