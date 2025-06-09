@@ -1,4 +1,4 @@
-# Step-by-step tutorial
+# Step-by-step tutorial with React Native
 
 This tutorial will get you started, by taking an existing Rust crate, and building a React Native library from it.
 
@@ -80,11 +80,11 @@ Opening `package.json` add the following:
 
 ```diff
   "scripts": {
-+    "ubrn:ios":      "ubrn build ios     --config ubrn.config.yaml --and-generate && (cd example/ios && pod install)",
-+    "ubrn:android":  "ubrn build android --config ubrn.config.yaml --and-generate",
-+    "ubrn:web":      "ubrn build web     --config ubrn.config.yaml",
-+    "ubrn:checkout": "ubrn checkout      --config ubrn.config.yaml",
-+    "ubrn:clean": "rm -Rf cpp/ android/src/main/java ios/ src/Native* src/generated/ src/index.ts*",
++    "ubrn:ios":      "ubrn build ios --and-generate && (cd example/ios && pod install)",
++    "ubrn:android":  "ubrn build android --and-generate",
++    "ubrn:web":      "ubrn build web",
++    "ubrn:checkout": "ubrn checkout",
++    "ubrn:clean": "rm -rfv cpp/ android/CMakeLists.txt android/src/main/java android/*.cpp ios/ src/Native* src/index.*ts* src/generated/",
     "example": "yarn workspace react-native-my-rust-lib-example",
     "test": "jest",
     "typecheck": "tsc",
@@ -219,7 +219,7 @@ export default function App() {
 Next, add the following lines in place of the lines we just deleted:
 
 ```ts
-import { Calculator, type BinaryOperator, SafeAddition, ComputationResult } from '../../src';
+import { Calculator, type BinaryOperator, SafeAddition, ComputationResult } from 'my-rust-lib';
 
 // A Rust object
 const calculator = new Calculator();
@@ -257,7 +257,7 @@ We need to edit `example/input.js`:
 import { AppRegistry } from 'react-native';
 import App from './src/App';
 import { name as appName } from './app.json';
-+import { uniffiInitAsync } from "dummy-lib";
++import { uniffiInitAsync } from "my-rust-lib";
 
 +uniffiInitAsync().then(() => {
 +   AppRegistry.registerComponent(appName, () => App);
