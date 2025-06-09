@@ -24,7 +24,7 @@ function uniffiEnsureInitialized() {
     }
     {%- endfor %}
 
-    {% for fn in self.initialization_fns() -%}
-    {{ fn }}();
+    {% for func in self.initialization_fns() -%}
+    {{ func }}();
     {% endfor -%}
 }

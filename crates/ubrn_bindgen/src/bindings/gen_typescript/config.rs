@@ -7,8 +7,6 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use uniffi_bindgen::backend::TemplateExpression;
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TsConfig {
@@ -54,7 +52,16 @@ pub(crate) struct CustomTypeConfig {
     pub(crate) imports: Vec<(String, String)>,
     pub(crate) type_name: Option<String>,
     #[serde(alias = "lift")]
-    pub(crate) into_custom: TemplateExpression,
+    pub(crate) into_custom: String,
     #[serde(alias = "lower")]
-    pub(crate) from_custom: TemplateExpression,
+    pub(crate) from_custom: String,
+}
+
+impl CustomTypeConfig {
+    pub(crate) fn lift(&self, variable: &str) -> String {
+        self.into_custom.replace("{}", variable)
+    }
+    pub(crate) fn lower(&self, variable: &str) -> String {
+        self.from_custom.replace("{}", variable)
+    }
 }

@@ -7,7 +7,7 @@ use std::{path::PathBuf, process::Command};
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
-use cargo_metadata::{Metadata, MetadataCommand};
+use cargo_metadata::{Metadata, MetadataCommand, TargetKind};
 
 use crate::{path_or_shim, run_cmd_quietly};
 
@@ -187,7 +187,7 @@ fn guess_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> String {
 
 fn find_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<String> {
     // Get the library name
-    let lib = "lib".to_owned();
+    let lib = TargetKind::Lib;
     metadata
         .packages
         .iter()
