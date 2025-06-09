@@ -10,7 +10,7 @@ mod util;
 use std::borrow::Borrow;
 
 use anyhow::Result;
-use rinja::Template;
+use askama::Template;
 use ubrn_common::CrateMetadata;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;

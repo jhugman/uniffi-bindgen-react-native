@@ -37,22 +37,22 @@ const {{ ffi_converter_name }} = (() => {
     class FFIConverter implements FfiConverter<FfiType, TsType> {
         lift(value: FfiType): TsType {
             const intermediate = intermediateConverter.lift(value);
-            return {{ config.into_custom.render("intermediate") }};
+            return {{ config.lift("intermediate") }};
         }
         lower(value: TsType): FfiType {
-            const intermediate = {{ config.from_custom.render("value") }};
+            const intermediate = {{ config.lower("value") }};
             return intermediateConverter.lower(intermediate);
         }
         read(from: RustBuffer): TsType {
             const intermediate = intermediateConverter.read(from);
-            return {{ config.into_custom.render("intermediate") }};
+            return {{ config.lift("intermediate") }};
         }
         write(value: TsType, into: RustBuffer): void {
-            const intermediate = {{ config.from_custom.render("value") }};
+            const intermediate = {{ config.lower("value") }};
             intermediateConverter.write(intermediate, into);
         }
         allocationSize(value: TsType): number {
-            const intermediate = {{ config.from_custom.render("value") }};
+            const intermediate = {{ config.lower("value") }};
             return intermediateConverter.allocationSize(intermediate);
         }
     }
