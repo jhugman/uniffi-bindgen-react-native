@@ -10,7 +10,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use ubrn_testing::timer::TimerFuture;
+use ubrn_testing::timer::{TimerFuture, TimerService as _};
 
 #[cfg(not(target_arch = "wasm32"))]
 type EventHandlerFut = Pin<Box<dyn Future<Output = ()> + Send>>;
