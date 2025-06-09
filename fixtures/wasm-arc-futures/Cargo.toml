@@ -1,18 +1,19 @@
 [package]
-name = "uniffi-fixture-error-types"
-version = "0.22.0"
+name = "uniffi-fixtures-wasm-arc-futures"
+version = "0.21.0"
+authors = ["zzorba"]
 edition = "2021"
 license = "MPL-2.0"
 publish = false
 
 [lib]
+name = "wasm_arc_futures"
 crate-type = ["lib", "cdylib"]
-name = "uniffi_error_types"
 
 [dependencies]
-uniffi = { workspace = true, features = ["wasm-unstable-single-threaded"] }
-anyhow = "1"
-thiserror = "1.0"
+uniffi = { workspace = true, features = ["cli", "wasm-unstable-single-threaded"] }
+async-trait = "0.1"
+ubrn_testing = { path = "../../crates/ubrn_testing" }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build", "wasm-unstable-single-threaded"] }
