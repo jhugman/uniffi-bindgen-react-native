@@ -24,9 +24,9 @@ cargo add uniffi
 
 ```yaml
 rust:
-	repo: https://github.com/example/my-rust-sdk
-	branch: main
-	manifestPath: crates/my-api/Cargo.toml
+    repo: https://github.com/example/my-rust-sdk
+    branch: main
+    manifestPath: crates/my-api/Cargo.toml
 ```
 In this case, the `ubrn checkout` command will clone the given repo with the branch/ref into the `rust_modules` directory of the project. Note that instead of `branch` you can also use `rev` or `ref`.
 
@@ -36,8 +36,8 @@ The `manifestPath` is the path relative to the root of the Rust workspace direct
 
 ```yaml
 rust:
-	directory: ./rust
-	manifestPath: crates/my-api/Cargo.toml
+    directory: ./rust
+    manifestPath: crates/my-api/Cargo.toml
 ```
 In this case, the `./rust` directory tells `ubrn` where the Rust workspace is, relative to your React Native library project. The `manifestPath` is the relative path from the workspace file to the crate which will be used to build bindings.
 
@@ -47,17 +47,17 @@ This section governs the generation of the bindings— the nitty-gritty of the R
 
 ```yaml
 bindings:
-	cpp: cpp/bindings
-	ts: ts/bindings
-	uniffiToml: ./uniffi.toml
+    cpp: cpp/bindings
+    ts: ts/bindings
+    uniffiToml: ./uniffi.toml
 ```
 The [`uniffi.toml` file](uniffi-toml.md) configures custom types, to further customize the conversion into Typescript data-types.
 
 If missing, the defaults will be used:
 ```
 bindings:
-	cpp: cpp/generated
-	ts: ts/generated
+    cpp: cpp/generated
+    ts: ts/generated
 ```
 ## `android`
 
@@ -67,17 +67,17 @@ This section can be omitted entirely, as sensible defaults are provided. If you 
 
 ```yaml
 android:
-	directory: ./android
-	cargoExtras: []
-	targets:
-	- arm64-v8a
-	- armeabi-v7a
-	- x86
-	- x86_64
-	apiLevel: 21
-	jniLibs: src/main/jniLibs
-	packageName: <DERIVED FROM package.json>
-	codegenOutputDir: <DERIVED FROM package.json>
+    directory: ./android
+    cargoExtras: []
+    targets:
+    - arm64-v8a
+    - armeabi-v7a
+    - x86
+    - x86_64
+    apiLevel: 21
+    jniLibs: src/main/jniLibs
+    packageName: <DERIVED FROM package.json>
+    codegenOutputDir: <DERIVED FROM package.json>
 ```
 
 The `directory` is the location of the Android project, relative to the root of the React Native library project.
