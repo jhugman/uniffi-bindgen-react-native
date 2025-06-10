@@ -330,21 +330,6 @@ export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
 }
 
 export const FfiConverterArrayBuffer = (() => {
-  function unwrapBuffer(value: ArrayBuffer): ArrayBuffer {
-    // Typed arrays are accepted by TS as array buffers,
-    // even though they are really ArrayBufferViews.
-    if (ArrayBuffer.isView(value)) {
-      const ab = value.buffer;
-      const start = value.byteOffset;
-      const length = value.byteLength;
-      if (start === 0 && ab.byteLength === length) {
-        return ab;
-      }
-      const end = start + length;
-      return ab.slice(start, end);
-    }
-    return value;
-  }
   const lengthConverter = FfiConverterInt32;
   class FFIConverter extends AbstractFfiConverterByteArray<ArrayBuffer> {
     read(from: RustBuffer): ArrayBuffer {
@@ -354,7 +339,7 @@ export const FfiConverterArrayBuffer = (() => {
     write(value: ArrayBuffer, into: RustBuffer): void {
       const length = value.byteLength;
       lengthConverter.write(length, into);
-      into.writeByteArray(new Uint8Array(unwrapBuffer(value)));
+      into.writeByteArray(new Uint8Array(value));
     }
     allocationSize(value: ArrayBuffer): number {
       return lengthConverter.allocationSize(0) + value.byteLength;
