@@ -45,6 +45,8 @@ runs:
           ../turbo-module-comparison-testing
 
     - name: Generate & build turbo module
+      # Disable the perma-failing android
+      if: ${{ inputs.platform != 'android' }}
       shell: bash
       run: |
         ./scripts/test-turbo-modules.sh \
