@@ -82,7 +82,7 @@ impl EntryArg {
 }
 
 pub(crate) fn typecheck_ts(file: &Utf8Path) -> Result<()> {
-    run_tsc(file, "ES2021", tsc_typecheck)?;
+    run_tsc(file, "ES2024", tsc_typecheck)?;
     Ok(())
 }
 

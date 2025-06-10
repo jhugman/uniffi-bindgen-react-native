@@ -9,10 +9,10 @@ import { Console as HermesConsole, URL as HermesURL } from "./hermes";
 export type RuntimeContext = "nodejs" | "hermes" | "browser";
 
 export function __runtimeContext(): RuntimeContext {
-  if (globalThis.print !== undefined) {
+  if ((globalThis as any).print !== undefined) {
     return "hermes";
   }
-  if (globalThis.document !== undefined) {
+  if ((globalThis as any).document !== undefined) {
     return "browser";
   }
   return "nodejs";

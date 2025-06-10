@@ -32,7 +32,7 @@ export class RustBuffer {
   }
 
   static fromByteArray(buf: UniffiByteArray): RustBuffer {
-    return new RustBuffer(buf.buffer);
+    return new RustBuffer(buf.buffer as ArrayBuffer);
   }
 
   get length(): number {
@@ -43,7 +43,7 @@ export class RustBuffer {
     return new Uint8Array(this.arrayBuffer);
   }
 
-  readArrayBuffer(numBytes: number): ArrayBufferLike {
+  readArrayBuffer(numBytes: number): ArrayBuffer {
     const start = this.readOffset;
     const end = this.checkOverflow(start, numBytes);
     const value = this.arrayBuffer.slice(start, end);
