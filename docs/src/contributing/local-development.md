@@ -2,7 +2,7 @@
 
 ## Pre-installation
 
-This guide is in addition to the [Pre-installation](../guides/pre-installation.md) guide.
+This guide is in addition to the Pre-installation guides for [React Native](../guides/rn/pre-installation.md) and [WASM](../guides/web/pre-installation.md).
 
 ```sh
 git clone https://github.com/jhugman/uniffi-bindgen-react-native

@@ -36,7 +36,7 @@ pub(crate) struct WebBuildArgs {
     ///
     /// Overrides the setting in the config file.
     ///
-    /// If that is missing, then defualt to "web".
+    /// If that is missing, then default to "web".
     #[clap(long, conflicts_with_all = ["no_generate", "no_wasm_pack"])]
     target: Option<WasmTarget>,
 

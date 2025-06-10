@@ -79,6 +79,8 @@ fn from_static() -> Box<EventHandlerFn> {
 // for wasm.
 #[uniffi::export]
 async fn make_object() -> Arc<SimpleObject> {
+    #[cfg(target_arch = "wasm32")]
+    console_error_panic_hook::set_once();
     SimpleObject::new_with_callback(from_static())
 }
 

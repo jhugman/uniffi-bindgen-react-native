@@ -1,4 +1,4 @@
-# Step-by-step tutorial
+# Step-by-step tutorial with React Native
 
 This tutorial will get you started, by taking an existing Rust crate, and building a React Native library from it.
 
@@ -43,8 +43,6 @@ For following along, here are the rest of my answers.
 ✔ What is the URL for the package author? … https://github.com/jhugman
 ✔ What is the URL for the repository? … https://github.com/jhugman/react-native-my-rust-lib
 ✔ What type of library do you want to develop? › Turbo module
-✔ Which languages do you want to use? › C++ for Android & iOS
-✔ What type of example app do you want to create? › Vanilla
 ✔ Project created successfully at my-rust-lib!
 ```
 
@@ -82,10 +80,11 @@ Opening `package.json` add the following:
 
 ```diff
   "scripts": {
-+    "ubrn:ios":      "ubrn build ios     --config ubrn.config.yaml --and-generate && (cd example/ios && pod install)",
-+    "ubrn:android":  "ubrn build android --config ubrn.config.yaml --and-generate",
-+    "ubrn:checkout": "ubrn checkout      --config ubrn.config.yaml",
-+    "ubrn:clean": "rm -Rf cpp/ android/src/main/java ios/ src/Native* src/generated/ src/index.ts*",
++    "ubrn:ios":      "ubrn build ios --and-generate && (cd example/ios && pod install)",
++    "ubrn:android":  "ubrn build android --and-generate",
++    "ubrn:web":      "ubrn build web",
++    "ubrn:checkout": "ubrn checkout",
++    "ubrn:clean": "rm -rfv cpp/ android/CMakeLists.txt android/src/main/java android/*.cpp ios/ src/Native* src/index.*ts* src/generated/",
     "example": "yarn workspace react-native-my-rust-lib-example",
     "test": "jest",
     "typecheck": "tsc",
@@ -114,13 +113,13 @@ alias ubrn=$(yarn ubrn --path)
 
 There is a guide to the `ubrn` command [here][cli].
 
-[cli]: ../reference/commandline.md
+[cli]: ../../reference/commandline.md
 
 ## Step 3: Create the `ubrn.config.yaml` file
 
 Full documentation on how to configure your library can be found in [the YAML configuration file page][config] of this book.
 
-[config]: ../reference/config-yaml.md
+[config]: ../../reference/config-yaml.md
 
 For now, we just want to get started; let's start with an existing Rust crate that has uniffi bindings.
 
@@ -189,6 +188,19 @@ yarn ubrn:android --targets aarch64-linux-android,armv7-linux-androideabi
 This won't happen with the `uniffi-starter` library, however a common error is to not enable a `staticlib` crate type in the project's `Cargo.toml`. Instructions on how to do this are given [here](../reference/commandline.md#admonition-note).
 ```
 
+Building for Web will:
+
+1. Build the Rust crate for your machine
+1. Use the built library file to generate
+   - a WASM crate
+   - Typescript bindings
+1. Build the WASM crate for `wasm32-unknown-unknown`
+1. Use `wasm-bindgen` to connect the WASM crate to the typescript bindings
+
+```sh
+yarn ubrn:web
+```
+
 ## Step 5: Write an example app exercising the Rust API
 
 Here, we're editing the app file at `example/src/App.tsx`.
@@ -207,7 +219,7 @@ export default function App() {
 Next, add the following lines in place of the lines we just deleted:
 
 ```ts
-import { Calculator, type BinaryOperator, SafeAddition, ComputationResult } from '../../src';
+import { Calculator, type BinaryOperator, SafeAddition, ComputationResult } from 'my-rust-lib';
 
 // A Rust object
 const calculator = new Calculator();
@@ -237,6 +249,24 @@ const computation: ComputationResult = calculator
 const result = computation.value.toString();
 ```
 
+Next, we need to update the timing of App registration.
+
+We need to edit `example/input.js`:
+
+```diff
+import { AppRegistry } from 'react-native';
+import App from './src/App';
+import { name as appName } from './app.json';
++import { uniffiInitAsync } from "my-rust-lib";
+
++uniffiInitAsync().then(() => {
++   AppRegistry.registerComponent(appName, () => App);
++});
+- AppRegistry.registerComponent(appName, () => App);
+```
+
+This is so WASM bundles can be loaded asynchronously.
+
 ## Step 6: Run the example app
 
 Now you can run the apps on Android and iOS:
@@ -248,6 +278,8 @@ yarn example start
 As with the starter app from `create-react-native-library`, there is very little to look at.
 
 We should, if all has gone to plan, see `Result: 42` on screen.
+
+For the web, see the [Getting Started, Web edition](../web/getting-started.md)
 
 ## Step 7: Make changes in the Rust
 
