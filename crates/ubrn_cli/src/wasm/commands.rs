@@ -79,7 +79,9 @@ impl WebBuildArgs {
             &library_path,
             &target,
             &config.wasm.wasm_bindgen_extras,
-            &config.bindings.ts_path(project_root).join("wasm-bindgen"),
+            &config
+                .wasm_bindings_ts_path(project_root)
+                .join("wasm-bindgen"),
         )?;
 
         Ok(())
