@@ -1,10 +1,49 @@
 # Upcoming releases
 
+[//]: # (## ✨ What's New ✨)
 [//]: # (## 🦊 What's Changed)
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.0-0...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-0...main
+
+---
+
+# 0.29.3-0
+
+## ✨ What's New ✨
+
+### 🌏🕸️ WASM!
+
+After 6 months of development, we are releasing the first version of `uniffi-bindgen-react-native` for use with WASM:
+
+- Different fixtures running:
+  - Fixtures `chronological` and `gc-callbacks-crasher` (#238)
+  - Fixture `async-callbacks` (#237)
+- Configuration file and `ubrn` command line:
+  - Enable entrypoint and ts bindings directory to be customized for wasm (#259)
+  - Add `ubrn build web --and-generate` command (#253)
+  - Add CLI testing for `uniffi-bindgen-react-native` command. (#257)
+  - Refactor of ubrn_cli into config and commands modules (#251)
+- `uniffi-runtime-javascript` runtime, now on `crates.io`:
+  - Add runtimeVersion to vary version of uniffi-runtime-javascript (#256)
+  - Prepare uniffi-runtime-javascript crate for release (#248)
+
+## 🦊 What's Changed
+
+- Add default value for the --config option in all ubrn commands (#265)
+- Change Windows path separators in CMakeLists.txt (#261)
+- Bump `uniffi-rs` version to 0.29.3 (#267)
+- Bump bob & RN versions (#242) and (#260)
+- Run yarn pack as part of compatibility tests (#250)
+- Add to "who is using" section of readme (#239)
+- Fix wrong key name of `manifestPath` in docs (#240)
+
+## ⚠️ Breaking Changes
+
+- Bump Typescript version to 5.8, affecting `ArrayBuffer` (#271)
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.0-0...0.29.3-3
 
 ---
 

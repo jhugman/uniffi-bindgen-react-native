@@ -59,6 +59,7 @@ mathjax-support = false
 site-url = "/mdBook/"
 git-repository-url = "https://github.com/jhugman/uniffi-bindgen-react-native"
 edit-url-template = "edit/main/docs/{path}"
+default-theme = "light"
 
 # open on gh config.
 git-branch = "main"
