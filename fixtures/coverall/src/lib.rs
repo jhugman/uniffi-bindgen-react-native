@@ -247,6 +247,7 @@ pub struct DictWithDefaults {
     integer: u64,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum MaybeSimpleDict {
     Yeah { d: SimpleDict },
