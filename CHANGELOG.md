@@ -43,7 +43,7 @@ After 6 months of development, we are releasing the first version of `uniffi-bin
 
 - Bump Typescript version to 5.8, affecting `ArrayBuffer` (#271)
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.0-0...0.29.3-3
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.0-0...0.29.3-0
 
 ---
 
