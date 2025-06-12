@@ -1,20 +1,17 @@
 # Summary
 
 [Introduction](README.md)
-
-# Getting started
-
-## React Native
+# Getting started for React Native
 
 - [Before you start](guides/rn/pre-installation.md)
 - [Step by step: Make your first library project](guides/rn/getting-started.md)
-  - [Troubleshooting](guides/rn/troubleshooting.md)
+- [Troubleshooting](guides/rn/troubleshooting.md)
 
-## WASM
+# Getting started for the Web
 
 - [Before you start](guides/web/pre-installation.md)
 - [Step by step: Make your first library project](guides/web/getting-started.md)
-  - [Troubleshooting](guides/web/troubleshooting.md)
+- [Troubleshooting](guides/web/troubleshooting.md)
 
 # Guides
 

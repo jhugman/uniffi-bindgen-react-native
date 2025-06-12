@@ -3,7 +3,7 @@
 1. The version number should be incremented in:
   - the [`package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/package.json#L3)
   - the [`crates/ubrn_cli/Cargo.toml`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_cli/Cargo.toml#L3).
-  - the [`crates/uniffi-runtime-javascript](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/uniffi-runtime-javascript/Cargo.toml#L3)
+  - the [`crates/uniffi-runtime-javascript`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/uniffi-runtime-javascript/Cargo.toml#L3)
 1. Push as a PR as usual, with subject: `Release ${VERSION_NUMBER}`.
 1. Once this has landed, [draft a new release](https://github.com/jhugman/uniffi-bindgen-react-native/releases/new).
 1. Create a new tag (in the choose a new tag dialog) with the version number (without a `v`).
