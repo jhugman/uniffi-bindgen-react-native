@@ -62,6 +62,9 @@ pub(crate) struct WasmConfig {
     #[serde(default = "WasmConfig::default_entrypoint")]
     #[serde(deserialize_with = "ProjectConfig::relative_path")]
     pub(crate) entrypoint: String,
+
+    #[serde(default = "WasmConfig::default_rustflags")]
+    pub(crate) rustflags: ExtraArgs,
 }
 
 impl Default for WasmConfig {
@@ -99,6 +102,10 @@ impl WasmConfig {
         package_json
             .browser_entrypoint()
             .unwrap_or_else(|| "src/index.web.ts".to_string())
+    }
+    fn default_rustflags() -> ExtraArgs {
+        let args: &[&str] = &[];
+        args.into()
     }
 }
 
