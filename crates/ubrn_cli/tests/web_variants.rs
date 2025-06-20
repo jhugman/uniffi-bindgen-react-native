@@ -341,7 +341,10 @@ fn test_rustflags() -> Result<()> {
                 .arg("build")
                 .arg_pair_suffix("--manifest-path", "rust_modules/wasm/Cargo.toml")
                 .arg_pair("--target", "wasm32-unknown-unknown")
-                .env("RUSTFLAGS", "--cfg web_sys_unstable_apis -C target-feature=+atomics"),
+                .env(
+                    "RUSTFLAGS",
+                    "--cfg web_sys_unstable_apis -C target-feature=+atomics",
+                ),
             Command::new("wasm-bindgen")
                 .arg_pair("--target", "web")
                 .arg("--omit-default-module-path")
