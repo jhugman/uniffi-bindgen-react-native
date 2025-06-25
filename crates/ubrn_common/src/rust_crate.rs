@@ -133,7 +133,7 @@ fn so_extension_from_target<'a>(target: &str) -> &'a str {
         "a"
     } else if target.contains("android") {
         // We're using staticlib files here. cargo ndk use .so files.
-        "a"
+        "so"
     } else if target.contains("wasm") {
         "wasm"
     } else {
