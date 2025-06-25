@@ -1,0 +1,6 @@
+rust:
+  directory: rust/shim
+  manifestPath: Cargo.toml
+
+wasm:
+  rustflags: ['--cfg', 'web_sys_unstable_apis', '-C', 'target-feature=+atomics']

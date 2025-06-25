@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
-use cargo_metadata::Metadata;
+use cargo_metadata::{Metadata, MetadataCommand};
 use clap::{command, Args};
 use ubrn_common::{mk_dir, path_or_shim, CrateMetadata, Utf8PathBufExt as _};
 use uniffi_bindgen::{cargo_metadata::CrateConfigSupplier, BindingGenerator};
@@ -168,22 +168,50 @@ impl BindingsArgs {
 
         let try_format_code = !out.no_format;
 
-        let config_supplier = CrateConfigSupplier::from(metadata);
-
         let configs: Vec<ModuleMetadata> = if input.library_mode {
-            uniffi_bindgen::library_mode::generate_bindings(
-                &path_or_shim(&input.source)?,
+            let lib_path = &path_or_shim(&input.source)?;
+            println!("DEBUG: Processing library file: {}", lib_path);
+            println!("DEBUG: Library file exists: {}", lib_path.exists());
+            println!("DEBUG: Crate name: {:?}", input.crate_name);
+            println!("DEBUG: Config path: {:?}", input.config);
+            
+            // Use default config supplier like the working matrix-sdk xtask
+            let config_supplier = CrateConfigSupplier::default();
+            
+            // TEST: Use KotlinBindingGenerator to see if the issue is with ReactNativeBindingGenerator
+            let kotlin_generator = uniffi_bindgen::bindings::KotlinBindingGenerator;
+            
+            // Use full output directory path like the working xtask
+            let full_output_dir = out.ts_dir.canonicalize_utf8_or_shim()?;
+            
+            println!("DEBUG UBRN: About to call generate_bindings with:");
+            println!("DEBUG UBRN:   lib_path = {}", lib_path);
+            println!("DEBUG UBRN:   crate_name = {:?}", input.crate_name);
+            println!("DEBUG UBRN:   generator = KotlinBindingGenerator");
+            println!("DEBUG UBRN:   config_supplier = CrateConfigSupplier::default()");
+            println!("DEBUG UBRN:   config_path = {:?}", input.config.as_deref());
+            println!("DEBUG UBRN:   output_dir = {}", &full_output_dir);
+            println!("DEBUG UBRN:   try_format_code = {}", try_format_code);
+            
+            let results = uniffi_bindgen::library_mode::generate_bindings(
+                lib_path,
                 input.crate_name.clone(),
-                binding_generator,
+                &kotlin_generator,
                 &config_supplier,
                 input.config.as_deref(),
-                &dummy_dir,
+                &full_output_dir,
                 try_format_code,
-            )?
-            .iter()
-            .map(|s| s.into())
-            .collect()
+            )?;
+            
+            println!("DEBUG: Generated {} binding results", results.len());
+            
+            results
+                .iter()
+                .map(|s| s.into())
+                .collect()
         } else {
+            // For non-library mode, use config supplier from metadata
+            let config_supplier = CrateConfigSupplier::from(metadata);
             uniffi_bindgen::generate_external_bindings(
                 binding_generator,
                 input.source.clone(),

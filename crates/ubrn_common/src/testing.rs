@@ -41,6 +41,9 @@ pub struct Command {
 
     /// The working directory for the command, if specified
     pub current_dir: Option<PathBuf>,
+
+    /// The environment variables for the command
+    pub env: HashMap<String, String>,
 }
 
 /// A record of a file that was written
@@ -68,10 +71,24 @@ impl Command {
         // Extract working directory if set
         let current_dir = cmd.get_current_dir().map(|p| p.to_path_buf());
 
+        // Extract environment variables
+        let env = cmd
+            .get_envs()
+            .filter_map(|(key, value)| {
+                value.map(|v| {
+                    (
+                        key.to_string_lossy().to_string(),
+                        v.to_string_lossy().to_string(),
+                    )
+                })
+            })
+            .collect();
+
         Command {
             program,
             args,
             current_dir,
+            env,
         }
     }
 }
