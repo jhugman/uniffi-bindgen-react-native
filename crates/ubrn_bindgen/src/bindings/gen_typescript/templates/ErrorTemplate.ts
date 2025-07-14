@@ -126,3 +126,5 @@ const {{ ffi_converter_name }} = (() => {
 {% let is_error = true %}
 {%- include "TaggedEnumTemplate.ts" %}
 {%- endif %}
+
+{{- self.export_converter(ffi_converter_name) -}}
