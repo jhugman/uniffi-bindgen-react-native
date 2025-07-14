@@ -66,6 +66,7 @@ impl WebBuildArgs {
                 &config.wasm.cargo_extras,
                 &target,
                 &crate_dir,
+                &config.wasm.rustflags,
             )?;
             CrateMetadata::try_from(manifest_path.to_path_buf())?
         };
@@ -124,6 +125,7 @@ impl WebBuildArgs {
         cargo_extras: &ExtraArgs,
         target: &Target,
         rust_dir: &Utf8Path,
+        rustflags: &ExtraArgs,
     ) -> Result<()> {
         let mut cmd = Command::new("cargo");
         cmd.arg("build")
@@ -136,6 +138,14 @@ impl WebBuildArgs {
             cmd.arg("--profile").arg(profile);
         }
         cmd.args(cargo_extras.clone()).current_dir(rust_dir);
+
+        // Apply RUSTFLAGS if specified
+        let rustflags_vec: Vec<String> = rustflags.clone().into_iter().collect();
+        if !rustflags_vec.is_empty() {
+            let rustflags_str = rustflags_vec.join(" ");
+            cmd.env("RUSTFLAGS", rustflags_str);
+        }
+
         run_cmd(&mut cmd)?;
         Ok(())
     }
