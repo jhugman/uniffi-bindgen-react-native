@@ -129,7 +129,7 @@ impl AndroidBuildArgs {
             .arg("--target")
             .arg(target.to_string())
             .arg("--platform")
-            .arg(format!("{}", api_level));
+            .arg(format!("{api_level}"));
         let profile = self.common_args.profile();
         if profile != "release" {
             cmd.arg("--no-strip");

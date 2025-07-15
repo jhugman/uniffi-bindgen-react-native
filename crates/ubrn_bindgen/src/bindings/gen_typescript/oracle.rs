@@ -280,7 +280,7 @@ fn rewrite_keywords(nm: String) -> String {
         "yield",
     ]);
     if keywords.contains(nm.as_str()) {
-        format!("{}_", nm)
+        format!("{nm}_")
     } else {
         nm
     }

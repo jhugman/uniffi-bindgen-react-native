@@ -47,7 +47,7 @@ impl IOsConfig {
         let name = workspace::package_json().name();
         let (org, name) = org_and_name(&name);
         let prefix = if let Some(org) = org {
-            format!("{}_{}", org, name).to_upper_camel_case()
+            format!("{org}_{name}").to_upper_camel_case()
         } else {
             trim_react_native(name).to_upper_camel_case()
         };
