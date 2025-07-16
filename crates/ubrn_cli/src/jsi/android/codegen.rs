@@ -16,6 +16,7 @@ pub(crate) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>>
         CMakeLists::rc_new(config.clone()),
         CppAdapter::rc_new(config.clone()),
         AndroidManifest::rc_new(config.clone()),
+        ProguardRules::rc_new(config.clone()),
         // Android with Java
         JavaModule::rc_new(config.clone()),
         JavaPackage::rc_new(config.clone()),
@@ -171,5 +172,20 @@ impl RenderedFile for CMakeLists {
             .android
             .directory(project_root)
             .join(filename)
+    }
+}
+
+templated_file!(ProguardRules, "proguard-rules.pro");
+impl RenderedFile for ProguardRules {
+    fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        let filename = "proguard-rules.pro";
+        self.config
+            .project
+            .android
+            .directory(project_root)
+            .join(filename)
+    }
+    fn filter_by(&self) -> bool {
+        self.config.native_bindings
     }
 }
