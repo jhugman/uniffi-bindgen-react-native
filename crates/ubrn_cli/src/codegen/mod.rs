@@ -42,6 +42,7 @@ pub(crate) struct TemplateConfig {
     pub(crate) rust_crate: CrateMetadata,
     pub(crate) modules: Vec<ModuleMetadata>,
     pub(crate) uses_kotlin: OnceCell<bool>,
+    pub(crate) native_bindings: bool,
 }
 
 impl TemplateConfig {
@@ -49,6 +50,7 @@ impl TemplateConfig {
         project: ProjectConfig,
         rust_crate: CrateMetadata,
         modules: Vec<ModuleMetadata>,
+        native_bindings: bool,
     ) -> Self {
         let mut modules = modules;
         modules.sort_by_key(|m| m.ts());
@@ -56,6 +58,7 @@ impl TemplateConfig {
             project,
             rust_crate,
             modules,
+            native_bindings,
             uses_kotlin: OnceCell::new(),
         }
     }
@@ -65,8 +68,14 @@ pub(crate) fn get_template_config(
     project: ProjectConfig,
     rust_crate: CrateMetadata,
     modules: Vec<ModuleMetadata>,
+    native_bindings: bool,
 ) -> Rc<TemplateConfig> {
-    Rc::new(TemplateConfig::new(project, rust_crate, modules))
+    Rc::new(TemplateConfig::new(
+        project,
+        rust_crate,
+        modules,
+        native_bindings,
+    ))
 }
 
 pub(crate) fn render_files(
@@ -246,7 +255,7 @@ mod tests {
 
         let project_config = config::ProjectConfig::empty(name, crate_config);
         let modules = modules.iter().map(|s| ModuleMetadata::new(s)).collect();
-        let template = TemplateConfig::new(project_config, crate_metadata, modules);
+        let template = TemplateConfig::new(project_config, crate_metadata, modules, false);
         Ok(Rc::new(template))
     }
 

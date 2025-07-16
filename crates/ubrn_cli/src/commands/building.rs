@@ -51,6 +51,7 @@ impl BuildArgs {
             lib_file,
             self.cmd.project_config()?,
             Platform::from(&self.cmd),
+            self.cmd.native_bindings(),
         )
         .run()?;
 
@@ -106,6 +107,15 @@ impl BuildCmd {
     #[cfg(not(feature = "wasm"))]
     pub(crate) fn then_build(&self) -> Result<()> {
         Ok(())
+    }
+
+    pub(crate) fn native_bindings(&self) -> bool {
+        match self {
+            Self::Android(a) => a.native_bindings,
+            Self::Ios(a) => a.native_bindings,
+            #[cfg(feature = "wasm")]
+            Self::Web(_) => false, // Web does not support native bindings
+        }
     }
 }
 
