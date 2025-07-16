@@ -40,10 +40,12 @@ import module4, {
   getSubType,
   getTraitImpl,
   SubLibType,
+  throwUniffiOneError,
 } from "../../generated/imported_types_sublib";
 import module5, {
   getMyProcMacroType,
   UniffiOneEnum,
+  UniffiOneError,
   UniffiOneProcMacroType,
   UniffiOneTrait,
   UniffiOneType,
@@ -163,4 +165,10 @@ test("proc-macro fron uniffi-one-ns roundtripping via functions in lib", (t) => 
   const t1 = UniffiOneProcMacroType.create({ sval: "hello" });
   t.assertEqual(getUniffiOneProcMacroType(t1), t1);
   t.assertEqual(getMyProcMacroType(t1), t1);
+});
+
+test("an error from uniffi one is used by another crate", (t) => {
+  t.assertThrows(UniffiOneError.instanceOf, () => {
+    throwUniffiOneError();
+  });
 });

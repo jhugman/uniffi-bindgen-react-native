@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use std::sync::Arc;
-use uniffi_one::{UniffiOneEnum, UniffiOneInterface, UniffiOneTrait};
+use uniffi_one::{UniffiOneEnum, UniffiOneError, UniffiOneInterface, UniffiOneTrait};
 
 #[derive(Default, uniffi::Record)]
 pub struct SubLibType {
@@ -29,6 +29,11 @@ impl UniffiOneTrait for OneImpl {
 #[uniffi::export]
 fn get_trait_impl() -> Arc<dyn UniffiOneTrait> {
     Arc::new(OneImpl {})
+}
+
+#[uniffi::export]
+fn throw_uniffi_one_error() -> Result<(), UniffiOneError> {
+    Err(UniffiOneError::TheError)
 }
 
 uniffi::setup_scaffolding!("imported_types_sublib");

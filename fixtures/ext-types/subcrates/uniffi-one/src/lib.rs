@@ -3,7 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::{
+    fmt::Display,
+    sync::atomic::{AtomicI32, Ordering},
+};
 
 pub struct UniffiOneType {
     pub sval: String,
@@ -12,6 +15,17 @@ pub struct UniffiOneType {
 pub enum UniffiOneEnum {
     One,
     Two,
+}
+
+#[derive(Debug, uniffi::Error)]
+pub enum UniffiOneError {
+    TheError,
+}
+
+impl Display for UniffiOneError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{self:?}"))
+    }
 }
 
 #[derive(uniffi::Record)]
