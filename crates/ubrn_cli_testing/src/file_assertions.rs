@@ -65,8 +65,7 @@ fn check_files(expected_files: &[File]) -> Result<(), String> {
 
         if !found_match {
             return Err(format!(
-                "No matching file found for expected file: {}",
-                expected_path
+                "No matching file found for expected file: {expected_path}"
             ));
         }
     }
@@ -82,16 +81,16 @@ fn check_file_content(recorded: &RecordedFile, expected: &File) -> Option<String
             ContentMatcher::Contains(substring) => {
                 if !recorded.content.contains(substring) {
                     return Some(format!(
-                        "File '{}' should contain '{}' but it doesn't.\nContent: {}",
-                        recorded.path, substring, recorded.content
+                        "File '{}' should contain '{substring}' but it doesn't.\nContent: {}",
+                        recorded.path, recorded.content
                     ));
                 }
             }
             ContentMatcher::DoesNotContain(substring) => {
                 if recorded.content.contains(substring) {
                     return Some(format!(
-                        "File '{}' should not contain '{}' but it does.\nContent: {}",
-                        recorded.path, substring, recorded.content
+                        "File '{}' should not contain '{substring}' but it does.\nContent: {}",
+                        recorded.path, recorded.content
                     ));
                 }
             }

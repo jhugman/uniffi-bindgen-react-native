@@ -78,16 +78,14 @@ impl CrateConfig {
         // Validate the path ends with Cargo.toml
         if !path_str.ends_with("Cargo.toml") {
             return Err(serde::de::Error::custom(format!(
-                "Manifest path must end with 'Cargo.toml': {}",
-                path_str
+                "Manifest path must end with 'Cargo.toml': {path_str}"
             )));
         }
 
         // Validate that the path doesn't contain invalid characters
         if Path::new(&path_str).file_name().is_none() {
             return Err(serde::de::Error::custom(format!(
-                "Invalid manifest path: {}",
-                path_str
+                "Invalid manifest path: {path_str}"
             )));
         }
 

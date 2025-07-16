@@ -71,8 +71,7 @@ fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<St
                 // If it's not an exact match, check if it's a suffix match
                 if expected_str != actual_str && !actual_str.contains(&expected_str.to_string()) {
                     return Some(format!(
-                        "Working directory mismatch: expected path containing '{}', got '{}'",
-                        expected_str, actual_str
+                        "Working directory mismatch: expected path containing '{expected_str}', got '{actual_str}'"
                     ));
                 }
             }
@@ -94,14 +93,13 @@ fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<St
             ArgMatcher::Exact(expected_arg) => {
                 if arg_idx >= recorded_args.len() {
                     return Some(format!(
-                        "Missing argument at position {}: expected '{}'",
-                        arg_idx, expected_arg
+                        "Missing argument at position {arg_idx}: expected '{expected_arg}'",
                     ));
                 }
                 if recorded_args[arg_idx] != *expected_arg {
                     return Some(format!(
-                        "Argument mismatch at position {}: expected '{}', got '{}'",
-                        arg_idx, expected_arg, recorded_args[arg_idx]
+                        "Argument mismatch at position {arg_idx}: expected '{expected_arg}', got '{}'",
+                        recorded_args[arg_idx]
                     ));
                 }
                 arg_idx += 1;
@@ -109,14 +107,13 @@ fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<St
             ArgMatcher::Suffix(suffix) => {
                 if arg_idx >= recorded_args.len() {
                     return Some(format!(
-                        "Missing argument at position {}: expected argument ending with '{}'",
-                        arg_idx, suffix
+                        "Missing argument at position {arg_idx}: expected argument ending with '{suffix}'",
                     ));
                 }
                 if !recorded_args[arg_idx].ends_with(suffix) {
                     return Some(format!(
-                        "Argument suffix mismatch at position {}: expected suffix '{}', got '{}'",
-                        arg_idx, suffix, recorded_args[arg_idx]
+                        "Argument suffix mismatch at position {arg_idx}: expected suffix '{suffix}', got '{}'",
+                        recorded_args[arg_idx]
                     ));
                 }
                 arg_idx += 1;
@@ -124,28 +121,25 @@ fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<St
             ArgMatcher::Pair(key, value) => {
                 if arg_idx >= recorded_args.len() {
                     return Some(format!(
-                        "Missing argument pair at position {}: expected key '{}' with value '{}'",
-                        arg_idx, key, value
+                        "Missing argument pair at position {arg_idx}: expected key '{key}' with value '{value}'",
                     ));
                 }
                 if arg_idx + 1 >= recorded_args.len() {
                     return Some(format!(
-                        "Incomplete argument pair at position {}: got key '{}' but missing value (expected '{}')",
-                        arg_idx,
+                        "Incomplete argument pair at position {arg_idx}: got key '{}' but missing value (expected '{value}')",
                         recorded_args[arg_idx],
-                        value
                     ));
                 }
                 if recorded_args[arg_idx] != *key {
                     return Some(format!(
-                        "Argument pair key mismatch at position {}: expected '{}', got '{}'",
-                        arg_idx, key, recorded_args[arg_idx]
+                        "Argument pair key mismatch at position {arg_idx}: expected '{key}', got '{}'",
+                        recorded_args[arg_idx],
                     ));
                 }
                 if recorded_args[arg_idx + 1] != *value {
                     return Some(format!(
-                        "Argument pair value mismatch at position {}: for key '{}', expected '{}', got '{}'",
-                        arg_idx + 1, key, value, recorded_args[arg_idx + 1]
+                        "Argument pair value mismatch at position {}: for key '{key}', expected '{value}', got '{}'",
+                        arg_idx + 1, recorded_args[arg_idx + 1],
                     ));
                 }
                 arg_idx += 2;
@@ -153,28 +147,25 @@ fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<St
             ArgMatcher::PairSuffix(key, value_suffix) => {
                 if arg_idx >= recorded_args.len() {
                     return Some(format!(
-                        "Missing argument pair at position {}: expected key '{}' with value ending with '{}'",
-                        arg_idx, key, value_suffix
+                        "Missing argument pair at position {arg_idx}: expected key '{key}' with value ending with '{value_suffix}'",
                     ));
                 }
                 if arg_idx + 1 >= recorded_args.len() {
                     return Some(format!(
-                        "Incomplete argument pair at position {}: got key '{}' but missing value (expected to end with '{}')",
-                        arg_idx,
+                        "Incomplete argument pair at position {arg_idx}: got key '{}' but missing value (expected to end with '{value_suffix}')",
                         recorded_args[arg_idx],
-                        value_suffix
                     ));
                 }
                 if recorded_args[arg_idx] != *key {
                     return Some(format!(
-                        "Argument pair key mismatch at position {}: expected '{}', got '{}'",
-                        arg_idx, key, recorded_args[arg_idx]
+                        "Argument pair key mismatch at position {arg_idx}: expected '{key}', got '{}'",
+                        recorded_args[arg_idx],
                     ));
                 }
                 if !recorded_args[arg_idx + 1].ends_with(value_suffix) {
                     return Some(format!(
-                        "Argument pair value suffix mismatch at position {}: for key '{}', expected suffix '{}', got '{}'",
-                        arg_idx + 1, key, value_suffix, recorded_args[arg_idx + 1]
+                        "Argument pair value suffix mismatch at position {}: for key '{key}', expected suffix '{value_suffix}', got '{}'",
+                        arg_idx + 1, recorded_args[arg_idx + 1],
                     ));
                 }
                 arg_idx += 2;

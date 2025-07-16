@@ -81,8 +81,8 @@ impl Bootstrap for TestRunnerCmd {
         cmd.current_dir(&dir)
             .arg("-G")
             .arg("Ninja")
-            .arg(format!("-DHERMES_SRC_DIR={}", &hermes_src))
-            .arg(format!("-DHERMES_BUILD_DIR={}", hermes_build))
+            .arg(format!("-DHERMES_SRC_DIR={hermes_src}"))
+            .arg(format!("-DHERMES_BUILD_DIR={hermes_build}"))
             .arg(&src_dir);
 
         run_cmd(&mut cmd)?;

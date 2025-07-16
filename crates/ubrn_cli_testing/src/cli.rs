@@ -43,6 +43,5 @@ pub fn run_cli(cmd_str: &str) -> Result<()> {
     cmd.args(args);
 
     // Use the ubrn_common command execution, which handles recording
-    ubrn_common::run_cmd(&mut cmd)
-        .with_context(|| format!("Failed to execute command: {}", cmd_str))
+    ubrn_common::run_cmd(&mut cmd).with_context(|| format!("Failed to execute command: {cmd_str}"))
 }
