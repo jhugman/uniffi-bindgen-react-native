@@ -117,13 +117,13 @@ This is useful as some generated files use the targets specified in this command
 Once the library files (one for each target) are created, they are copied into the `jniLibs` specified by the YAML configuration.
 
 ```admonish note
-React Native requires that the Rust library be built as a static library. The CMake based build will combine the C++ with the static library into a shared object.
+React Native requires that the Rust library be built as a shared library. This allows the same Rust core to be shared between React Native and Kotlin bindings, avoiding code duplication.
 
-To configure Rust to build a static library, you should ensure `staticlib` is in the `crate-type` list in the `[lib]` section of the `Cargo.toml` file. Minimally, this should be in the `Cargo.toml` manifest file:
+To configure Rust to build a shared library, you should ensure `cdylib` is in the `crate-type` list in the `[lib]` section of the `Cargo.toml` file. Minimally, this should be in the `Cargo.toml` manifest file:
 
 <pre>
 <code class="hljs">[lib]
-crate-type = ["staticlib"]
+crate-type = ["cdylib"]
 </code>
 </pre>
 ```

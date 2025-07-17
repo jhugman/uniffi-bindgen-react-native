@@ -53,7 +53,7 @@ cmake_path(
   ${CMAKE_SOURCE_DIR}/{{ jni_libs_dir }}/${ANDROID_ABI}/{{ self.config.rust_crate.library_file(Some("android")) }}
   NORMALIZE
 )
-add_library(my_rust_lib STATIC IMPORTED)
+add_library(my_rust_lib SHARED IMPORTED)
 set_target_properties(my_rust_lib PROPERTIES IMPORTED_LOCATION ${MY_RUST_LIB})
 
 # Add ReactAndroid libraries, being careful to account for different versions.

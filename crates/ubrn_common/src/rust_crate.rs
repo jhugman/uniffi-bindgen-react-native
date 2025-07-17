@@ -35,7 +35,7 @@ impl CrateMetadata {
 
     pub fn library_path_exists(&self, path: &Utf8Path) -> Result<()> {
         if !path.exists() {
-            anyhow::bail!("Library doesn't exist. This may be because `staticlib` is not in the `crate-type` list in the [lib] entry of Cargo.toml: {}", self.manifest_path());
+            anyhow::bail!("Library doesn't exist. This may be because `cdylib` is not in the `crate-type` list in the [lib] entry of Cargo.toml: {}", self.manifest_path());
         }
         Ok(())
     }
@@ -132,8 +132,8 @@ fn so_extension_from_target<'a>(target: &str) -> &'a str {
     } else if target.contains("ios") {
         "a"
     } else if target.contains("android") {
-        // We're using staticlib files here. cargo ndk use .so files.
-        "a"
+        // We're using shared library files here. cargo ndk builds .so files.
+        "so"
     } else if target.contains("wasm") {
         "wasm"
     } else {
