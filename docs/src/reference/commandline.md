@@ -135,7 +135,13 @@ If you are building native bindings on Android:
 ```toml
 [bindings.kotlin]
 cdylib_name = "<your_lib_name>"
-package_name = "<your_android_package_name>" # You can use any package name you want, but it is recommended to use the same package name as your Android app. We use that to generate proguard-rules.
+```
+* if you are using proguard, you will need to add proper rules to the `proguard-rules.pro` file, like so:
+```
+-dontwarn java.awt.*
+-keep class com.sun.jna.* { *; }
+-keepclassmembers class * extends com.sun.jna.* { public *; }
+-keep class <crate_package_name>.** { *; }
 ```
 ````
 

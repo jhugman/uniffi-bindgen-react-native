@@ -93,7 +93,6 @@ lift = """((v: MyEnum) => {
 
 ### Kotlin cdylib_name
 The `cdylib_name` is the name of the library that will be loaded by JNA in the runtime. 
-Keep in mind that this setting is only used when the Kotlin native bindings are generated.
 If the `cdylib_name` is different from output library name, JNA won't be able to load the library and will fail silently.
 
 ```toml
@@ -102,13 +101,14 @@ cdylib_name = "my_library_name"
 ```
 
 ### Kotlin package_name
-The `package_name` is the package name that will be used in the generated Kotlin code. All the generated native classes will be placed in this package.
-
-```admonish warning
-`package_name` is used to determine which Kotlin classes should be ignored by proguard. If you use a different package name, you will need to setup proguard rules on your own.
-```
+The `package_name` is the package name that will be used in the generated Kotlin code. All the generated native classes will be placed inside this package.
 
 ```toml
 [bindings.kotlin]
-package_name = "com.example.myapp"
+package_name = "com.example.myapp.mycrate"
+```
+
+```admonish warning
+If you are using proguard it is important to add the appropriate classes to proguard-rules.pro.
+Otherwise, application in the release version may not work as it should.
 ```
