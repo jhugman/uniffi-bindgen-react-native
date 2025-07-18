@@ -138,9 +138,6 @@ cdylib_name = "<your_lib_name>"
 ```
 * if you are using proguard, you will need to add proper rules to the `proguard-rules.pro` file, like so:
 ```
--dontwarn java.awt.*
--keep class com.sun.jna.* { *; }
--keepclassmembers class * extends com.sun.jna.* { public *; }
 -keep class <crate_package_name>.** { *; }
 ```
 ````
@@ -390,7 +387,7 @@ Options:
           The configuration file for this build
 
       --native-bindings 
-          This will add required implementations to the generated `build.gradle` file.
+          This will add implementations required for native Android bindings to the generated `build.gradle` file.
     
   -h, --help
           Print help
