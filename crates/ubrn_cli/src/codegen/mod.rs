@@ -201,6 +201,7 @@ mod tests {
                 api_level: 21,
                 package_name: "com.tester".to_string(),
                 codegen_output_dir: "android/generated".to_string(),
+                use_shared_library: false,
             };
             let ios = IOsConfig {
                 directory: "ios".to_string(),
