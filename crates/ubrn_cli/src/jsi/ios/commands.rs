@@ -117,7 +117,8 @@ impl IosBuildArgs {
             self.cargo_build(&manifest_path, target, cargo_extras, &rust_dir)?;
 
             // Now we need to get the path to the lib.a file, to feed to xcodebuild.
-            let library = metadata.library_path(Some(&target.triple), self.common_args.profile(), None);
+            let library =
+                metadata.library_path(Some(&target.triple), self.common_args.profile(), None);
             target_files.insert(target.clone(), library);
         }
         Ok(target_files)

@@ -34,7 +34,7 @@ pub(crate) struct AndroidConfig {
 
     #[serde(default = "AndroidConfig::default_codegen_output_dir")]
     pub(crate) codegen_output_dir: String,
-    
+
     #[serde(default = "AndroidConfig::default_use_shared_library")]
     pub(crate) use_shared_library: bool,
 }

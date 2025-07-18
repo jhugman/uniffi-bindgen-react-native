@@ -25,7 +25,12 @@ impl CrateMetadata {
         profile.unwrap_or(if release { "release" } else { "debug" })
     }
 
-    pub fn library_path(&self, target: Option<&str>, profile: &str, use_shared_library: Option<bool>) -> Utf8PathBuf {
+    pub fn library_path(
+        &self,
+        target: Option<&str>,
+        profile: &str,
+        use_shared_library: Option<bool>,
+    ) -> Utf8PathBuf {
         let library_name = self.library_file(target, use_shared_library);
         match target {
             Some(t) => self.target_dir.join(t).join(profile).join(library_name),
@@ -131,7 +136,9 @@ fn so_extension_from_target<'a>(target: &str, use_shared_library: Option<bool>) 
         "dylib"
     } else if target.contains("ios") {
         "a"
-    } else if target.contains("android") && use_shared_library.expect("By default we use static libs on android") {
+    } else if target.contains("android")
+        && use_shared_library.expect("By default we use static libs on android")
+    {
         "so"
     } else if target.contains("android") {
         "a"
