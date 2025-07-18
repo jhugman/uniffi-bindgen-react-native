@@ -88,7 +88,7 @@ impl WasmCrateArgs {
             .map(|s| ModuleMetadata::new(s))
             .collect();
         let rust_crate = project.crate_.metadata()?;
-        let config = get_template_config(project, rust_crate, modules);
+        let config = get_template_config(project, rust_crate, modules, false);
         let files = wasm::get_files(config.clone());
         render_files(config.clone(), files.into_iter())?;
         Ok(())

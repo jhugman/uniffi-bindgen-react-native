@@ -1,6 +1,6 @@
 The `uniffi.toml` file is a toml file used to customize [the generation of C++ and Typescript](https://mozilla.github.io/uniffi-rs/0.27/bindings.html).
 
-As of time of writing, only `typescript` bindings generation exposes any options for customization, and only for `customTypes`.
+As of time of writing we support `typescript.customTypes`, `kotlin.cdylib_name` and `kotlin.package_name`.
 
 ### Logging the FFI
 
@@ -89,4 +89,26 @@ lift = """((v: MyEnum) => {
     }
 })({})
 """
+```
+
+### Kotlin cdylib_name
+The `cdylib_name` is the name of the library that will be loaded by JNA in the runtime. 
+If the `cdylib_name` is different from output library name, JNA won't be able to load the library and will fail silently.
+
+```toml
+[bindings.kotlin]
+cdylib_name = "my_library_name"
+```
+
+### Kotlin package_name
+The `package_name` is the package name that will be used in the generated Kotlin code. All the generated native classes will be placed inside this package.
+
+```toml
+[bindings.kotlin]
+package_name = "com.example.myapp.mycrate"
+```
+
+```admonish warning
+If you are using proguard it is important to add the appropriate classes to proguard-rules.pro.
+Otherwise, application in the release version may not work as it should.
 ```

@@ -96,6 +96,9 @@ pub(crate) struct GenerateAllArgs {
 
     /// A path to staticlib file.
     lib_file: Utf8PathBuf,
+
+    /// Whether to generate native bindings or not.
+    native_bindings: bool,
 }
 
 #[derive(Debug)]
@@ -107,14 +110,22 @@ pub(crate) struct GenerateAllCommand {
     lib_file: Utf8PathBuf,
 
     platform: Option<Platform>,
+
+    /// Whether to generate native bindings or not.
+    native_bindings: bool,
 }
 
 impl GenerateAllCommand {
-    pub(crate) fn new(lib_file: Utf8PathBuf, project_config: ProjectConfig) -> Self {
+    pub(crate) fn new(
+        lib_file: Utf8PathBuf,
+        project_config: ProjectConfig,
+        native_bindings: bool,
+    ) -> Self {
         Self {
             lib_file,
             project_config,
             platform: None,
+            native_bindings,
         }
     }
 
@@ -122,11 +133,13 @@ impl GenerateAllCommand {
         lib_file: Utf8PathBuf,
         project_config: ProjectConfig,
         platform: Platform,
+        native_bindings: bool,
     ) -> Self {
         Self {
             lib_file,
             project_config,
             platform: Some(platform),
+            native_bindings,
         }
     }
 
@@ -138,12 +151,13 @@ impl GenerateAllCommand {
     pub(crate) fn run(&self) -> Result<()> {
         let pwd = ubrn_common::pwd()?;
         let lib_file = pwd.join(&self.lib_file);
+        let native_bindings = self.native_bindings;
 
         // Step 1: Generate bindings
         let modules = self.generate_bindings(&lib_file)?;
 
         // Step 2: Generate template files
-        self.generate_template_files(modules)?;
+        self.generate_template_files(modules, native_bindings)?;
 
         Ok(())
     }
@@ -175,10 +189,14 @@ impl GenerateAllCommand {
         })
     }
 
-    fn generate_template_files(&self, modules: Vec<ModuleMetadata>) -> Result<()> {
+    fn generate_template_files(
+        &self,
+        modules: Vec<ModuleMetadata>,
+        native_bindings: bool,
+    ) -> Result<()> {
         let project = &self.project_config;
         let rust_crate = project.crate_.metadata()?;
-        let config = get_template_config(project.clone(), rust_crate, modules);
+        let config = get_template_config(project.clone(), rust_crate, modules, native_bindings);
 
         let files = match &self.platform {
             Some(platform) => files::get_files_for(config.clone(), platform),
@@ -194,9 +212,11 @@ impl TryFrom<&GenerateAllArgs> for GenerateAllCommand {
 
     fn try_from(value: &GenerateAllArgs) -> Result<Self> {
         let project_config = value.config.clone().try_into()?;
+        let native_bindings = value.native_bindings;
         Ok(GenerateAllCommand::new(
             value.lib_file.clone(),
             project_config,
+            native_bindings,
         ))
     }
 }

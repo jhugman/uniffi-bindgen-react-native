@@ -43,7 +43,7 @@ pub(crate) struct IosBuildArgs {
 
     /// Generate native Swift Bindings together with the xcframework
     #[clap(long, conflicts_with_all = ["no_xcodebuild"], default_value = "false")]
-    native_bindings: bool,
+    pub(crate) native_bindings: bool,
 
     /// Comma separated list of targets, that override the values in
     /// the `config.yaml` file.

@@ -48,7 +48,7 @@ pub(crate) struct AndroidBuildArgs {
 
     /// Generate native Kotlin Bindings together with the JNI libraries
     #[clap(long, conflicts_with_all = ["no_jni_libs"], default_value = "false")]
-    native_bindings: bool,
+    pub(crate) native_bindings: bool,
 }
 
 impl AndroidBuildArgs {
