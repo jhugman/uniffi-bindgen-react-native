@@ -25,8 +25,8 @@ impl CrateMetadata {
         profile.unwrap_or(if release { "release" } else { "debug" })
     }
 
-    pub fn library_path(&self, target: Option<&str>, profile: &str) -> Utf8PathBuf {
-        let library_name = self.library_file(target);
+    pub fn library_path(&self, target: Option<&str>, profile: &str, use_shared_library: Option<bool>) -> Utf8PathBuf {
+        let library_name = self.library_file(target, use_shared_library);
         match target {
             Some(t) => self.target_dir.join(t).join(profile).join(library_name),
             None => self.target_dir.join(profile).join(library_name),
@@ -40,8 +40,8 @@ impl CrateMetadata {
         Ok(())
     }
 
-    pub fn library_file(&self, target: Option<&str>) -> String {
-        let ext = so_extension(target);
+    pub fn library_file(&self, target: Option<&str>, use_shared_library: Option<bool>) -> String {
+        let ext = so_extension(target, use_shared_library);
         if ext == "wasm" {
             format!("{}.{ext}", &self.library_name)
         } else {
@@ -117,22 +117,23 @@ impl CrateMetadata {
     }
 }
 
-pub fn so_extension<'a>(target: Option<&str>) -> &'a str {
+pub fn so_extension<'a>(target: Option<&str>, use_shared_library: Option<bool>) -> &'a str {
     match target {
-        Some(t) => so_extension_from_target(t),
+        Some(t) => so_extension_from_target(t, use_shared_library),
         _ => so_extension_from_cfg(),
     }
 }
 
-fn so_extension_from_target<'a>(target: &str) -> &'a str {
+fn so_extension_from_target<'a>(target: &str, use_shared_library: Option<bool>) -> &'a str {
     if target.contains("windows") {
         "dll"
     } else if target.contains("darwin") {
         "dylib"
     } else if target.contains("ios") {
         "a"
+    } else if target.contains("android") && use_shared_library.expect("By default we use static libs on android") {
+        "so"
     } else if target.contains("android") {
-        // We're using staticlib files here. cargo ndk use .so files.
         "a"
     } else if target.contains("wasm") {
         "wasm"
