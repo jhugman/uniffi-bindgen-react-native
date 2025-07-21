@@ -90,15 +90,13 @@ fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<St
             Some(actual_value) => {
                 if actual_value != expected_value {
                     return Some(format!(
-                        "Environment variable mismatch: for key '{}', expected '{}', got '{}'",
-                        expected_key, expected_value, actual_value
+                        "Environment variable mismatch: for key '{expected_key}', expected '{expected_value}', got '{actual_value}'"
                     ));
                 }
             }
             None => {
                 return Some(format!(
-                    "Missing environment variable: expected '{}' with value '{}'",
-                    expected_key, expected_value
+                    "Missing environment variable: expected '{expected_key}' with value '{expected_value}'"
                 ));
             }
         }
