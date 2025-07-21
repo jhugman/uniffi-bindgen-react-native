@@ -126,6 +126,8 @@ To configure Rust to build a static library, you should ensure `staticlib` is in
 crate-type = ["staticlib"]
 </code>
 </pre>
+
+On Android you can decide if you want to use shared or static version of library. See the [Android section of the configuration documentation](config-yaml.md#android) for more information.
 ```
 
 ````admonish warning

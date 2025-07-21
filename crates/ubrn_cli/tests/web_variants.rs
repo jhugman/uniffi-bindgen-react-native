@@ -26,7 +26,7 @@ fn test_release() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         // Run the command under test
@@ -76,7 +76,7 @@ fn test_monorepo() -> Result<()> {
         );
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -132,7 +132,7 @@ fn test_multi_features() -> Result<()> {
         );
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -183,12 +183,12 @@ fn test_distinct_bindings() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -231,12 +231,12 @@ fn test_override_entrypoint_in_config_yaml() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -284,12 +284,12 @@ fn test_merged_cargo_toml_patch() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;

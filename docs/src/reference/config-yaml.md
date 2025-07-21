@@ -78,6 +78,7 @@ android:
     jniLibs: src/main/jniLibs
     packageName: <DERIVED FROM package.json>
     codegenOutputDir: <DERIVED FROM package.json>
+    useSharedLibrary: true
 ```
 
 The `directory` is the location of the Android project, relative to the root of the React Native library project.
@@ -101,6 +102,23 @@ To customize the `codegenOutputDir`, you should edit or add the entry at the pat
 ```admonish warning
 Note that for Android the `outputDir` value in `package.json` needs to have a matching entry under `dependency`/`platforms`/`android`/`cmakeListsPath` in `react-native.config.js`. For example, if you set the Android output directory in `package.json` to `android/tmp`, the `cmakeListsPath` value in `react-native.config.js` needs to be set to `tmp/jni/CMakeLists.txt`.
 ```
+
+`useSharedLibrary` is a boolean that controls if the Rust code is linked as a shared library or a static library. The default is `false`, which means that the Rust code is linked as a static library. If you want to linked it as a dynamic library, set this to `true`.
+
+````admonish warning
+Note that when building as a shared library, you should ensure that Rust is configured to build dynamic library.
+
+```toml
+[lib]
+crate-type = ["cdylib"]
+```
+
+Also, please keep in mind that with `useSharedLibrary: true`, you should not `strip` your library while building it. As this will break generating turbo module and native bindings. This should not affect app performance as Android will optimize it during app build.
+```toml
+[profile.your_profile]
+strip = "none"
+```
+````
 
 ## `ios`
 

@@ -81,7 +81,7 @@ impl CppBindingArg {
         let mut cmd = Command::new("ninja");
         run_cmd_quietly(cmd.current_dir(&build_dir))?;
 
-        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension(None))))
+        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension(None, None))))
     }
 
     pub(crate) fn compile_without_crate(&self, clean: bool) -> Result<Utf8PathBuf> {
@@ -123,6 +123,6 @@ impl CppBindingArg {
         let mut cmd = Command::new("ninja");
         run_cmd_quietly(cmd.current_dir(&build_dir))?;
 
-        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension(None))))
+        Ok(build_dir.join(format!("lib{extension_name}.{}", so_extension(None, None))))
     }
 }
