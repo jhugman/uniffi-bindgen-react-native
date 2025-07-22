@@ -203,3 +203,19 @@ pub fn docstring(docstring: &str, spaces: &i32) -> Result<String, askama::Error>
     let spaces = usize::try_from(*spaces).unwrap_or_default();
     Ok(textwrap::indent(&wrapped, &" ".repeat(spaces)))
 }
+
+pub(super) fn is_optional_type(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<bool, askama::Error> {
+    let type_ = types.as_type(as_type);
+    Ok(matches!(type_, Type::Optional { .. }))
+}
+
+pub(super) fn type_name_without_undefined(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
+    let og_type_name = type_name(as_type, types)?;
+    Ok(og_type_name.replace(" | undefined", ""))
+}

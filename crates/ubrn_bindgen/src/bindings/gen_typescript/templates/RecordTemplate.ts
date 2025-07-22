@@ -5,7 +5,7 @@
 export type {{ type_name }} = {
     {%- for field in rec.fields() %}
     {%- call ts::docstring(field, 4) %}
-    {{ field.name()|var_name }}: {{ field|type_name(self) }}
+    {{ field.name()|var_name }}{% if field|is_optional_type(self) %}?{% endif %}: {{ field|type_name_without_undefined(self) }}
     {%- if !loop.last %},{% endif %}
     {%- endfor %}
 }
