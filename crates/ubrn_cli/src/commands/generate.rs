@@ -98,6 +98,7 @@ pub(crate) struct GenerateAllArgs {
     lib_file: Utf8PathBuf,
 
     /// Whether to generate native bindings or not.
+    #[clap(long, default_value = "false")]
     native_bindings: bool,
 }
 
