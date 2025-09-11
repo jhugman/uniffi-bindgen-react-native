@@ -149,11 +149,14 @@ impl AndroidBuildArgs {
             cmd.args(["--profile", profile]);
         }
         cmd.args(cargo_extras.clone());
-        
+
         // Set target-specific RUSTFLAGS for 16KB page alignment
-        let rustflags_env = format!("CARGO_TARGET_{}_RUSTFLAGS", target.triple().to_uppercase().replace('-', "_"));
+        let rustflags_env = format!(
+            "CARGO_TARGET_{}_RUSTFLAGS",
+            target.triple().to_uppercase().replace('-', "_")
+        );
         cmd.env(rustflags_env, "-C link-arg=-Wl,-z,max-page-size=16384");
-        
+
         run_cmd(cmd.current_dir(rust_dir))?;
         Ok(target.clone())
     }
