@@ -16,8 +16,8 @@ jobs:
         bob-version:
           - 0.49.10
         rn-version:
-          - 0.77.2
-          - 0.78.2
+          - 0.81.0
+          - 0.82.0
       # Uncomment to debug failures
       # fail-fast: false
 
