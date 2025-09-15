@@ -17,10 +17,6 @@ runs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@1.88.0
 
-    - name: Install Rust Fmt
-      shell: bash
-      run: rustup component add rustfmt
-
     - name: Install cargo-ndk
       if: ${{ inputs.platform == 'android' }}
       shell: bash
