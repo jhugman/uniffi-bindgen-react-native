@@ -12,12 +12,15 @@
     "email": "james@hugman.tv"
   },
   "type": "module",
-  "main": "./typescript/src/index.ts",
+  "main": "./typescript/dist/index.js",
+  "types": "./typescript/dist/index.d.ts",
   "bin": {
     "ubrn": "./bin/cli.cjs",
     "uniffi-bindgen-react-native": "./bin/cli.cjs"
   },
   "scripts": {
+    "build": "tsc",
+    "prepare": "yarn build",
     "test": "./scripts/run-tests.sh"
   },
   "devDependencies": {
