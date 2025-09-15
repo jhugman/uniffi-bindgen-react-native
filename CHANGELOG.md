@@ -7,6 +7,10 @@
 
 **Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...main
 
+## 🦊 What's Changed
+
+- Build TS to JS before publish; ship compiled JS + types to avoid strict TS errors. Inspired by [#198](https://github.com/jhugman/uniffi-bindgen-react-native/pull/198) ([@hassankhan](https://github.com/hassankhan)); implemented in [#297](https://github.com/jhugman/uniffi-bindgen-react-native/pull/297) ([@EthanShoeDev](https://github.com/EthanShoeDev)).
+
 ---
 
 # 0.29.3-1
