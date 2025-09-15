@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "es2022",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
-    "module": "commonjs",                                /* Specify what module code is generated. */
+    "module": "commonjs", 
+    "declaration": true,
+    "outDir": "./typescript/dist",                                   /* Specify what module code is generated. */
     "paths": {
       "uniffi-bindgen-react-native": ["./typescript/src/index"],/* Specify a set of entries that re-map imports to additional lookup locations. */
       "@/*": ["./typescript/testing/*"],
