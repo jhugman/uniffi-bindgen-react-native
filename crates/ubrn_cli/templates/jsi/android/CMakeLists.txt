@@ -52,7 +52,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
 
 cmake_path(
   SET MY_RUST_LIB
-  ${CMAKE_SOURCE_DIR}/{{ jni_libs_dir }}/${ANDROID_ABI}/{{ self.config.rust_crate.library_file(Some("android")) }}
+  ${CMAKE_SOURCE_DIR}/{{ jni_libs_dir }}/${ANDROID_ABI}/{{ self.config.rust_crate.library_file(Some("android"), Some(*self.config.project.android.use_shared_library)) }}
   NORMALIZE
 )
 
