@@ -7,6 +7,8 @@ project({{ self.config.project.module_cpp() }})
 {%- let bindings_dir = self.relative_to(root, dir) %}
 {%- let dir = self.config.project.tm.cpp_path(root) %}
 {%- let tm_dir = self.relative_to(root, dir) %}
+{%- let is_so_lib = self.config.project.android.use_shared_library %}
+{%- let is_static_lib = !is_so_lib %}
 
 set (CMAKE_VERBOSE_MAKEFILE ON)
 set (CMAKE_CXX_STANDARD 17)
@@ -50,11 +52,18 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
 
 cmake_path(
   SET MY_RUST_LIB
-  ${CMAKE_SOURCE_DIR}/{{ jni_libs_dir }}/${ANDROID_ABI}/{{ self.config.rust_crate.library_file(Some("android")) }}
+  ${CMAKE_SOURCE_DIR}/{{ jni_libs_dir }}/${ANDROID_ABI}/{{ self.config.rust_crate.library_file(Some("android"), Some(*self.config.project.android.use_shared_library)) }}
   NORMALIZE
 )
+
+{%- if is_static_lib %}
 add_library(my_rust_lib STATIC IMPORTED)
 set_target_properties(my_rust_lib PROPERTIES IMPORTED_LOCATION ${MY_RUST_LIB})
+{%- endif %}
+{%- if is_so_lib %}
+add_library(my_rust_lib SHARED IMPORTED)
+set_target_properties(my_rust_lib PROPERTIES IMPORTED_LOCATION ${MY_RUST_LIB} IMPORTED_NO_SONAME ON)
+{%- endif %}
 
 # Add ReactAndroid libraries, being careful to account for different versions.
 find_package(ReactAndroid REQUIRED CONFIG)

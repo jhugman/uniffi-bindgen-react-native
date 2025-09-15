@@ -5,9 +5,24 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-0...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...main
 
 ---
+
+# 0.29.3-1
+
+## ✨ What's New ✨
+
+- Support for dynamic libraries on Android ([#285](https://github.com/jhugman/uniffi-bindgen-react-native/pull/285)). Thank you [@exploIF](https://github.com/exploIF)!
+- Add `RUSTFLAGS` command for web build ([#276](https://github.com/jhugman/uniffi-bindgen-react-native/pull/276)). Thank you [@zzorba](https://github.com/zzorba)!
+
+## 🦊 What's Changed
+
+- A fix for generating native Kotlin bindings ([#283](https://github.com/jhugman/uniffi-bindgen-react-native/pull/283))
+- `serde-toml-merge` is version pinned ([#280](https://github.com/jhugman/uniffi-bindgen-react-native/pull/280))
+- Export `FFIConverters` for errors ([#279](https://github.com/jhugman/uniffi-bindgen-react-native/pull/279))
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-0...0.29.3-1
 
 # 0.29.3-0
 

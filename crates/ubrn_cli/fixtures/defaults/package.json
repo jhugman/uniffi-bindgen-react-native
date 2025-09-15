@@ -156,6 +156,6 @@
     "version": "0.50.2"
   },
   "dependencies": {
-    "uniffi-bindgen-react-native": "^0.29.3-0"
+    "uniffi-bindgen-react-native": "^0.29.3-1"
   }
 }
