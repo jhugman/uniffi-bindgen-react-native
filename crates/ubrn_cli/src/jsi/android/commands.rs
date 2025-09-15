@@ -106,7 +106,7 @@ impl AndroidBuildArgs {
         targets: &[Target],
         cargo_extras: &ExtraArgs,
         api_level: usize,
-        use_shared_library: bool,
+        _use_shared_library: bool,
     ) -> Result<HashMap<Target, Utf8PathBuf>> {
         let manifest_path = crate_.manifest_path()?;
         let rust_dir = crate_.crate_dir()?;
@@ -118,7 +118,7 @@ impl AndroidBuildArgs {
             let target =
                 self.cargo_build(target, &manifest_path, cargo_extras, api_level, &rust_dir)?;
             let library =
-                metadata.library_path(Some(target.triple()), profile, Some(use_shared_library));
+                metadata.library_path(Some(target.triple()), profile);
             target_files.insert(target, library);
         }
         Ok(target_files)
@@ -157,14 +157,14 @@ impl AndroidBuildArgs {
         &self,
         metadata: &CrateMetadata,
         targets: &[Target],
-        use_shared_library: Option<bool>,
+        _use_shared_library: Option<bool>,
     ) -> HashMap<Target, Utf8PathBuf> {
         let profile = self.common_args.profile();
         targets
             .iter()
             .filter_map(|target| {
                 let library =
-                    metadata.library_path(Some(target.triple()), profile, use_shared_library);
+                    metadata.library_path(Some(target.triple()), profile);
                 if library.exists() {
                     Some((target.clone(), library))
                 } else {
@@ -179,7 +179,7 @@ impl AndroidBuildArgs {
         metadata: &CrateMetadata,
         jni_libs: &Utf8Path,
         target_files: &HashMap<Target, Utf8PathBuf>,
-        use_shared_library: bool,
+        _use_shared_library: bool,
     ) -> Result<()> {
         println!("-- Copying into jniLibs directory");
         println!("rm -Rf {jni_libs}");
@@ -189,7 +189,7 @@ impl AndroidBuildArgs {
             mk_dir(&dst_dir)?;
 
             let dst_lib = dst_dir
-                .join(metadata.library_file(Some(target.triple()), Some(use_shared_library)));
+                .join(metadata.library_file(Some(target.triple())));
             println!("cp {library} {dst_lib}");
             cp_file(library, &dst_lib)?;
         }

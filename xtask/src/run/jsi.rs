@@ -40,7 +40,7 @@ impl Jsi {
             (Some(crate_), None, Some(bindings)) => {
                 let profile = crate_.profile();
                 let crate_ = crate_.cargo_build(clean)?;
-                let crate_lib = crate_.library_path(None, profile, None);
+                let crate_lib = crate_.library_path(None, profile);
                 let target_dir = crate_.target_dir();
                 let lib_name = crate_.library_name();
                 let modules =

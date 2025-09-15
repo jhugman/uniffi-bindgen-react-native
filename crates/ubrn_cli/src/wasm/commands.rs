@@ -50,7 +50,7 @@ impl WebBuildArgs {
         let crate_ = &config.crate_;
         self.cargo_build(&crate_.manifest_path()?, &config.wasm, &crate_.crate_dir()?)?;
         let metadata = crate_.metadata()?;
-        let library_path = metadata.library_path(None, "debug", None);
+        let library_path = metadata.library_path(None, "debug");
         Ok(vec![library_path])
     }
 
@@ -71,7 +71,7 @@ impl WebBuildArgs {
             CrateMetadata::try_from(manifest_path.to_path_buf())?
         };
         let library_path =
-            wasm_crate.library_path(Some(target.triple()), self.common_args.profile(), None);
+            wasm_crate.library_path(Some(target.triple()), self.common_args.profile());
         let target = self
             .target
             .clone()

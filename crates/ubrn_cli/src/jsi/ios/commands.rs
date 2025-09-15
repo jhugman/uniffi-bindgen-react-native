@@ -118,7 +118,7 @@ impl IosBuildArgs {
 
             // Now we need to get the path to the lib.a file, to feed to xcodebuild.
             let library =
-                metadata.library_path(Some(&target.triple), self.common_args.profile(), None);
+                metadata.library_path(Some(&target.triple), self.common_args.profile());
             target_files.insert(target.clone(), library);
         }
         Ok(target_files)
@@ -165,7 +165,7 @@ impl IosBuildArgs {
             } else {
                 let dir = metadata.target_dir().join("lipo").join(p.lib_folder_name());
                 mk_dir(&dir)?;
-                let output = dir.join(metadata.library_file(Some("ios"), None));
+                let output = dir.join(metadata.library_file(Some("ios")));
                 let mut cmd = Command::new("lipo");
                 cmd.arg("-create");
                 for f in files {
@@ -277,7 +277,7 @@ impl IosBuildArgs {
         targets
             .iter()
             .filter_map(|target| {
-                let library = metadata.library_path(Some(&target.triple), profile, None);
+                let library = metadata.library_path(Some(&target.triple), profile);
                 if library.exists() {
                     Some((target.clone(), library))
                 } else {

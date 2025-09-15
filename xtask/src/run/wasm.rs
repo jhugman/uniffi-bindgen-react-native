@@ -51,7 +51,7 @@ impl Wasm {
             (Some(crate_), None, Some(bindings)) => {
                 let profile = crate_.profile();
                 let crate_ = crate_.cargo_build(clean)?;
-                let crate_lib = crate_.library_path(None, profile, None);
+                let crate_lib = crate_.library_path(None, profile);
 
                 let generated_crate = bindings.abi_dir();
                 let src_dir = generated_crate.join("src");
