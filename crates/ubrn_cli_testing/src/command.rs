@@ -3,7 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 /// A builder for command matchers to be used in tests
 #[derive(Debug, Clone)]
@@ -11,6 +14,7 @@ pub struct Command {
     program: String,
     args: Vec<ArgMatcher>,
     cwd: Option<PathBuf>,
+    env: HashMap<String, String>,
 }
 
 impl Command {
@@ -20,6 +24,7 @@ impl Command {
             program: program.to_string(),
             args: Vec::new(),
             cwd: None,
+            env: HashMap::new(),
         }
     }
 
@@ -64,6 +69,12 @@ impl Command {
         self
     }
 
+    /// Add an environment variable to match exactly
+    pub fn env(mut self, key: &str, value: &str) -> Self {
+        self.env.insert(key.to_string(), value.to_string());
+        self
+    }
+
     /// Get the program name
     pub(crate) fn program(&self) -> &str {
         &self.program
@@ -77,6 +88,11 @@ impl Command {
     /// Get the list of argument matchers
     pub(crate) fn args(&self) -> &[ArgMatcher] {
         &self.args
+    }
+
+    /// Get the environment variables
+    pub(crate) fn get_env(&self) -> &HashMap<String, String> {
+        &self.env
     }
 }
 

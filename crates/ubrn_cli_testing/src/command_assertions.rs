@@ -84,6 +84,24 @@ fn command_mismatch(recorded: &RecordedCommand, expected: &Command) -> Option<St
         }
     }
 
+    // Check environment variables
+    for (expected_key, expected_value) in expected.get_env() {
+        match recorded.env.get(expected_key) {
+            Some(actual_value) => {
+                if actual_value != expected_value {
+                    return Some(format!(
+                        "Environment variable mismatch: for key '{expected_key}', expected '{expected_value}', got '{actual_value}'"
+                    ));
+                }
+            }
+            None => {
+                return Some(format!(
+                    "Missing environment variable: expected '{expected_key}' with value '{expected_value}'"
+                ));
+            }
+        }
+    }
+
     // Check arguments - we need to consider the order and the different matcher types
     let mut arg_idx = 0;
     let recorded_args = &recorded.args;

@@ -23,7 +23,7 @@ fn test_happy_path_ios() -> Result<()> {
         shim_path("rust/shim", target_crate.project_root());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         // Run the command under test
@@ -105,7 +105,7 @@ fn test_happy_path_android() -> Result<()> {
         shim_path("rust/shim", target_crate.project_root());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         // Run the command under test
@@ -219,7 +219,7 @@ fn test_happy_path_web() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         // Run the command under test

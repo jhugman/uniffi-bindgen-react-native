@@ -26,7 +26,7 @@ fn test_release() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         // Run the command under test
@@ -76,7 +76,7 @@ fn test_monorepo() -> Result<()> {
         );
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -132,7 +132,7 @@ fn test_multi_features() -> Result<()> {
         );
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -183,12 +183,12 @@ fn test_distinct_bindings() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -231,12 +231,12 @@ fn test_override_entrypoint_in_config_yaml() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -284,12 +284,12 @@ fn test_merged_cargo_toml_patch() -> Result<()> {
         shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         shim_path(
             "libarithmetical.a",
-            target_crate.library_path(None, "debug"),
+            target_crate.library_path(None, "debug", None),
         );
 
         run_cli("ubrn build web --config ubrn.config.yaml")?;
@@ -303,6 +303,54 @@ fn test_merged_cargo_toml_patch() -> Result<()> {
                 )
                 .contains("wasm-bindgen = \"PATCHED\"")
                 .contains("zzz = \"PATCHED\""),
+        ]);
+
+        Ok(())
+    })
+}
+
+#[test]
+fn test_rustflags() -> Result<()> {
+    let target_crate = cargo_build("arithmetic")?;
+    let fixtures_dir = fixtures_dir();
+    with_fixture(fixtures_dir.clone(), "defaults", |_fixture_dir| {
+        // Set up file shims
+        shim_path("package.json", fixtures_dir.join("defaults/package.json"));
+        shim_path(
+            "ubrn.config.yaml",
+            fixtures_dir.join("defaults/ubrn-wasm.rustflags.config.yaml"),
+        );
+        shim_path("rust/shim/Cargo.toml", target_crate.manifest_path());
+        shim_path("rust/shim", target_crate.project_root());
+
+        shim_path("rust_modules/wasm/Cargo.toml", target_crate.manifest_path());
+        shim_path(
+            "libarithmetical.a",
+            target_crate.library_path(None, "debug", None),
+        );
+
+        run_cli("ubrn build web --config ubrn.config.yaml")?;
+
+        // Assert the expected commands were executed, including RUSTFLAGS
+        assert_commands(&[
+            Command::new("cargo")
+                .arg("build")
+                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml"),
+            Command::new("prettier"),
+            Command::new("cargo")
+                .arg("build")
+                .arg_pair_suffix("--manifest-path", "rust_modules/wasm/Cargo.toml")
+                .arg_pair("--target", "wasm32-unknown-unknown")
+                .env(
+                    "RUSTFLAGS",
+                    "--cfg web_sys_unstable_apis -C target-feature=+atomics",
+                ),
+            Command::new("wasm-bindgen")
+                .arg_pair("--target", "web")
+                .arg("--omit-default-module-path")
+                .arg_pair("--out-name", "index")
+                .arg_pair_suffix("--out-dir", "src/generated/wasm-bindgen")
+                .arg_suffix("wasm32-unknown-unknown/debug/arithmetical.wasm"),
         ]);
 
         Ok(())
