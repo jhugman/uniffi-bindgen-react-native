@@ -118,7 +118,6 @@ fn test_happy_path_android() -> Result<()> {
                 .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "arm64-v8a")
                 .arg_pair("--platform", "23")
-                .arg("--no-strip")
                 .arg("--")
                 .arg("build"),
             Command::new("cargo")
@@ -126,7 +125,6 @@ fn test_happy_path_android() -> Result<()> {
                 .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "armeabi-v7a")
                 .arg_pair("--platform", "23")
-                .arg("--no-strip")
                 .arg("--")
                 .arg("build"),
             Command::new("cargo")
@@ -134,7 +132,6 @@ fn test_happy_path_android() -> Result<()> {
                 .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "x86")
                 .arg_pair("--platform", "23")
-                .arg("--no-strip")
                 .arg("--")
                 .arg("build"),
             Command::new("cargo")
@@ -142,7 +139,6 @@ fn test_happy_path_android() -> Result<()> {
                 .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "x86_64")
                 .arg_pair("--platform", "23")
-                .arg("--no-strip")
                 .arg("--")
                 .arg("build"),
             Command::new("prettier"),
