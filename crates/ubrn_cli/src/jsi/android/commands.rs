@@ -141,9 +141,6 @@ impl AndroidBuildArgs {
             .arg("--platform")
             .arg(format!("{api_level}"));
         let profile = self.common_args.profile();
-        if profile != "release" {
-            cmd.arg("--no-strip");
-        }
         cmd.arg("--").arg("build");
         if profile != "debug" {
             cmd.args(["--profile", profile]);
