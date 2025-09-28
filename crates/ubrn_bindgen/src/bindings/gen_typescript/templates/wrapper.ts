@@ -3,7 +3,7 @@
 
 /* tslint:disable */
 /* eslint-disable */
-/* @ts-nocheck */
+// @ts-nocheck
 
 {%- if flavor.is_jsi() %}
 import nativeModule, {
