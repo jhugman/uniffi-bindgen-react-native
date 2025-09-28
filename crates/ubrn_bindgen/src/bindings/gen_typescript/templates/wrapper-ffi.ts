@@ -3,7 +3,7 @@
 
 /* tslint:disable */
 /* eslint-disable */
-/* @ts-nocheck */
+// @ts-nocheck
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
