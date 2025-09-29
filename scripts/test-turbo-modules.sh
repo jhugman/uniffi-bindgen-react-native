@@ -209,9 +209,12 @@ create_library() {
   fi
 
 
+  if [[ -z $(git config user.name) ]]; then
     git config --global user.name "Lord Mergealot"
+  fi
+  if [[ -z $(git config user.email) ]]; then
     git config --global user.email "lord@squash.git"
-
+  fi
 
 
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
