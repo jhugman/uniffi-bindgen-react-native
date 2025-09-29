@@ -227,7 +227,7 @@ create_library() {
   # after 5 seconds. Since some of our tests depend on the initial commit, we create
   # it ourselves if needed.
   enter_dir "$base"
-  if [[ ! -d .git ]] || [[ $(git rev-list --count HEAD) -ne 1 ]]; then
+  if [[ $(git rev-list --count HEAD || 0) -ne 1 ]]; then
     info "Creating git repository ourselves"
     git init || true
     git branch -M main || true
