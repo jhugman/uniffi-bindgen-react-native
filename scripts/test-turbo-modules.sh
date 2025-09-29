@@ -208,15 +208,6 @@ create_library() {
     languages="cpp"
   fi
 
-
-  if [[ -z $(git config user.name) ]]; then
-    git config --global user.name "Lord Mergealot"
-  fi
-  if [[ -z $(git config user.email) ]]; then
-    git config --global user.email "lord@squash.git"
-  fi
-
-
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx create-react-native-library@$BOB_VERSION \
     --react-native-version "$RN_VERSION" \
@@ -232,19 +223,13 @@ create_library() {
     --local false \
     "$base"
 
-  # create-react-native-library gives up creating the repository and initial commit
-  # after 5 seconds. Since some of our tests depend on the initial commit, we create
-  # it ourselves if needed.
+  # create-react-native-library silently gives up creating the repository on failures.
+  # Since some of our tests depend on the initial commit, we test that the repository
+  # was fully initialised here.
   enter_dir "$base"
   if [[ $(git rev-list --count HEAD || 0) -ne 1 ]]; then
-    info "Creating git repository ourselves"
-    git init || true
-    git branch -M main || true
-    git add .
-    git commit -m "chore: initial commit"
+    error "Creation of git repository failed"
   fi
-  git log -- ./android/build.gradle
-  git ls-files ./android/build.gradle
   exit_dir
 
   exit_dir

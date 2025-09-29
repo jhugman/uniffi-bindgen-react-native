@@ -32,6 +32,21 @@ runs:
       with:
         targets: ${{ inputs.platform == 'ios' && 'aarch64-apple-ios-sim' || 'aarch64-linux-android' }}
 
+    - name: Ensure git identity
+      shell: bash
+      run: |
+        # The comparison tests depend on create-react-native-library initialising
+        # a git repository with a first commit. This will silently fail if no git
+        # identity was set up which apparently is the case on some runners. Since
+        # this action doesn't actually push any commits, we just set up a fake
+        # identity.
+        if [[ -z $(git config user.name) ]]; then
+          git config --global user.name "Lord Mergealot"
+        fi
+        if [[ -z $(git config user.email) ]]; then
+          git config --global user.email "lord@squash.git"
+        fi
+
     - name: Comparison test the turbo-module generation
       shell: bash
       run: |
