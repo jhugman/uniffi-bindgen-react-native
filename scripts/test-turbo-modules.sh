@@ -223,13 +223,17 @@ create_library() {
     --local false \
     "$base"
 
-  cat "$base/android/build.gradle"
-  # sleep 3
-  pushd "$base"
-  git rev-parse --is-inside-work-tree
-  git ls-files "android/build.gradle"
-  git log -- "android/build.gradle"
-  popd
+  # create-react-native-library gives up creating the repository and initial commit
+  # after 5 seconds. Since some of our tests depend on the initial commit, we create
+  # it ourselves if needed.
+  enter_dir "$base"
+  if [[ $(git rev-parse --show-toplevel) != $(pwd) ]]; then
+    git init
+    git branch -M main
+    git add .
+    git commit -m "chore: initial commit"
+  fi
+  exit_dir
 
   exit_dir
 }
