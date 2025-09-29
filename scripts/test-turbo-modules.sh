@@ -208,6 +208,12 @@ create_library() {
     languages="cpp"
   fi
 
+
+    git config --global user.name "Lord Mergealot"
+    git config --global user.email "lord@squash.git"
+
+
+
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx create-react-native-library@$BOB_VERSION \
     --react-native-version "$RN_VERSION" \
