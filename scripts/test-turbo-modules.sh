@@ -227,10 +227,10 @@ create_library() {
   # after 5 seconds. Since some of our tests depend on the initial commit, we create
   # it ourselves if needed.
   enter_dir "$base"
-  if [[ $(git rev-parse --show-toplevel) != $(pwd) ]]; then
+  if [[ $(git rev-list --count HEAD) -ne 1 ]]; then
     info "Creating git repository ourselves"
-    git init
-    git branch -M main
+    git init || true
+    git branch -M main || true
     git add .
     git commit -m "chore: initial commit"
   fi
