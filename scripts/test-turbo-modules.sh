@@ -228,11 +228,14 @@ create_library() {
   # it ourselves if needed.
   enter_dir "$base"
   if [[ $(git rev-parse --show-toplevel) != $(pwd) ]]; then
+    info "Creating git repository ourselves"
     git init
     git branch -M main
     git add .
     git commit -m "chore: initial commit"
   fi
+  git log -- ./android/build.gradle
+  git ls-files ./android/build.gradle
   exit_dir
 
   exit_dir
