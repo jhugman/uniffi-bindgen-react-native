@@ -224,8 +224,10 @@ create_library() {
     "$base"
 
   cat "$base/android/build.gradle"
+  pushd "$base"
   git ls-files "$base/android/build.gradle"
   git log -- "$base/android/build.gradle"
+  popd
 
   exit_dir
 }
