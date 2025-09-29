@@ -293,7 +293,8 @@ check_line_unchanged() {
         info "Removed: $last_commit_line"
         info "Added  : $current_line"
         error "$file_path: found line with \"$search_string\" to have changed"
-
+    else
+        info "$file_path: \"$search_string\" ✔"
     fi
   done
 }
