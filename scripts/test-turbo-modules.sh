@@ -222,6 +222,9 @@ create_library() {
     --example vanilla \
     --local false \
     "$base"
+
+  cat "$base/android/build.gradle"
+
   exit_dir
 }
 
@@ -301,34 +304,35 @@ check_line_unchanged() {
 
 check_lines() {
   echo "-- Checking for unmodified lines in generated code"
-  check_line_unchanged "cpp/*.h" "#ifndef"
-  check_line_unchanged "cpp/*.h" "^namespace"
-  check_line_unchanged "cpp/*.cpp" ".h\""
-  check_line_unchanged "cpp/*.cpp" "^namespace"
-  check_line_unchanged "src/Native*" "getEnforcing"
+  check_line_unchanged "./cpp/*.h" "#ifndef"
+  check_line_unchanged "./cpp/*.h" "^namespace"
+  check_line_unchanged "./cpp/*.cpp" ".h\""
+  check_line_unchanged "./cpp/*.cpp" "^namespace"
+  check_line_unchanged "./src/Native*" "getEnforcing"
 
-  check_line_unchanged "android/CMakeLists.txt" "^project"
-  check_line_unchanged "android/CMakeLists.txt" "^add_library.*SHARED"
-  check_line_unchanged "android/build.gradle" "jsRootDir ="
-  check_line_unchanged "android/build.gradle" "libraryName ="
-  check_line_unchanged "android/build.gradle" "codegenJavaPackageName ="
-  check_line_unchanged "android/src/*/*Package.*" "package"
-  check_line_unchanged "android/src/*/*Package.*" "package"
-  check_line_unchanged "android/src/*/*Module.java" "System.loadLibrary"
-  check_line_unchanged "android/src/*/*Module*" "Spec"
-  check_line_unchanged "android/src/*/*Module*" "@ReactModule"
-  check_line_unchanged "android/src/*/*Module*" "package"
-  check_line_unchanged "android/src/*/*Module.java" "public class"
-  check_line_unchanged "android/src/*/*Module.kt" "^class "
-  check_line_unchanged "android/cpp-adapter.cpp" "#include \""
-  check_line_unchanged "android/cpp-adapter.cpp" "nativeMultiply"
-  check_line_unchanged "android/cpp-adapter.cpp" "::multiply"
-  check_line_unchanged "ios/*.h" "Spec>"
-  check_line_unchanged "ios/*.h" "<Native"
-  check_line_unchanged "ios/*.mm" "#import \""
-  check_line_unchanged "ios/*.mm" "@implementation"
-  check_line_unchanged "ios/*.mm" "multiply:"
-  check_line_unchanged "*.podspec" "s.name"
+  check_line_unchanged "./android/CMakeLists.txt" "^project"
+  check_line_unchanged "./android/CMakeLists.txt" "^add_library.*SHARED"
+  cat ./android/build.gradle
+  check_line_unchanged "./android/build.gradle" "jsRootDir ="
+  check_line_unchanged "./android/build.gradle" "libraryName ="
+  check_line_unchanged "./android/build.gradle" "codegenJavaPackageName ="
+  check_line_unchanged "./android/src/*/*Package.*" "package"
+  check_line_unchanged "./android/src/*/*Package.*" "package"
+  check_line_unchanged "./android/src/*/*Module.java" "System.loadLibrary"
+  check_line_unchanged "./android/src/*/*Module*" "Spec"
+  check_line_unchanged "./android/src/*/*Module*" "@ReactModule"
+  check_line_unchanged "./android/src/*/*Module*" "package"
+  check_line_unchanged "./android/src/*/*Module.java" "public class"
+  check_line_unchanged "./android/src/*/*Module.kt" "^class "
+  check_line_unchanged "./android/cpp-adapter.cpp" "#include \""
+  check_line_unchanged "./android/cpp-adapter.cpp" "nativeMultiply"
+  check_line_unchanged "./android/cpp-adapter.cpp" "::multiply"
+  check_line_unchanged "./ios/*.h" "Spec>"
+  check_line_unchanged "./ios/*.h" "<Native"
+  check_line_unchanged "./ios/*.mm" "#import \""
+  check_line_unchanged "./ios/*.mm" "@implementation"
+  check_line_unchanged "./ios/*.mm" "multiply:"
+  check_line_unchanged "./*.podspec" "s.name"
 }
 
 clean_turbo_modules() {
