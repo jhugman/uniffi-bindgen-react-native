@@ -224,12 +224,11 @@ create_library() {
     "$base"
 
   cat "$base/android/build.gradle"
-  sleep 3
+  # sleep 3
   pushd "$base"
-  git log || true
-  git status || true
-  git ls-files "$base/android/build.gradle" || true
-  git log -- "$base/android/build.gradle" || true
+  git rev-parse --is-inside-work-tree
+  git ls-files "android/build.gradle"
+  git log -- "android/build.gradle"
   popd
 
   exit_dir
