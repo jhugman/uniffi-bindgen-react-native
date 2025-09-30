@@ -656,7 +656,7 @@ impl<'a> ComponentTemplate<'a> {
         if t.is_none() {
             quote! { #runtime_ident::UniffiResultVoid }
         } else {
-            match t.unwrap() {
+            match t {
                 FfiType::UInt8 => quote! { #runtime_ident::UniffiResultUInt8 },
                 FfiType::UInt16 => quote! { #runtime_ident::UniffiResultUInt16 },
                 FfiType::UInt32 => quote! { #runtime_ident::UniffiResultUInt32 },

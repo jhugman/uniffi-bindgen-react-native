@@ -45,7 +45,7 @@ impl From<Handle> for i64 {
 }
 
 impl TryFrom<i64> for Handle {
-    type Error = std::convert::Infallible;
+    type Error = String;
 
     fn try_from(val: i64) -> Result<Handle, Self::Error> {
         Ok(Handle(val))
