@@ -653,10 +653,9 @@ impl<'a> ComponentTemplate<'a> {
 
     fn ffi_type_uniffi_result(&self, t: Option<&FfiType>) -> TokenStream {
         let runtime_ident = self.runtime_ident();
-        if t.is_none() {
-            quote! { #runtime_ident::UniffiResultVoid }
-        } else {
-            match t.unwrap() {
+        match t {
+            None => quote! { #runtime_ident::UniffiResultVoid },
+            Some(t) => match t {
                 FfiType::UInt8 => quote! { #runtime_ident::UniffiResultUInt8 },
                 FfiType::UInt16 => quote! { #runtime_ident::UniffiResultUInt16 },
                 FfiType::UInt32 => quote! { #runtime_ident::UniffiResultUInt32 },
@@ -679,7 +678,7 @@ impl<'a> ComponentTemplate<'a> {
                     self.ffi_type_uniffi_result(Some(t))
                 }
                 _ => unreachable!("Uniffi doesn't support returning {t:?} from callbacks"),
-            }
+            },
         }
     }
 

@@ -44,6 +44,7 @@ impl From<Handle> for i64 {
     }
 }
 
+#[allow(clippy::infallible_try_from)]
 impl TryFrom<i64> for Handle {
     type Error = std::convert::Infallible;
 
