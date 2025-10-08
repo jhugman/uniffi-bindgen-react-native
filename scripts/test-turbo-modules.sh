@@ -222,6 +222,16 @@ create_library() {
     --example vanilla \
     --local false \
     "$base"
+
+  # create-react-native-library silently gives up creating the repository on failures.
+  # Since some of our tests depend on the initial commit, we test that the repository
+  # was fully initialised here.
+  enter_dir "$base"
+  if [[ $(git rev-list --count HEAD || 0) -ne 1 ]]; then
+    error "Creation of git repository failed"
+  fi
+  exit_dir
+
   exit_dir
 }
 
@@ -293,7 +303,8 @@ check_line_unchanged() {
         info "Removed: $last_commit_line"
         info "Added  : $current_line"
         error "$file_path: found line with \"$search_string\" to have changed"
-
+    else
+        info "$file_path: \"$search_string\" ✔"
     fi
   done
 }
