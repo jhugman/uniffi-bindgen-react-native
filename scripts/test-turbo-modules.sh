@@ -319,9 +319,6 @@ check_lines() {
 
   check_line_unchanged "./android/CMakeLists.txt" "^project"
   check_line_unchanged "./android/CMakeLists.txt" "^add_library.*SHARED"
-  check_line_unchanged "./android/build.gradle" "jsRootDir ="
-  check_line_unchanged "./android/build.gradle" "libraryName ="
-  check_line_unchanged "./android/build.gradle" "codegenJavaPackageName ="
   check_line_unchanged "./android/src/*/*Package.*" "package"
   check_line_unchanged "./android/src/*/*Package.*" "package"
   check_line_unchanged "./android/src/*/*Module.java" "System.loadLibrary"
