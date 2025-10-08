@@ -55,6 +55,7 @@ or [**the UniFFI examples**](https://github.com/mozilla/uniffi-rs/tree/main/exam
 
 - [@unomed/react-native-matrix-sdk](https://www.npmjs.com/package/@unomed/react-native-matrix-sdk)
 - [ChessTiles on iOS](https://apps.apple.com/us/app/chesstiles/id6737867924) "uniffi-bindgen-react-native lets us run our performance critical solution search algorithm and business logic in Rust, while rapidly prototying the UI with React Native"
+- [@fressh/react-native-uniffi-russh](https://www.npmjs.com/package/@fressh/react-native-uniffi-russh)
 
 ## Prior art and related projects
 
