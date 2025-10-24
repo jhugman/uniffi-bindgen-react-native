@@ -85,7 +85,7 @@ impl ReactNativeBindingGenerator {
 impl BindingGenerator for ReactNativeBindingGenerator {
     type Config = ReactNativeConfig;
 
-    fn new_config(&self, root_toml: &toml::Value) -> Result<Self::Config> {
+    fn new_config(&self, root_toml: &toml::value::Value) -> Result<Self::Config> {
         Ok(match root_toml.get("bindings") {
             Some(v) => v.clone().try_into()?,
             None => Default::default(),
