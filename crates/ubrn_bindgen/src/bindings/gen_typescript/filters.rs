@@ -7,10 +7,8 @@ use super::{
     oracle::{AsCodeType, CodeOracle},
     TypeRenderer,
 };
-pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
-    backend::{Literal, Type},
-    interface::{AsType, Enum, FfiType, Variant},
+    interface::{AsType, Enum, FfiType, Literal, Type, Variant},
     ComponentInterface,
 };
 

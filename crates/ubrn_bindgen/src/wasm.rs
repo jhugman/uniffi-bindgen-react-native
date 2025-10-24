@@ -81,7 +81,7 @@ impl WasmBindingGenerator {
 impl BindingGenerator for WasmBindingGenerator {
     type Config = WasmConfig;
 
-    fn new_config(&self, root_toml: &toml::value::Value) -> Result<Self::Config> {
+    fn new_config(&self, root_toml: &toml::Value) -> Result<Self::Config> {
         Ok(match root_toml.get("bindings") {
             Some(v) => v.clone().try_into()?,
             None => Default::default(),

@@ -6,7 +6,7 @@
 use super::oracle::CodeType;
 use paste::paste;
 use uniffi_bindgen::{
-    backend::{Literal, Type},
+    interface::{Literal, Type},
     interface::Radix,
     ComponentInterface,
 };
