@@ -42,7 +42,12 @@ impl CodeType for OptionalCodeType {
     fn literal(&self, literal: &Literal, ci: &ComponentInterface) -> String {
         match literal {
             Literal::None => "undefined".into(),
-            Literal::Some { inner } => CodeOracle.find(&self.inner).literal(inner, ci),
+            Literal::Some { .. } => {
+                // In UniFFI 0.30, Some contains DefaultValueMetadata which we can't easily convert
+                // For now, use a simple default for the inner type
+                // TODO: Properly handle DefaultValueMetadata
+                "undefined".into()
+            }
             _ => panic!("Invalid literal for Optional type: {literal:?}"),
         }
     }
