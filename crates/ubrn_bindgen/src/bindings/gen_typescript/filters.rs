@@ -99,25 +99,33 @@ pub(super) fn lift_fn(
 }
 
 pub fn render_literal(
-    _literal: &uniffi_meta::DefaultValueMetadata,
+    literal: &uniffi_meta::DefaultValueMetadata,
     as_ct: &impl AsType,
-    _ci: &ComponentInterface,
+    ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
     // In UniFFI 0.30, the default value system changed to use DefaultValueMetadata
-    // For now, we return a simple default value based on the type
-    // TODO: Properly implement literal rendering using the actual literal value
     let type_ = as_ct.as_type();
     let code_type = type_.as_codetype();
-    Ok(match type_ {
-        Type::String => "\"\"".to_string(),
-        Type::Boolean => "false".to_string(),
-        Type::Int8 | Type::Int16 | Type::Int32 => "0".to_string(),
-        Type::Int64 => "0n".to_string(),
-        Type::UInt8 | Type::UInt16 | Type::UInt32 => "0".to_string(),
-        Type::UInt64 => "0n".to_string(),
-        Type::Float32 | Type::Float64 => "0.0".to_string(),
-        Type::Optional { .. } => "undefined".to_string(),
-        _ => format!("/* default for {} */", code_type.type_label(_ci)),
+    
+    Ok(match literal {
+        uniffi_meta::DefaultValueMetadata::Literal(lit) => {
+            // Use the actual literal value
+            code_type.literal(lit, ci)
+        }
+        uniffi_meta::DefaultValueMetadata::Default => {
+            // Generate sensible defaults based on type
+            match type_ {
+                Type::String => "\"\"".to_string(),
+                Type::Boolean => "false".to_string(),
+                Type::Int8 | Type::Int16 | Type::Int32 => "0".to_string(),
+                Type::Int64 => "0n".to_string(),
+                Type::UInt8 | Type::UInt16 | Type::UInt32 => "0".to_string(),
+                Type::UInt64 => "0n".to_string(),
+                Type::Float32 | Type::Float64 => "0.0".to_string(),
+                Type::Optional { .. } => "undefined".to_string(),
+                _ => format!("/* default for {} */", code_type.type_label(ci)),
+            }
+        }
     })
 }
 

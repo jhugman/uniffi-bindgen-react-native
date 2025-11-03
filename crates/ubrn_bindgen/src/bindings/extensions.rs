@@ -11,7 +11,7 @@ use topological_sort::TopologicalSort;
 use uniffi_bindgen::{
     interface::{
         FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
-        Function, Method, Object, UniffiTrait,
+        Function, Object, UniffiTrait,
     },
     ComponentInterface,
 };
