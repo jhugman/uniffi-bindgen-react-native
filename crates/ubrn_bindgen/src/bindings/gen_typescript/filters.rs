@@ -106,7 +106,7 @@ pub fn render_literal(
     // In UniFFI 0.30, the default value system changed to use DefaultValueMetadata
     let type_ = as_ct.as_type();
     let code_type = type_.as_codetype();
-    
+
     Ok(match literal {
         uniffi_meta::DefaultValueMetadata::Literal(lit) => {
             // Use the actual literal value
