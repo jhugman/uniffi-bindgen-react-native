@@ -17,7 +17,11 @@ namespace {{ ns }} {
 
     // We need to store a lambda in a global so we can call it from
     // a function pointer. The function pointer is passed to Rust.
-    static std::function<void(
+    static std::function<{# space #}
+    {%-   match callback.return_type() %}
+    {%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
+    {%-     when None %}void
+    {%-   endmatch %}(
         {%- for arg in callback.arguments() %}
         {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
         {{- arg_t }}
@@ -98,7 +102,11 @@ namespace {{ ns }} {
         }
     }
 
-    static void callback(
+    static {# space #}
+    {%-   match callback.return_type() %}
+    {%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
+    {%-     when None %}void
+    {%-   endmatch %} callback(
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -118,12 +126,27 @@ namespace {{ ns }} {
         if (rsLambda == nullptr) {
             // This only occurs when destructors are calling into Rust free/drop,
             // which causes the JS callback to be dropped.
+            {%- match callback.return_type() %}
+            {%-   when Some(return_type) %}
+            {%-     match return_type %}
+            {%-       when FfiType::UInt64 | FfiType::Handle %}
+            return 0;  // Return zero for handle/uint64_t return types
+            {%-       else %}
+            return {};  // Return default-constructed value
+            {%-     endmatch %}
+            {%-   when None %}
             return;
+            {%- endmatch %}
         }
 
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
+        {%- match callback.return_type() %}
+        {%-   when Some(_) %}
+        return rsLambda(
+        {%-   when None %}
         rsLambda(
+        {%- endmatch %}
             {%- for arg in callback.arguments() %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
             {{ arg_nm_rs }}

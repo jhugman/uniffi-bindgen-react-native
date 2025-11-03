@@ -1,4 +1,5 @@
 {%- let cb_name = callback.name()|ffi_callback_name %}
+{%- let ns = callback.cpp_namespace(ci) %}
 namespace {{ ci.cpp_namespace() }} {
 using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
@@ -33,3 +34,8 @@ template <> struct Bridging<{{ cb_name }}> {
   }
 };
 } // namespace {{ ci.cpp_namespace() }}
+
+// Namespace for makeCallbackFunction compatibility
+// For JS-to-Rust callbacks (like future dropped callbacks),
+// we generate the CallbackFunction implementation
+{%- include "CallbackFunction.cpp" %}
