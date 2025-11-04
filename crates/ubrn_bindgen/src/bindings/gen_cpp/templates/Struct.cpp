@@ -40,6 +40,31 @@ template <> struct Bridging<{{ struct_name }}> {
 
     return rsObject;
   }
+
+  static jsi::Value toJs(jsi::Runtime &rt,
+    std::shared_ptr<CallInvoker> callInvoker,
+    const {{ struct_name }} &rsValue
+  ) {
+    // Create a JS object
+    auto jsObject = jsi::Object(rt);
+
+    // Convert each field from Rust to JS
+    {%- for field in ffi_struct.fields() %}
+    {%-   let rs_field_name = field.name() %}
+    {%-   let ts_field_name = field.name()|var_name %}
+    {%-   if field.type_().is_callable() %}
+    jsObject.setProperty(rt, "{{ ts_field_name }}",
+      {{ field.type_().borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, rsValue.{{ rs_field_name }})
+    );
+    {%-   else %}
+    jsObject.setProperty(rt, "{{ ts_field_name }}",
+      {{ field.type_().borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, rsValue.{{ rs_field_name }})
+    );
+    {%-   endif %}
+    {%- endfor %}
+
+    return jsObject;
+  }
 };
 
 } // namespace {{ ci.cpp_namespace() }}

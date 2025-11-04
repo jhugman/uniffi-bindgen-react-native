@@ -29,6 +29,18 @@ template <> struct Bridging<RustCallStatus> {
     }
   }
 
+  static jsi::Value toJs(jsi::Runtime &rt,
+                         std::shared_ptr<CallInvoker> callInvoker,
+                         const RustCallStatus &status) {
+    auto statusObject = jsi::Object(rt);
+    if (status.error_buf.data != nullptr) {
+      auto rbuf = Bridging<RustBuffer>::toJs(rt, callInvoker, status.error_buf);
+      statusObject.setProperty(rt, "errorBuf", rbuf);
+    }
+    statusObject.setProperty(rt, "code", uniffi_jsi::Bridging<uint8_t>::toJs(rt, callInvoker, status.code));
+    return statusObject;
+  }
+
   static RustCallStatus fromJs(jsi::Runtime &rt,
                                std::shared_ptr<CallInvoker> invoker,
                                const jsi::Value &jsStatus) {

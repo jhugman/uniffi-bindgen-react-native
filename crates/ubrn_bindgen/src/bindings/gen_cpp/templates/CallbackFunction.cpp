@@ -158,7 +158,7 @@ namespace {{ ns }} {
         );
     }
 
-    static {{ name }}
+    [[maybe_unused]] static {{ name }}
     makeCallbackFunction( // {{ ns }}
                     jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
@@ -177,7 +177,11 @@ namespace {{ ns }} {
         }
         auto callbackFunction = value.asObject(rt).asFunction(rt);
         auto callbackValue = std::make_shared<jsi::Value>(rt, callbackFunction);
-        rsLambda = [&rt, callInvoker, callbackValue](
+        // Store a raw pointer to the runtime. This is safe because:
+        // 1. The runtime is owned by React Native and persists for the app lifetime
+        // 2. The cleanup() method is called when the runtime is destroyed, which nulls out rsLambda
+        jsi::Runtime *rtPtr = &rt;
+        rsLambda = [rtPtr, callInvoker, callbackValue](
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -214,17 +218,27 @@ namespace {{ ns }} {
                 // We'll then call that lambda from the callInvoker which will
                 // look after calling it on the correct thread.
                 {% if callback.is_blocking() -%}
-                callInvoker->invokeBlocking(rt, jsLambda);
+                callInvoker->invokeBlocking(*rtPtr, jsLambda);
                 {%- else %}
-                callInvoker->invokeNonBlocking(rt, jsLambda);
+                callInvoker->invokeNonBlocking(*rtPtr, jsLambda);
                 {%- endif %}
+                {%- match callback.return_type() %}
+                {%-   when Some(return_type) %}
+                {%-     match return_type %}
+                {%-       when FfiType::UInt64 | FfiType::Handle %}
+                return 0;  // Async callback, return immediately
+                {%-       else %}
+                return {};  // Return default-constructed value
+                {%-     endmatch %}
+                {%-   when None %}
+                {%- endmatch %}
         };
         return callback;
     }
 
     // This method is called from the destructor of {{ module_name }}, which only happens
     // when the jsi::Runtime is being destroyed.
-    static void cleanup() {
+    [[maybe_unused]] static void cleanup() {
         // The lambda holds a reference to the the Runtime, so when this is nulled out,
         // then the pointer will no longer be left dangling.
         rsLambda = nullptr;
