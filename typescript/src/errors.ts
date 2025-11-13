@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-import { uniffiTypeNameSymbol } from "./symbols";
+import { uniffiTypeNameSymbol } from "./symbols.js";
 
 // The top level error class for all uniffi-wrapped errors.
 //

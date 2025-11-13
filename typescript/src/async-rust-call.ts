@@ -3,14 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { UniffiInternalError } from "./errors";
-import { type UniffiByteArray } from "./ffi-types";
-import { UniffiHandleMap, type UniffiHandle } from "./handle-map";
+import { UniffiInternalError } from "./errors.js";
+import { type UniffiByteArray } from "./ffi-types.js";
+import { UniffiHandleMap, type UniffiHandle } from "./handle-map.js";
 import {
   type UniffiErrorHandler,
   type UniffiRustCallStatus,
   UniffiRustCaller,
-} from "./rust-call";
+} from "./rust-call.js";
 
 const UNIFFI_RUST_FUTURE_POLL_READY = 0;
 const UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1;

@@ -4,9 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-import { type UniffiByteArray } from "./ffi-types";
-import { type UniffiReferenceHolder } from "./callbacks";
-import { type UniffiRustCallStatus } from "./rust-call";
+import { type UniffiByteArray } from "./ffi-types.js";
+import { type UniffiReferenceHolder } from "./callbacks.js";
+import { type UniffiRustCallStatus } from "./rust-call.js";
 
 // This Result combines RustCallStatus and ReferenceHolder.
 // This is principally so we can _return_ something from calling from native into typescript.

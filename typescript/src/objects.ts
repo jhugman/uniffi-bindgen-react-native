@@ -8,11 +8,11 @@ import {
   AbstractFfiConverterByteArray,
   type FfiConverter,
   FfiConverterUInt64,
-} from "./ffi-converters";
-import { RustBuffer } from "./ffi-types";
-import type { UniffiGcObject } from "./rust-call";
-import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
-import { UniffiInternalError, UniffiThrownObject } from "./errors";
+} from "./ffi-converters.js";
+import { RustBuffer } from "./ffi-types.js";
+import type { UniffiGcObject } from "./rust-call.js";
+import { type UniffiHandle, UniffiHandleMap } from "./handle-map.js";
+import { UniffiInternalError, UniffiThrownObject } from "./errors.js";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.
