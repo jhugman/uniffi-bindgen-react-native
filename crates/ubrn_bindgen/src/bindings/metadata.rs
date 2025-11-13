@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use heck::ToUpperCamelCase;
 use uniffi_bindgen::Component;
 
 #[derive(Default)]
@@ -19,7 +18,11 @@ impl ModuleMetadata {
     }
 
     pub fn cpp_module(&self) -> String {
-        format!("Native{}", self.namespace.to_upper_camel_case())
+        // Explicitly capitalize the first letter to ensure proper casing
+        let mut chars = self.namespace.chars();
+        let first_upper = chars.next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
+        let rest: String = chars.collect();
+        format!("Native{}{}", first_upper, rest)
     }
 
     pub fn cpp_filename(&self) -> String {

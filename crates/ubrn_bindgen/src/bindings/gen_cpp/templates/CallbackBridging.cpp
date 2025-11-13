@@ -42,4 +42,3 @@ template <> struct Bridging<{{ cb_name }}Wrapper> {
 } // namespace {{ ci.cpp_namespace() }}
 #endif // {{ guard_name }}_DEFINED
 
-// CallbackFunction.cpp already generated in second loop

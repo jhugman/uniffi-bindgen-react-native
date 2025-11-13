@@ -85,3 +85,7 @@ pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
 pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
     Ok(format!("Uniffi{}", nm.to_upper_camel_case()))
 }
+
+pub fn sanitize_for_macro(s: &str) -> Result<String, askama::Error> {
+    Ok(s.replace("::", "_"))
+}

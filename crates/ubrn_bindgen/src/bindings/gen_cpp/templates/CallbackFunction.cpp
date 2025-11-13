@@ -1,5 +1,7 @@
 {%- let name = callback.name()|ffi_callback_name %}
-
+{%- let guard_ns = ns|sanitize_for_macro %}
+#ifndef CALLBACK_{{ guard_ns }}_{{ name }}_DEFINED
+#define CALLBACK_{{ guard_ns }}_{{ name }}_DEFINED
 // Callback function: {{ ns }}::{{ name }}
 //
 // We have the following constraints:
@@ -29,11 +31,11 @@ namespace {{ ns }} {
         {%- endfor %}
         {%- if callback.has_rust_call_status_arg() -%}
         , RustCallStatus*
-        {%- endif -%})> rsLambda = nullptr;
+        {%- endif -%})> rsLambda_{{ name }} = nullptr;
 
     // This is the main body of the callback. It's called from the lambda,
     // which itself is called from the callback function which is passed to Rust.
-    static void body(jsi::Runtime &rt,
+    static void body_{{ name }}(jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
                      std::shared_ptr<jsi::Value> callbackValue
             {%- for arg in callback.arguments() %}
@@ -103,10 +105,10 @@ namespace {{ ns }} {
     }
 
     static {# space #}
-    {%-   match callback.return_type() %}
+    {%- match callback.return_type() %}
     {%-     when Some(return_type) %}{{ return_type|ffi_type_name }}
     {%-     when None %}void
-    {%-   endmatch %} callback(
+    {%-   endmatch %} callback_{{ name }}(
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -120,10 +122,10 @@ namespace {{ ns }} {
         // call into Javascript. BUT how do we tell if the runtime has shutdown?
         //
         // Answer: the module destructor calls into callback `cleanup` method,
-        // which nulls out the rsLamda.
+        // which nulls out the rsLamda_{{ name }}.
         //
-        // If rsLamda is null, then there is no runtime to call into.
-        if (rsLambda == nullptr) {
+        // If rsLamda_{{ name }} is null, then there is no runtime to call into.
+        if (rsLambda_{{ name }} == nullptr) {
             // This only occurs when destructors are calling into Rust free/drop,
             // which causes the JS callback to be dropped.
             {%- match callback.return_type() %}
@@ -143,9 +145,9 @@ namespace {{ ns }} {
         // are all in the lambda.
         {%- match callback.return_type() %}
         {%-   when Some(_) %}
-        return rsLambda(
+        return rsLambda_{{ name }}(
         {%-   when None %}
-        rsLambda(
+        rsLambda_{{ name }}(
         {%- endmatch %}
             {%- for arg in callback.arguments() %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -163,7 +165,7 @@ namespace {{ ns }} {
                     jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
                      const jsi::Value &value) {
-        if (rsLambda != nullptr) {
+        if (rsLambda_{{ name }} != nullptr) {
             // `makeCallbackFunction` is called in two circumstances:
             //
             // 1. at startup, when initializing callback interface vtables.
@@ -173,7 +175,7 @@ namespace {{ ns }} {
             //
             // We can therefore return the callback function without making anything
             // new if we've been initialized already.
-            return callback;
+            return callback_{{ name }};
         }
         auto callbackFunction = value.asObject(rt).asFunction(rt);
         auto callbackValue = std::make_shared<jsi::Value>(rt, callbackFunction);
@@ -181,7 +183,7 @@ namespace {{ ns }} {
         // 1. The runtime is owned by React Native and persists for the app lifetime
         // 2. The cleanup() method is called when the runtime is destroyed, which nulls out rsLambda
         jsi::Runtime *rtPtr = &rt;
-        rsLambda = [rtPtr, callInvoker, callbackValue](
+        rsLambda_{{ name }} = [rtPtr, callInvoker, callbackValue](
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -205,7 +207,7 @@ namespace {{ ns }} {
                     , uniffi_call_status
                     {%- endif -%}
                 ](jsi::Runtime &rt) mutable {
-                    body(rt, callInvoker, callbackValue
+                    body_{{ name }}(rt, callInvoker, callbackValue
                         {%- for arg in callback.arguments() %}
                         {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
                         , {{ arg_nm_rs }}
@@ -233,7 +235,7 @@ namespace {{ ns }} {
                 {%-   when None %}
                 {%- endmatch %}
         };
-        return callback;
+        return callback_{{ name }};
     }
 
     // This method is called from the destructor of {{ module_name }}, which only happens
@@ -241,6 +243,7 @@ namespace {{ ns }} {
     [[maybe_unused]] static void cleanup() {
         // The lambda holds a reference to the the Runtime, so when this is nulled out,
         // then the pointer will no longer be left dangling.
-        rsLambda = nullptr;
+        rsLambda_{{ name }} = nullptr;
     }
 } // namespace {{ ns }}
+#endif // CALLBACK_{{ guard_ns }}_{{ name }}_DEFINED
