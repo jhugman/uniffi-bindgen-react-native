@@ -3,9 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call";
-import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
-import { type UniffiByteArray } from "./ffi-types";
+import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call.js";
+import { type UniffiHandle, UniffiHandleMap } from "./handle-map.js";
+import { type UniffiByteArray } from "./ffi-types.js";
 
 // Some additional data we hold for each in-flight promise.
 type PromiseHelper = {

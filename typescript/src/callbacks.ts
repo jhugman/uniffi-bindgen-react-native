@@ -3,18 +3,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
-import { type UniffiByteArray, RustBuffer } from "./ffi-types";
+import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters.js";
+import { type UniffiByteArray, RustBuffer } from "./ffi-types.js";
 import {
   type UniffiHandle,
   UniffiHandleMap,
   defaultUniffiHandle,
-} from "./handle-map";
+} from "./handle-map.js";
 import {
   CALL_ERROR,
   CALL_UNEXPECTED_ERROR,
   type UniffiRustCallStatus,
-} from "./rust-call";
+} from "./rust-call.js";
 
 const handleConverter = FfiConverterUInt64;
 
