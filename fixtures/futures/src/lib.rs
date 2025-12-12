@@ -389,6 +389,11 @@ pub trait SayAfterTrait: Send + Sync {
 #[async_trait::async_trait]
 pub trait SayAfterUdlTrait: Send + Sync {
     async fn say_after(&self, ms: u16, who: String) -> String;
+
+    #[doc(hidden)]
+    fn uniffi_foreign_handle(&self) -> Option<uniffi::Handle> {
+        None
+    }
 }
 
 struct SayAfterImpl1;

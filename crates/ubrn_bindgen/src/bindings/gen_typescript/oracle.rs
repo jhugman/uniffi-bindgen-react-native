@@ -5,8 +5,7 @@
  */
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::{
-    backend::{Literal, Type},
-    interface::{AsType, FfiType},
+    interface::{AsType, FfiType, Literal, Type},
     ComponentInterface,
 };
 
@@ -69,7 +68,7 @@ impl CodeOracle {
             FfiType::UInt64 | FfiType::Int64 => "0n".to_owned(),
             FfiType::Float64 => "0.0".to_owned(),
             FfiType::Float32 => "0.0".to_owned(),
-            FfiType::RustArcPtr(_) => "null".to_owned(),
+            FfiType::Handle => "0n".to_owned(),
             FfiType::RustBuffer(_) => "/*empty*/ new Uint8Array(0)".to_owned(),
             FfiType::Callback(_) => "null".to_owned(),
             FfiType::RustCallStatus => "uniffiCreateCallStatus()".to_owned(),
@@ -96,7 +95,7 @@ impl CodeOracle {
                 self.ffi_type_label(ffi_type)
             }
             FfiType::Struct(_) => self.ffi_type_label(ffi_type),
-            FfiType::RustArcPtr(_) => "PointerByReference".to_owned(),
+            FfiType::Handle => "bigint".to_owned(),
             // JNA structs default to ByReference
             _ => panic!("{ffi_type:?} by reference is not implemented"),
         }
@@ -104,7 +103,7 @@ impl CodeOracle {
 
     pub(crate) fn ffi_type_label_for_cpp(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
-            FfiType::RustArcPtr(_) => "UniffiRustArcPtr".to_string(),
+            FfiType::Handle => "uint64_t".to_string(),
             FfiType::ForeignBytes => "Uint8Array".to_string(),
             FfiType::RustBuffer(_) => "string".to_string(),
             _ => self.ffi_type_label(ffi_type),
@@ -120,7 +119,6 @@ impl CodeOracle {
             FfiType::Float32 => "number".to_string(),
             FfiType::Float64 => "number".to_string(),
             FfiType::Handle => "bigint".to_string(),
-            FfiType::RustArcPtr(_) => "bigint".to_string(),
             FfiType::RustBuffer(_) => "Uint8Array".to_string(),
             FfiType::RustCallStatus => "UniffiRustCallStatus".to_string(),
             FfiType::ForeignBytes => "ForeignBytes".to_string(),
