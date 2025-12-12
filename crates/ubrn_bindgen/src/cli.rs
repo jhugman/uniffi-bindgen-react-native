@@ -8,7 +8,7 @@ use std::str::FromStr;
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use cargo_metadata::Metadata;
-use clap::{command, Args};
+use clap::Args;
 use ubrn_common::{mk_dir, path_or_shim, CrateMetadata, Utf8PathBufExt as _};
 use uniffi_bindgen::{cargo_metadata::CrateConfigSupplier, BindingGenerator};
 
