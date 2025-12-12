@@ -284,6 +284,7 @@ pub(crate) impl Object {
             UniffiTrait::Display { .. } => nm == "Display",
             UniffiTrait::Eq { .. } => nm == "Eq",
             UniffiTrait::Hash { .. } => nm == "Hash",
+            UniffiTrait::Ord { .. } => nm == "Ord",
         }
     }
 
