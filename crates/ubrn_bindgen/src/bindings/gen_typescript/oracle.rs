@@ -5,8 +5,7 @@
  */
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::{
-    backend::{Literal, Type},
-    interface::{AsType, FfiType},
+    interface::{AsType, FfiType, Literal, Type},
     ComponentInterface,
 };
 
