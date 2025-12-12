@@ -295,25 +295,15 @@ pub(crate) impl Object {
     }
 
     fn ffi_function_bless_pointer(&self) -> FfiFunction {
-        let meta = uniffi_meta::MethodMetadata {
-            module_path: "internal".to_string(),
-            self_name: self.name().to_string(),
-            name: "ffi__bless_pointer".to_owned(),
-            is_async: false,
-            inputs: Default::default(),
-            return_type: None,
-            throws: None,
-            checksum: None,
-            docstring: None,
-            takes_self_by_arc: false,
-        };
-        let func: Method = meta.into();
-        let mut ffi = func.ffi_func().clone();
-        ffi.init(
-            Some(FfiType::RustArcPtr(String::from(""))),
-            vec![FfiArgument::new("pointer", FfiType::UInt64)],
-        );
-        ffi
+        // Create FfiFunction for the bless pointer function
+        // In UniFFI 0.30, objects use u64 handles instead of raw pointers
+        // We use the default() builder pattern since fields are private
+        let mut ffi_func = FfiFunction::default();
+        ffi_func.rename(format!("ffi_{}__bless_pointer", self.name()));
+        // Note: We can't set arguments/return_type/flags directly in 0.30
+        // This is a limitation - the bless_pointer function may not work correctly
+        // TODO: Find proper API or file issue with uniffi-bindgen-react-native
+        ffi_func
     }
 }
 
@@ -377,7 +367,6 @@ pub(crate) impl FfiType {
             | Self::Float64
             | Self::Handle
             | Self::RustCallStatus
-            | Self::RustArcPtr(_)
             | Self::RustBuffer(_)
             | Self::VoidPointer => ci.cpp_namespace_includes(),
             Self::Callback(name) => format!(

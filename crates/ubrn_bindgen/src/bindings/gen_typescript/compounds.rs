@@ -5,7 +5,7 @@
  */
 use super::oracle::{AsCodeType, CodeOracle, CodeType};
 use uniffi_bindgen::{
-    backend::{Literal, Type},
+    interface::{Literal, Type},
     ComponentInterface,
 };
 
