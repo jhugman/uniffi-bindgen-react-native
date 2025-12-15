@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 ROOT=
 UBRN_BIN=
 PWD=
@@ -208,8 +208,15 @@ create_library() {
     languages="cpp"
   fi
 
+  # Tools was only introduced in 0.55.0
+  local tools="--tools eslint"
+  if version_lt "$BOB_VERSION" "0.55.0"; then
+    tools=
+  fi
+
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx create-react-native-library@$BOB_VERSION \
+    "$base" \
     --react-native-version "$RN_VERSION" \
     --slug "$PROJECT_SLUG" \
     --description "An automated test" \
@@ -221,7 +228,7 @@ create_library() {
     --type "$type" \
     --example vanilla \
     --local false \
-    "$base"
+    $tools
 
   # create-react-native-library silently gives up creating the repository on failures.
   # Since some of our tests depend on the initial commit, we test that the repository
@@ -464,7 +471,6 @@ run_default() {
 
 run_for_builder_bob() {
   local builder_bob_version=$1
-  echo "y" | npx "create-react-native-library@$builder_bob_version" > /dev/null 2>&1
 
   local fixture_dir="$ROOT/integration/fixtures/turbo-module-testing"
   local working_dir="/tmp/turbomodule-tests"
