@@ -61,7 +61,6 @@ pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
         FfiType::Int64 => "int64_t".into(),
         FfiType::Float32 => "float".into(),
         FfiType::Float64 => "double".into(),
-        FfiType::RustArcPtr(_) => "void *".into(),
         FfiType::RustBuffer(_) => "RustBuffer".into(),
         FfiType::ForeignBytes => "ForeignBytes".into(),
         FfiType::Callback(nm) => ffi_callback_name(nm)?,
@@ -85,4 +84,8 @@ pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
 
 pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
     Ok(format!("Uniffi{}", nm.to_upper_camel_case()))
+}
+
+pub fn sanitize_for_macro(s: &str) -> Result<String, askama::Error> {
+    Ok(s.replace("::", "_"))
 }
