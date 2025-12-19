@@ -6,17 +6,17 @@
 // Entry point for the runtime for uniffi-bindgen-react-native.
 // This modules is not needed directly, but is imported from generated code.
 //
-export * from "./async-callbacks";
-export * from "./async-rust-call";
-export * from "./callbacks";
-export * from "./enums";
-export * from "./errors";
-export * from "./ffi-converters";
-export * from "./ffi-types";
-export * from "./handle-map";
-export * from "./objects";
-export * from "./records";
-export * from "./result";
-export * from "./rust-call";
-export * from "./symbols";
-export * from "./type-utils";
+export * from "./async-callbacks.js";
+export * from "./async-rust-call.js";
+export * from "./callbacks.js";
+export * from "./enums.js";
+export * from "./errors.js";
+export * from "./ffi-converters.js";
+export * from "./ffi-types.js";
+export * from "./handle-map.js";
+export * from "./objects.js";
+export * from "./records.js";
+export * from "./result.js";
+export * from "./rust-call.js";
+export * from "./symbols.js";
+export * from "./type-utils.js";

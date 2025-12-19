@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { UniffiInternalError } from "./errors";
-import { type UniffiByteArray } from "./ffi-types";
+import { UniffiInternalError } from "./errors.js";
+import { type UniffiByteArray } from "./ffi-types.js";
 
 export const CALL_SUCCESS = 0;
 export const CALL_ERROR = 1;
