@@ -66,6 +66,11 @@ pub trait UniffiOneTrait: Send + Sync {
 // Note `UDL` vs `Udl` is important here to test foreign binding name fixups.
 pub trait UniffiOneUDLTrait: Send + Sync {
     fn hello(&self) -> String;
+
+    #[doc(hidden)]
+    fn uniffi_foreign_handle(&self) -> Option<uniffi::Handle> {
+        None
+    }
 }
 
 uniffi::include_scaffolding!("uniffi-one");
