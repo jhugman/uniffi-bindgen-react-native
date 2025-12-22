@@ -595,7 +595,7 @@ impl<'a> ComponentTemplate<'a> {
         ffi_func: &FfiCallbackFunction,
     ) -> TokenStream {
         let args_no_return: Vec<_> = ffi_func.arguments_no_return().collect();
-        let args = self.arg_list_decl(&args_no_return, |t| self.ffi_type_foreign(t));
+        let args = self.arg_list_decl(&args_no_return, |t| self.ffi_type_foreign_to_rust(t));
         let return_tokens = if_then_map(ffi_func.returns_result(), || {
             let return_type = self.ffi_type_uniffi_result(ffi_func.arg_return_type().as_ref());
             quote! { -> #return_type }
@@ -646,7 +646,7 @@ impl<'a> ComponentTemplate<'a> {
 
     fn ffi_type_foreign_to_rust(&self, t: &FfiType) -> TokenStream {
         match t {
-            FfiType::Reference(t) => self.ffi_type_foreign(t),
+            FfiType::Reference(t) | FfiType::MutReference(t) => self.ffi_type_foreign(t),
             _ => self.ffi_type_foreign(t),
         }
     }
