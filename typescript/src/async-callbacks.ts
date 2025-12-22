@@ -29,11 +29,11 @@ function emptyLowerError<E>(e: E): UniffiByteArray {
 }
 
 // Callbacks passed into Rust.
-type UniffiForeignFutureFree = (handle: bigint) => void;
+type UniffiForeignFutureDroppedCallback = (handle: bigint) => void;
 
-export type UniffiForeignFuture = {
+export type UniffiForeignFutureDroppedCallbackStruct = {
   handle: bigint;
-  free: UniffiForeignFutureFree;
+  free: UniffiForeignFutureDroppedCallback;
 };
 
 export function uniffiTraitInterfaceCallAsync<T>(
@@ -44,7 +44,7 @@ export function uniffiTraitInterfaceCallAsync<T>(
     errorBuffer: UniffiByteArray,
   ) => void,
   lowerString: (str: string) => UniffiByteArray,
-): UniffiForeignFuture {
+): UniffiForeignFutureDroppedCallbackStruct {
   return uniffiTraitInterfaceCallAsyncWithError(
     makeCall,
     handleSuccess,
@@ -65,7 +65,7 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
   isErrorType: (error: any) => boolean,
   lowerError: (error: E) => UniffiByteArray,
   lowerString: (str: string) => UniffiByteArray,
-): UniffiForeignFuture {
+): UniffiForeignFutureDroppedCallbackStruct {
   const settledHolder: { settled: boolean } = { settled: false };
   const abortController = new AbortController();
   const promise = makeCall(abortController.signal)
@@ -92,7 +92,7 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
 
   const promiseHelper = { abortController, settledHolder, promise };
   const handle = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.insert(promiseHelper);
-  return /* UniffiForeignFuture */ {
+  return /* UniffiForeignFutureDroppedCallbackStruct */ {
     handle,
     free: uniffiForeignFutureFree,
   };
