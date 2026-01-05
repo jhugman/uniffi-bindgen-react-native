@@ -7,11 +7,9 @@ use super::{
     oracle::{AsCodeType, CodeOracle},
     TypeRenderer,
 };
-pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
-    backend::{Literal, Type},
-    interface::{AsType, Enum, FfiType, Variant},
-    ComponentInterface,
+    interface::{AsType, DefaultValue, Enum, FfiType, Literal, Type, Variant},
+    to_askama_error, ComponentInterface,
 };
 
 pub(super) fn type_name(
@@ -100,21 +98,25 @@ pub(super) fn lift_fn(
     ))
 }
 
-pub fn render_literal(
-    literal: &Literal,
+pub fn render_default(
+    default: &DefaultValue,
     as_ct: &impl AsType,
     ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().literal(literal, ci))
+    as_ct
+        .as_codetype()
+        .default(default, ci)
+        .map_err(|e| to_askama_error(&e))
 }
 
 pub fn variant_discr_literal(
     e: &Enum,
     index: &usize,
-    ci: &ComponentInterface,
+    _ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
     let literal = e.variant_discr(*index).expect("invalid index");
-    let ts_literal = Type::Int32.as_codetype().literal(&literal, ci);
+    // let ts_literal = Type::Int32.as_codetype().literal(&literal, ci);
+    let ts_literal = "0".into(); // todo?
     Ok(match literal {
         Literal::String(_) => ts_literal,
         Literal::UInt(_, _, typ) | Literal::Int(_, _, typ)
@@ -193,6 +195,11 @@ pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
 /// Get the idiomatic Typescript rendering of an FFI struct name
 pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_struct_name(nm))
+}
+
+/// Convert a Type to its corresponding FfiType
+pub fn ffi_type(type_: &Type) -> Result<FfiType, askama::Error> {
+    Ok(FfiType::from(type_))
 }
 
 /// Get the idiomatic Typescript rendering of docstring

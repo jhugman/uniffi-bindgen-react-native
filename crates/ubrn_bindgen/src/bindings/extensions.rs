@@ -15,7 +15,7 @@ use uniffi_bindgen::{
     },
     ComponentInterface,
 };
-use uniffi_meta::Type;
+use uniffi_meta::{AsType, Type};
 
 #[ext]
 pub(crate) impl ComponentInterface {
@@ -284,6 +284,7 @@ pub(crate) impl Object {
             UniffiTrait::Display { .. } => nm == "Display",
             UniffiTrait::Eq { .. } => nm == "Eq",
             UniffiTrait::Hash { .. } => nm == "Hash",
+            UniffiTrait::Ord { .. } => nm == "Ord",
         }
     }
 
@@ -306,10 +307,10 @@ pub(crate) impl Object {
             docstring: None,
             takes_self_by_arc: false,
         };
-        let func: Method = meta.into();
+        let func: Method = Method::from_metadata(meta, self.as_type());
         let mut ffi = func.ffi_func().clone();
         ffi.init(
-            Some(FfiType::RustArcPtr(String::from(""))),
+            Some(FfiType::Handle),
             vec![FfiArgument::new("pointer", FfiType::UInt64)],
         );
         ffi
@@ -376,7 +377,6 @@ pub(crate) impl FfiType {
             | Self::Float64
             | Self::Handle
             | Self::RustCallStatus
-            | Self::RustArcPtr(_)
             | Self::RustBuffer(_)
             | Self::VoidPointer => ci.cpp_namespace_includes(),
             Self::Callback(name) => format!(

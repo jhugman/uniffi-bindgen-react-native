@@ -7,7 +7,7 @@
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
-  type UniffiForeignFuture as RuntimeUniffiForeignFuture,
+  type UniffiForeignFutureDroppedCallbackStruct as RuntimeUniffiForeignFuture,
   type UniffiRustCallStatus,
   type UniffiRustArcPtr,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
