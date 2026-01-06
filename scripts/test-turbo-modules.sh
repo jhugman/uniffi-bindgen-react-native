@@ -214,6 +214,12 @@ create_library() {
     tools=
   fi
 
+  # The directory paramter was only introduced in 0.55.2. A patch release, of course. Where else?
+  local directory="--directory $base"
+  if version_lt "$BOB_VERSION" "0.55.2"; then
+    directory=
+  fi
+
   echo "-- Creating library $PROJECT_SLUG with create-react-native-library@$BOB_VERSION"
   npm_config_yes=true npx create-react-native-library@$BOB_VERSION \
     "$base" \
@@ -228,15 +234,37 @@ create_library() {
     --type "$type" \
     --example vanilla \
     --local false \
-    $tools
+    $tools \
+    $directory
 
-  # create-react-native-library silently gives up creating the repository on failures.
-  # Since some of our tests depend on the initial commit, we test that the repository
-  # was fully initialised here.
   enter_dir "$base"
-  if [[ $(git rev-list --count HEAD || 0) -ne 1 ]]; then
-    error "Creation of git repository failed"
+
+  if version_lt "$BOB_VERSION" "0.55.2"; then
+    # create-react-native-library silently gives up creating the repository on failures.
+    # Since some of our tests depend on the initial commit, we test that the repository
+    # was fully initialised here.
+    if [[ $(git rev-list --count HEAD || 0) -ne 1 ]]; then
+      error "Creation of git repository failed"
+    fi
+  else
+    # 0.55.2 seemingly stopped creating git repositories altogether because .. why not?
+
+    # Since ubrn depends on it, make sure package.json contains a repository object.
+    jq --arg slug "$PROJECT_SLUG" '
+      .repository = {
+        type: "git",
+        url: ("git+https://github.com/jhugman/" + $slug)
+      }
+    ' package.json > package.json.tmp
+    mv package.json.tmp package.json
+
+    # Since some of our tests depend on the initial commit, we initialise the repository
+    # ourselves.
+    git init
+    git add --all
+    git commit -m "Initial import"
   fi
+
   exit_dir
 
   exit_dir
@@ -353,7 +381,7 @@ generate_turbo_module_for_diffing() {
   enter_dir "$PROJECT_DIR"
   clean_turbo_modules
   echo "-- Running ubrn checkout"
-  "$UBRN_BIN" checkout --config "$UBRN_CONFIG" 2>/dev/null
+  "$UBRN_BIN" checkout --config "$UBRN_CONFIG"
   echo "-- Running ubrn generate turbo-module"
   "$UBRN_BIN" generate jsi turbo-module --config "$UBRN_CONFIG" fake_module
 
