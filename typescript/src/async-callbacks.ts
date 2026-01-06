@@ -54,6 +54,7 @@ export function uniffiTraitInterfaceCallAsync<T>(
     lowerString,
   );
 }
+//todo
 
 export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
   makeCall: (signal: AbortSignal) => Promise<T>,
