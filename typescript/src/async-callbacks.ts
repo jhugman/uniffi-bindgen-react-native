@@ -14,7 +14,7 @@ type PromiseHelper = {
   // The abort controller we will use to cancel, if necessary.
   abortController: AbortController;
   // A mutable object which gets set when the promise has succeeded or errored.
-  // If uniffiForeignFutureFree gets called before settled is turned to true,
+  // If uniffiForeignFutureDroppedCallback gets called before settled is turned to true,
   // then we know that it is a call to cancel the task.
   settledHolder: {
     settled: boolean;
@@ -44,14 +44,16 @@ export function uniffiTraitInterfaceCallAsync<T>(
     errorBuffer: UniffiByteArray,
   ) => void,
   lowerString: (str: string) => UniffiByteArray,
-): UniffiForeignFutureDroppedCallbackStruct {
-  return uniffiTraitInterfaceCallAsyncWithError(
+  droppedCallback: UniffiForeignFutureDroppedCallbackStruct,
+) {
+  uniffiTraitInterfaceCallAsyncWithError(
     makeCall,
     handleSuccess,
     handleError,
     notExpectedError,
     emptyLowerError,
     lowerString,
+    droppedCallback,
   );
 }
 
@@ -65,7 +67,8 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
   isErrorType: (error: any) => boolean,
   lowerError: (error: E) => UniffiByteArray,
   lowerString: (str: string) => UniffiByteArray,
-): UniffiForeignFutureDroppedCallbackStruct {
+  droppedCallback: UniffiForeignFutureDroppedCallbackStruct,
+) {
   const settledHolder: { settled: boolean } = { settled: false };
   const abortController = new AbortController();
   const promise = makeCall(abortController.signal)
@@ -92,13 +95,11 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
 
   const promiseHelper = { abortController, settledHolder, promise };
   const handle = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.insert(promiseHelper);
-  return /* UniffiForeignFutureDroppedCallbackStruct */ {
-    handle,
-    free: uniffiForeignFutureFree,
-  };
+  droppedCallback.handle = handle;
+  droppedCallback.free = uniffiForeignFutureDroppedCallback;
 }
 
-function uniffiForeignFutureFree(handle: UniffiHandle) {
+function uniffiForeignFutureDroppedCallback(handle: UniffiHandle) {
   const helper = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.remove(handle);
   // #JS_TASK_CANCELLATION
   //

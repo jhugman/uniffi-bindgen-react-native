@@ -92,7 +92,7 @@ const isRustFutureContinuationCallbackTypeCompatible: UniffiStructuralEquality<
 > = true;
 const isUniffiForeignFutureTypeCompatible: UniffiStructuralEquality<
   RuntimeUniffiForeignFuture,
-  UniffiForeignFuture
+  UniffiForeignFutureDroppedCallbackStruct
 > = true;
 
 {%- import "macros.ts" as ts %}

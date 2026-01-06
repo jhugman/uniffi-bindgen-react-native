@@ -756,7 +756,11 @@ impl<'a> ComponentTemplate<'a> {
                 let mod_ident = snake_case_ident(cb);
                 quote! { #mod_ident::FnSig }
             }
-            FfiType::Reference(t) | FfiType::MutReference(t) => {
+            FfiType::MutReference(t) => {
+                let typ = self.ffi_type_rust(t);
+                quote! { &mut #typ }
+            }
+            FfiType::Reference(t) => {
                 let typ = self.ffi_type_rust(t);
                 quote! { std::ptr::NonNull::<#typ> }
             }

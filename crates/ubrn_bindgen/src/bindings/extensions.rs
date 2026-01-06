@@ -478,7 +478,7 @@ fn is_continuation(nm: &str) -> bool {
 }
 
 fn is_free(nm: &str) -> bool {
-    nm == "CallbackInterfaceFree" || nm == "ForeignFutureFree"
+    nm == "CallbackInterfaceFree" || nm == "ForeignFutureDroppedCallback"
 }
 
 #[ext]

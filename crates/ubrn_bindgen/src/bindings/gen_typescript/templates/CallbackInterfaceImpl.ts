@@ -109,24 +109,25 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
             {%- match meth.throws_type() %}
             {%- when None %}
             {{- self.import_infra("uniffiTraitInterfaceCallAsync", "async-callbacks") }}
-            const uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
+            uniffiTraitInterfaceCallAsync(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower,
+                /*droppedCallback:*/ uniffiOutDroppedCallback
             );
             {%- when Some(error_type) %}
             {{- self.import_infra("uniffiTraitInterfaceCallAsyncWithError", "async-callbacks") }}
-            const uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
+            uniffiTraitInterfaceCallAsyncWithError(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
                 /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower,
+                /*droppedCallback:*/ uniffiOutDroppedCallback
             );
             {%- endmatch %}
-            return uniffiForeignFuture;
             {%- endif %}
         },
         {%- endfor %}
