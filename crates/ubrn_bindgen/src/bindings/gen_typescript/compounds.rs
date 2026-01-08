@@ -5,7 +5,7 @@
  */
 use super::oracle::{AsCodeType, CodeOracle, CodeType};
 use uniffi_bindgen::{
-    backend::{Literal, Type},
+    interface::{DefaultValue, Literal, Type},
     ComponentInterface,
 };
 
@@ -42,7 +42,32 @@ impl CodeType for OptionalCodeType {
     fn literal(&self, literal: &Literal, ci: &ComponentInterface) -> String {
         match literal {
             Literal::None => "undefined".into(),
-            Literal::Some { inner } => CodeOracle.find(&self.inner).literal(inner, ci),
+            Literal::Some { inner } => {
+                // In UniFFI 0.30, Some contains a DefaultValue (DefaultValueMetadata)
+                match &**inner {
+                    DefaultValue::Literal(inner_literal) => {
+                        // Recursively render the inner literal value
+                        CodeOracle.find(self.inner()).literal(inner_literal, ci)
+                    }
+                    DefaultValue::Default => {
+                        // For Some(Default), we need to provide the default value of the inner type.
+                        // For primitive types, this is well-defined (0, false, "", etc.)
+                        // For complex types (enums, records), we generate a placeholder comment.
+                        let inner_type = self.inner();
+                        let code_type = CodeOracle.find(inner_type);
+                        match inner_type {
+                            Type::String => "\"\"".into(),
+                            Type::Boolean => "false".into(),
+                            Type::Int8 | Type::Int16 | Type::Int32 => "0".into(),
+                            Type::Int64 => "0n".into(),
+                            Type::UInt8 | Type::UInt16 | Type::UInt32 => "0".into(),
+                            Type::UInt64 => "0n".into(),
+                            Type::Float32 | Type::Float64 => "0.0".into(),
+                            _ => format!("/* default for {} */", code_type.type_label(ci)),
+                        }
+                    }
+                }
+            }
             _ => panic!("Invalid literal for Optional type: {literal:?}"),
         }
     }
