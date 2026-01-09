@@ -13,7 +13,7 @@ import {
 } from "./rust-call";
 
 const UNIFFI_RUST_FUTURE_POLL_READY = 0;
-const UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1;
+const UNIFFI_RUST_FUTURE_POLL_WAKE = 1;
 
 // The UniffiRustFutureContinuationCallback is generated in the {{ namespace }}-ffi.ts file,
 // when iterating over `ci.ffi_definitions()`.

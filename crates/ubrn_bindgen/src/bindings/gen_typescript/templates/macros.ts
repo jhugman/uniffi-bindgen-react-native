@@ -40,7 +40,7 @@
             {%- if func.return_type().is_some() %}
                 return
             {%- endif %} {% call native_method_handle(func.ffi_func().name()) %}(
-                {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
+                {%- if func.self_type().is_some() %}{{ obj_factory }}.clonePointer(this), {% endif %}
                 {%- call arg_list_lowered(func) %}
                 callStatus);
             },
@@ -130,7 +130,7 @@
             /*rustCaller:*/ uniffiCaller,
             /*rustFutureFunc:*/ () => {
                 return {% call native_method_handle(callable.ffi_func().name()) %}(
-                    {%- if callable.takes_self() %}
+                    {%- if callable.self_type().is_some() %}
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
@@ -173,7 +173,7 @@
     {%- for arg in func.arguments() -%}
         {{ arg.name()|var_name }}: {{ arg|type_name(self) -}}
         {%- match arg.default_value() %}
-        {%- when Some with(literal) %} = {{ literal|render_literal(arg, ci) }}
+        {%- when Some with(default) %} = {{ default|render_default(arg, ci) }}
         {%- else %}
         {%- endmatch %}
         {%- if !loop.last %}, {% endif -%}
@@ -198,7 +198,7 @@
     {%-   else %}
     {{-     field.name()|var_name }}: {{ field|type_name(self) -}}
     {%-     match field.default_value() %}
-    {%-       when Some with(literal) %} = {{ literal|render_literal(field, ci) }}
+    {%-       when Some with(default) %} = {{ default|render_default(field, ci) }}
     {%-       else %}
     {%-     endmatch -%}
     {%-   endif %}

@@ -26,10 +26,10 @@ class TestGuid(unittest.TestCase):
         # This is testing `get_guid` which never returns a result, so everything
         # is InternalError representing a panic.
         # The fixture hard-codes some Guid strings to return specific errors.
-        with self.assertRaisesRegex(InternalError, "Failed to convert arg 'value': The Guid is too short"):
+        with self.assertRaisesRegex(InternalError, get_value_arg_issue("The Guid is too short")):
             get_guid("")
 
-        with self.assertRaisesRegex(InternalError, "Failed to convert arg 'value': Something unexpected went wrong"):
+        with self.assertRaisesRegex(InternalError, get_value_arg_issue("Something unexpected went wrong")):
             get_guid("unexpected")
 
         with self.assertRaisesRegex(InternalError, "guid value caused a panic!"):
@@ -41,7 +41,7 @@ class TestGuid(unittest.TestCase):
         with self.assertRaises(GuidError.TooShort):
             try_get_guid("")
 
-        with self.assertRaisesRegex(InternalError, "Failed to convert arg 'value': Something unexpected went wrong"):
+        with self.assertRaisesRegex(InternalError, get_value_arg_issue("Something unexpected went wrong")):
             try_get_guid("unexpected")
 
         with self.assertRaisesRegex(InternalError, "guid value caused a panic!"):
@@ -57,6 +57,15 @@ class TestGuid(unittest.TestCase):
 
     def test_custom(self):
         get_nested_object(InnerObject())
+
+
+def get_value_arg_issue(value):
+    return f"""Failed to convert arg 'value':
+Lifting custom type `ext_types_custom::Guid` from FFI type `alloc::string::String` failed at fixtures/ext-types/subcrates/custom-types/src/lib.rs:97
+
+Caused by:
+    {value}"""
+
 
 if __name__=='__main__':
     unittest.main()

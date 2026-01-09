@@ -17,8 +17,8 @@ export const {{ decl_type_name }} = (() => {
     const defaults = () => ({
         {%- for field in rec.fields() %}
         {%- match field.default_value() %}
-        {%- when Some with(literal) %}
-        {{- field.name()|var_name }}: {{ literal|render_literal(field, ci) }}
+        {%- when Some with(default) %}
+        {{- field.name()|var_name }}: {{ default|render_default(field, ci) }}
         {%- if !loop.last %},{% endif %}
         {%- else %}
         {%- endmatch -%}
