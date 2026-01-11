@@ -51,7 +51,7 @@ extern "C" {
 {%-       else %}
     // Implementation of callback function calling from JS to Rust {{ callback.name() }},
     // passed from Rust to JS as part of async callbacks.
-{%-         include "ForeignFuture.cpp" %}
+{%-         include "ForeignFutureDroppedCallbackStruct.cpp" %}
 {%-       endif %}
 {%-     when FfiDefinition::Struct(ffi_struct) %}
 {%-       include "Struct.cpp" %}

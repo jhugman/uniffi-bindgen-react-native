@@ -7,10 +7,9 @@ use super::{
     oracle::{AsCodeType, CodeOracle},
     TypeRenderer,
 };
-pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
-    backend::{Literal, Type},
     interface::{AsType, Enum, FfiType, Variant},
+    interface::{Literal, Type},
     ComponentInterface,
 };
 
@@ -193,6 +192,11 @@ pub fn ffi_callback_name(nm: &str) -> Result<String, askama::Error> {
 /// Get the idiomatic Typescript rendering of an FFI struct name
 pub fn ffi_struct_name(nm: &str) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_struct_name(nm))
+}
+
+/// Convert a Type to its corresponding FfiType
+pub fn ffi_type(type_: &Type) -> Result<FfiType, askama::Error> {
+    Ok(FfiType::from(type_))
 }
 
 /// Get the idiomatic Typescript rendering of docstring
