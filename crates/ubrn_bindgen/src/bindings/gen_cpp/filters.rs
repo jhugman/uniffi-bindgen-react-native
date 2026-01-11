@@ -10,7 +10,16 @@ use crate::bindings::extensions::{ComponentInterfaceExt, FfiTypeExt};
 
 pub fn ffi_type_name_from_js(ffi_type: &FfiType) -> Result<String, askama::Error> {
     Ok(match ffi_type {
-        FfiType::MutReference(inner) | FfiType::Reference(inner) => ffi_type_name_from_js(inner)?,
+        FfiType::MutReference(inner) => {
+            let type_name = ffi_type_name_from_js(inner)?;
+            if type_name == "UniffiForeignFutureDroppedCallbackStruct" {
+                format!("{}*", type_name)
+            } else {
+                type_name
+            }
+        }
+        // FfiType::Reference(inner) => format!("const {}*", ffi_type_name_from_js(inner)?),
+        FfiType::Reference(inner) => ffi_type_name_from_js(inner)?,
         _ => ffi_type_name(ffi_type)?,
     })
 }

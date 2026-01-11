@@ -124,7 +124,7 @@ pub(crate) impl ComponentInterface {
 
     fn iter_ffi_structs_for_free(&self) -> impl Iterator<Item = FfiStruct> {
         self.iter_ffi_structs()
-            .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFuture")
+            .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFutureDroppedCallbackStruct")
     }
 
     fn iter_ffi_definitions_exported_by_ts(&self) -> impl Iterator<Item = FfiDefinition> {
@@ -140,7 +140,9 @@ pub(crate) impl ComponentInterface {
 
     fn iter_ffi_structs_for_callbacks(&self) -> impl Iterator<Item = FfiStruct> {
         self.ffi_definitions().filter_map(|d| match d {
-            FfiDefinition::Struct(st) if st.is_foreign_future() && st.name() != "ForeignFuture" => {
+            FfiDefinition::Struct(st)
+                if st.is_foreign_future() && st.name() != "ForeignFutureDroppedCallbackStruct" =>
+            {
                 Some(st)
             }
             _ => None,
@@ -478,7 +480,7 @@ fn is_continuation(nm: &str) -> bool {
 }
 
 fn is_free(nm: &str) -> bool {
-    nm == "CallbackInterfaceFree" || nm == "ForeignFutureFree"
+    nm == "CallbackInterfaceFree" || nm == "ForeignFutureDroppedCallback"
 }
 
 #[ext]

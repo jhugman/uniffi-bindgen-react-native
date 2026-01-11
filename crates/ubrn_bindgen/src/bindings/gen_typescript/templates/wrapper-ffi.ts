@@ -7,7 +7,7 @@
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
-  type UniffiForeignFuture as RuntimeUniffiForeignFuture,
+  type UniffiForeignFutureDroppedCallbackStruct as RuntimeUniffiForeignFutureDroppedCallbackStruct,
   type UniffiRustCallStatus,
   type UniffiRustArcPtr,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
@@ -91,8 +91,8 @@ const isRustFutureContinuationCallbackTypeCompatible: UniffiStructuralEquality<
   UniffiRustFutureContinuationCallback
 > = true;
 const isUniffiForeignFutureTypeCompatible: UniffiStructuralEquality<
-  RuntimeUniffiForeignFuture,
-  UniffiForeignFuture
+  RuntimeUniffiForeignFutureDroppedCallbackStruct,
+  UniffiForeignFutureDroppedCallbackStruct
 > = true;
 
 {%- import "macros.ts" as ts %}

@@ -566,6 +566,33 @@ impl<'a> ComponentTemplate<'a> {
             })
             .collect();
 
+        let is_dropped = st.module_ident() == "foreign_future_dropped_callback_struct";
+        let dropped_ptr = if_or_default(
+            is_dropped,
+            quote! {
+                #[wasm_bindgen]
+                #[repr(C)]
+                pub struct VTableRsPtr {
+                    inner: std::ptr::NonNull<VTableRs>,
+                }
+                #[wasm_bindgen]
+                impl VTableRsPtr {
+                    pub fn set_value(&mut self, item: VTableJs) {
+                        // Safety: We assume self.inner always points to valid,
+                        // initialized heap memory allocated during creation.
+                        unsafe {
+                            let rust_ptr = self.inner.as_mut();
+                            *rust_ptr = <VTableRs>::into_rust(item);
+                        }
+                    }
+                }
+                impl IntoJs<VTableRsPtr> for std::ptr::NonNull<VTableRs> {
+                    fn into_js(self) -> VTableRsPtr {
+                        VTableRsPtr{ inner: self }
+                    }
+                }
+            },
+        );
         quote! {
             mod #module_name {
                 use super::*;
@@ -583,6 +610,8 @@ impl<'a> ComponentTemplate<'a> {
                     #vtable_rs_fields
                 }
 
+                #dropped_ptr
+
                 #into_rust_block
                 #copy_into_block
             }
@@ -595,7 +624,7 @@ impl<'a> ComponentTemplate<'a> {
         ffi_func: &FfiCallbackFunction,
     ) -> TokenStream {
         let args_no_return: Vec<_> = ffi_func.arguments_no_return().collect();
-        let args = self.arg_list_decl(&args_no_return, |t| self.ffi_type_foreign(t));
+        let args = self.arg_list_decl(&args_no_return, |t| self.ffi_type_foreign_to_rust(t));
         let return_tokens = if_then_map(ffi_func.returns_result(), || {
             let return_type = self.ffi_type_uniffi_result(ffi_func.arg_return_type().as_ref());
             quote! { -> #return_type }
@@ -646,6 +675,13 @@ impl<'a> ComponentTemplate<'a> {
 
     fn ffi_type_foreign_to_rust(&self, t: &FfiType) -> TokenStream {
         match t {
+            FfiType::MutReference(t) => match &**t {
+                FfiType::Struct(s) => {
+                    let mod_ident = snake_case_ident(s);
+                    quote! { #mod_ident::VTableRsPtr }
+                }
+                _ => self.ffi_type_foreign(t),
+            },
             FfiType::Reference(t) => self.ffi_type_foreign(t),
             _ => self.ffi_type_foreign(t),
         }

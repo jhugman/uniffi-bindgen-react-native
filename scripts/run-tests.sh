@@ -96,4 +96,7 @@ for fixture in ${fixtures} ; do
         --flavor "$flavor" \
         "${test_file}"
     echo
+
+    # Clean up generated dir so that CI doesn't run out of disk
+    rm -Rf "${out_dir}" 2>/dev/null
 done

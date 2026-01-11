@@ -33,6 +33,7 @@ extern "C" {
 {% include "BridgingHelper.cpp" %}
 {% include "RustBufferHelper.cpp" %}
 {% include "RustCallStatusHelper.cpp" %}
+{% include "MutablePointer.cpp" %}
 {% include "VTableRegistryHelper.cpp" %}
 
 // This calls into Rust.
