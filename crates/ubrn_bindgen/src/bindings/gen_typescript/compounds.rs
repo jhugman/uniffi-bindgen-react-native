@@ -4,8 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use super::oracle::{AsCodeType, CodeOracle, CodeType};
+use anyhow::{bail, Result};
 use uniffi_bindgen::{
-    interface::{Literal, Type},
+    interface::{DefaultValue, Literal, Type},
     ComponentInterface,
 };
 
@@ -39,11 +40,13 @@ impl CodeType for OptionalCodeType {
         format!("Optional{}", CodeOracle.find(self.inner()).canonical_name())
     }
 
-    fn literal(&self, literal: &Literal, ci: &ComponentInterface) -> String {
-        match literal {
-            Literal::None => "undefined".into(),
-            Literal::Some { inner } => CodeOracle.find(&self.inner).literal(inner, ci),
-            _ => panic!("Invalid literal for Optional type: {literal:?}"),
+    fn default(&self, default: &DefaultValue, ci: &ComponentInterface) -> Result<String> {
+        match default {
+            DefaultValue::Default | DefaultValue::Literal(Literal::None) => Ok("undefined".into()),
+            DefaultValue::Literal(Literal::Some { inner }) => {
+                CodeOracle.find(&self.inner).default(inner, ci)
+            }
+            _ => bail!("Invalid literal for Optional type: {default:?}"),
         }
     }
 }
@@ -71,10 +74,12 @@ impl CodeType for SequenceCodeType {
         format!("Array{}", CodeOracle.find(self.inner()).canonical_name())
     }
 
-    fn literal(&self, literal: &Literal, _ci: &ComponentInterface) -> String {
-        match literal {
-            Literal::EmptySequence => "[]".into(),
-            _ => panic!("Invalid literal for List type: {literal:?}"),
+    fn default(&self, default: &DefaultValue, _ci: &ComponentInterface) -> Result<String> {
+        match default {
+            DefaultValue::Default | DefaultValue::Literal(Literal::EmptySequence) => {
+                Ok("[]".into())
+            }
+            _ => bail!("Invalid literal for List type: {default:?}"),
         }
     }
 }
@@ -116,10 +121,12 @@ impl CodeType for MapCodeType {
         )
     }
 
-    fn literal(&self, literal: &Literal, _ci: &ComponentInterface) -> String {
-        match literal {
-            Literal::EmptyMap => "mapOf()".into(),
-            _ => panic!("Invalid literal for Map type: {literal:?}"),
+    fn default(&self, default: &DefaultValue, _ci: &ComponentInterface) -> Result<String> {
+        match default {
+            DefaultValue::Default | DefaultValue::Literal(Literal::EmptyMap) => {
+                Ok("new Map()".into())
+            }
+            _ => bail!("Invalid literal for Map type: {default:?}"),
         }
     }
 }

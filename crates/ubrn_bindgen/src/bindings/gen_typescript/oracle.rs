@@ -1,3 +1,4 @@
+use anyhow::bail;
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -5,8 +6,7 @@
  */
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::{
-    interface::{AsType, FfiType},
-    interface::{Literal, Type},
+    interface::{AsType, DefaultValue, FfiType, Type},
     ComponentInterface,
 };
 
@@ -207,8 +207,12 @@ pub(crate) trait CodeType: std::fmt::Debug {
     /// with this type only.
     fn canonical_name(&self) -> String;
 
-    fn literal(&self, _literal: &Literal, ci: &ComponentInterface) -> String {
-        unimplemented!("Unimplemented for {}", self.type_label(ci))
+    // default for named types is to assume a ctor exists.
+    fn default(&self, default: &DefaultValue, ci: &ComponentInterface) -> Result<String> {
+        match default {
+            DefaultValue::Default => Ok(format!("{}()", self.type_label(ci))),
+            DefaultValue::Literal(_) => bail!("Literals for named types are not supported"),
+        }
     }
 
     /// Name of the FfiConverter

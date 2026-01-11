@@ -8,9 +8,8 @@ use super::{
     TypeRenderer,
 };
 use uniffi_bindgen::{
-    interface::{AsType, Enum, FfiType, Variant},
-    interface::{Literal, Type},
-    ComponentInterface,
+    interface::{AsType, DefaultValue, Enum, FfiType, Literal, Type, Variant},
+    to_askama_error, ComponentInterface,
 };
 
 pub(super) fn type_name(
@@ -99,21 +98,25 @@ pub(super) fn lift_fn(
     ))
 }
 
-pub fn render_literal(
-    literal: &Literal,
+pub fn render_default(
+    default: &DefaultValue,
     as_ct: &impl AsType,
     ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().literal(literal, ci))
+    as_ct
+        .as_codetype()
+        .default(default, ci)
+        .map_err(|e| to_askama_error(&e))
 }
 
 pub fn variant_discr_literal(
     e: &Enum,
     index: &usize,
-    ci: &ComponentInterface,
+    _ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
     let literal = e.variant_discr(*index).expect("invalid index");
-    let ts_literal = Type::Int32.as_codetype().literal(&literal, ci);
+    // let ts_literal = Type::Int32.as_codetype().literal(&literal, ci);
+    let ts_literal = "0".into(); // todo?
     Ok(match literal {
         Literal::String(_) => ts_literal,
         Literal::UInt(_, _, typ) | Literal::Int(_, _, typ)

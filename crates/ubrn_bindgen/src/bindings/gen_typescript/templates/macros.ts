@@ -173,7 +173,7 @@
     {%- for arg in func.arguments() -%}
         {{ arg.name()|var_name }}: {{ arg|type_name(self) -}}
         {%- match arg.default_value() %}
-        {%- when Some with(literal) %} = {{ literal|render_literal(arg, ci) }}
+        {%- when Some with(default) %} = {{ default|render_default(arg, ci) }}
         {%- else %}
         {%- endmatch %}
         {%- if !loop.last %}, {% endif -%}
@@ -198,7 +198,7 @@
     {%-   else %}
     {{-     field.name()|var_name }}: {{ field|type_name(self) -}}
     {%-     match field.default_value() %}
-    {%-       when Some with(literal) %} = {{ literal|render_literal(field, ci) }}
+    {%-       when Some with(default) %} = {{ default|render_default(field, ci) }}
     {%-       else %}
     {%-     endmatch -%}
     {%-   endif %}
