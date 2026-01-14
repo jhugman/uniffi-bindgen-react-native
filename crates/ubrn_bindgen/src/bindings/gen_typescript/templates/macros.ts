@@ -40,7 +40,7 @@
             {%- if func.return_type().is_some() %}
                 return
             {%- endif %} {% call native_method_handle(func.ffi_func().name()) %}(
-                {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
+                {%- if func.takes_self() %}{{ obj_factory }}.cloneHandle(this), {% endif %}
                 {%- call arg_list_lowered(func) %}
                 callStatus);
             },
@@ -54,7 +54,7 @@
 {%- endmacro %}
 
 // e.g. `fooBar() { body }`, which accepts an obj_factory to create, clone and free
-// pointers.
+// handles.
 {%- macro method_decl(func_decl, obj_factory, callable, indent) %}
 {%- call func_decl("", func_decl, obj_factory, callable, indent) %}
 {%- endmacro %}
@@ -91,10 +91,10 @@
     constructor(
     {%- call arg_list_decl(callable) -%}) {%- call throws_kw(callable) %} {
         super();
-        const pointer =
+        const handle =
             {% call to_ffi_method_call(obj_factory, callable) %};
-        this[pointerLiteralSymbol] = pointer;
-        this[destructorGuardSymbol] = {{ obj_factory }}.bless(pointer);
+        this[handleLiteralSymbol] = handle;
+        this[destructorGuardSymbol] = {{ obj_factory }}.bless(handle);
     }
 {%- endmacro %}
 
@@ -131,7 +131,7 @@
             /*rustFutureFunc:*/ () => {
                 return {% call native_method_handle(callable.ffi_func().name()) %}(
                     {%- if callable.takes_self() %}
-                    {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
+                    {{ obj_factory }}.cloneHandle(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
                     {{ arg|ffi_converter_name(self) }}.lower({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}

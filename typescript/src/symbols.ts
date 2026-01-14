@@ -25,7 +25,7 @@ export const destructorGuardSymbol = Symbol.for("destructor");
  * The `bigint` pointer corresponding to the Rust memory address
  * of the native peer.
  */
-export const pointerLiteralSymbol = Symbol.for("pointer");
+export const handleLiteralSymbol = Symbol.for("handle");
 
 /**
  * The `string` name of the object, enum or error class.

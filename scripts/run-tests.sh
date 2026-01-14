@@ -49,11 +49,13 @@ supports_flavor() {
   return 1
 }
 
-for test in "${root}"/typescript/tests/*.test.ts ; do
-    echo "Running test $test"
-    cargo xtask run "${test}" --flavor "$flavor"
-    echo
-done
+if [ ${#selected_fixtures[@]} -eq 0 ]; then
+  for test in "${root}"/typescript/tests/*.test.ts ; do
+      echo "Running test $test"
+      cargo xtask run "${test}" --flavor "$flavor"
+      echo
+  done
+fi
 
 if [ ${#selected_fixtures[@]} -eq 0 ]; then
     fixtures=$(cd "${root}/fixtures" && ls)

@@ -70,7 +70,6 @@ pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
         FfiType::Int64 => "int64_t".into(),
         FfiType::Float32 => "float".into(),
         FfiType::Float64 => "double".into(),
-        FfiType::RustArcPtr(_) => "void *".into(),
         FfiType::RustBuffer(_) => "RustBuffer".into(),
         FfiType::ForeignBytes => "ForeignBytes".into(),
         FfiType::Callback(nm) => ffi_callback_name(nm)?,

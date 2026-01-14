@@ -91,7 +91,7 @@ pub(crate) impl ComponentInterface {
     fn iter_ffi_functions_js_to_cpp(&self) -> impl Iterator<Item = FfiFunction> {
         self.iter_ffi_functions_js_to_cpp_and_back()
             .chain(self.iter_ffi_functions_js_to_rust())
-            .chain(self.iter_ffi_function_bless_pointer())
+            .chain(self.iter_ffi_function_bless_handle())
     }
 
     fn iter_ffi_functions_js_to_abi_rust(&self) -> impl Iterator<Item = FfiFunction> {
@@ -109,10 +109,10 @@ pub(crate) impl ComponentInterface {
         })
     }
 
-    fn iter_ffi_function_bless_pointer(&self) -> impl Iterator<Item = FfiFunction> {
+    fn iter_ffi_function_bless_handle(&self) -> impl Iterator<Item = FfiFunction> {
         self.object_definitions()
             .iter()
-            .map(|o| o.ffi_function_bless_pointer())
+            .map(|o| o.ffi_function_bless_handle())
     }
 
     fn iter_ffi_structs(&self) -> impl Iterator<Item = FfiStruct> {
@@ -192,7 +192,7 @@ pub(crate) impl ComponentInterface {
         for type_ in self.iter_local_types() {
             match type_ {
                 Type::Object { name, .. } => {
-                    // Objects only rely on a pointer, not the fields backing it.
+                    // Objects only rely on a handle, not the fields backing it.
                     add_edge(&mut graph, &mut types, type_, &Type::UInt64);
                     // Fields in the constructor are executed long after everything has
                     // been initialized.
@@ -295,11 +295,11 @@ pub(crate) impl Object {
             .any(|t| Self::is_uniffi_trait(t, nm))
     }
 
-    fn ffi_function_bless_pointer(&self) -> FfiFunction {
+    fn ffi_function_bless_handle(&self) -> FfiFunction {
         let meta = uniffi_meta::MethodMetadata {
             module_path: "internal".to_string(),
             self_name: self.name().to_string(),
-            name: "ffi__bless_pointer".to_owned(),
+            name: "ffi__bless_handle".to_owned(),
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -311,8 +311,8 @@ pub(crate) impl Object {
         let func: Method = meta.into();
         let mut ffi = func.ffi_func().clone();
         ffi.init(
-            Some(FfiType::RustArcPtr(String::from(""))),
-            vec![FfiArgument::new("pointer", FfiType::UInt64)],
+            Some(FfiType::Handle),
+            vec![FfiArgument::new("handle", FfiType::UInt64)],
         );
         ffi
     }
@@ -378,7 +378,6 @@ pub(crate) impl FfiType {
             | Self::Float64
             | Self::Handle
             | Self::RustCallStatus
-            | Self::RustArcPtr(_)
             | Self::RustBuffer(_)
             | Self::VoidPointer => ci.cpp_namespace_includes(),
             Self::Callback(name) => format!(
