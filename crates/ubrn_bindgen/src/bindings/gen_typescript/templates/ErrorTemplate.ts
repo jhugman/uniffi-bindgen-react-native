@@ -30,7 +30,7 @@ export const {{ decl_type_name }} = (() => {
          */
         readonly [variantOrdinalSymbol] = {{ loop.index }};
 
-        public readonly tag = {{ type_name__Tags }}.{{ variant|variant_name }};
+        readonly tag = {{ type_name__Tags }}.{{ variant|variant_name }};
 
         constructor(message: string) {
             super("{{ type_name }}", "{{ variant_name }}", message);
