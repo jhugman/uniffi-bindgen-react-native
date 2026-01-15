@@ -40,7 +40,7 @@
             {%- if func.return_type().is_some() %}
                 return
             {%- endif %} {% call native_method_handle(func.ffi_func().name()) %}(
-                {%- if func.takes_self() %}{{ obj_factory }}.cloneHandle(this), {% endif %}
+                {%- if func.self_type().is_some() %}{{ obj_factory }}.cloneHandle(this), {% endif %}
                 {%- call arg_list_lowered(func) %}
                 callStatus);
             },
@@ -130,7 +130,7 @@
             /*rustCaller:*/ uniffiCaller,
             /*rustFutureFunc:*/ () => {
                 return {% call native_method_handle(callable.ffi_func().name()) %}(
-                    {%- if callable.takes_self() %}
+                    {%- if callable.self_type().is_some() %}
                     {{ obj_factory }}.cloneHandle(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
