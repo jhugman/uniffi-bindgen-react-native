@@ -74,7 +74,7 @@ const dummyHandle: UnsafeMutableRawPointer = BigInt("0");
 export class FfiConverterObject<T>
   implements FfiConverter<UnsafeMutableRawPointer, T>
 {
-  constructor(private factory: UniffiObjectFactory<T>) {}
+  constructor(protected factory: UniffiObjectFactory<T>) {}
 
   lift(value: UnsafeMutableRawPointer): T {
     return this.factory.create(value);
@@ -97,6 +97,9 @@ export class FfiConverterObject<T>
   }
 }
 
+const bigint0 = BigInt("0");
+const bigint1 = BigInt("1");
+
 /// An FfiConverter for objects with callbacks.
 const handleSafe: StructuralEquality<UniffiHandle, UnsafeMutableRawPointer> =
   true;
@@ -110,19 +113,34 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
   }
 
   lower(value: T): UnsafeMutableRawPointer {
-    return this.handleMap.insert(value);
+    if (this.factory.isConcreteType(value)) {
+      // rust object
+      return this.factory.cloneHandle(value);
+    } else {
+      return this.handleMap.insert(value);
+    }
   }
 
   lift(value: UnsafeMutableRawPointer): T {
-    if (this.handleMap.has(value)) {
-      return this.handleMap.get(value);
+    if ((value & bigint1) == bigint0) {
+      // rust generated
+      if (this.handleMap.has(value)) {
+        return this.handleMap.get(value);
+      } else {
+        return super.lift(value);
+      }
     } else {
-      return super.lift(value);
+      // this is remove in other languages...
+      return this.handleMap.get(value) ?? super.lift(value);
     }
   }
 
   drop(handle: UniffiHandle): T | undefined {
     return this.handleMap.remove(handle);
+  }
+
+  clone(handle: UniffiHandle): UniffiHandle {
+    return this.handleMap.clone(handle);
   }
 }
 

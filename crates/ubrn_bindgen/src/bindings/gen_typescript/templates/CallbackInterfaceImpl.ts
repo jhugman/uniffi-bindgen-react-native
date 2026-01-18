@@ -13,6 +13,14 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
     // Create the VTable using a series of closures.
     // ts automatically converts these into C callback functions.
     vtable: {
+        uniffiFree: (uniffiHandle: UniffiHandle): void => {
+            // {{ name }}: this will throw a stale handle error if the handle isn't found.
+            {{ ffi_converter_name }}.drop(uniffiHandle);
+        },
+        uniffiClone: (uniffiHandle: UniffiHandle): UniffiHandle => {
+            // {{ name }}: this will throw a stale handle error if the handle isn't found.
+            return {{ ffi_converter_name }}.clone(uniffiHandle);
+        },
         {%- for (ffi_callback, meth) in vtable_methods %}
         {{ meth.name()|fn_name }}: (
             {%- for arg in ffi_callback.arguments_no_return() %}
@@ -131,10 +139,6 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
             {%- endif %}
         },
         {%- endfor %}
-        uniffiFree: (uniffiHandle: UniffiHandle): void => {
-            // {{ name }}: this will throw a stale handle error if the handle isn't found.
-            {{ ffi_converter_name }}.drop(uniffiHandle);
-        }
     },
     register: () => {
         {% call ts::fn_handle(cbi.ffi_init_callback()) %}(

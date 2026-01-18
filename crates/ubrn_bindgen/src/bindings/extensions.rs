@@ -127,6 +127,10 @@ pub(crate) impl ComponentInterface {
             .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFutureDroppedCallbackStruct")
     }
 
+    fn iter_ffi_structs_for_clone(&self) -> impl Iterator<Item = FfiStruct> {
+        self.iter_ffi_structs().filter(|s| !s.is_foreign_future())
+    }
+
     fn iter_ffi_definitions_exported_by_ts(&self) -> impl Iterator<Item = FfiDefinition> {
         self.ffi_definitions().filter(|d| d.is_exported())
     }
@@ -414,7 +418,7 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn is_exported(&self) -> bool {
-        !self.is_user_callback() && !self.is_free_callback()
+        !self.is_user_callback() && !self.is_free_callback() && !self.is_clone_callback()
     }
 
     fn is_rust_calling_js(&self) -> bool {
@@ -422,7 +426,7 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn returns_result(&self) -> bool {
-        self.is_blocking()
+        self.is_blocking() || self.return_type().is_some()
     }
 
     fn is_continuation_callback(&self) -> bool {
@@ -431,6 +435,10 @@ pub(crate) impl FfiCallbackFunction {
 
     fn is_free_callback(&self) -> bool {
         is_free(self.name())
+    }
+
+    fn is_clone_callback(&self) -> bool {
+        is_clone(self.name())
     }
 
     fn is_future_callback(&self) -> bool {
@@ -486,6 +494,10 @@ fn is_free(nm: &str) -> bool {
     nm == "CallbackInterfaceFree" || nm == "ForeignFutureDroppedCallback"
 }
 
+fn is_clone(nm: &str) -> bool {
+    nm == "CallbackInterfaceClone"
+}
+
 #[ext]
 pub(crate) impl FfiStruct {
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
@@ -496,6 +508,14 @@ pub(crate) impl FfiStruct {
     fn cpp_namespace_free(&self, ci: &ComponentInterface) -> String {
         format!(
             "{}::{}::free",
+            self.cpp_namespace(ci),
+            self.name().to_lower_camel_case().to_lowercase()
+        )
+    }
+
+    fn cpp_namespace_clone(&self, ci: &ComponentInterface) -> String {
+        format!(
+            "{}::{}::clone",
             self.cpp_namespace(ci),
             self.name().to_lower_camel_case().to_lowercase()
         )
@@ -522,5 +542,8 @@ pub(crate) impl FfiStruct {
 pub(crate) impl FfiField {
     fn is_free(&self) -> bool {
         matches!(self.type_(), FfiType::Callback(s) if is_free(&s))
+    }
+    fn is_clone(&self) -> bool {
+        matches!(self.type_(), FfiType::Callback(s) if is_clone(&s))
     }
 }
