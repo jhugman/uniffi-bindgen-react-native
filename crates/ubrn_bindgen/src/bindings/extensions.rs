@@ -15,7 +15,7 @@ use uniffi_bindgen::{
     },
     ComponentInterface,
 };
-use uniffi_meta::{MethodReceiver, Type};
+use uniffi_meta::{AsType, Type};
 
 #[ext]
 pub(crate) impl ComponentInterface {
@@ -302,10 +302,8 @@ pub(crate) impl Object {
 
     fn ffi_function_bless_handle(&self) -> FfiFunction {
         let meta = uniffi_meta::MethodMetadata {
-            receiver: MethodReceiver::Object {
-                module_path: "internal".to_string(),
-                name: self.name().to_string(),
-            },
+            module_path: "internal".to_string(),
+            self_name: self.name().to_string(),
             name: "ffi__bless_handle".to_owned(),
             is_async: false,
             inputs: Default::default(),
@@ -315,8 +313,7 @@ pub(crate) impl Object {
             docstring: None,
             takes_self_by_arc: false,
         };
-        // let func: Method = Method::from_metadata(meta, self.as_type());
-        let func: Method = meta.into();
+        let func: Method = Method::from_metadata(meta, self.as_type());
         let mut ffi = func.ffi_func().clone();
         ffi.init(
             Some(FfiType::Handle),
