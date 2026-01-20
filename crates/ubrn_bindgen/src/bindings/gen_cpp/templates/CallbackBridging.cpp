@@ -1,8 +1,5 @@
 {%- let cb_name = callback.name()|ffi_callback_name %}
 {%- let guard_name = cb_name|fmt("BRIDGING_{}") %}
-// Include guards are needed because ForeignFuture callbacks (like UniffiForeignFutureCompleteVoid)
-// are shared types used by all crates. When multiple crates with async functions are linked together,
-// each generates code for these callbacks. Without guards, we get duplicate Bridging specializations.
 #ifndef {{ guard_name }}_DEFINED
 #define {{ guard_name }}_DEFINED
 namespace {{ ci.cpp_namespace() }} {
@@ -45,4 +42,3 @@ template <> struct Bridging<{{ cb_name }}Wrapper> {
 } // namespace {{ ci.cpp_namespace() }}
 #endif // {{ guard_name }}_DEFINED
 
-// CallbackFunction.cpp already generated in second loop

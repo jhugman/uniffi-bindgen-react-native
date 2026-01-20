@@ -2,6 +2,7 @@
 // Trust me, you don't want to mess with it!
 {%- let namespace = ci.namespace() %}
 {%- let module_name = module.cpp_module() %}
+{%- let module_name_upper = module_name|upper %}
 {%- let registry = ci.cpp_namespace()|fmt("{}::registry") %}
 #include "{{ module.hpp_filename() }}"
 
@@ -37,6 +38,61 @@ extern "C" {
 
 // This calls into Rust.
 
+// Generate Bridging for ForeignFutureResult structs (needed if module doesn't have async fns)
+{% include "ForeignFutureResultBridging.cpp" %}
+
+// FIRST: Declare all callback wrapper structs
+{%- for def in ci.ffi_definitions() %}
+{%-   match def %}
+{%-     when FfiDefinition::CallbackFunction(callback) %}
+{%-       include "CallbackWrapperDecl.cpp" %}
+{%-     else %}
+{%-   endmatch %}
+{%- endfor %}
+
+// SECOND: Generate callback implementations (makeCallbackFunction, etc.)
+// Structs need these for their fromJs methods
+{%- for def in ci.ffi_definitions() %}
+{%-   match def %}
+{%-     when FfiDefinition::CallbackFunction(callback) %}
+{%-       if callback.is_rust_calling_js() %}
+{%-         if callback.is_free_callback() %}
+{%            call cpp::callback_fn_free_impl(callback) %}
+{%-         else %}
+{%-           call cpp::callback_fn_impl(callback) %}
+{%-         endif %}
+{%-       else %}
+{%-         let ns = callback.cpp_namespace(ci) %}
+{%-         include "CallbackFunction.cpp" %}
+{%-       endif %}
+{%-     else %}
+{%-   endmatch %}
+{%- endfor %}
+
+// THIRD: Generate Bridging templates for ALL callbacks FIRST
+// Structs will need these
+{%- for def in ci.ffi_definitions() %}
+{%-   match def %}
+{%-     when FfiDefinition::CallbackFunction(callback) %}
+{%-       if callback.is_rust_calling_js() %}
+{%-         include "CallbackBridging.cpp" %}
+{%-       else %}
+{%-         include "ForeignFuture.cpp" %}
+{%-       endif %}
+{%-     else %}
+{%-   endmatch %}
+{%- endfor %}
+
+// FOURTH: Generate Bridging templates for ALL structs
+// These can now use both callback makeCallbackFunction AND callback Bridging templates
+{%- for def in ci.ffi_definitions() %}
+{%-   match def %}
+{%-     when FfiDefinition::Struct(ffi_struct) %}
+{%-       include "Struct.cpp" %}
+{%-     else %}
+{%-   endmatch %}
+{%- endfor %}
+
 {%- for def in ci.ffi_definitions() %}
 {%-   match def %}
 {%-     when FfiDefinition::CallbackFunction(callback) %}
@@ -49,12 +105,10 @@ extern "C" {
 {%-           call cpp::callback_fn_impl(callback) %}
 {%-         endif %}
 {%-       else %}
-    // Implementation of callback function calling from JS to Rust {{ callback.name() }},
-    // passed from Rust to JS as part of async callbacks.
-{%-         include "ForeignFuture.cpp" %}
+    // JS-to-Rust callbacks already generated in first loop
 {%-       endif %}
 {%-     when FfiDefinition::Struct(ffi_struct) %}
-{%-       include "Struct.cpp" %}
+    // Structs already generated in first loop
 {%-     else %}
 {%-   endmatch %}
 {%- endfor %}

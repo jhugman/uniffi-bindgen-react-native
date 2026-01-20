@@ -22,7 +22,8 @@ impl From<uniffi::UnexpectedUniFFICallbackError> for TelephoneError {
     }
 }
 
-// SIM cards.
+// SIM cards exposed to foreign bindings.
+#[uniffi::trait_interface]
 pub trait SimCard: Send + Sync {
     fn name(&self) -> String;
 }

@@ -1,4 +1,7 @@
 {%- let struct_name = ffi_struct.name()|ffi_struct_name %}
+{%- let guard_name = struct_name|fmt("BRIDGING_{}") %}
+#ifndef {{ guard_name }}_DEFINED
+#define {{ guard_name }}_DEFINED
 namespace {{ ci.cpp_namespace() }} {
 using namespace facebook;
 using CallInvoker = uniffi_runtime::UniffiCallInvoker;
@@ -40,6 +43,33 @@ template <> struct Bridging<{{ struct_name }}> {
 
     return rsObject;
   }
+
+  static jsi::Value toJs(jsi::Runtime &rt,
+    std::shared_ptr<CallInvoker> callInvoker,
+    const {{ struct_name }} &rsValue
+  ) {
+    // Create a JS object
+    auto jsObject = jsi::Object(rt);
+
+    // Convert each field from Rust to JS
+    {%- for field in ffi_struct.fields() %}
+    {%-   let rs_field_name = field.name() %}
+    {%-   let ts_field_name = field.name()|var_name %}
+    {%-   if field.type_().is_callable() %}
+    {%-     let callback_name = field.type_().borrow()|ffi_type_name %}
+    jsObject.setProperty(rt, "{{ ts_field_name }}",
+      {{ field.type_().borrow()|bridging_namespace(ci) }}::Bridging<{{ callback_name }}Wrapper>::toJs(rt, callInvoker, {{ callback_name }}Wrapper(rsValue.{{ rs_field_name }}))
+    );
+    {%-   else %}
+    jsObject.setProperty(rt, "{{ ts_field_name }}",
+      {{ field.type_().borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, rsValue.{{ rs_field_name }})
+    );
+    {%-   endif %}
+    {%- endfor %}
+
+    return jsObject;
+  }
 };
 
 } // namespace {{ ci.cpp_namespace() }}
+#endif // {{ guard_name }}_DEFINED

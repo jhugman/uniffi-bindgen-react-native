@@ -11,7 +11,7 @@ use topological_sort::TopologicalSort;
 use uniffi_bindgen::{
     interface::{
         FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
-        Function, Method, Object, UniffiTrait,
+        Function, Object, UniffiTrait,
     },
     ComponentInterface,
 };
@@ -284,6 +284,7 @@ pub(crate) impl Object {
             UniffiTrait::Display { .. } => nm == "Display",
             UniffiTrait::Eq { .. } => nm == "Eq",
             UniffiTrait::Hash { .. } => nm == "Hash",
+            UniffiTrait::Ord { .. } => nm == "Ord",
         }
     }
 
@@ -294,23 +295,26 @@ pub(crate) impl Object {
     }
 
     fn ffi_function_bless_pointer(&self) -> FfiFunction {
-        let meta = uniffi_meta::MethodMetadata {
-            module_path: "internal".to_string(),
-            self_name: self.name().to_string(),
-            name: "ffi__bless_pointer".to_owned(),
+        // Create FfiFunction for the bless pointer function.
+        // This function ties JS garbage collection to Rust reference counting,
+        // wrapping a raw pointer in a HostObject that calls the destructor when collected.
+        // In UniFFI 0.30, objects use u64 handles instead of raw pointers.
+        let meta = uniffi_meta::FnMetadata {
+            module_path: format!("bless_{}", self.name()),
+            name: format!("ffi_{}__bless_pointer", self.name()),
             is_async: false,
             inputs: Default::default(),
             return_type: None,
             throws: None,
             checksum: None,
             docstring: None,
-            takes_self_by_arc: false,
         };
-        let func: Method = meta.into();
+        let func: Function = meta.into();
         let mut ffi = func.ffi_func().clone();
+        // The bless function takes a u64 handle and returns a blessed object (void for JS side)
         ffi.init(
-            Some(FfiType::RustArcPtr(String::from(""))),
-            vec![FfiArgument::new("pointer", FfiType::UInt64)],
+            None, // return type is handled specially in ObjectHelper.cpp
+            vec![FfiArgument::new("ptr", FfiType::UInt64)],
         );
         ffi
     }
@@ -376,7 +380,6 @@ pub(crate) impl FfiType {
             | Self::Float64
             | Self::Handle
             | Self::RustCallStatus
-            | Self::RustArcPtr(_)
             | Self::RustBuffer(_)
             | Self::VoidPointer => ci.cpp_namespace_includes(),
             Self::Callback(name) => format!(
