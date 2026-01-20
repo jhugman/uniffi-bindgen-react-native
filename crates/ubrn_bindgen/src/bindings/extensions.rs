@@ -295,15 +295,28 @@ pub(crate) impl Object {
     }
 
     fn ffi_function_bless_pointer(&self) -> FfiFunction {
-        // Create FfiFunction for the bless pointer function
-        // In UniFFI 0.30, objects use u64 handles instead of raw pointers
-        // We use the default() builder pattern since fields are private
-        let mut ffi_func = FfiFunction::default();
-        ffi_func.rename(format!("ffi_{}__bless_pointer", self.name()));
-        // Note: We can't set arguments/return_type/flags directly in 0.30
-        // This is a limitation - the bless_pointer function may not work correctly
-        // TODO: Find proper API or file issue with uniffi-bindgen-react-native
-        ffi_func
+        // Create FfiFunction for the bless pointer function.
+        // This function ties JS garbage collection to Rust reference counting,
+        // wrapping a raw pointer in a HostObject that calls the destructor when collected.
+        // In UniFFI 0.30, objects use u64 handles instead of raw pointers.
+        let meta = uniffi_meta::FnMetadata {
+            module_path: format!("bless_{}", self.name()),
+            name: format!("ffi_{}__bless_pointer", self.name()),
+            is_async: false,
+            inputs: Default::default(),
+            return_type: None,
+            throws: None,
+            checksum: None,
+            docstring: None,
+        };
+        let func: Function = meta.into();
+        let mut ffi = func.ffi_func().clone();
+        // The bless function takes a u64 handle and returns a blessed object (void for JS side)
+        ffi.init(
+            None, // return type is handled specially in ObjectHelper.cpp
+            vec![FfiArgument::new("ptr", FfiType::UInt64)],
+        );
+        ffi
     }
 }
 
