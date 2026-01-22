@@ -26,7 +26,13 @@ pub(crate) trait RenderedFile: DynTemplate {
         let from = file
             .parent()
             .expect("Expected this file to have a directory");
-        pathdiff::diff_utf8_paths(to, from).expect("Should be able to find a relative path")
+        let path = pathdiff::diff_utf8_paths(to, from).expect("Should be able to find a relative path");
+
+        // Fix non-canonical paths: pathdiff can generate "cpp/.." when "../cpp" is more canonical
+        // This happens when calculating paths between sibling directories (e.g., android/ to cpp/)
+        // CMake and other tools prefer the "../dir" form over "dir/.." even though both work
+        let path_str = path.as_str().replace("cpp/..", "../cpp");
+        Utf8PathBuf::from(path_str)
     }
     fn filter_by(&self) -> bool {
         true
