@@ -15,7 +15,7 @@ use uniffi_bindgen::{
     },
     ComponentInterface,
 };
-use uniffi_meta::Type;
+use uniffi_meta::{AsType, Type};
 
 #[ext]
 pub(crate) impl ComponentInterface {
@@ -91,7 +91,7 @@ pub(crate) impl ComponentInterface {
     fn iter_ffi_functions_js_to_cpp(&self) -> impl Iterator<Item = FfiFunction> {
         self.iter_ffi_functions_js_to_cpp_and_back()
             .chain(self.iter_ffi_functions_js_to_rust())
-            .chain(self.iter_ffi_function_bless_pointer())
+            .chain(self.iter_ffi_function_bless_handle())
     }
 
     fn iter_ffi_functions_js_to_abi_rust(&self) -> impl Iterator<Item = FfiFunction> {
@@ -109,10 +109,10 @@ pub(crate) impl ComponentInterface {
         })
     }
 
-    fn iter_ffi_function_bless_pointer(&self) -> impl Iterator<Item = FfiFunction> {
+    fn iter_ffi_function_bless_handle(&self) -> impl Iterator<Item = FfiFunction> {
         self.object_definitions()
             .iter()
-            .map(|o| o.ffi_function_bless_pointer())
+            .map(|o| o.ffi_function_bless_handle())
     }
 
     fn iter_ffi_structs(&self) -> impl Iterator<Item = FfiStruct> {
@@ -124,7 +124,11 @@ pub(crate) impl ComponentInterface {
 
     fn iter_ffi_structs_for_free(&self) -> impl Iterator<Item = FfiStruct> {
         self.iter_ffi_structs()
-            .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFuture")
+            .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFutureDroppedCallbackStruct")
+    }
+
+    fn iter_ffi_structs_for_clone(&self) -> impl Iterator<Item = FfiStruct> {
+        self.iter_ffi_structs().filter(|s| !s.is_foreign_future())
     }
 
     fn iter_ffi_definitions_exported_by_ts(&self) -> impl Iterator<Item = FfiDefinition> {
@@ -140,7 +144,9 @@ pub(crate) impl ComponentInterface {
 
     fn iter_ffi_structs_for_callbacks(&self) -> impl Iterator<Item = FfiStruct> {
         self.ffi_definitions().filter_map(|d| match d {
-            FfiDefinition::Struct(st) if st.is_foreign_future() && st.name() != "ForeignFuture" => {
+            FfiDefinition::Struct(st)
+                if st.is_foreign_future() && st.name() != "ForeignFutureDroppedCallbackStruct" =>
+            {
                 Some(st)
             }
             _ => None,
@@ -190,7 +196,7 @@ pub(crate) impl ComponentInterface {
         for type_ in self.iter_local_types() {
             match type_ {
                 Type::Object { name, .. } => {
-                    // Objects only rely on a pointer, not the fields backing it.
+                    // Objects only rely on a handle, not the fields backing it.
                     add_edge(&mut graph, &mut types, type_, &Type::UInt64);
                     // Fields in the constructor are executed long after everything has
                     // been initialized.
@@ -284,6 +290,7 @@ pub(crate) impl Object {
             UniffiTrait::Display { .. } => nm == "Display",
             UniffiTrait::Eq { .. } => nm == "Eq",
             UniffiTrait::Hash { .. } => nm == "Hash",
+            UniffiTrait::Ord { .. } => nm == "Ord",
         }
     }
 
@@ -293,11 +300,11 @@ pub(crate) impl Object {
             .any(|t| Self::is_uniffi_trait(t, nm))
     }
 
-    fn ffi_function_bless_pointer(&self) -> FfiFunction {
+    fn ffi_function_bless_handle(&self) -> FfiFunction {
         let meta = uniffi_meta::MethodMetadata {
             module_path: "internal".to_string(),
             self_name: self.name().to_string(),
-            name: "ffi__bless_pointer".to_owned(),
+            name: "ffi__bless_handle".to_owned(),
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -306,11 +313,11 @@ pub(crate) impl Object {
             docstring: None,
             takes_self_by_arc: false,
         };
-        let func: Method = meta.into();
+        let func: Method = Method::from_metadata(meta, self.as_type());
         let mut ffi = func.ffi_func().clone();
         ffi.init(
-            Some(FfiType::RustArcPtr(String::from(""))),
-            vec![FfiArgument::new("pointer", FfiType::UInt64)],
+            Some(FfiType::Handle),
+            vec![FfiArgument::new("handle", FfiType::UInt64)],
         );
         ffi
     }
@@ -376,7 +383,6 @@ pub(crate) impl FfiType {
             | Self::Float64
             | Self::Handle
             | Self::RustCallStatus
-            | Self::RustArcPtr(_)
             | Self::RustBuffer(_)
             | Self::VoidPointer => ci.cpp_namespace_includes(),
             Self::Callback(name) => format!(
@@ -409,7 +415,7 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn is_exported(&self) -> bool {
-        !self.is_user_callback() && !self.is_free_callback()
+        !self.is_user_callback() && !self.is_free_callback() && !self.is_clone_callback()
     }
 
     fn is_rust_calling_js(&self) -> bool {
@@ -417,7 +423,7 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn returns_result(&self) -> bool {
-        self.is_blocking()
+        self.is_blocking() || self.return_type().is_some()
     }
 
     fn is_continuation_callback(&self) -> bool {
@@ -426,6 +432,10 @@ pub(crate) impl FfiCallbackFunction {
 
     fn is_free_callback(&self) -> bool {
         is_free(self.name())
+    }
+
+    fn is_clone_callback(&self) -> bool {
+        is_clone(self.name())
     }
 
     fn is_future_callback(&self) -> bool {
@@ -478,7 +488,11 @@ fn is_continuation(nm: &str) -> bool {
 }
 
 fn is_free(nm: &str) -> bool {
-    nm == "CallbackInterfaceFree" || nm == "ForeignFutureFree"
+    nm == "CallbackInterfaceFree" || nm == "ForeignFutureDroppedCallback"
+}
+
+fn is_clone(nm: &str) -> bool {
+    nm == "CallbackInterfaceClone"
 }
 
 #[ext]
@@ -491,6 +505,14 @@ pub(crate) impl FfiStruct {
     fn cpp_namespace_free(&self, ci: &ComponentInterface) -> String {
         format!(
             "{}::{}::free",
+            self.cpp_namespace(ci),
+            self.name().to_lower_camel_case().to_lowercase()
+        )
+    }
+
+    fn cpp_namespace_clone(&self, ci: &ComponentInterface) -> String {
+        format!(
+            "{}::{}::clone",
             self.cpp_namespace(ci),
             self.name().to_lower_camel_case().to_lowercase()
         )
@@ -517,5 +539,8 @@ pub(crate) impl FfiStruct {
 pub(crate) impl FfiField {
     fn is_free(&self) -> bool {
         matches!(self.type_(), FfiType::Callback(s) if is_free(&s))
+    }
+    fn is_clone(&self) -> bool {
+        matches!(self.type_(), FfiType::Callback(s) if is_clone(&s))
     }
 }

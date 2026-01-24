@@ -40,7 +40,7 @@
             {%- if func.return_type().is_some() %}
                 return
             {%- endif %} {% call native_method_handle(func.ffi_func().name()) %}(
-                {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
+                {%- if func.self_type().is_some() %}{{ obj_factory }}.cloneHandle(this), {% endif %}
                 {%- call arg_list_lowered(func) %}
                 callStatus);
             },
@@ -54,7 +54,7 @@
 {%- endmacro %}
 
 // e.g. `fooBar() { body }`, which accepts an obj_factory to create, clone and free
-// pointers.
+// handles.
 {%- macro method_decl(func_decl, obj_factory, callable, indent) %}
 {%- call func_decl("", func_decl, obj_factory, callable, indent) %}
 {%- endmacro %}
@@ -91,10 +91,10 @@
     constructor(
     {%- call arg_list_decl(callable) -%}) {%- call throws_kw(callable) %} {
         super();
-        const pointer =
+        const handle =
             {% call to_ffi_method_call(obj_factory, callable) %};
-        this[pointerLiteralSymbol] = pointer;
-        this[destructorGuardSymbol] = {{ obj_factory }}.bless(pointer);
+        this[handleLiteralSymbol] = handle;
+        this[destructorGuardSymbol] = {{ obj_factory }}.bless(handle);
     }
 {%- endmacro %}
 
@@ -130,8 +130,8 @@
             /*rustCaller:*/ uniffiCaller,
             /*rustFutureFunc:*/ () => {
                 return {% call native_method_handle(callable.ffi_func().name()) %}(
-                    {%- if callable.takes_self() %}
-                    {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
+                    {%- if callable.self_type().is_some() %}
+                    {{ obj_factory }}.cloneHandle(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}
                     {{ arg|ffi_converter_name(self) }}.lower({{ arg.name()|var_name }}){% if !loop.last %},{% endif %}
@@ -173,7 +173,7 @@
     {%- for arg in func.arguments() -%}
         {{ arg.name()|var_name }}: {{ arg|type_name(self) -}}
         {%- match arg.default_value() %}
-        {%- when Some with(literal) %} = {{ literal|render_literal(arg, ci) }}
+        {%- when Some with(default) %} = {{ default|render_default(arg, ci) }}
         {%- else %}
         {%- endmatch %}
         {%- if !loop.last %}, {% endif -%}
@@ -198,7 +198,7 @@
     {%-   else %}
     {{-     field.name()|var_name }}: {{ field|type_name(self) -}}
     {%-     match field.default_value() %}
-    {%-       when Some with(literal) %} = {{ literal|render_literal(field, ci) }}
+    {%-       when Some with(default) %} = {{ default|render_default(field, ci) }}
     {%-       else %}
     {%-     endmatch -%}
     {%-   endif %}

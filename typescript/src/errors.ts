@@ -112,9 +112,9 @@ export const UniffiInternalError = (() => {
       super("Raw enum value doesn't match any cases");
     }
   }
-  class UnexpectedNullPointer extends Error {
+  class UnexpectedNullHandle extends Error {
     constructor() {
-      super("Raw pointer value was null");
+      super("Raw handle value was null");
     }
   }
   class UnexpectedRustCallStatusCode extends Error {
@@ -167,7 +167,7 @@ export const UniffiInternalError = (() => {
     IncompleteData,
     AbortError,
     UnexpectedEnumCase,
-    UnexpectedNullPointer,
+    UnexpectedNullHandle,
     UnexpectedRustCallStatusCode,
     UnexpectedRustCallError,
     UnexpectedStaleHandle,

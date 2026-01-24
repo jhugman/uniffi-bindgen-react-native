@@ -33,6 +33,7 @@ extern "C" {
 {% include "BridgingHelper.cpp" %}
 {% include "RustBufferHelper.cpp" %}
 {% include "RustCallStatusHelper.cpp" %}
+{% include "MutablePointer.cpp" %}
 {% include "VTableRegistryHelper.cpp" %}
 
 // This calls into Rust.
@@ -44,6 +45,9 @@ extern "C" {
 {%-         if callback.is_free_callback() %}
     // Implementation of free callback function {{ callback.name() }}
 {%            call cpp::callback_fn_free_impl(callback) %}
+{%-         else if callback.is_clone_callback() %}
+    // Implementation of clone callback function {{ callback.name() }}
+{%            call cpp::callback_fn_clone_impl(callback) %}
 {%-         else %}
     // Implementation of callback function calling from Rust to JS {{ callback.name() }}
 {%-           call cpp::callback_fn_impl(callback) %}
@@ -51,7 +55,7 @@ extern "C" {
 {%-       else %}
     // Implementation of callback function calling from JS to Rust {{ callback.name() }},
     // passed from Rust to JS as part of async callbacks.
-{%-         include "ForeignFuture.cpp" %}
+{%-         include "ForeignFutureDroppedCallbackStruct.cpp" %}
 {%-       endif %}
 {%-     when FfiDefinition::Struct(ffi_struct) %}
 {%-       include "Struct.cpp" %}
@@ -119,6 +123,9 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
 {%-         if callback.is_free_callback() %}
     // Cleanup for "free" callback function {{ callback.name() }}
 {%            call cpp::callback_fn_free_cleanup(callback) %}
+{%-         else if callback.is_clone_callback() %}
+    // Cleanup for "clone" callback function {{ callback.name() }}
+{%            call cpp::callback_fn_clone_cleanup(callback) %}
 {%-         else %}
     // Cleanup for callback function {{ callback.name() }}
 {%            call cpp::callback_fn_cleanup(callback) %}

@@ -13,6 +13,14 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
     // Create the VTable using a series of closures.
     // ts automatically converts these into C callback functions.
     vtable: {
+        uniffiFree: (uniffiHandle: UniffiHandle): void => {
+            // {{ name }}: this will throw a stale handle error if the handle isn't found.
+            {{ ffi_converter_name }}.drop(uniffiHandle);
+        },
+        uniffiClone: (uniffiHandle: UniffiHandle): UniffiHandle => {
+            // {{ name }}: this will throw a stale handle error if the handle isn't found.
+            return {{ ffi_converter_name }}.clone(uniffiHandle);
+        },
         {%- for (ffi_callback, meth) in vtable_methods %}
         {{ meth.name()|fn_name }}: (
             {%- for arg in ffi_callback.arguments_no_return() %}
@@ -109,31 +117,28 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
             {%- match meth.throws_type() %}
             {%- when None %}
             {{- self.import_infra("uniffiTraitInterfaceCallAsync", "async-callbacks") }}
-            const uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
+            uniffiTraitInterfaceCallAsync(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower,
+                /*droppedCallback:*/ uniffiOutDroppedCallback,
             );
             {%- when Some(error_type) %}
             {{- self.import_infra("uniffiTraitInterfaceCallAsyncWithError", "async-callbacks") }}
-            const uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
+            uniffiTraitInterfaceCallAsyncWithError(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
                 /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower,
+                /*droppedCallback:*/ uniffiOutDroppedCallback,
             );
             {%- endmatch %}
-            return uniffiForeignFuture;
             {%- endif %}
         },
         {%- endfor %}
-        uniffiFree: (uniffiHandle: UniffiHandle): void => {
-            // {{ name }}: this will throw a stale handle error if the handle isn't found.
-            {{ ffi_converter_name }}.drop(uniffiHandle);
-        }
     },
     register: () => {
         {% call ts::fn_handle(cbi.ffi_init_callback()) %}(

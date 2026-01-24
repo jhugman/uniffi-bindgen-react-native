@@ -6,15 +6,25 @@
 import { UniffiInternalError } from "./errors";
 
 export type UniffiHandle = bigint;
-export const defaultUniffiHandle = BigInt("0");
+// Initial value and increment amount for handles.
+// These ensure that SWIFT handles always have the lowest bit set
+const UNIFFI_HANDLEMAP_INITIAL: bigint = BigInt("1");
+const UNIFFI_HANDLEMAP_DELTA: bigint = BigInt("2");
+export const defaultUniffiHandle = UNIFFI_HANDLEMAP_INITIAL;
 
 export class UniffiHandleMap<T> {
   private map = new Map<UniffiHandle, T>();
-  private currentHandle: UniffiHandle = defaultUniffiHandle;
+  private currentHandle: UniffiHandle = UNIFFI_HANDLEMAP_INITIAL;
 
   insert(value: T): UniffiHandle {
+    return this.doInsert(value);
+  }
+
+  private doInsert(value: T) {
+    const handle = this.currentHandle;
     this.map.set(this.currentHandle, value);
-    return this.currentHandle++;
+    this.currentHandle += UNIFFI_HANDLEMAP_DELTA;
+    return handle;
   }
 
   get(handle: UniffiHandle): T {
@@ -45,6 +55,15 @@ export class UniffiHandleMap<T> {
       throw new UniffiInternalError.UnexpectedStaleHandle();
     }
     return obj;
+  }
+
+  clone(handle: UniffiHandle): UniffiHandle {
+    const obj = this.map.get(handle);
+    if (obj === undefined) {
+      // see `get`
+      throw new UniffiInternalError.UnexpectedStaleHandle();
+    }
+    return this.doInsert(obj);
   }
 
   remove(handle: UniffiHandle): T | undefined {

@@ -15,9 +15,17 @@
 namespace {{ ns }} {
     using namespace facebook;
 
+    {% let ret_type %}
+    {% match callback.return_type() %}
+      {% when Some with (val) %}
+        {% let ret_type = val|ffi_type_name() %}
+      {% when None %}
+        {% let ret_type = "void".into() %}
+    {% endmatch %}
+
     // We need to store a lambda in a global so we can call it from
     // a function pointer. The function pointer is passed to Rust.
-    static std::function<void(
+    static std::function<{{ ret_type }}(
         {%- for arg in callback.arguments() %}
         {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
         {{- arg_t }}
@@ -29,7 +37,7 @@ namespace {{ ns }} {
 
     // This is the main body of the callback. It's called from the lambda,
     // which itself is called from the callback function which is passed to Rust.
-    static void body(jsi::Runtime &rt,
+    static {{ ret_type }} body(jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
                      std::shared_ptr<jsi::Value> callbackValue
             {%- for arg in callback.arguments() %}
@@ -91,6 +99,9 @@ namespace {{ ns }} {
                 );
             {%- else %}
             {%- endmatch %}
+            {% if ret_type != "void" %}
+            return uniffi_jsi::Bridging<{{ret_type}}>::fromJs(rt, callInvoker, uniffiResult);
+            {% endif %}
         } catch (const jsi::JSError &error) {
             std::cout << "Error in callback {{ name }}: "
                     << error.what() << std::endl;
@@ -98,7 +109,7 @@ namespace {{ ns }} {
         }
     }
 
-    static void callback(
+    static {{ret_type}} callback(
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -118,12 +129,17 @@ namespace {{ ns }} {
         if (rsLambda == nullptr) {
             // This only occurs when destructors are calling into Rust free/drop,
             // which causes the JS callback to be dropped.
-            return;
+            {% if ret_type == "uint64_t" -%}
+                return 0ULL;
+            {%- else -%}
+                return;
+            {%- endif %}
+
         }
 
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
-        rsLambda(
+        {% if ret_type != "void" -%}return {% endif %}rsLambda(
             {%- for arg in callback.arguments() %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
             {{ arg_nm_rs }}
@@ -165,9 +181,14 @@ namespace {{ ns }} {
             , RustCallStatus* uniffi_call_status
             {%- endif -%}
             ) {
+                {% if ret_type == "uint64_t" -%}
+                auto result = std::make_shared<uint64_t>(0);
+                {%- endif %}
+
                 // We immediately make a lambda which will do the work of transforming the
                 // arguments into JSI values and calling the callback.
                 uniffi_runtime::UniffiCallFunc jsLambda = [
+                    {% if ret_type != "void" %}result,{% endif %}
                     callInvoker,
                     callbackValue
                     {%- for arg in callback.arguments() %}
@@ -178,7 +199,7 @@ namespace {{ ns }} {
                     , uniffi_call_status
                     {%- endif -%}
                 ](jsi::Runtime &rt) mutable {
-                    body(rt, callInvoker, callbackValue
+                    {% if ret_type != "void" %}*result = {% endif %}body(rt, callInvoker, callbackValue
                         {%- for arg in callback.arguments() %}
                         {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
                         , {{ arg_nm_rs }}
@@ -192,6 +213,9 @@ namespace {{ ns }} {
                 // look after calling it on the correct thread.
                 {% if callback.is_blocking() -%}
                 callInvoker->invokeBlocking(rt, jsLambda);
+                {% else if ret_type != "void" -%}
+                callInvoker->invokeBlocking(rt, jsLambda);
+                return *result;
                 {%- else %}
                 callInvoker->invokeNonBlocking(rt, jsLambda);
                 {%- endif %}

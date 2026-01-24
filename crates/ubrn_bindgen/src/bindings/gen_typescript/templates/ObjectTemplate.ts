@@ -5,7 +5,7 @@
 {{- self.import_infra_type("FfiConverter", "ffi-converters") -}}
 {{- self.import_infra_type("UniffiRustArcPtr", "rust-call") }}
 {{- self.import_infra("destructorGuardSymbol", "symbols") -}}
-{{- self.import_infra("pointerLiteralSymbol", "symbols") -}}
+{{- self.import_infra("handleLiteralSymbol", "symbols") -}}
 {{- self.import_infra("uniffiTypeNameSymbol", "symbols") -}}
 
 {%- let obj = ci.get_object_definition(name).expect("Object definition not found in this ci") %}
@@ -18,10 +18,10 @@
 
 {%- include "ObjectInterfaceTemplate.ts" %}
 {%- macro private_ctor() %}
-private constructor(pointer: UnsafeMutableRawPointer) {
+private constructor(handle: UnsafeMutableRawPointer) {
     super();
-    this[pointerLiteralSymbol] = pointer;
-    this[destructorGuardSymbol] = {{ obj_factory }}.bless(pointer);
+    this[handleLiteralSymbol] = handle;
+    this[destructorGuardSymbol] = {{ obj_factory }}.bless(handle);
 }
 {%- endmacro %}
 
@@ -30,7 +30,7 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
 
     readonly [uniffiTypeNameSymbol] = "{{ impl_class_name }}";
     readonly [destructorGuardSymbol]: UniffiRustArcPtr;
-    readonly [pointerLiteralSymbol]: UnsafeMutableRawPointer;
+    readonly [handleLiteralSymbol]: UnsafeMutableRawPointer;
 
     {%- match obj.primary_constructor() %}
     {%- when Some with (cons) %}
@@ -117,8 +117,8 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
     uniffiDestroy(): void {
         const ptr = (this as any)[destructorGuardSymbol];
         if (ptr !== undefined) {
-            const pointer = {{ obj_factory }}.pointer(this);
-            {{ obj_factory }}.freePointer(pointer);
+            const handle = {{ obj_factory }}.handle(this);
+            {{ obj_factory }}.freeHandle(handle);
             {{ obj_factory }}.unbless(ptr);
             delete (this as any)[destructorGuardSymbol];
         }
@@ -144,14 +144,14 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = (() => {
     {% if flavor.supports_finalization_registry() %}
     /// <reference lib="es2021" />
     const registry = typeof FinalizationRegistry !== 'undefined' ? new FinalizationRegistry<UnsafeMutableRawPointer>((heldValue: UnsafeMutableRawPointer) => {
-        {{ obj_factory }}.freePointer(heldValue);
+        {{ obj_factory }}.freeHandle(heldValue);
     }) : null;
     {% endif %}
     return {
-    create(pointer: UnsafeMutableRawPointer): {{ type_name }} {
+    create(handle: UnsafeMutableRawPointer): {{ type_name }} {
         const instance = Object.create({{ impl_class_name }}.prototype);
-        instance[pointerLiteralSymbol] = pointer;
-        instance[destructorGuardSymbol] = this.bless(pointer);
+        instance[handleLiteralSymbol] = handle;
+        instance[destructorGuardSymbol] = this.bless(handle);
         instance[uniffiTypeNameSymbol] = "{{ impl_class_name }}";
         return instance;
     },
@@ -177,7 +177,7 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = (() => {
     bless(p: UnsafeMutableRawPointer): UniffiRustArcPtr {
         return uniffiCaller.rustCall(
             /*caller:*/ (status) =>
-                {% call ts::fn_handle(obj.ffi_function_bless_pointer()) %}(p, status),
+                {% call ts::fn_handle(obj.ffi_function_bless_handle()) %}(p, status),
             /*liftString:*/ FfiConverterString.lift
         );
     },
@@ -187,24 +187,24 @@ const {{ obj_factory }}: UniffiObjectFactory<{{ type_name }}> = (() => {
     },
     {%- endif %}
 
-    pointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
+    handle(obj: {{ type_name }}): UnsafeMutableRawPointer {
         if ((obj as any)[destructorGuardSymbol] === undefined) {
-            throw new UniffiInternalError.UnexpectedNullPointer();
+            throw new UniffiInternalError.UnexpectedNullHandle();
         }
-        return (obj as any)[pointerLiteralSymbol];
+        return (obj as any)[handleLiteralSymbol];
     },
 
-    clonePointer(obj: {{ type_name }}): UnsafeMutableRawPointer {
-        const pointer = this.pointer(obj);
+    cloneHandle(obj: {{ type_name }}): UnsafeMutableRawPointer {
+        const handle = this.handle(obj);
         return uniffiCaller.rustCall(
-            /*caller:*/ (callStatus) => {% call ts::fn_handle(obj.ffi_object_clone()) %}(pointer, callStatus),
+            /*caller:*/ (callStatus) => {% call ts::fn_handle(obj.ffi_object_clone()) %}(handle, callStatus),
             /*liftString:*/ FfiConverterString.lift
         );
     },
 
-    freePointer(pointer: UnsafeMutableRawPointer): void {
+    freeHandle(handle: UnsafeMutableRawPointer): void {
         uniffiCaller.rustCall(
-            /*caller:*/ (callStatus) => {% call ts::fn_handle(obj.ffi_object_free()) %}(pointer, callStatus),
+            /*caller:*/ (callStatus) => {% call ts::fn_handle(obj.ffi_object_free()) %}(handle, callStatus),
             /*liftString:*/ FfiConverterString.lift
         );
     },

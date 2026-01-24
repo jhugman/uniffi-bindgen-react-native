@@ -133,6 +133,17 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 {%- endmacro %}
 
 {#-
+// ns is the namespace used for the free callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_clone_impl(callback) %}
+{%- for st in self.ci.iter_ffi_structs_for_clone() %}
+{%- let ns = st.cpp_namespace_clone(ci) %}
+{%- include "CallbackFunction.cpp" %}
+{%- endfor %}
+{%- endmacro %}
+
+{#-
 // ns is the namespace used for the callback function.
 // It should match the value rendered by the callback_fn_namespace macro.
 #}
@@ -152,11 +163,25 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 {%- endfor %}
 {%- endmacro %}
 
+{#-
+// ns is the namespace used for the free callback function.
+// It should match the value rendered by the callback_fn_namespace macro.
+#}
+{%- macro callback_fn_clone_cleanup(callback) %}
+{%- for st in self.ci.iter_ffi_structs_for_clone() %}
+{%- let ns = st.cpp_namespace_clone(ci) %}
+{{- ns }}::cleanup();
+{%- endfor %}
+{%- endmacro %}
+
 
 {%- macro callback_fn_namespace(st, field) %}
 {%- if field.is_free() %}
 {#- // match the callback_fn_free_impl macro  #}
 {{- st.cpp_namespace_free(ci) -}}
+{%- else if field.is_clone() %}
+{#- // match the callback_fn_clone_impl macro  #}
+{{- st.cpp_namespace_clone(ci) -}}
 {%- else %}
 {#- // match the callback_fn_impl macro  #}
 {{- field.type_().borrow().cpp_namespace(ci) }}

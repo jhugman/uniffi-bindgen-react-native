@@ -55,18 +55,18 @@ export type UnsafeMutableRawPointer = bigint;
  * Methods of this interface are not exposed to the API.
  */
 export interface UniffiObjectFactory<T> {
-  bless(pointer: UnsafeMutableRawPointer): UniffiRustArcPtr;
+  bless(handle: UnsafeMutableRawPointer): UniffiRustArcPtr;
   unbless(ptr: UniffiRustArcPtr): void;
-  create(pointer: UnsafeMutableRawPointer): T;
-  pointer(obj: T): UnsafeMutableRawPointer;
-  clonePointer(obj: T): UnsafeMutableRawPointer;
-  freePointer(pointer: UnsafeMutableRawPointer): void;
+  create(handle: UnsafeMutableRawPointer): T;
+  handle(obj: T): UnsafeMutableRawPointer;
+  cloneHandle(obj: T): UnsafeMutableRawPointer;
+  freeHandle(handle: UnsafeMutableRawPointer): void;
   isConcreteType(obj: any): obj is T;
 }
 
-const pointerConverter: FfiConverter<any, UnsafeMutableRawPointer> =
+const handleConverter: FfiConverter<any, UnsafeMutableRawPointer> =
   FfiConverterUInt64;
-const dummyPointer: UnsafeMutableRawPointer = BigInt("0");
+const dummyHandle: UnsafeMutableRawPointer = BigInt("0");
 
 /**
  * An FfiConverter for an object.
@@ -74,28 +74,31 @@ const dummyPointer: UnsafeMutableRawPointer = BigInt("0");
 export class FfiConverterObject<T>
   implements FfiConverter<UnsafeMutableRawPointer, T>
 {
-  constructor(private factory: UniffiObjectFactory<T>) {}
+  constructor(protected factory: UniffiObjectFactory<T>) {}
 
   lift(value: UnsafeMutableRawPointer): T {
     return this.factory.create(value);
   }
   lower(value: T): UnsafeMutableRawPointer {
     if (this.factory.isConcreteType(value)) {
-      return this.factory.clonePointer(value);
+      return this.factory.cloneHandle(value);
     } else {
-      throw new Error("Cannot lower this object to a pointer");
+      throw new Error("Cannot lower this object to a handle");
     }
   }
   read(from: RustBuffer): T {
-    return this.lift(pointerConverter.read(from));
+    return this.lift(handleConverter.read(from));
   }
   write(value: T, into: RustBuffer): void {
-    pointerConverter.write(this.lower(value), into);
+    handleConverter.write(this.lower(value), into);
   }
   allocationSize(value: T): number {
-    return pointerConverter.allocationSize(dummyPointer);
+    return handleConverter.allocationSize(dummyHandle);
   }
 }
+
+const bigint0 = BigInt("0");
+const bigint1 = BigInt("1");
 
 /// An FfiConverter for objects with callbacks.
 const handleSafe: StructuralEquality<UniffiHandle, UnsafeMutableRawPointer> =
@@ -110,23 +113,38 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
   }
 
   lower(value: T): UnsafeMutableRawPointer {
-    return this.handleMap.insert(value);
+    if (this.factory.isConcreteType(value)) {
+      // rust object
+      return this.factory.cloneHandle(value);
+    } else {
+      return this.handleMap.insert(value);
+    }
   }
 
   lift(value: UnsafeMutableRawPointer): T {
-    if (this.handleMap.has(value)) {
-      return this.handleMap.get(value);
+    if ((value & bigint1) == bigint0) {
+      // rust generated
+      if (this.handleMap.has(value)) {
+        return this.handleMap.get(value);
+      } else {
+        return super.lift(value);
+      }
     } else {
-      return super.lift(value);
+      // this is remove in other languages...
+      return this.handleMap.get(value) ?? super.lift(value);
     }
   }
 
   drop(handle: UniffiHandle): T | undefined {
     return this.handleMap.remove(handle);
   }
+
+  clone(handle: UniffiHandle): UniffiHandle {
+    return this.handleMap.clone(handle);
+  }
 }
 
-/// Due to some mismatches in the ffi converter mechanisms, errors are a RustBuffer holding a pointer
+/// Due to some mismatches in the ffi converter mechanisms, errors are a RustBuffer holding a handle
 export class FfiConverterObjectAsError<T> extends AbstractFfiConverterByteArray<
   UniffiThrownObject<T>
 > {

@@ -205,6 +205,11 @@ impl NodeTrait for Trait2 {
 
 pub trait StringUtil: Send + Sync {
     fn concat(&self, a: &str, b: &str) -> String;
+
+    #[doc(hidden)]
+    fn uniffi_foreign_handle(&self) -> Option<uniffi::Handle> {
+        None
+    }
 }
 
 pub struct StringUtilImpl1;
