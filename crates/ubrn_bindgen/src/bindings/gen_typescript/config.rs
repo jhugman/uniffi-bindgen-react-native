@@ -16,6 +16,8 @@ pub(crate) struct TsConfig {
     pub(crate) console_import: Option<String>,
     #[serde(default)]
     pub(crate) custom_types: HashMap<String, CustomTypeConfig>,
+    #[serde(default)]
+    pub(crate) strict_object_types: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
