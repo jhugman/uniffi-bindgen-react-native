@@ -19,7 +19,7 @@ impl EnumCodeType {
 }
 
 impl CodeType for EnumCodeType {
-    fn type_label(&self, ci: &ComponentInterface) -> String {
+    fn type_label(&self, ci: &ComponentInterface, _opt_out_interface: bool) -> String {
         let nm = CodeOracle.class_name(ci, &self.id);
         if ci.is_name_used_as_error(&self.id) {
             rewrite_error_name(&nm).to_string()
@@ -28,7 +28,7 @@ impl CodeType for EnumCodeType {
         }
     }
 
-    fn decl_type_label(&self, ci: &ComponentInterface) -> String {
+    fn decl_type_label(&self, ci: &ComponentInterface, _opt_out_interface: bool) -> String {
         let nm = CodeOracle.class_name(ci, &self.id);
         if ci.is_name_used_as_error(&self.id) {
             rewrite_error_name(&nm).to_string()
@@ -45,7 +45,7 @@ impl CodeType for EnumCodeType {
         if let Literal::Enum(v, _) = literal {
             format!(
                 "{}.{}",
-                self.type_label(ci),
+                self.type_label(ci, false),
                 CodeOracle.enum_variant_name(v)
             )
         } else {

@@ -24,8 +24,10 @@ impl CodeType for ObjectCodeType {
     // In Typescript, this is `{class_name}Interface`, and for callback
     // interfaces (when `self.imp.has_callback_interface()`) `{class_name}`.
     //
-    fn type_label(&self, ci: &ComponentInterface) -> String {
-        if !self.imp.is_trait_interface() || ci.is_name_used_as_error(&self.name) {
+    fn type_label(&self, ci: &ComponentInterface, opt_out_interface: bool) -> String {
+        if !opt_out_interface
+            && (!self.imp.is_trait_interface() || ci.is_name_used_as_error(&self.name))
+        {
             format!("{}Interface", CodeOracle.class_name(ci, &self.name))
         } else {
             CodeOracle.class_name(ci, &self.name)
@@ -41,7 +43,7 @@ impl CodeType for ObjectCodeType {
     // Unlike other languages, in Typescript it is legal to have the interface/type called the same thing
     // as the implementation class. This is very useful so as avoid extra cognitive burden,
     // and naming collisions.
-    fn decl_type_label(&self, ci: &ComponentInterface) -> String {
+    fn decl_type_label(&self, ci: &ComponentInterface, _opt_out_interface: bool) -> String {
         if !self.imp.is_trait_interface() || ci.is_name_used_as_error(&self.name) {
             CodeOracle.class_name(ci, &self.name)
         } else {
