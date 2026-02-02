@@ -190,14 +190,14 @@ impl<T: AsType> AsCodeType for T {
 pub(crate) trait CodeType: std::fmt::Debug {
     /// The language specific label used to reference this type. This will be used in
     /// method signatures and property declarations.
-    fn type_label(&self, ci: &ComponentInterface) -> String;
+    fn type_label(&self, ci: &ComponentInterface, opt_out_interface: bool) -> String;
 
     /// The container type for this type. Most of the time, this is the samne as the type_label.
     /// However, just occassionally the typescript type is different.
     /// e.g. errors are instantiated with `new MyError.Foo()`, but have typescript type of
     /// `MyErrorType`.
-    fn decl_type_label(&self, ci: &ComponentInterface) -> String {
-        self.type_label(ci)
+    fn decl_type_label(&self, ci: &ComponentInterface, opt_out_interface: bool) -> String {
+        self.type_label(ci, opt_out_interface)
     }
 
     /// A representation of this type label that can be used as part of another
@@ -208,7 +208,7 @@ pub(crate) trait CodeType: std::fmt::Debug {
     fn canonical_name(&self) -> String;
 
     fn literal(&self, _literal: &Literal, ci: &ComponentInterface) -> String {
-        unimplemented!("Unimplemented for {}", self.type_label(ci))
+        unimplemented!("Unimplemented for {}", self.type_label(ci, false))
     }
 
     /// Name of the FfiConverter
