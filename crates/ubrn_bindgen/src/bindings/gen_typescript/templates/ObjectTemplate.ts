@@ -16,7 +16,9 @@
 
 {%- let is_error = ci.is_name_used_as_error(name) %}
 
-{%- include "ObjectInterfaceTemplate.ts" %}
+{%- if !config.opt_out_interface %} 
+    {%- include "ObjectInterfaceTemplate.ts" %}
+{%- endif %}
 {%- macro private_ctor() %}
 private constructor(pointer: UnsafeMutableRawPointer) {
     super();
@@ -26,7 +28,7 @@ private constructor(pointer: UnsafeMutableRawPointer) {
 {%- endmacro %}
 
 {% call ts::docstring(obj, 0) %}
-export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ protocol_name }} {
+export class {{ impl_class_name }} extends UniffiAbstractObject {%- if !config.opt_out_interface %} implements {{ protocol_name }}{%- endif %} {
 
     readonly [uniffiTypeNameSymbol] = "{{ impl_class_name }}";
     readonly [destructorGuardSymbol]: UniffiRustArcPtr;
