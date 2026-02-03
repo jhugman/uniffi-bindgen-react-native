@@ -1,5 +1,8 @@
 The `uniffi.toml` file is a toml file used to customize [the generation of C++ and Typescript](https://mozilla.github.io/uniffi-rs/0.27/bindings.html).
 
+To include the file when invoking `ubrn`, specify the path in the
+[corresponding key of the config](../reference/config-yaml.md#bindings).
+
 As of time of writing we support `typescript.customTypes`, `kotlin.cdylib_name` and `kotlin.package_name`.
 
 ### Logging the FFI
