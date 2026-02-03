@@ -65,6 +65,9 @@ function myObject(): MyObjectInterface
 
 This is to support mocking of Rust objects.
 
+To opt out of this behavior, there is a
+[corresponding key](../reference/uniffi-toml.md#opting-out-of-interface-generation) in `uniffi.toml`.
+
 ### Uniffi traits
 
 Implementing the following traits in Rust causes the corresponding methods to be generated in Typescript:

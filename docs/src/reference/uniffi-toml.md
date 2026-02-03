@@ -5,6 +5,16 @@ To include the file when invoking `ubrn`, specify the path in the
 
 As of time of writing we support `typescript.customTypes`, `kotlin.cdylib_name` and `kotlin.package_name`.
 
+### Opting out of Interface generation
+
+By default, `ubrn` generates [Object interfaces](../idioms/objects.md#object-interfaces) for all objects. To opt out of
+this behavior, set `bindings.typescript.optOutInterface` to `true`.
+
+```toml
+[bindings.typescript]
+optOutInterface = true
+```
+
 ### Logging the FFI
 
 The generated Typescript code can optionally be created to generate logging.
