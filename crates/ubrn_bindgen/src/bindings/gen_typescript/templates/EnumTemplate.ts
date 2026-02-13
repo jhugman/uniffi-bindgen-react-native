@@ -32,10 +32,16 @@ const {{ ffi_converter_name }} = (() => {
                 {%- for variant in e.variants() %}
                 case {{ type_name }}.{{ variant|variant_name }}: return ordinalConverter.write({{ loop.index0 + 1 }}, into);
                 {%- endfor %}
+                default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
         }
         allocationSize(value: TypeName): number {
-            return ordinalConverter.allocationSize(0);
+            switch (value) {
+                {%- for variant in e.variants() %}
+                case {{ type_name }}.{{ variant|variant_name }}: return ordinalConverter.allocationSize(0);
+                {%- endfor %}
+                default: throw new UniffiInternalError.UnexpectedEnumCase();
+            }
         }
     }
     return new FFIConverter();
