@@ -12,6 +12,7 @@ pub fn get_traits() -> Vec<Arc<dyn NodeTrait>> {
     vec![Arc::new(Trait1::default()), Arc::new(Trait2::default())]
 }
 
+#[uniffi::trait_interface]
 pub trait NodeTrait: Send + Sync + std::fmt::Debug {
     fn name(&self) -> String;
 
@@ -203,6 +204,7 @@ impl NodeTrait for Trait2 {
     }
 }
 
+#[uniffi::trait_interface]
 pub trait StringUtil: Send + Sync {
     fn concat(&self, a: &str, b: &str) -> String;
 }

@@ -7,12 +7,15 @@ use super::{
     oracle::{AsCodeType, CodeOracle},
     TypeRenderer,
 };
-pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
-    backend::{Literal, Type},
-    interface::{AsType, Enum, FfiType, Variant},
+    interface::{AsType, Enum, FfiType, Literal, Type, Variant},
     ComponentInterface,
 };
+
+/// Get the FfiType for a Type (was in uniffi_bindgen::backend::filters in 0.29)
+pub fn ffi_type(type_: &impl AsType) -> Result<FfiType, askama::Error> {
+    Ok(type_.as_type().into())
+}
 
 pub(super) fn type_name(
     as_type: &impl AsType,
@@ -101,11 +104,16 @@ pub(super) fn lift_fn(
 }
 
 pub fn render_literal(
-    literal: &Literal,
+    default_value: &uniffi_meta::DefaultValueMetadata,
     as_ct: &impl AsType,
     ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().literal(literal, ci))
+    match default_value {
+        uniffi_meta::DefaultValueMetadata::Literal(literal) => {
+            Ok(as_ct.as_codetype().literal(literal, ci))
+        }
+        uniffi_meta::DefaultValueMetadata::Default => Ok("undefined".to_string()),
+    }
 }
 
 pub fn variant_discr_literal(
