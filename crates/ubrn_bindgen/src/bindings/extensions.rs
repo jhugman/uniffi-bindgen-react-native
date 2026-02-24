@@ -398,7 +398,11 @@ pub(crate) impl FfiType {
 
 #[ext]
 pub(crate) impl FfiArgument {
-    fn is_return(&self) -> bool {
+    /// Returns true if this argument is an output parameter written by the caller.
+    /// This includes both the standard return out-param (`uniffi_out_return`) and
+    /// the dropped-callback out-param (`uniffi_out_dropped_callback`) introduced in
+    /// uniffi 0.30 for direct-return clone callbacks.
+    fn is_output_param(&self) -> bool {
         self.name() == "uniffi_out_return" || self.name() == "uniffi_out_dropped_callback"
     }
 }
@@ -450,13 +454,13 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn has_return_out_param(&self) -> bool {
-        self.arguments().into_iter().any(|a| a.is_return())
+        self.arguments().into_iter().any(|a| a.is_output_param())
     }
 
     fn arg_return_type(&self) -> Option<FfiType> {
         self.arguments()
             .into_iter()
-            .find(|a| a.is_return() && !a.type_().is_void())
+            .find(|a| a.is_output_param() && !a.type_().is_void())
             .map(|a| {
                 let t = a.type_();
                 match t {
@@ -469,7 +473,7 @@ pub(crate) impl FfiCallbackFunction {
     fn arg_return_cpp_name(&self) -> String {
         self.arguments()
             .into_iter()
-            .find(|a| a.is_return() && !a.type_().is_void())
+            .find(|a| a.is_output_param() && !a.type_().is_void())
             .map(|a| format!("rs_{}", a.name().to_lower_camel_case()))
             .unwrap_or_else(|| "rs_uniffiOutReturn".to_string())
     }
@@ -487,7 +491,9 @@ pub(crate) impl FfiCallbackFunction {
     }
 
     fn arguments_no_return(&self) -> impl Iterator<Item = &FfiArgument> {
-        self.arguments().into_iter().filter(|a| !a.is_return())
+        self.arguments()
+            .into_iter()
+            .filter(|a| !a.is_output_param())
     }
 }
 

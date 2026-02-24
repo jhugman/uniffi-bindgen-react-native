@@ -130,6 +130,11 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
     return this.handleMap.remove(handle);
   }
 
+  /**
+   * Called by Rust's `CallbackInterfaceClone` vtable entry when it clones an
+   * Arc holding a foreign-implemented object. Returns a new handle pointing to
+   * the same JS object; removing either handle does not affect the other.
+   */
   clone(handle: UniffiHandle): UniffiHandle {
     return this.handleMap.clone(handle);
   }

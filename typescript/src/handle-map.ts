@@ -53,6 +53,14 @@ export class UniffiHandleMap<T> {
     return obj;
   }
 
+  /**
+   * Creates a second handle pointing to the same object. Rust calls this (via
+   * `CallbackInterfaceClone`) when it clones an Arc holding a foreign-implemented
+   * trait object, so two Arc references can exist with independent lifetimes.
+   *
+   * This clones the *handle*, not the object itself. Both handles resolve to the
+   * same JS object reference, and removing either handle does not affect the other.
+   */
   clone(handle: UniffiHandle): UniffiHandle {
     const obj = this.map.get(handle);
     if (obj === undefined) {
