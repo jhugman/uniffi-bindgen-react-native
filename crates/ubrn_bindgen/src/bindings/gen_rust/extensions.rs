@@ -81,6 +81,16 @@ fn ffi_definitions2(
                 };
                 definitions.push(FfiDefinition2::CallbackFunction(cb));
                 ident
+            } else if callback.is_clone_callback() {
+                let ident = callback.module_ident_clone(&ffi_struct);
+                let callback = callback.clone();
+                let module_ident = ident.clone();
+                let cb = FfiCallbackFunction2 {
+                    callback,
+                    module_ident,
+                };
+                definitions.push(FfiDefinition2::CallbackFunction(cb));
+                ident
             } else {
                 callback.module_ident()
             };
@@ -94,7 +104,11 @@ fn ffi_definitions2(
 
     for callback in callbacks.into_values() {
         if callback.is_free_callback() {
-            // this is done above.
+            // this is done above per-vtable.
+            continue;
+        }
+        if callback.is_clone_callback() {
+            // this is done above per-vtable.
             continue;
         }
         if !has_async_callbacks && callback.is_future_callback() {
@@ -148,6 +162,9 @@ pub(super) impl FfiStruct {
 pub(super) impl FfiCallbackFunction {
     fn module_ident_free(&self, enclosing: &FfiStruct) -> Ident {
         ident(&format!("{}__free", enclosing.name().to_snake_case()))
+    }
+    fn module_ident_clone(&self, enclosing: &FfiStruct) -> Ident {
+        ident(&format!("{}__clone", enclosing.name().to_snake_case()))
     }
     fn module_ident(&self) -> Ident {
         snake_case_ident(self.name())

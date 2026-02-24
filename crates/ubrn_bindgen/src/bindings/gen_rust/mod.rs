@@ -400,8 +400,26 @@ impl<'a> ComponentTemplate<'a> {
         let args_into_js: TokenStream =
             self.arg_list_convert(&args, |ident, _| self.convert_to_js(ident));
 
+        // Direct return: e.g., CallbackInterfaceClone: extern "C" fn(handle: u64) -> u64
+        // (no out-param, no call-status, but has a Rust-side return type)
+        let direct_return: Option<FfiType> = cb
+            .callback()
+            .return_type()
+            .cloned()
+            .filter(|_| !cb.has_return_out_param());
+        let fn_return_suffix = map_or_default(direct_return.as_ref(), |rt| {
+            let rust_return = self.ffi_type_rust(rt);
+            quote! { -> #rust_return }
+        });
+        let direct_return_expr = map_or_default(direct_return.as_ref(), |rt| {
+            let rust_return = self.ffi_type_rust(rt);
+            quote! { #rust_return::into_rust(#result_ident) }
+        });
+
         let return_let = if_or_default(
-            cb.callback().has_rust_call_status_arg() || cb.return_type().is_some(),
+            cb.callback().has_rust_call_status_arg()
+                || cb.return_type().is_some()
+                || direct_return.is_some(),
             quote! {
                 let #result_ident =
             },
@@ -444,12 +462,13 @@ impl<'a> ComponentTemplate<'a> {
                 }
             }
 
-            pub(super) type FnSig = extern "C" fn(#rust_args_decl #return_arg_decl #call_status_arg_decl);
+            pub(super) type FnSig = extern "C" fn(#rust_args_decl #return_arg_decl #call_status_arg_decl) #fn_return_suffix;
 
-            extern "C" fn implementation(#rust_args_decl #return_arg_decl #call_status_arg_decl) {
+            extern "C" fn implementation(#rust_args_decl #return_arg_decl #call_status_arg_decl) #fn_return_suffix {
                 #return_let CALLBACK.with(|#cell| #cell.with_value(|#callback| #callback.call(#callback, #args_into_js)));
                 #call_status_copy
                 #return_copy
+                #direct_return_expr
             }
         };
 
@@ -596,10 +615,17 @@ impl<'a> ComponentTemplate<'a> {
     ) -> TokenStream {
         let args_no_return: Vec<_> = ffi_func.arguments_no_return().collect();
         let args = self.arg_list_decl(&args_no_return, |t| self.ffi_type_foreign(t));
-        let return_tokens = if_then_map(ffi_func.returns_result(), || {
+        let is_direct_return = ffi_func.return_type().is_some() && !ffi_func.has_return_out_param();
+        let return_tokens = if is_direct_return {
+            let rt = ffi_func.return_type().unwrap();
+            let return_type = self.ffi_type_foreign(rt);
+            quote! { -> #return_type }
+        } else if ffi_func.returns_result() {
             let return_type = self.ffi_type_uniffi_result(ffi_func.arg_return_type().as_ref());
             quote! { -> #return_type }
-        });
+        } else {
+            quote! {}
+        };
         quote! {
             #[wasm_bindgen(method)]
             pub fn call(this_: &#callback_fn_ident, ctx_: &#callback_fn_ident, #args) #return_tokens;
