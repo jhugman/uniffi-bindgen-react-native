@@ -74,7 +74,7 @@ const dummyPointer: UnsafeMutableRawPointer = BigInt("0");
 export class FfiConverterObject<T>
   implements FfiConverter<UnsafeMutableRawPointer, T>
 {
-  constructor(private factory: UniffiObjectFactory<T>) {}
+  constructor(protected factory: UniffiObjectFactory<T>) {}
 
   lift(value: UnsafeMutableRawPointer): T {
     return this.factory.create(value);
@@ -110,6 +110,11 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
   }
 
   lower(value: T): UnsafeMutableRawPointer {
+    // Rust-backed objects are lowered as raw Arc pointers (even numbers).
+    // TS-implemented objects are inserted into the handleMap as foreign handles (odd numbers).
+    if (this.factory.isConcreteType(value)) {
+      return super.lower(value);
+    }
     return this.handleMap.insert(value);
   }
 
@@ -123,6 +128,10 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
 
   drop(handle: UniffiHandle): T | undefined {
     return this.handleMap.remove(handle);
+  }
+
+  clone(handle: UniffiHandle): UniffiHandle {
+    return this.handleMap.clone(handle);
   }
 }
 

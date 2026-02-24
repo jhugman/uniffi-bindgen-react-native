@@ -36,6 +36,9 @@ export class FfiConverterCallback<T> implements FfiConverter<UniffiHandle, T> {
   allocationSize(value: T): number {
     return handleConverter.allocationSize(defaultUniffiHandle);
   }
+  clone(handle: UniffiHandle): UniffiHandle {
+    return this.handleMap.clone(handle);
+  }
   drop(handle: UniffiHandle): T | undefined {
     return this.handleMap.remove(handle);
   }

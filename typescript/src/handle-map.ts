@@ -10,11 +10,17 @@ export const defaultUniffiHandle = BigInt("0");
 
 export class UniffiHandleMap<T> {
   private map = new Map<UniffiHandle, T>();
-  private currentHandle: UniffiHandle = defaultUniffiHandle;
+  // Foreign handles must be odd values per uniffi 0.30.x:
+  // "Foreign handles are generated with a handle map that only generates odd values."
+  // "Foreign handles must always have the lowest bit set"
+  // "0 is an invalid value."
+  private currentHandle: UniffiHandle = BigInt(1);
 
   insert(value: T): UniffiHandle {
-    this.map.set(this.currentHandle, value);
-    return this.currentHandle++;
+    const handle = this.currentHandle;
+    this.map.set(handle, value);
+    this.currentHandle += BigInt(2); // stay odd
+    return handle;
   }
 
   get(handle: UniffiHandle): T {
@@ -45,6 +51,14 @@ export class UniffiHandleMap<T> {
       throw new UniffiInternalError.UnexpectedStaleHandle();
     }
     return obj;
+  }
+
+  clone(handle: UniffiHandle): UniffiHandle {
+    const obj = this.map.get(handle);
+    if (obj === undefined) {
+      throw new UniffiInternalError.UnexpectedStaleHandle();
+    }
+    return this.insert(obj);
   }
 
   remove(handle: UniffiHandle): T | undefined {

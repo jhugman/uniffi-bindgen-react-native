@@ -399,7 +399,7 @@ pub(crate) impl FfiType {
 #[ext]
 pub(crate) impl FfiArgument {
     fn is_return(&self) -> bool {
-        self.name() == "uniffi_out_return"
+        self.name() == "uniffi_out_return" || self.name() == "uniffi_out_dropped_callback"
     }
 }
 
@@ -430,8 +430,15 @@ pub(crate) impl FfiCallbackFunction {
         is_free(self.name())
     }
 
+    fn is_clone_callback(&self) -> bool {
+        self.name() == "CallbackInterfaceClone"
+    }
+
     fn is_future_callback(&self) -> bool {
-        self.name().starts_with("ForeignFuture")
+        // ForeignFutureDroppedCallback is used as a field in ForeignFutureDroppedCallbackStruct,
+        // passed from JS to Rust (fromJs direction). It needs makeCallbackFunction, so it must
+        // go through callback_fn_impl rather than ForeignFuture.cpp (which only generates toJs).
+        self.name().starts_with("ForeignFuture") && self.name() != "ForeignFutureDroppedCallback"
     }
 
     fn is_user_callback(&self) -> bool {
@@ -452,12 +459,19 @@ pub(crate) impl FfiCallbackFunction {
             .find(|a| a.is_return() && !a.type_().is_void())
             .map(|a| {
                 let t = a.type_();
-                if let FfiType::Reference(t) = t {
-                    *t
-                } else {
-                    t
+                match t {
+                    FfiType::Reference(t) | FfiType::MutReference(t) => *t,
+                    _ => t,
                 }
             })
+    }
+
+    fn arg_return_cpp_name(&self) -> String {
+        self.arguments()
+            .into_iter()
+            .find(|a| a.is_return() && !a.type_().is_void())
+            .map(|a| format!("rs_{}", a.name().to_lower_camel_case()))
+            .unwrap_or_else(|| "rs_uniffiOutReturn".to_string())
     }
 
     fn is_blocking(&self) -> bool {
@@ -467,7 +481,9 @@ pub(crate) impl FfiCallbackFunction {
         // In practice this means that all user code is blocking, and uniffi internal
         // code is non-blocking: Future continuation callbacks, and free callback and
         // free future callbacks.
-        self.has_return_out_param() || self.has_rust_call_status_arg()
+        self.has_return_out_param()
+            || self.has_rust_call_status_arg()
+            || self.return_type().is_some()
     }
 
     fn arguments_no_return(&self) -> impl Iterator<Item = &FfiArgument> {
@@ -519,5 +535,37 @@ pub(crate) impl FfiStruct {
 pub(crate) impl FfiField {
     fn is_free(&self) -> bool {
         matches!(self.type_(), FfiType::Callback(s) if is_free(&s))
+    }
+
+    /// Returns true if this field is a user-defined callback interface method or clone function.
+    /// These need per-vtable-field namespaces to avoid rsLambda aliasing across vtable structs.
+    fn is_user_callback(&self) -> bool {
+        match self.type_() {
+            FfiType::Callback(name) => name.starts_with("CallbackInterface") && !is_free(&name),
+            _ => false,
+        }
+    }
+
+    /// Returns a namespace unique to this field within its containing vtable struct.
+    /// This prevents multiple vtable structs that share the same callback type (e.g.
+    /// `CallbackInterfaceClone`) from sharing a single static `rsLambda`.
+    fn cpp_namespace_in_struct(&self, ci: &ComponentInterface, struct_name: &str) -> String {
+        let base_ns = self.type_().cpp_namespace(ci);
+        format!("{}::{}", base_ns, struct_name.to_lowercase())
+    }
+
+    /// Returns the `FfiCallbackFunction` definition for this field's callback type,
+    /// or `None` if the field is not a `Callback` type.
+    fn callback_function(&self, ci: &ComponentInterface) -> Option<FfiCallbackFunction> {
+        if let FfiType::Callback(name) = self.type_() {
+            for def in ci.ffi_definitions() {
+                if let FfiDefinition::CallbackFunction(cb) = def {
+                    if cb.name() == name {
+                        return Some(cb);
+                    }
+                }
+            }
+        }
+        None
     }
 }
