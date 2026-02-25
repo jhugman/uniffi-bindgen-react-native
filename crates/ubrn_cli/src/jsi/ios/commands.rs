@@ -10,9 +10,8 @@ use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use ubrn_common::{mk_dir, mv_files, rm_dir, run_cmd, CrateMetadata};
-use uniffi_bindgen::{
-    bindings::SwiftBindingGenerator, cargo_metadata::CrateConfigSupplier,
-    library_mode::generate_bindings,
+use uniffi_bindgen::bindings::{
+    generate as generate_native_swift_bindings, GenerateOptions, TargetLanguage,
 };
 
 use crate::{
@@ -185,9 +184,6 @@ impl IosBuildArgs {
         config: &ProjectConfig,
         target_files: &[Utf8PathBuf],
     ) -> Result<(), anyhow::Error> {
-        let manifest_path = config.crate_.manifest_path()?;
-        let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
-        let config_supplier = CrateConfigSupplier::from(metadata);
         let library_path = target_files
             .first()
             .context("Need at least one library file to generate native iOS bindings")?;
@@ -196,15 +192,13 @@ impl IosBuildArgs {
             rm_dir(&out_dir)?;
         }
         ubrn_common::mk_dir(&out_dir)?;
-        generate_bindings(
-            library_path,
-            None,
-            &SwiftBindingGenerator,
-            &config_supplier,
-            None,
-            &out_dir,
-            false,
-        )?;
+        generate_native_swift_bindings(GenerateOptions {
+            source: library_path.clone(),
+            languages: vec![TargetLanguage::Swift],
+            out_dir: out_dir.clone(),
+            format: false,
+            ..Default::default()
+        })?;
         Ok(())
     }
 
