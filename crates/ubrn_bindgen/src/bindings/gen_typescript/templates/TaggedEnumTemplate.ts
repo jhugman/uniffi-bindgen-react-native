@@ -127,6 +127,14 @@ export const {{ decl_type_name }} = (() => {
 
     return Object.freeze({
         instanceOf,
+        {%- let constructors = e.constructors() %}
+        {%- if !constructors.is_empty() %}
+{% call ts::value_receiver_constructors(constructors, "        ", ",") %}
+        {%- endif %}
+        {%- let methods = e.methods() %}
+        {%- if !methods.is_empty() %}
+{% call ts::value_receiver_methods(methods, ffi_converter_name, type_name, "        ", ",") %}
+        {%- endif %}
   {%- for variant in e.variants() %}
   {%-   let external_name = variant.name()|class_name(ci) %}
   {%-   let variant_name = external_name|fmt("{}_") %}
