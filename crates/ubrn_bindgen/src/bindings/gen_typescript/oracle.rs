@@ -102,7 +102,7 @@ impl CodeOracle {
 
     pub(crate) fn ffi_type_label_for_cpp(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
-            FfiType::Handle => "UniffiRustArcPtr".to_string(),
+            FfiType::Handle => "UniffiGcObject".to_string(),
             FfiType::ForeignBytes => "Uint8Array".to_string(),
             FfiType::RustBuffer(_) => "string".to_string(),
             _ => self.ffi_type_label(ffi_type),

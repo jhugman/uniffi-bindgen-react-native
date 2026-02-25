@@ -115,14 +115,14 @@ function uniffiCheckCallStatus(
 }
 
 /**
- * A member of any object, backed by a C++ DestructibleObject (@see RustArcPtr.h).
+ * A member of any object, acting as a GC guard / destructor guard.
  *
- * The object has a destructor lambda.
+ * The object has a destructor lambda, called when the GC collects the object.
  */
-export type UniffiRustArcPtr = {
+export type UniffiGcObject = {
   /**
    * Called by the `object.uniffiDestroy()` to disable the
-   * action of the C++ destructor.
+   * action of the destructor guard.
    */
   markDestroyed(): void;
 };

@@ -10,9 +10,8 @@ import {
   FfiConverterUInt64,
 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
-import type { UniffiRustArcPtr } from "./rust-call";
+import type { UniffiGcObject } from "./rust-call";
 import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
-import { type StructuralEquality } from "./type-utils";
 import { UniffiInternalError, UniffiThrownObject } from "./errors";
 
 /**
@@ -45,41 +44,36 @@ export abstract class UniffiAbstractObject {
 }
 
 /**
- * The JS representation of a Rust pointer.
- */
-export type UnsafeMutableRawPointer = bigint;
-
-/**
  * The interface for a helper class generated for each `interface` class.
  *
  * Methods of this interface are not exposed to the API.
  */
 export interface UniffiObjectFactory<T> {
-  bless(pointer: UnsafeMutableRawPointer): UniffiRustArcPtr;
-  unbless(ptr: UniffiRustArcPtr): void;
-  create(pointer: UnsafeMutableRawPointer): T;
-  pointer(obj: T): UnsafeMutableRawPointer;
-  clonePointer(obj: T): UnsafeMutableRawPointer;
-  freePointer(pointer: UnsafeMutableRawPointer): void;
+  bless(pointer: UniffiHandle): UniffiGcObject;
+  unbless(ptr: UniffiGcObject): void;
+  create(pointer: UniffiHandle): T;
+  pointer(obj: T): UniffiHandle;
+  clonePointer(obj: T): UniffiHandle;
+  freePointer(pointer: UniffiHandle): void;
   isConcreteType(obj: any): obj is T;
 }
 
-const pointerConverter: FfiConverter<any, UnsafeMutableRawPointer> =
+const pointerConverter: FfiConverter<any, UniffiHandle> =
   FfiConverterUInt64;
-const dummyPointer: UnsafeMutableRawPointer = BigInt("0");
+const dummyPointer: UniffiHandle = BigInt("0");
 
 /**
  * An FfiConverter for an object.
  */
 export class FfiConverterObject<T>
-  implements FfiConverter<UnsafeMutableRawPointer, T>
+  implements FfiConverter<UniffiHandle, T>
 {
   constructor(protected factory: UniffiObjectFactory<T>) {}
 
-  lift(value: UnsafeMutableRawPointer): T {
+  lift(value: UniffiHandle): T {
     return this.factory.create(value);
   }
-  lower(value: T): UnsafeMutableRawPointer {
+  lower(value: T): UniffiHandle {
     if (this.factory.isConcreteType(value)) {
       return this.factory.clonePointer(value);
     } else {
@@ -98,9 +92,6 @@ export class FfiConverterObject<T>
 }
 
 /// An FfiConverter for objects with callbacks.
-const handleSafe: StructuralEquality<UniffiHandle, UnsafeMutableRawPointer> =
-  true;
-
 export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
   constructor(
     factory: UniffiObjectFactory<T>,
@@ -109,7 +100,7 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
     super(factory);
   }
 
-  lower(value: T): UnsafeMutableRawPointer {
+  lower(value: T): UniffiHandle {
     // Rust-backed objects are lowered as raw Arc pointers (even numbers).
     // TS-implemented objects are inserted into the handleMap as foreign handles (odd numbers).
     if (this.factory.isConcreteType(value)) {
@@ -118,7 +109,7 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
     return this.handleMap.insert(value);
   }
 
-  lift(value: UnsafeMutableRawPointer): T {
+  lift(value: UniffiHandle): T {
     if (this.handleMap.has(value)) {
       return this.handleMap.get(value);
     } else {
@@ -146,7 +137,7 @@ export class FfiConverterObjectAsError<T> extends AbstractFfiConverterByteArray<
 > {
   constructor(
     private typeName: string,
-    private innerConverter: FfiConverter<UnsafeMutableRawPointer, T>,
+    private innerConverter: FfiConverter<UniffiHandle, T>,
   ) {
     super();
   }

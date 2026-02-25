@@ -9,7 +9,7 @@ import {
   type StructuralEquality as UniffiStructuralEquality,
   type UniffiForeignFuture as RuntimeUniffiForeignFuture,
   type UniffiRustCallStatus,
-  type UniffiRustArcPtr,
+  type UniffiGcObject,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
   type UniffiResult,
  } from 'uniffi-bindgen-react-native';
