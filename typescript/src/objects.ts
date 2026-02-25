@@ -58,16 +58,13 @@ export interface UniffiObjectFactory<T> {
   isConcreteType(obj: any): obj is T;
 }
 
-const pointerConverter: FfiConverter<any, UniffiHandle> =
-  FfiConverterUInt64;
+const pointerConverter: FfiConverter<any, UniffiHandle> = FfiConverterUInt64;
 const dummyPointer: UniffiHandle = BigInt("0");
 
 /**
  * An FfiConverter for an object.
  */
-export class FfiConverterObject<T>
-  implements FfiConverter<UniffiHandle, T>
-{
+export class FfiConverterObject<T> implements FfiConverter<UniffiHandle, T> {
   constructor(protected factory: UniffiObjectFactory<T>) {}
 
   lift(value: UniffiHandle): T {

@@ -3,7 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { TraitMethods, TraitEnum, TraitRecord, FlatTraitEnum, makeFlatTraitEnum } from "../../generated/trait_methods";
+import {
+  TraitMethods,
+  TraitEnum,
+  TraitRecord,
+  FlatTraitEnum,
+  makeFlatTraitEnum,
+} from "../../generated/trait_methods";
 import { test } from "@/asserts";
 
 test("toString() is generated", (t) => {
@@ -54,7 +60,9 @@ test("enum equals() is generated", (t) => {
 });
 
 test("enum compareTo() is generated", (t) => {
-  t.assertTrue(new TraitEnum.Alpha().compareTo(new TraitEnum.Beta({ val: "x" })) < 0);
+  t.assertTrue(
+    new TraitEnum.Alpha().compareTo(new TraitEnum.Beta({ val: "x" })) < 0,
+  );
 });
 
 test("record toString() is generated on factory", (t) => {
@@ -107,17 +115,39 @@ test("flat enum hashCode() returns a bigint", (t) => {
   const h = FlatTraitEnum.hashCode(FlatTraitEnum.Alpha);
   t.assertEqual(typeof h, "bigint");
   // Equal values must have equal hash codes
-  t.assertEqual(FlatTraitEnum.hashCode(FlatTraitEnum.Alpha), FlatTraitEnum.hashCode(FlatTraitEnum.Alpha));
+  t.assertEqual(
+    FlatTraitEnum.hashCode(FlatTraitEnum.Alpha),
+    FlatTraitEnum.hashCode(FlatTraitEnum.Alpha),
+  );
   // Different values should (very likely) have different hash codes
-  t.assertNotEqual(FlatTraitEnum.hashCode(FlatTraitEnum.Alpha), FlatTraitEnum.hashCode(FlatTraitEnum.Beta));
+  t.assertNotEqual(
+    FlatTraitEnum.hashCode(FlatTraitEnum.Alpha),
+    FlatTraitEnum.hashCode(FlatTraitEnum.Beta),
+  );
 });
 
 test("flat enum compareTo() orders Alpha < Beta < Gamma", (t) => {
-  t.assertTrue(FlatTraitEnum.compareTo(FlatTraitEnum.Alpha, FlatTraitEnum.Beta) < 0, "Alpha should be less than Beta");
-  t.assertTrue(FlatTraitEnum.compareTo(FlatTraitEnum.Beta, FlatTraitEnum.Gamma) < 0, "Beta should be less than Gamma");
-  t.assertTrue(FlatTraitEnum.compareTo(FlatTraitEnum.Alpha, FlatTraitEnum.Gamma) < 0, "Alpha should be less than Gamma");
-  t.assertTrue(FlatTraitEnum.compareTo(FlatTraitEnum.Beta, FlatTraitEnum.Alpha) > 0, "Beta should be greater than Alpha");
-  t.assertEqual(FlatTraitEnum.compareTo(FlatTraitEnum.Alpha, FlatTraitEnum.Alpha), 0, "Alpha equals Alpha");
+  t.assertTrue(
+    FlatTraitEnum.compareTo(FlatTraitEnum.Alpha, FlatTraitEnum.Beta) < 0,
+    "Alpha should be less than Beta",
+  );
+  t.assertTrue(
+    FlatTraitEnum.compareTo(FlatTraitEnum.Beta, FlatTraitEnum.Gamma) < 0,
+    "Beta should be less than Gamma",
+  );
+  t.assertTrue(
+    FlatTraitEnum.compareTo(FlatTraitEnum.Alpha, FlatTraitEnum.Gamma) < 0,
+    "Alpha should be less than Gamma",
+  );
+  t.assertTrue(
+    FlatTraitEnum.compareTo(FlatTraitEnum.Beta, FlatTraitEnum.Alpha) > 0,
+    "Beta should be greater than Alpha",
+  );
+  t.assertEqual(
+    FlatTraitEnum.compareTo(FlatTraitEnum.Alpha, FlatTraitEnum.Alpha),
+    0,
+    "Alpha equals Alpha",
+  );
 });
 
 test("flat enum roundtrips through FFI", (t) => {
