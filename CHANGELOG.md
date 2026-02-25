@@ -5,15 +5,23 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-# (## ✨ What's New ✨)
+## ✨ What's New ✨
 
 - Add support for 16KB page size alignment on android (as required by Android 15 + Google Play by Nov 1, 2025) ([#294](https://github.com/jhugman/uniffi-bindgen-react-native/pull/294)). Thank you [@zzorba](https://github.com/zzorba)!
-
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...main
+- Uniffi traits `Display`, `Debug`, `Eq`, `Hash`, and `Ord` now generate corresponding TypeScript methods for records and enums (they already worked for objects; `Ord`/`compareTo()` is also new for objects).
+- Custom types can now be used as `Result` error types when wrapping enums or objects.
+- Function/method argument defaults now work correctly for custom types (e.g. `Option<CustomType>` parameters can have `= None`).
 
 ## 🦊 What's Changed
 
 - Build TS to JS before publish; ship compiled JS + types to avoid strict TS errors. Inspired by [#198](https://github.com/jhugman/uniffi-bindgen-react-native/pull/198) ([@hassankhan](https://github.com/hassankhan)); implemented in [#297](https://github.com/jhugman/uniffi-bindgen-react-native/pull/297) ([@EthanShoeDev](https://github.com/EthanShoeDev)).
+- Bump `uniffi-rs` to [0.30.0](https://github.com/mozilla/uniffi-rs/blob/main/CHANGELOG.md).
+
+## ⚠️ Breaking Changes
+
+- `UniffiRustArcPtr` renamed to `UniffiGcObject` and `UnsafeMutableRawPointer` renamed to `UniffiHandle` in generated TypeScript bindings. Regenerate your bindings to pick up the new names.
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...main
 
 ---
 
