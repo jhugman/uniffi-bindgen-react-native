@@ -10,6 +10,10 @@ import {
 } from "../../generated/uniffi_value_type_methods";
 import { test } from "@/asserts";
 
+// floats should be "close enough".
+const almostEquals = (a: number, b: number): boolean =>
+  Math.abs(a - b) < 0.000001;
+
 // Tests for Point record methods.
 
 test("Point.create() creates a record with given fields", (t) => {
@@ -59,7 +63,33 @@ test("Direction variants are accessible", (t) => {
   t.assertNotEqual(Direction.North, Direction.South);
 });
 
-// Tests for Shape tagged enum (no methods yet, just basic construction).
+test("Direction.opposite(North) returns South", (t) => {
+  t.assertEqual(Direction.opposite(Direction.North), Direction.South);
+});
+
+test("Direction.opposite(South) returns North", (t) => {
+  t.assertEqual(Direction.opposite(Direction.South), Direction.North);
+});
+
+test("Direction.opposite(East) returns West", (t) => {
+  t.assertEqual(Direction.opposite(Direction.East), Direction.West);
+});
+
+test("Direction.opposite(West) returns East", (t) => {
+  t.assertEqual(Direction.opposite(Direction.West), Direction.East);
+});
+
+test("Direction.isVertical returns true for North and South", (t) => {
+  t.assertTrue(Direction.isVertical(Direction.North));
+  t.assertTrue(Direction.isVertical(Direction.South));
+});
+
+test("Direction.isVertical returns false for East and West", (t) => {
+  t.assertFalse(Direction.isVertical(Direction.East));
+  t.assertFalse(Direction.isVertical(Direction.West));
+});
+
+// Tests for Shape tagged enum construction and area method.
 
 test("Shape.Circle can be constructed and has tag", (t) => {
   const c = new Shape.Circle({ radius: 5.0 });
@@ -70,4 +100,19 @@ test("Shape.Rectangle can be constructed", (t) => {
   const r = new Shape.Rectangle({ width: 3.0, height: 4.0 });
   t.assertEqual(r.inner.width, 3.0);
   t.assertEqual(r.inner.height, 4.0);
+});
+
+test("Shape.area of a circle with radius 1 is pi", (t) => {
+  const circle = new Shape.Circle({ radius: 1.0 });
+  t.assertEqual(Shape.area(circle), Math.PI, undefined, almostEquals);
+});
+
+test("Shape.area of a rectangle 3x4 is 12", (t) => {
+  const rect = new Shape.Rectangle({ width: 3.0, height: 4.0 });
+  t.assertEqual(Shape.area(rect), 12.0, undefined, almostEquals);
+});
+
+test("Shape.area scales with radius squared for circles", (t) => {
+  const c2 = new Shape.Circle({ radius: 2.0 });
+  t.assertEqual(Shape.area(c2), 4.0 * Math.PI, undefined, almostEquals);
 });
