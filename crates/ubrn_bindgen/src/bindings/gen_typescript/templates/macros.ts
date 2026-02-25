@@ -232,6 +232,27 @@
 {%- endif %}
 {%- endmacro %}
 
+{#- Generates Rust constructor bindings for a value-type receiver (records, flat enums). -#}
+{#- Constructors have no `self` — they are static factory functions returning a new instance. -#}
+{%- macro value_receiver_constructors(constructors, method_prefix, method_suffix) %}
+{%- for cons in constructors %}
+{{ method_prefix }}{{ cons.name()|fn_name }}(
+    {%- call arg_list_decl(cons) -%}): {%- call return_type(cons) %} {
+{%- call call_body("unreachable", cons) %}
+    }{{ method_suffix }}
+{%- endfor %}
+{%- endmacro %}
+
+{#- Generates regular (non-trait) method bindings for a value-type receiver (records, flat enums). -#}
+{#- Methods take `self: TypeName` as their first argument. -#}
+{%- macro value_receiver_methods(methods, ffi_converter, type_name, method_prefix, method_suffix) %}
+{%- for meth in methods %}
+{{ method_prefix }}{{ meth.name()|fn_name }}(self: {{ type_name }}{%- for arg in meth.arguments() %}, {{ arg.name()|var_name }}: {{ arg|type_name(self) }}{%- endfor %}): {%- call return_type(meth) %} {
+{%- call call_body_value(ffi_converter, "self", meth) %}
+    }{{ method_suffix }}
+{%- endfor %}
+{%- endmacro %}
+
 {%- macro call_async(obj_factory, callable) -%}
 {{- self.import_infra("uniffiRustCallAsync", "async-rust-call") -}}
         await uniffiRustCallAsync(

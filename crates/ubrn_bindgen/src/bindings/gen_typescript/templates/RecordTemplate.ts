@@ -28,24 +28,27 @@ export const {{ decl_type_name }} = (() => {
     const create = (() => {
         return uniffiCreateRecord<{{ type_name }}, ReturnType<typeof defaults>>(defaults);
     })();
+{%- let constructors = rec.constructors() %}
+{%- let methods = rec.methods() %}
+{%- let rust_has_create = rec.has_rust_constructor_named("create") %}
+{%- let rust_has_new   = rec.has_rust_constructor_named("new") %}
     return Object.freeze({
-        /**
-         * Create a frozen instance of {@link {{ type_name }}}, with defaults specified
-         * in Rust, in the {@link {{ ci.namespace() }}} crate.
-         */
+        {%- if !rust_has_create %}
         create,
-
-        /**
-         * Create a frozen instance of {@link {{ type_name }}}, with defaults specified
-         * in Rust, in the {@link {{ ci.namespace() }}} crate.
-         */
+        {%- else %}
+        // Note: Rust defines a constructor named 'create', replacing the default TypeScript factory helper.
+        {%- endif %}
+        {%- if !rust_has_new %}
         new: create,
-
-        /**
-         * Defaults specified in the {@link {{ ci.namespace() }}} crate.
-         */
+        {%- endif %}
         defaults: () => Object.freeze(defaults()) as Partial<{{ type_name }}>,
 {% call ts::uniffi_trait_methods_value_receiver(tm, ffi_converter_name, type_name, "    ", ",") %}
+{%- if !constructors.is_empty() %}
+{% call ts::value_receiver_constructors(constructors, "    ", ",") %}
+{%- endif %}
+{%- if !methods.is_empty() %}
+{% call ts::value_receiver_methods(methods, ffi_converter_name, type_name, "    ", ",") %}
+{%- endif %}
     });
 })();
 
