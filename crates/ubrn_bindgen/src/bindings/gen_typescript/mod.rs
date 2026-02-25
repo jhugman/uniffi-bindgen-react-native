@@ -35,7 +35,8 @@ use self::{
 use crate::{
     bindings::{
         extensions::{
-            ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
+            ComponentInterfaceExt, EnumExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt,
+            ObjectExt,
         },
         metadata::ModuleMetadata,
         type_map::TypeMap,

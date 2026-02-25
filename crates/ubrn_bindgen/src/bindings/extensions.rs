@@ -10,8 +10,8 @@ use heck::{ToLowerCamelCase, ToSnakeCase};
 use topological_sort::TopologicalSort;
 use uniffi_bindgen::{
     interface::{
-        FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
-        Function, Method, Object, UniffiTrait,
+        Enum, FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct,
+        FfiType, Function, Method, Object, UniffiTrait,
     },
     ComponentInterface,
 };
@@ -274,6 +274,18 @@ fn store_with_name(types: &mut HashMap<String, Type>, type_: &Type) -> String {
     let name = format!("{type_:?}");
     types.entry(name.clone()).or_insert_with(|| type_.clone());
     name
+}
+
+#[ext]
+pub(crate) impl Enum {
+    fn has_uniffi_traits(&self) -> bool {
+        let tm = self.uniffi_trait_methods();
+        tm.display_fmt.is_some()
+            || tm.debug_fmt.is_some()
+            || tm.eq_eq.is_some()
+            || tm.hash_hash.is_some()
+            || tm.ord_cmp.is_some()
+    }
 }
 
 #[ext]
