@@ -18,9 +18,9 @@ default = ["console_error_panic_hook"]
 wasm-bindgen = "*"
 {{crate_name}} = { path = "{{crate_path}}" }
 uniffi-runtime-javascript = { path = "{{uniffi_runtime_javascript}}", features = ["wasm32"] }
-# uniffi_core 0.30.x requires this feature for wasm32 to relax the `Future: Send` bound.
+# uniffi_core 0.31.x requires this feature for wasm32 to relax the `Future: Send` bound.
 # https://github.com/mozilla/uniffi-rs/issues/2828
-uniffi_core = { version = "0.30", features = ["wasm-unstable-single-threaded"] }
+uniffi_core = { version = "0.31", features = ["wasm-unstable-single-threaded"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
