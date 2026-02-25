@@ -1856,6 +1856,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "uniffi-fixture-value-type-methods"
+version = "0.1.0"
+dependencies = [
+ "uniffi",
+]
+
+[[package]]
 name = "uniffi-fixtures-async-callbacks"
 version = "0.21.0"
 dependencies = [
