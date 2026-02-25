@@ -15,10 +15,18 @@ export enum {{ type_name }} {
     {% endfor %}
 }
 {%- let tm = e.uniffi_trait_methods() %}
-{%- if e.has_uniffi_traits() %}
+{%- let constructors = e.constructors() %}
+{%- let methods = e.methods() %}
+{%- if e.has_uniffi_traits() || !constructors.is_empty() || !methods.is_empty() %}
 
 export namespace {{ type_name }} {
 {% call ts::uniffi_trait_methods_value_receiver(tm, ffi_converter_name, type_name, "    export function ", "") %}
+{%- if !constructors.is_empty() %}
+{% call ts::value_receiver_constructors(constructors, "    export function ", "") %}
+{%- endif %}
+{%- if !methods.is_empty() %}
+{% call ts::value_receiver_methods(methods, ffi_converter_name, type_name, "    export function ", "") %}
+{%- endif %}
 }
 {%- endif %}
 
