@@ -248,4 +248,30 @@ fn get_tuple(t: Option<TupleError>) -> TupleError {
     t.unwrap_or_else(|| TupleError::Oops("oops".to_string()))
 }
 
+// A custom type that wraps TupleError for use as an error
+#[derive(Debug)]
+pub struct CustomTupleError(TupleError);
+
+impl std::fmt::Display for CustomTupleError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for CustomTupleError {}
+
+uniffi::custom_type!(CustomTupleError, TupleError, {
+    lower: |e| e.0,
+    try_lift: |e| Ok(CustomTupleError(e)),
+});
+
+#[uniffi::export]
+fn oops_custom(i: u16) -> Result<(), CustomTupleError> {
+    Err(CustomTupleError(if i == 0 {
+        TupleError::Oops("custom-oops".to_string())
+    } else {
+        TupleError::Value(i)
+    }))
+}
+
 uniffi::include_scaffolding!("error_types");

@@ -56,12 +56,21 @@ pub(super) fn ffi_error_converter_name(
 ) -> Result<String, askama::Error> {
     // special handling for types used as errors.
     let type_ = types.as_type(as_type);
-    let mut name = type_.as_codetype().ffi_converter_name();
-    if matches!(type_, Type::Object { .. }) {
+    // For custom types wrapping an enum/object, use the builtin as the error type
+    let effective_type = match &type_ {
+        Type::Custom { builtin, .. }
+            if matches!(**builtin, Type::Enum { .. } | Type::Object { .. }) =>
+        {
+            *builtin.clone()
+        }
+        _ => type_.clone(),
+    };
+    let mut name = effective_type.as_codetype().ffi_converter_name();
+    if matches!(effective_type, Type::Object { .. }) {
         name.push_str("__as_error")
     }
-    if types.ci.is_external(&type_) {
-        let module_path = type_
+    if types.ci.is_external(&effective_type) {
+        let module_path = effective_type
             .module_path()
             .expect("External type should have a module path");
         let namespace = types
