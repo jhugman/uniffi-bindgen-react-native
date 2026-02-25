@@ -91,6 +91,7 @@ interface Optionneur {
   string sinon_string(optional string value = "default");
 
   sequence<string> sinon_sequence(optional sequence<string> value = []);
+  record<string, string> sinon_map(optional record<string, string> value = {});
 
   // Either sides of nullable.
   string? sinon_null(optional string? value = null);
@@ -141,6 +142,7 @@ dictionary OptionneurDictionnaire {
   boolean boolean_var = true;
   string string_var = "default";
   sequence<string> list_var = [];
+  record<string, string> map_var = {};
   Enumeration enumeration_var = "DEUX";
   minusculeMAJUSCULEEnum? dictionnaire_var = null;
 };

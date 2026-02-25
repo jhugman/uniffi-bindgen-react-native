@@ -125,7 +125,7 @@ impl CodeType for MapCodeType {
 
     fn literal(&self, literal: &Literal, _ci: &ComponentInterface) -> String {
         match literal {
-            Literal::EmptyMap => "mapOf()".into(),
+            Literal::EmptyMap => "new Map()".into(),
             _ => panic!("Invalid literal for Map type: {literal:?}"),
         }
     }

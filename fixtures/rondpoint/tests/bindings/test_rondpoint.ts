@@ -166,6 +166,7 @@ test("Testing defaulting properties in record types", (t) => {
     booleanVar: true,
     stringVar: "default",
     listVar: [],
+    mapVar: new Map(),
     enumerationVar: Enumeration.Deux,
     dictionnaireVar: undefined,
   });
@@ -271,6 +272,7 @@ test("Default arguments are defaulting", (t) => {
   t.assertEqual(op.sinonString(), "default");
   t.assertEqual(op.sinonBoolean(), false);
   t.assertEqual(op.sinonSequence(), []);
+  t.assertEqual(op.sinonMap(), new Map());
 
   // optionals
   t.assertEqual(op.sinonNull(), null);
@@ -354,6 +356,13 @@ test("Default arguments are overridden", (t) => {
   affirmAllerRetour(t, op.sinonF64.bind(op), "sinonF64", inputData.f64);
 
   affirmAllerRetour(t, op.sinonEnum.bind(op), "sinonEnum", inputData.enums);
+
+  // maps
+  const mapInputs: Map<string, string>[] = [
+    new Map(),
+    new Map([["key", "value"]]),
+  ];
+  affirmAllerRetour(t, op.sinonMap.bind(op), "sinonMap", mapInputs);
 
   op.uniffiDestroy();
 });
