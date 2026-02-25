@@ -75,6 +75,7 @@ Trait    | Typescript method | Return
 `Debug`  | `toDebugString()` | `string`
 `Eq`     | `equals(other)`   | `boolean`
 `Hash`   | `hashCode()`      | `bigint`
+`Ord`    | `compareTo(other)`| `number` (i8: −1, 0, or 1)
 
 ### Garbage collection
 
