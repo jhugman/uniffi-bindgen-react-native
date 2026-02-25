@@ -18,8 +18,8 @@ namespace coverall {
     [Throws=CoverallRichErrorNoVariantData]
     void throw_rich_error_no_variant_data();
 
-    //Getters make_rust_getters();
-    //void test_getters(Getters g);
+    Getters make_rust_getters();
+    void test_getters(Getters g);
 
     //sequence<string> ancestor_names(NodeTrait node);
 
@@ -33,8 +33,8 @@ namespace coverall {
     [Throws=ComplexError]
     f32 divide_by_text(f32 value, string value_as_text);
 
-    //Getters test_round_trip_through_rust(Getters getters);
-    //void test_round_trip_through_foreign(Getters getters);
+    Getters test_round_trip_through_rust(Getters getters);
+    void test_round_trip_through_foreign(Getters getters);
 
 };
 
@@ -233,7 +233,6 @@ interface ThreadsafeCounter {
   i32 increment_if_busy();
 };
 
-/*
 // Test trait interface #1
 //
 // The goal here is to test all possible arg, return, and error types.
@@ -248,7 +247,6 @@ interface Getters {
     void get_nothing(string v);
     Coveralls round_trip_object(Coveralls coveralls);
 };
-*/
 
 /*
 // Test trait interface #2

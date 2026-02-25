@@ -689,9 +689,10 @@ impl<'a> ComponentTemplate<'a> {
                 FfiType::Int8 => quote! { #runtime_ident::UniffiResultInt8 },
                 FfiType::Int16 => quote! { #runtime_ident::UniffiResultInt16 },
                 FfiType::Int32 => quote! { #runtime_ident::UniffiResultInt32 },
-                FfiType::Handle | FfiType::Int64 => quote! { #runtime_ident::UniffiResultInt64 },
+                FfiType::Int64 => quote! { #runtime_ident::UniffiResultInt64 },
                 FfiType::Float32 => quote! { #runtime_ident::UniffiResultFloat32 },
                 FfiType::Float64 => quote! { #runtime_ident::UniffiResultFloat64 },
+                FfiType::Handle => quote! { #runtime_ident::UniffiResultUInt64 },
                 FfiType::RustBuffer(_) | FfiType::ForeignBytes => {
                     quote! { #runtime_ident::UniffiResultForeignBytes }
                 }

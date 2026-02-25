@@ -38,6 +38,7 @@ pub fn ancestor_names(node: Arc<dyn NodeTrait>) -> Vec<String> {
 /// Test trait
 ///
 /// The goal here is to test all possible arg, return, and error types.
+#[uniffi::trait_interface]
 pub trait Getters: Send + Sync {
     fn get_bool(&self, v: bool, arg2: bool) -> bool;
     fn get_string(&self, v: String, arg2: bool) -> Result<String, CoverallError>;
@@ -160,10 +161,14 @@ pub fn test_getters(getters: Arc<dyn Getters>) {
         getters.get_option("unknown-error".to_owned(), true),
         Err(ComplexError::UnknownError)
     );
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        getters.get_string("unexpected-error".to_owned(), true)
-    }));
-    assert!(result.is_err());
+    // catch_unwind doesn't work in WASM (panic = "abort"); skip this assertion there.
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            getters.get_string("unexpected-error".to_owned(), true)
+        }));
+        assert!(result.is_err());
+    }
 }
 
 #[derive(Debug, Default)]
