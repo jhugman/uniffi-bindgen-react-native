@@ -32,6 +32,11 @@ fn get_trait_impl() -> Arc<dyn UniffiOneTrait> {
 }
 
 #[uniffi::export]
+fn call_trait_impl(t: Arc<dyn UniffiOneTrait>) -> String {
+    t.hello()
+}
+
+#[uniffi::export]
 fn throw_uniffi_one_error() -> Result<(), UniffiOneError> {
     Err(UniffiOneError::TheError)
 }
