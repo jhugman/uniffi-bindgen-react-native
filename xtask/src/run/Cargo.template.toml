@@ -11,11 +11,9 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-# We want to ensure that the version of wasm-bindgen is selected by the
-# uniffi-runtime-javascript crate.
-# cargo is smart enough to do this if we don't put any further restrictions
-# on it.
-wasm-bindgen = "*"
+# Pin wasm-bindgen to avoid js-sys compile time regression introduced in 0.2.101+.
+# See: https://github.com/rustwasm/wasm-bindgen/issues/XXXX
+wasm-bindgen = "=0.2.100"
 {{crate_name}} = { path = "{{crate_path}}" }
 uniffi-runtime-javascript = { path = "{{uniffi_runtime_javascript}}", features = ["wasm32"] }
 # uniffi_core 0.31.x requires this feature for wasm32 to relax the `Future: Send` bound.
@@ -38,4 +36,4 @@ opt-level = "s"
 [workspace]
 
 [workspace.dependencies]
-wasm-bindgen = "*"
+wasm-bindgen = "=0.2.100"
