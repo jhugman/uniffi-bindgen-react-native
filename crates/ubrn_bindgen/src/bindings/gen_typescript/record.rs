@@ -19,7 +19,7 @@ impl RecordCodeType {
 }
 
 impl CodeType for RecordCodeType {
-    fn type_label(&self, ci: &ComponentInterface) -> String {
+    fn type_label(&self, ci: &ComponentInterface, _opt_out_interface: bool) -> String {
         CodeOracle.class_name(ci, &self.id)
     }
 

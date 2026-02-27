@@ -61,7 +61,7 @@ macro_rules! impl_code_type_for_primitive {
             pub struct $T;
 
             impl CodeType for $T  {
-                fn type_label(&self, _ci: &ComponentInterface) -> String {
+                fn type_label(&self, _ci: &ComponentInterface, _opt_out_interface: bool) -> String {
                     $class_name.into()
                 }
 

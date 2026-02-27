@@ -24,9 +24,9 @@ impl OptionalCodeType {
 }
 
 impl CodeType for OptionalCodeType {
-    fn type_label(&self, ci: &ComponentInterface) -> String {
+    fn type_label(&self, ci: &ComponentInterface, opt_out_interface: bool) -> String {
         let inner = self.inner();
-        let inner_ts = CodeOracle.find(inner).type_label(ci);
+        let inner_ts = CodeOracle.find(inner).type_label(ci, opt_out_interface);
         if !matches!(inner, Type::Optional { .. }) {
             format!("{inner_ts} | undefined",)
         } else {
@@ -70,8 +70,13 @@ impl SequenceCodeType {
 }
 
 impl CodeType for SequenceCodeType {
-    fn type_label(&self, ci: &ComponentInterface) -> String {
-        format!("Array<{}>", CodeOracle.find(self.inner()).type_label(ci))
+    fn type_label(&self, ci: &ComponentInterface, opt_out_interface: bool) -> String {
+        format!(
+            "Array<{}>",
+            CodeOracle
+                .find(self.inner())
+                .type_label(ci, opt_out_interface)
+        )
     }
 
     fn canonical_name(&self) -> String {
@@ -107,11 +112,15 @@ impl MapCodeType {
 }
 
 impl CodeType for MapCodeType {
-    fn type_label(&self, ci: &ComponentInterface) -> String {
+    fn type_label(&self, ci: &ComponentInterface, opt_out_interface: bool) -> String {
         format!(
             "Map<{}, {}>",
-            CodeOracle.find(self.key()).type_label(ci),
-            CodeOracle.find(self.value()).type_label(ci),
+            CodeOracle
+                .find(self.key())
+                .type_label(ci, opt_out_interface),
+            CodeOracle
+                .find(self.value())
+                .type_label(ci, opt_out_interface),
         )
     }
 
