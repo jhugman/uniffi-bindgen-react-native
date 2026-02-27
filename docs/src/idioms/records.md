@@ -1,6 +1,6 @@
 ## Records
 
-[Uniffi records](https://mozilla.github.io/uniffi-rs/latest/proc_macro/index.html#the-uniffirecord-derive) are data objects whose fields are serialized and passed over the FFI i.e. pass by value. They do not have methods.
+[Uniffi records](https://mozilla.github.io/uniffi-rs/latest/proc_macro/index.html#the-uniffirecord-derive) are data objects whose fields are serialized and passed over the FFI i.e. pass by value.
 
 In UDL, they may be specified with the `dictionary` keyword:
 
@@ -54,6 +54,44 @@ const myRecord = MyRecord.create({
 
 assert(myRecord.mandatoryProperty === "Specified in Typescript");
 assert(myRecord.defaultProperty === "Specified by UDL or Rust");
+```
+
+## Methods
+
+Records can have methods defined via `#[uniffi::export] impl`:
+
+```rust
+#[derive(uniffi::Record)]
+pub struct Point {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[uniffi::export]
+impl Point {
+    pub fn distance_to(&self, other: &Point) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        (dx * dx + dy * dy).sqrt()
+    }
+
+    pub fn scale(&self, factor: f64) -> Point {
+        Point { x: self.x * factor, y: self.y * factor }
+    }
+}
+```
+
+Since records are plain data objects with no class instances, methods become **static-style functions on the companion factory object**, alongside `create` and `new`. The `self` parameter becomes the first argument:
+
+```typescript
+// Point has no defaulted fields, so create and new both accept all fields.
+const p = Point.create({ x: 3.0, y: 4.0 });
+const p2 = Point.new({ x: 3.0, y: 4.0 });   // synonym for create
+
+const origin = Point.create({ x: 0.0, y: 0.0 });
+
+Point.distanceTo(p, origin);   // 5.0
+Point.scale(p, 2.0);           // { x: 6.0, y: 8.0 }
 ```
 
 ## Uniffi traits
