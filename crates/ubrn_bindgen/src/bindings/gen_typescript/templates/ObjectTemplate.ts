@@ -40,7 +40,7 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
     {%- call private_ctor() %}
 
     // Async primary constructor declared for this class.
-    {%-   call ts::method_decl("public static", obj_factory, cons, 4) %}
+    {%-   call ts::method_decl("static", obj_factory, cons, 4) %}
     {%- endif %}
     {%- when None %}
     // No primary constructor declared for this class.
@@ -48,11 +48,11 @@ export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ pr
     {%- endmatch %}
 
     {% for cons in obj.alternate_constructors() %}
-    {%- call ts::method_decl("public static", obj_factory, cons, 4) %}
+    {%- call ts::method_decl("static", obj_factory, cons, 4) %}
     {% endfor %}
 
     {% for meth in obj.methods() -%}
-    {%- call ts::method_decl("public", obj_factory, meth, 4) %}
+    {%- call ts::method_decl("", obj_factory, meth, 4) %}
     {% endfor %}
 
     {%- for tm in obj.uniffi_traits() %}
