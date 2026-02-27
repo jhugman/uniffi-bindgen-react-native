@@ -61,6 +61,12 @@ The `run-tests.sh` script also runs the Typescript-only tests in the `typescript
 
 These have been useful to prototype generated Typescript before moving them into templates.
 
+`run-tests.sh` also runs the same fixtures with WASM:
+
+```sh
+./scripts/run-tests.sh --flavor wasm
+```
+
 ### Running rust only unit tests
 
 Rust unit tests are encouraged! They can be run as usual with:
@@ -83,4 +89,14 @@ Running with the `--check` does not change the files, just finishes abnormally i
 
 ```sh
 cargo xtask fmt --check
+```
+
+## Before pushing a PR
+
+Ensure that the following all run cleanly:
+
+```sh
+cargo xtask fmt
+./scripts/run-tests.sh --flavor jsi
+./scripts/run-tests.sh --flavor wasm
 ```
