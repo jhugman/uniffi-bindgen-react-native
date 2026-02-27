@@ -1,6 +1,6 @@
 [package]
 name = "uniffi-runtime-javascript"
-version = "0.30.0-0"
+version = "0.30.0-1"
 edition = "2021"
 authors = ["James Hugman <james@hugman.tv>"]
 description = "Javascript runtime for UniFFI-generated bindings"
@@ -11,7 +11,7 @@ keywords = ["ffi", "code-generation", "javascript", "wasm"]
 categories = ["api-bindings", "development-tools::ffi"]
 
 [dependencies]
-uniffi_core = { version = "0.29", default-features = false }
+uniffi_core = { workspace = true, default-features = false }
 wasm-bindgen = { version = "0.2.97", optional = true }
 
 [features]
