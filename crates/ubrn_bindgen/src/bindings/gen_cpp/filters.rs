@@ -61,12 +61,11 @@ pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
         FfiType::Int64 => "int64_t".into(),
         FfiType::Float32 => "float".into(),
         FfiType::Float64 => "double".into(),
-        FfiType::RustArcPtr(_) => "void *".into(),
+        FfiType::Handle => "/*handle*/ uint64_t".into(),
         FfiType::RustBuffer(_) => "RustBuffer".into(),
         FfiType::ForeignBytes => "ForeignBytes".into(),
         FfiType::Callback(nm) => ffi_callback_name(nm)?,
         FfiType::Struct(nm) => ffi_struct_name(nm)?,
-        FfiType::Handle => "/*handle*/ uint64_t".into(),
         FfiType::RustCallStatus => "RustCallStatus".into(),
         FfiType::MutReference(inner) | FfiType::Reference(inner) => {
             format!("{} *", ffi_type_name(inner)?)

@@ -158,8 +158,19 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
 {#- // match the callback_fn_free_impl macro  #}
 {{- st.cpp_namespace_free(ci) -}}
 {%- else %}
+{%- if field.is_user_callback() %}
+{#- // user callbacks get a unique ns per vtable struct to avoid rsLambda aliasing  #}
+{{- field.cpp_namespace_in_struct(ci, st.name()) }}
+{%- else %}
 {#- // match the callback_fn_impl macro  #}
 {{- field.type_().borrow().cpp_namespace(ci) }}
+{%- endif %}
+{%- endif %}
+{%- endmacro %}
+
+{%- macro callback_fn_vtable_field_cleanup(ffi_struct, field) %}
+{%- if field.is_user_callback() %}
+{{- field.cpp_namespace_in_struct(ci, ffi_struct.name()) }}::cleanup();
 {%- endif %}
 {%- endmacro %}
 

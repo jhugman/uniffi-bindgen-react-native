@@ -1,6 +1,7 @@
 {{- self.import_infra("uniffiCreateRecord", "records") }}
 
 {%- let rec = ci.get_record_definition(name).expect("Record definition not found in this ci") %}
+{%- let tm = rec.uniffi_trait_methods() %}
 {%- call ts::docstring(rec, 0) %}
 export type {{ type_name }} = {
     {%- for field in rec.fields() %}
@@ -44,6 +45,7 @@ export const {{ decl_type_name }} = (() => {
          * Defaults specified in the {@link {{ ci.namespace() }}} crate.
          */
         defaults: () => Object.freeze(defaults()) as Partial<{{ type_name }}>,
+{% call ts::uniffi_trait_methods_value_receiver(tm, ffi_converter_name, type_name, "    ", ",") %}
     });
 })();
 

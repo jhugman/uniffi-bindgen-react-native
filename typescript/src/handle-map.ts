@@ -10,11 +10,17 @@ export const defaultUniffiHandle = BigInt("0");
 
 export class UniffiHandleMap<T> {
   private map = new Map<UniffiHandle, T>();
-  private currentHandle: UniffiHandle = defaultUniffiHandle;
+  // Foreign handles must be odd values per uniffi 0.30.x:
+  // "Foreign handles are generated with a handle map that only generates odd values."
+  // "Foreign handles must always have the lowest bit set"
+  // "0 is an invalid value."
+  private currentHandle: UniffiHandle = BigInt(1);
 
   insert(value: T): UniffiHandle {
-    this.map.set(this.currentHandle, value);
-    return this.currentHandle++;
+    const handle = this.currentHandle;
+    this.map.set(handle, value);
+    this.currentHandle += BigInt(2); // stay odd
+    return handle;
   }
 
   get(handle: UniffiHandle): T {
@@ -45,6 +51,22 @@ export class UniffiHandleMap<T> {
       throw new UniffiInternalError.UnexpectedStaleHandle();
     }
     return obj;
+  }
+
+  /**
+   * Creates a second handle pointing to the same object. Rust calls this (via
+   * `CallbackInterfaceClone`) when it clones an Arc holding a foreign-implemented
+   * trait object, so two Arc references can exist with independent lifetimes.
+   *
+   * This clones the *handle*, not the object itself. Both handles resolve to the
+   * same JS object reference, and removing either handle does not affect the other.
+   */
+  clone(handle: UniffiHandle): UniffiHandle {
+    const obj = this.map.get(handle);
+    if (obj === undefined) {
+      throw new UniffiInternalError.UnexpectedStaleHandle();
+    }
+    return this.insert(obj);
   }
 
   remove(handle: UniffiHandle): T | undefined {

@@ -40,7 +40,31 @@
             {%- if func.return_type().is_some() %}
                 return
             {%- endif %} {% call native_method_handle(func.ffi_func().name()) %}(
-                {%- if func.takes_self() %}{{ obj_factory }}.clonePointer(this), {% endif %}
+                {%- if func.self_type().is_some() %}{{ obj_factory }}.clonePointer(this), {% endif %}
+                {%- call arg_list_lowered(func) %}
+                callStatus);
+            },
+            /*liftString:*/ FfiConverterString.lift,
+    )
+{%- endmacro -%}
+
+// Like to_ffi_method_call, but for value-type receivers (enums, records) which
+// lower their "self" via an FfiConverter rather than a pointer clone.
+{%- macro to_ffi_value_call(ffi_converter, self_value, func) -%}
+    {%- match func.throws_type() -%}
+    {%- when Some with (e) -%}
+        {{- self.import_infra("UniffiRustCaller", "rust-call") }}
+        uniffiCaller.rustCallWithError(
+            /*liftError:*/ {{ e|lift_error_fn(self) }},
+            /*caller:*/ (callStatus) => {
+    {%- else -%}
+        uniffiCaller.rustCall(
+            /*caller:*/ (callStatus) => {
+    {%- endmatch %}
+            {%- if func.return_type().is_some() %}
+                return
+            {%- endif %} {% call native_method_handle(func.ffi_func().name()) %}(
+                {{ ffi_converter }}.lower({{ self_value }}),
                 {%- call arg_list_lowered(func) %}
                 callStatus);
             },
@@ -124,13 +148,97 @@
 
 {%- endmacro %}
 
+// Like call_body, but for value-type receivers (enums, records).
+// Trait methods are never async so no async handling needed.
+{%- macro call_body_value(ffi_converter, self_value, callable) %}
+{%- match callable.return_type() -%}
+{%-     when Some with (return_type) %}
+    return {{ return_type|ffi_converter_name(self) }}.lift({% call to_ffi_value_call(ffi_converter, self_value, callable) %});
+{%-     when None %}
+{%-         call to_ffi_value_call(ffi_converter, self_value, callable) %};
+{%- endmatch %}
+{%- endmacro %}
+
+// Generates uniffi trait instance methods for a value-type receiver (e.g. enum variant classes).
+// `self_lower` is the expression used to lower the receiver (e.g. "this as unknown as TypeName").
+// `type_name` is used for the parameter type of binary methods (equals, compareTo).
+{%- macro uniffi_trait_methods_instance(tm, ffi_converter, self_lower, type_name) %}
+{%- if let Some(fmt) = tm.display_fmt %}
+    toString(): {% call return_type(fmt) %} {
+        {% call call_body_value(ffi_converter, self_lower, fmt) %}
+    }
+{%- endif %}
+{%- if let Some(fmt) = tm.debug_fmt %}
+    toDebugString(): {% call return_type(fmt) %} {
+        {% call call_body_value(ffi_converter, self_lower, fmt) %}
+    }
+{%- if tm.display_fmt.is_none() %}
+    toString(): {% call return_type(fmt) %} {
+        {% call call_body_value(ffi_converter, self_lower, fmt) %}
+    }
+{%- endif %}
+{%- endif %}
+{%- if let Some(eq) = tm.eq_eq %}
+    equals(other: {{ type_name }}): {% call return_type(eq) %} {
+        {% call call_body_value(ffi_converter, self_lower, eq) %}
+    }
+{%- endif %}
+{%- if let Some(hash) = tm.hash_hash %}
+    hashCode(): {% call return_type(hash) %} {
+        {% call call_body_value(ffi_converter, self_lower, hash) %}
+    }
+{%- endif %}
+{%- if let Some(cmp) = tm.ord_cmp %}
+    compareTo(other: {{ type_name }}): {% call return_type(cmp) %} {
+        {% call call_body_value(ffi_converter, self_lower, cmp) %}
+    }
+{%- endif %}
+{%- endmacro %}
+
+// Generates uniffi trait methods for a value-type receiver (e.g. records, flat enum namespaces).
+// `method_prefix` prepends each method declaration; must begin with 4 spaces (e.g. "    " or "    export function ").
+// `method_suffix` appends after each closing brace (e.g. "," for object literal, "" for namespace).
+// Note: the closing brace is hardcoded at 4-space indent, so method_prefix must start with 4 spaces.
+{%- macro uniffi_trait_methods_value_receiver(tm, ffi_converter, type_name, method_prefix, method_suffix) %}
+{%- if let Some(fmt) = tm.display_fmt %}
+{{ method_prefix }}toString(value: {{ type_name }}): {% call return_type(fmt) %} {
+        {% call call_body_value(ffi_converter, "value", fmt) %}
+    }{{ method_suffix }}
+{%- endif %}
+{%- if let Some(fmt) = tm.debug_fmt %}
+{{ method_prefix }}toDebugString(value: {{ type_name }}): {% call return_type(fmt) %} {
+        {% call call_body_value(ffi_converter, "value", fmt) %}
+    }{{ method_suffix }}
+{%- if tm.display_fmt.is_none() %}
+{{ method_prefix }}toString(value: {{ type_name }}): {% call return_type(fmt) %} {
+        {% call call_body_value(ffi_converter, "value", fmt) %}
+    }{{ method_suffix }}
+{%- endif %}
+{%- endif %}
+{%- if let Some(eq) = tm.eq_eq %}
+{{ method_prefix }}equals(value: {{ type_name }}, {% call arg_list_decl(eq) %}): {% call return_type(eq) %} {
+        {% call call_body_value(ffi_converter, "value", eq) %}
+    }{{ method_suffix }}
+{%- endif %}
+{%- if let Some(hash) = tm.hash_hash %}
+{{ method_prefix }}hashCode(value: {{ type_name }}): {% call return_type(hash) %} {
+        {% call call_body_value(ffi_converter, "value", hash) %}
+    }{{ method_suffix }}
+{%- endif %}
+{%- if let Some(cmp) = tm.ord_cmp %}
+{{ method_prefix }}compareTo(value: {{ type_name }}, {% call arg_list_decl(cmp) %}): {% call return_type(cmp) %} {
+        {% call call_body_value(ffi_converter, "value", cmp) %}
+    }{{ method_suffix }}
+{%- endif %}
+{%- endmacro %}
+
 {%- macro call_async(obj_factory, callable) -%}
 {{- self.import_infra("uniffiRustCallAsync", "async-rust-call") -}}
         await uniffiRustCallAsync(
             /*rustCaller:*/ uniffiCaller,
             /*rustFutureFunc:*/ () => {
                 return {% call native_method_handle(callable.ffi_func().name()) %}(
-                    {%- if callable.takes_self() %}
+                    {%- if callable.self_type().is_some() %}
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments().is_empty() %},{% endif %}
                     {% endif %}
                     {%- for arg in callable.arguments() -%}

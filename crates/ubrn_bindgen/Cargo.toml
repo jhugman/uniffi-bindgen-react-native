@@ -19,7 +19,7 @@ heck = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
-toml = "0.5"
+toml = ">=0.8, <=0.9"
 topological-sort = "0.2.2"
 ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }

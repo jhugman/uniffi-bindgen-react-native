@@ -133,6 +133,9 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
         uniffiFree: (uniffiHandle: UniffiHandle): void => {
             // {{ name }}: this will throw a stale handle error if the handle isn't found.
             {{ ffi_converter_name }}.drop(uniffiHandle);
+        },
+        uniffiClone: (uniffiHandle: UniffiHandle): UniffiHandle => {
+            return {{ ffi_converter_name }}.clone(uniffiHandle);
         }
     },
     register: () => {

@@ -203,6 +203,9 @@ impl Optionneur {
     fn sinon_sequence(&self, value: Vec<String>) -> Vec<String> {
         value
     }
+    fn sinon_map(&self, value: HashMap<String, String>) -> HashMap<String, String> {
+        value
+    }
 
     fn sinon_zero(&self, value: Option<i32>) -> Option<i32> {
         value
@@ -288,6 +291,7 @@ pub struct OptionneurDictionnaire {
     boolean_var: bool,
     string_var: String,
     list_var: Vec<String>,
+    map_var: HashMap<String, String>,
     enumeration_var: Enumeration,
     dictionnaire_var: Option<minusculeMAJUSCULEEnum>,
 }

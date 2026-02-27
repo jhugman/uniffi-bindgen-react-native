@@ -55,3 +55,55 @@ const myRecord = MyRecord.create({
 assert(myRecord.mandatoryProperty === "Specified in Typescript");
 assert(myRecord.defaultProperty === "Specified by UDL or Rust");
 ```
+
+## Uniffi traits
+
+Implementing the following traits in Rust causes the corresponding methods to be generated in Typescript:
+
+Trait    | Typescript method      | Return
+-------- | --------------------- | -------
+`Display`| `toString()`          | `string`
+`Debug`  | `toDebugString()`     | `string`
+`Eq`     | `equals(value, other)`| `boolean`
+`Hash`   | `hashCode()`          | `bigint`
+`Ord`    | `compareTo(value, other)`| `number` (i8: −1, 0, or 1)
+
+Note: since records have no class instance, `equals` and `compareTo` take the record value as their first argument: `TraitRecord.equals(a, b)` rather than `a.equals(b)`.
+
+These are declared on the record using the `#[uniffi::export(...)]` attribute:
+
+```rust
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, uniffi::Record)]
+#[uniffi::export(Debug, Display, Eq, Hash, Ord)]
+pub struct TraitRecord {
+    pub name: String,
+    pub value: i32,
+}
+
+impl std::fmt::Display for TraitRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TraitRecord({}, {})", self.name, self.value)
+    }
+}
+```
+
+Unlike objects and enums (where these methods are instance methods), records are plain data objects with no class instances. Because of this, the trait methods become **static-style methods on the companion factory object**:
+
+```typescript
+const r = { name: "hello", value: 42 };
+
+TraitRecord.toString(r);          // "TraitRecord(hello, 42)"
+TraitRecord.toDebugString(r);     // 'TraitRecord { name: "hello", value: 42 }'
+
+const a = { name: "x", value: 1 };
+const b = { name: "x", value: 1 };
+const c = { name: "x", value: 2 };
+
+TraitRecord.equals(a, b);         // true
+TraitRecord.equals(a, c);         // false
+
+TraitRecord.hashCode(r);          // bigint
+
+TraitRecord.compareTo(a, c);      // negative (1 sorts before 2)
+TraitRecord.compareTo(c, a);      // positive
+```

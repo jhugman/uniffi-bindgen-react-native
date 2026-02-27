@@ -47,6 +47,13 @@ class Sim implements SimCard {
     return "typescript";
   }
 }
+
+// Regression test for the multi-vtable clone bug (uniffi 0.30): when two
+// foreign-trait vtables (SimCard and CallAnswerer) are registered in the same
+// module, the shared CallbackInterfaceClone handler must dispatch to the
+// correct per-vtable handleMap. In the buggy version, registering CallAnswerer's
+// vtable overwrote the shared CALLBACK thread-local, causing SimCard clones to
+// look up handles in CallAnswerer's handleMap and throw a stale-handle error.
 test("A typescript sim with a typescript answerer", (t) => {
   const telephone = new Telephone();
   t.assertEqual(

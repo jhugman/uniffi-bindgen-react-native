@@ -5,7 +5,7 @@
  */
 use super::oracle::{AsCodeType, CodeOracle, CodeType};
 use uniffi_bindgen::{
-    backend::{Literal, Type},
+    interface::{Literal, Type},
     ComponentInterface,
 };
 
@@ -42,7 +42,14 @@ impl CodeType for OptionalCodeType {
     fn literal(&self, literal: &Literal, ci: &ComponentInterface) -> String {
         match literal {
             Literal::None => "undefined".into(),
-            Literal::Some { inner } => CodeOracle.find(&self.inner).literal(inner, ci),
+            Literal::Some { inner } => match inner.as_ref() {
+                uniffi_meta::DefaultValueMetadata::Literal(lit) => {
+                    CodeOracle.find(&self.inner).literal(lit, ci)
+                }
+                uniffi_meta::DefaultValueMetadata::Default => {
+                    panic!("DefaultValueMetadata::Default not supported in Optional literal")
+                }
+            },
             _ => panic!("Invalid literal for Optional type: {literal:?}"),
         }
     }
@@ -118,7 +125,7 @@ impl CodeType for MapCodeType {
 
     fn literal(&self, literal: &Literal, _ci: &ComponentInterface) -> String {
         match literal {
-            Literal::EmptyMap => "mapOf()".into(),
+            Literal::EmptyMap => "new Map()".into(),
             _ => panic!("Invalid literal for Map type: {literal:?}"),
         }
     }

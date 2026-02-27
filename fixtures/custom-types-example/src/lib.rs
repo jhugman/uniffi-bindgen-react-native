@@ -118,4 +118,9 @@ pub fn get_example_custom_type() -> ExampleCustomType {
     ExampleCustomType("abadidea".to_string())
 }
 
+#[uniffi::export(default(handle = None))]
+pub fn get_maybe_custom_default(handle: Option<Handle>) -> Option<Handle> {
+    handle
+}
+
 uniffi::include_scaffolding!("custom-types");

@@ -45,8 +45,10 @@ extern "C" {
     // Implementation of free callback function {{ callback.name() }}
 {%            call cpp::callback_fn_free_impl(callback) %}
 {%-         else %}
+{%-           if !callback.is_user_callback() %}
     // Implementation of callback function calling from Rust to JS {{ callback.name() }}
-{%-           call cpp::callback_fn_impl(callback) %}
+{%-             call cpp::callback_fn_impl(callback) %}
+{%-           endif %}
 {%-         endif %}
 {%-       else %}
     // Implementation of callback function calling from JS to Rust {{ callback.name() }},
@@ -54,6 +56,17 @@ extern "C" {
 {%-         include "ForeignFuture.cpp" %}
 {%-       endif %}
 {%-     when FfiDefinition::Struct(ffi_struct) %}
+{%-       if ffi_struct.is_vtable() %}
+{%-         for field in ffi_struct.ffi_functions() %}
+{%-           if field.is_user_callback() %}
+{%-             if let Some(callback) = field.callback_function(ci) %}
+    // Implementation of {{ callback.name() }} for vtable field {{ field.name() }} in {{ ffi_struct.name() }}
+{%-               let ns = field.cpp_namespace_in_struct(ci, ffi_struct.name()) %}
+{%                include "CallbackFunction.cpp" %}
+{%-             endif %}
+{%-           endif %}
+{%-         endfor %}
+{%-       endif %}
 {%-       include "Struct.cpp" %}
 {%-     else %}
 {%-   endmatch %}
@@ -120,9 +133,19 @@ void {{ module_name }}::set(jsi::Runtime& rt, const jsi::PropNameID& name, const
     // Cleanup for "free" callback function {{ callback.name() }}
 {%            call cpp::callback_fn_free_cleanup(callback) %}
 {%-         else %}
+{%-           if !callback.is_user_callback() %}
     // Cleanup for callback function {{ callback.name() }}
-{%            call cpp::callback_fn_cleanup(callback) %}
+{%              call cpp::callback_fn_cleanup(callback) %}
+{%-           endif %}
 {%-         endif %}
+{%-       endif %}
+{%-     when FfiDefinition::Struct(ffi_struct) %}
+{%-       if ffi_struct.is_vtable() %}
+{%-         for field in ffi_struct.ffi_functions() %}
+{%-           if field.is_user_callback() %}
+{%              call cpp::callback_fn_vtable_field_cleanup(ffi_struct, field) %}
+{%-           endif %}
+{%-         endfor %}
 {%-       endif %}
 {%-     else %}
 {%-   endmatch %}

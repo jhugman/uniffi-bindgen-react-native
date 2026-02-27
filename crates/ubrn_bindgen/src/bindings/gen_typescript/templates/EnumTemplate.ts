@@ -14,6 +14,13 @@ export enum {{ type_name }} {
     {%- if !loop.last %},{% endif -%}
     {% endfor %}
 }
+{%- let tm = e.uniffi_trait_methods() %}
+{%- if e.has_uniffi_traits() %}
+
+export namespace {{ type_name }} {
+{% call ts::uniffi_trait_methods_value_receiver(tm, ffi_converter_name, type_name, "    export function ", "") %}
+}
+{%- endif %}
 
 const {{ ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
@@ -46,6 +53,6 @@ const {{ ffi_converter_name }} = (() => {
 {%- let superclass = "UniffiEnum" %}
 {% let is_error = false %}
 {%- include "TaggedEnumTemplate.ts" %}
-{%- endif %}{# endif enum.is_flat() #}
+{%- endif %}{# endif e.is_flat() #}
 
 {{- self.export_converter(ffi_converter_name) -}}

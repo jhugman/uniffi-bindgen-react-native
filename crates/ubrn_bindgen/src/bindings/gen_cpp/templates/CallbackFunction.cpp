@@ -1,4 +1,5 @@
 {%- let name = callback.name()|ffi_callback_name %}
+{%- let return_type = callback.return_type() %}
 
 // Callback function: {{ ns }}::{{ name }}
 //
@@ -25,7 +26,13 @@ namespace {{ ns }} {
         {%- endfor %}
         {%- if callback.has_rust_call_status_arg() -%}
         , RustCallStatus*
-        {%- endif -%})> rsLambda = nullptr;
+        {%- endif -%}
+        {%- match return_type -%}
+        {%- when Some(return_type) -%}
+        {%- if !callback.arguments().is_empty() || callback.has_rust_call_status_arg() %}, {% endif %}
+        {{- return_type|ffi_type_name }}*
+        {%- when None -%}
+        {%- endmatch -%})> rsLambda = nullptr;
 
     // This is the main body of the callback. It's called from the lambda,
     // which itself is called from the callback function which is passed to Rust.
@@ -39,7 +46,12 @@ namespace {{ ns }} {
             {%- endfor %}
             {%- if callback.has_rust_call_status_arg() -%}
             , RustCallStatus* uniffi_call_status
-            {%- endif -%}) {
+            {%- endif -%}
+            {%- match return_type -%}
+            {%- when Some(return_type) %}
+            , {{ return_type|ffi_type_name }}* uniffi_direct_return
+            {%- when None -%}
+            {%- endmatch -%}) {
 
         // Convert the arguments from Rust, into jsi::Values.
         // We'll use the Bridging class to do this…
@@ -75,11 +87,12 @@ namespace {{ ns }} {
 
             {% match callback.arg_return_type() -%}
             {%- when Some with (arg_t) %}
+            {%- let return_var = callback.arg_return_cpp_name() %}
             // return type is {{ arg_t|fmt("{:?}") }}
             {%- let is_async = arg_t.is_foreign_future() %}
             {%- let arg_t_label = arg_t|ffi_type_name_from_js %}
             // Finally, we need to copy the return value back into the Rust pointer.
-            *rs_uniffiOutReturn =
+            *{{ return_var }} =
                 {{ arg_t|bridging_namespace(ci) }}::Bridging<
                 {%- if is_async %}
                     {{ arg_t_label }}
@@ -91,6 +104,17 @@ namespace {{ ns }} {
                 );
             {%- else %}
             {%- endmatch %}
+
+            {%- match return_type -%}
+            {%- when Some(return_type) %}
+            // Write the direct return value back to the caller.
+            if (uniffi_direct_return != nullptr) {
+                *uniffi_direct_return = {{ return_type|bridging_class(ci) }}::fromJs(
+                    rt, callInvoker, uniffiResult
+                );
+            }
+            {%- when None -%}
+            {%- endmatch %}
         } catch (const jsi::JSError &error) {
             std::cout << "Error in callback {{ name }}: "
                     << error.what() << std::endl;
@@ -98,7 +122,7 @@ namespace {{ ns }} {
         }
     }
 
-    static void callback(
+    static {% match return_type %}{%- when Some(return_type) %}{{ return_type|ffi_type_name }}{%- when None %}void{%- endmatch %} callback(
             {%- for arg in callback.arguments() %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
@@ -118,8 +142,19 @@ namespace {{ ns }} {
         if (rsLambda == nullptr) {
             // This only occurs when destructors are calling into Rust free/drop,
             // which causes the JS callback to be dropped.
+            {%- match return_type %}
+            {%- when Some(_) %}
+            return 0;
+            {%- when None %}
             return;
+            {%- endmatch %}
         }
+
+        {%- match return_type -%}
+        {%- when Some(return_type) %}
+        {{ return_type|ffi_type_name }} uniffi_result = 0;
+        {%- when None -%}
+        {%- endmatch %}
 
         // The runtime, the actual callback jsi::funtion, and the callInvoker
         // are all in the lambda.
@@ -132,10 +167,18 @@ namespace {{ ns }} {
             {%- if callback.has_rust_call_status_arg() -%}
             , uniffi_call_status
             {%- endif -%}
+            {%- if return_type.is_some() -%}
+            {%- if !callback.arguments().is_empty() || callback.has_rust_call_status_arg() %}, {% endif %}
+            &uniffi_result
+            {%- endif -%}
         );
+
+        {%- if return_type.is_some() %}
+        return uniffi_result;
+        {%- endif %}
     }
 
-    static {{ name }}
+    [[maybe_unused]] static {{ name }}
     makeCallbackFunction( // {{ ns }}
                     jsi::Runtime &rt,
                      std::shared_ptr<uniffi_runtime::UniffiCallInvoker> callInvoker,
@@ -164,6 +207,12 @@ namespace {{ ns }} {
             {%- if callback.has_rust_call_status_arg() -%}
             , RustCallStatus* uniffi_call_status
             {%- endif -%}
+            {%- match return_type -%}
+            {%- when Some(return_type) -%}
+            {%- if !callback.arguments().is_empty() || callback.has_rust_call_status_arg() %}, {% endif %}
+            {{- return_type|ffi_type_name }}* uniffi_direct_return
+            {%- when None -%}
+            {%- endmatch -%}
             ) {
                 // We immediately make a lambda which will do the work of transforming the
                 // arguments into JSI values and calling the callback.
@@ -177,6 +226,9 @@ namespace {{ ns }} {
                     {%- if callback.has_rust_call_status_arg() -%}
                     , uniffi_call_status
                     {%- endif -%}
+                    {%- if return_type.is_some() -%}
+                    , uniffi_direct_return
+                    {%- endif -%}
                 ](jsi::Runtime &rt) mutable {
                     body(rt, callInvoker, callbackValue
                         {%- for arg in callback.arguments() %}
@@ -185,6 +237,9 @@ namespace {{ ns }} {
                         {%- endfor %}
                         {%- if callback.has_rust_call_status_arg() -%}
                         , uniffi_call_status
+                        {%- endif -%}
+                        {%- if return_type.is_some() -%}
+                        , uniffi_direct_return
                         {%- endif -%}
                     );
                 };

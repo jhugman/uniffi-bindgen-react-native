@@ -162,3 +162,84 @@ enum MyEnum {
     Bar = 4,
 }
 ```
+
+## Uniffi traits
+
+Implementing the following traits in Rust causes the corresponding methods to be generated in Typescript:
+
+Trait    | Typescript method | Return
+-------- | ----------------- | -------
+`Display`| `toString()`      | `string`
+`Debug`  | `toDebugString()` | `string`
+`Eq`     | `equals(other)`   | `boolean`
+`Hash`   | `hashCode()`      | `bigint`
+`Ord`    | `compareTo(other)`| `number` (i8: −1, 0, or 1)
+
+These are declared on the enum using the `#[uniffi::export(...)]` attribute:
+
+```rust
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, uniffi::Enum)]
+#[uniffi::export(Debug, Display, Eq, Hash, Ord)]
+pub enum TraitEnum {
+    Alpha,
+    Beta { val: String },
+}
+
+impl std::fmt::Display for TraitEnum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TraitEnum::Alpha => write!(f, "Alpha"),
+            TraitEnum::Beta { val } => write!(f, "Beta({})", val),
+        }
+    }
+}
+```
+
+For **enums with properties** (tagged enums), these become **instance methods on each variant class**:
+
+```typescript
+const a = new TraitEnum.Alpha();
+const b = new TraitEnum.Beta({ val: "hello" });
+
+a.toString();         // "Alpha"
+b.toString();         // "Beta(hello)"
+a.toDebugString();    // "Alpha"
+
+a.equals(new TraitEnum.Alpha());              // true
+a.equals(b);                                  // false
+
+a.compareTo(b);       // negative (Alpha sorts before Beta)
+b.compareTo(a);       // positive
+
+a.hashCode();         // bigint
+```
+
+For **flat enums** (variants with no data), the methods are generated as **static functions in a namespace** that merges with the enum. This keeps the enum variants as plain values:
+
+```rust
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, uniffi::Enum)]
+#[uniffi::export(Debug, Display, Eq, Hash, Ord)]
+pub enum FlatTraitEnum {
+    Alpha,
+    Beta,
+    Gamma,
+}
+```
+
+```typescript
+// Variants are still plain enum values
+const a = FlatTraitEnum.Alpha;
+const b = FlatTraitEnum.Beta;
+
+// Trait methods are static namespace functions
+FlatTraitEnum.toString(a);           // "Alpha"
+FlatTraitEnum.toDebugString(a);      // "Alpha"
+
+FlatTraitEnum.equals(a, b);          // false
+FlatTraitEnum.equals(a, FlatTraitEnum.Alpha);  // true
+
+FlatTraitEnum.compareTo(a, b);       // negative (Alpha sorts before Beta)
+FlatTraitEnum.compareTo(b, a);       // positive
+
+FlatTraitEnum.hashCode(a);           // bigint
+```

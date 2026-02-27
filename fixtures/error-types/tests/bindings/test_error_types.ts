@@ -14,6 +14,7 @@ import {
   getError,
   Inner,
   oops,
+  oopsCustom,
   oopsEnum,
   oopsNowrap,
   oopsTuple,
@@ -259,4 +260,17 @@ test("getError", (t) => {
   t.assertFalse(e instanceof Error);
   // … but it is an ErrorInterface.
   t.assertTrue(ErrorInterface.instanceOf(e));
+});
+
+test("oops_custom - custom type wrapping enum used as error", (t) => {
+  t.assertThrows(
+    (error) => {
+      if (TupleError.Oops.instanceOf(error)) {
+        t.assertEqual(error.inner[0], "custom-oops");
+        return true;
+      }
+      return false;
+    },
+    () => oopsCustom(0),
+  );
 });

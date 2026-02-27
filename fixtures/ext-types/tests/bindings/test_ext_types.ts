@@ -37,6 +37,7 @@ import module3, {
   ObjectsType,
 } from "../../generated/imported_types_lib";
 import module4, {
+  callTraitImpl,
   getSubType,
   getTraitImpl,
   SubLibType,
@@ -171,4 +172,16 @@ test("an error from uniffi one is used by another crate", (t) => {
   t.assertThrows(UniffiOneError.instanceOf, () => {
     throwUniffiOneError();
   });
+});
+
+test("TypeScript implementing an external trait works", (t) => {
+  const tsImpl: UniffiOneTrait = {
+    hello(): string {
+      return "hello from TypeScript implementing external trait";
+    },
+  };
+  t.assertEqual(
+    callTraitImpl(tsImpl),
+    "hello from TypeScript implementing external trait",
+  );
 });

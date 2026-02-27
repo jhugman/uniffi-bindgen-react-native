@@ -6,6 +6,7 @@
 
 import {
   getCustomTypesDemo,
+  getMaybeCustomDefault,
   Handle,
   identityEnumWrapper,
   MyEnum_Tags,
@@ -53,6 +54,14 @@ test("Rust TimeInterval structs --> via u64/BigInt --> Date", (t) => {
   demo.timeIntervalSecDbl = new Date(789.0);
   demo.timeIntervalSecFlt = new Date(111.0);
   t.assertEqual(demo, getCustomTypesDemo(demo));
+});
+
+test("custom type optional parameter with default works", (t) => {
+  // Should be callable without arguments (defaults to None/undefined)
+  t.assertNull(getMaybeCustomDefault(undefined));
+  // Should work when provided
+  // Note: Handle is i64, in TypeScript it's BigInt
+  t.assertEqual(getMaybeCustomDefault(BigInt(42)), BigInt(42));
 });
 
 /// Custom types can be made of generated types.

@@ -7,12 +7,15 @@ use super::{
     oracle::{AsCodeType, CodeOracle},
     TypeRenderer,
 };
-pub(crate) use uniffi_bindgen::backend::filters::*;
 use uniffi_bindgen::{
-    backend::{Literal, Type},
-    interface::{AsType, Enum, FfiType, Variant},
+    interface::{AsType, Enum, FfiType, Literal, Type, Variant},
     ComponentInterface,
 };
+
+/// Get the FfiType for a Type (was in uniffi_bindgen::backend::filters in 0.29)
+pub fn ffi_type(type_: &impl AsType) -> Result<FfiType, askama::Error> {
+    Ok(type_.as_type().into())
+}
 
 pub(super) fn type_name(
     as_type: &impl AsType,
@@ -53,12 +56,21 @@ pub(super) fn ffi_error_converter_name(
 ) -> Result<String, askama::Error> {
     // special handling for types used as errors.
     let type_ = types.as_type(as_type);
-    let mut name = type_.as_codetype().ffi_converter_name();
-    if matches!(type_, Type::Object { .. }) {
+    // For custom types wrapping an enum/object, use the builtin as the error type
+    let effective_type = match &type_ {
+        Type::Custom { builtin, .. }
+            if matches!(**builtin, Type::Enum { .. } | Type::Object { .. }) =>
+        {
+            *builtin.clone()
+        }
+        _ => type_.clone(),
+    };
+    let mut name = effective_type.as_codetype().ffi_converter_name();
+    if matches!(effective_type, Type::Object { .. }) {
         name.push_str("__as_error")
     }
-    if types.ci.is_external(&type_) {
-        let module_path = type_
+    if types.ci.is_external(&effective_type) {
+        let module_path = effective_type
             .module_path()
             .expect("External type should have a module path");
         let namespace = types
@@ -101,11 +113,16 @@ pub(super) fn lift_fn(
 }
 
 pub fn render_literal(
-    literal: &Literal,
+    default_value: &uniffi_meta::DefaultValueMetadata,
     as_ct: &impl AsType,
     ci: &ComponentInterface,
 ) -> Result<String, askama::Error> {
-    Ok(as_ct.as_codetype().literal(literal, ci))
+    match default_value {
+        uniffi_meta::DefaultValueMetadata::Literal(literal) => {
+            Ok(as_ct.as_codetype().literal(literal, ci))
+        }
+        uniffi_meta::DefaultValueMetadata::Default => Ok("undefined".to_string()),
+    }
 }
 
 pub fn variant_discr_literal(

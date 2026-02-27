@@ -98,6 +98,10 @@ export const {{ decl_type_name }} = (() => {
             return obj.tag === {{ variant_tag }};
         }
 
+        {%- let tm = e.uniffi_trait_methods() %}
+        {%- let self_lower = format!("this as unknown as {type_name}") %}
+        {% call ts::uniffi_trait_methods_instance(tm, ffi_converter_name, self_lower, type_name) %}
+
         {% if is_error %}
         {%-   if has_fields %}
         static hasInner(obj: any): obj is {{ variant_name }} {
