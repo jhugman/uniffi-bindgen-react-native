@@ -16,6 +16,7 @@
 
 - Build TS to JS before publish; ship compiled JS + types to avoid strict TS errors. Inspired by [#198](https://github.com/jhugman/uniffi-bindgen-react-native/pull/198) ([@hassankhan](https://github.com/hassankhan)); implemented in [#297](https://github.com/jhugman/uniffi-bindgen-react-native/pull/297) ([@EthanShoeDev](https://github.com/EthanShoeDev)).
 - Bump `uniffi-rs` to [0.30.0](https://github.com/mozilla/uniffi-rs/blob/main/CHANGELOG.md).
+- Changed RustBuffer `capacity` and `len` to `uint64_t`, fixing a crasher on 32-bit devices. ([#313](https://github.com/jhugman/uniffi-bindgen-react-native/pull/313)). Thank you [@sfourdrinier](https://github.com/sfourdrinier)!
 
 ## ⚠️ Breaking Changes
 
