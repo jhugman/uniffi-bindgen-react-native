@@ -126,6 +126,8 @@ impl CodeFormatter for RustArgs {
                 .arg("--all")
                 .arg("--all-targets")
                 .arg("--no-deps")
+                .arg("--workspace")
+                .arg("--tests")
                 .arg("--manifest-path")
                 .arg("Cargo.toml")
                 .current_dir(root);
@@ -136,6 +138,7 @@ impl CodeFormatter for RustArgs {
                 );
                 run_cmd_quietly(&mut cmd)?;
             } else {
+                cmd.arg("--allow-dirty").arg("--fix");
                 run_cmd(&mut cmd)?;
             }
         }

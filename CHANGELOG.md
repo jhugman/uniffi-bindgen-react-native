@@ -5,6 +5,12 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.30.0-0...main
+
+---
+
+# 0.30.0-0
+
 ## ✨ What's New ✨
 
 - Add support for 16KB page size alignment on android (as required by Android 15 + Google Play by Nov 1, 2025) ([#294](https://github.com/jhugman/uniffi-bindgen-react-native/pull/294)). Thank you [@zzorba](https://github.com/zzorba)!
@@ -22,7 +28,7 @@
 
 - `UniffiRustArcPtr` renamed to `UniffiGcObject` and `UnsafeMutableRawPointer` renamed to `UniffiHandle` in generated TypeScript bindings. Regenerate your bindings to pick up the new names.
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...0.30.0-0
 
 ---
 
