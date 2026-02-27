@@ -21,4 +21,5 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.8.22"
 uniffi = "=0.30.0"
 uniffi_bindgen = "=0.30.0"
+uniffi_core = { version = "=0.30.0", default-features = false }
 uniffi_meta = "=0.30.0"

@@ -1595,14 +1595,14 @@ dependencies = [
  "clap",
  "uniffi_bindgen",
  "uniffi_build",
- "uniffi_core 0.30.0",
+ "uniffi_core",
  "uniffi_macros",
  "uniffi_pipeline",
 ]
 
 [[package]]
 name = "uniffi-bindgen-react-native"
-version = "0.30.0-0"
+version = "0.30.0-1"
 dependencies = [
  "anyhow",
  "askama",
@@ -1864,9 +1864,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi-runtime-javascript"
-version = "0.30.0-0"
+version = "0.30.0-1"
 dependencies = [
- "uniffi_core 0.29.3",
+ "uniffi_core",
  "wasm-bindgen",
 ]
 
@@ -1906,18 +1906,6 @@ dependencies = [
  "anyhow",
  "camino",
  "uniffi_bindgen",
-]
-
-[[package]]
-name = "uniffi_core"
-version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e3b997192dc15ef1778c842001811ec7f241a093a693ac864e1fc938e64fa9"
-dependencies = [
- "anyhow",
- "bytes",
- "once_cell",
- "static_assertions",
 ]
 
 [[package]]

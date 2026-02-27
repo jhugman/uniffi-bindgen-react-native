@@ -5,11 +5,11 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.30.0-0...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.30.0-1...main
 
 ---
 
-# 0.30.0-0
+# 0.30.0-1
 
 ## ✨ What's New ✨
 
@@ -28,7 +28,7 @@
 
 - `UniffiRustArcPtr` renamed to `UniffiGcObject` and `UnsafeMutableRawPointer` renamed to `UniffiHandle` in generated TypeScript bindings. Regenerate your bindings to pick up the new names.
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...0.30.0-0
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.29.3-1...0.30.0-1
 
 ---
 
