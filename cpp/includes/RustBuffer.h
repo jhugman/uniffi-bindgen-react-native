@@ -11,7 +11,7 @@
 #include <jsi/jsi.h>
 
 struct RustBuffer {
-  size_t capacity;
-  size_t len;
+  uint64_t capacity;
+  uint64_t len;
   uint8_t *data;
 };
