@@ -3,18 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{
-    collections::{BTreeSet, HashMap},
-    process::Command,
-};
+use std::{collections::HashMap, process::Command};
 
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use ubrn_common::{cp_file, mk_dir, rm_dir, run_cmd, CrateMetadata};
-use uniffi_bindgen::{
-    bindings::KotlinBindingGenerator, cargo_metadata::CrateConfigSupplier,
-    library_mode::generate_bindings,
+use uniffi_bindgen::bindings::{
+    generate as generate_native_kotlin_bindings, GenerateOptions, TargetLanguage,
 };
 
 use crate::{
@@ -204,29 +200,21 @@ impl AndroidBuildArgs {
     fn generate_native_bindings(
         &self,
         config: &ProjectConfig,
-        target_files: &HashMap<Target, Utf8PathBuf>,
+        libs: &HashMap<Target, Utf8PathBuf>,
     ) -> Result<(), anyhow::Error> {
         println!("-- Generating native Kotlin bindings");
-        let manifest_path = config.crate_.manifest_path()?;
-        let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
-        let config_supplier = CrateConfigSupplier::from(metadata);
-        let libs = target_files
-            .clone()
-            .into_values()
-            .collect::<BTreeSet<Utf8PathBuf>>();
         let library_path = libs
-            .first()
+            .values()
+            .next()
             .context("Need at least one library file to generate native Kotlin bindings")?;
         let out_dir = config.android.src_main_java_dir(config.project_root());
-        generate_bindings(
-            library_path,
-            None,
-            &KotlinBindingGenerator,
-            &config_supplier,
-            None,
-            &out_dir,
-            false,
-        )?;
+        generate_native_kotlin_bindings(GenerateOptions {
+            source: library_path.clone(),
+            languages: vec![TargetLanguage::Kotlin],
+            out_dir: out_dir.clone(),
+            format: false,
+            ..Default::default()
+        })?;
         Ok(())
     }
 

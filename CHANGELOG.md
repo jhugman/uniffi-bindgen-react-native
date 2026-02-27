@@ -5,6 +5,20 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+## ✨ What's New ✨
+
+- Records and enums now support methods in TypeScript bindings, tracking uniffi 0.31's new value-type methods feature. Flat enums use direct method calls; tagged enums use a factory pattern ([#347](https://github.com/jhugman/uniffi-bindgen-react-native/pull/347)).
+
+## 🦊 What's Changed
+
+- Bump `uniffi-rs` to [0.31.0](https://github.com/mozilla/uniffi-rs/blob/main/CHANGELOG.md).
+- Replace deprecated `SwiftBindingGenerator`/`KotlinBindingGenerator` with `bindings::generate` for iOS and Android native bindings.
+- Pin `wasm-bindgen` to 0.2.100 to avoid a compile-time regression in `js-sys`.
+
+## ⚠️ Breaking Changes
+
+- uniffi 0.31 changes method checksums (the self type is no longer included), so bindings compiled against 0.30.x are not compatible with 0.31.x. Regenerate your bindings after upgrading.
+
 **Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.30.0-1...main
 
 ---

@@ -11,7 +11,7 @@ use topological_sort::TopologicalSort;
 use uniffi_bindgen::{
     interface::{
         Enum, FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct,
-        FfiType, Function, Method, Object, UniffiTrait,
+        FfiType, Function, Method, Object, Record, UniffiTrait,
     },
     ComponentInterface,
 };
@@ -285,6 +285,15 @@ pub(crate) impl Enum {
             || tm.eq_eq.is_some()
             || tm.hash_hash.is_some()
             || tm.ord_cmp.is_some()
+    }
+}
+
+#[ext]
+pub(crate) impl Record {
+    /// Returns true if any Rust-defined constructor has the given name.
+    /// Used to decide whether to suppress TypeScript factory helpers (`create`, `new`).
+    fn has_rust_constructor_named(&self, name: &str) -> bool {
+        self.constructors().iter().any(|c| c.name() == name)
     }
 }
 
