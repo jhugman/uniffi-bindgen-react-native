@@ -22,6 +22,12 @@
 {%- else %}
 export type {{ protocol_name }} = {{ name }};
 {%- endif %}
+{%- if !config.strict_object_types && !obj.has_callback_interface() %}
+/**
+ * @deprecated Use `{{ protocol_name }}` instead.
+ */
+export type {{ name }}Interface = {{ protocol_name }};
+{%- endif %}
 {%- macro private_ctor() %}
 private constructor(pointer: UniffiHandle) {
     super();
