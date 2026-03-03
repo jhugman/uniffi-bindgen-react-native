@@ -163,6 +163,57 @@ enum MyEnum {
 }
 ```
 
+## Methods
+
+Enums can have methods defined via `#[uniffi::export] impl`:
+
+```rust
+#[derive(uniffi::Enum)]
+pub enum Direction { North, South, East, West }
+
+#[uniffi::export]
+impl Direction {
+    pub fn opposite(&self) -> Direction {
+        match self {
+            Direction::North => Direction::South,
+            Direction::South => Direction::North,
+            Direction::East => Direction::West,
+            Direction::West => Direction::East,
+        }
+    }
+}
+```
+
+For **flat enums**, methods become **static-style functions on the enum namespace**. The `self` parameter becomes the first argument:
+
+```typescript
+Direction.opposite(Direction.North);  // Direction.South
+Direction.opposite(Direction.East);   // Direction.West
+```
+
+For **tagged enums** (enums with properties), methods follow the same pattern — static functions on the outer namespace, taking a variant instance as first argument:
+
+```rust
+#[derive(uniffi::Enum)]
+pub enum Shape {
+    Circle { radius: f64 },
+    Rectangle { width: f64, height: f64 },
+}
+
+#[uniffi::export]
+impl Shape {
+    pub fn area(&self) -> f64 { … }
+}
+```
+
+```typescript
+const circle = new Shape.Circle({ radius: 1.0 });
+const rect = new Shape.Rectangle({ width: 3.0, height: 4.0 });
+
+Shape.area(circle);  // Math.PI
+Shape.area(rect);    // 12.0
+```
+
 ## Uniffi traits
 
 Implementing the following traits in Rust causes the corresponding methods to be generated in Typescript:

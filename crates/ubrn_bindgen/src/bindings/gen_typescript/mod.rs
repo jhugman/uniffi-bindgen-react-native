@@ -36,7 +36,7 @@ use crate::{
     bindings::{
         extensions::{
             ComponentInterfaceExt, EnumExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt,
-            ObjectExt,
+            ObjectExt, RecordExt,
         },
         metadata::ModuleMetadata,
         type_map::TypeMap,
