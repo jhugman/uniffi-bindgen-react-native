@@ -21,12 +21,12 @@ impl ObjectCodeType {
 impl CodeType for ObjectCodeType {
     // This is the name of the type/interface.
     //
-    // In Typescript, this is `{class_name}Interface`, and for callback
+    // In Typescript, this is `{class_name}Like`, and for callback
     // interfaces (when `self.imp.has_callback_interface()`) `{class_name}`.
     //
     fn type_label(&self, ci: &ComponentInterface) -> String {
         if !self.imp.is_trait_interface() || ci.is_name_used_as_error(&self.name) {
-            format!("{}Interface", CodeOracle.class_name(ci, &self.name))
+            format!("{}Like", CodeOracle.class_name(ci, &self.name))
         } else {
             CodeOracle.class_name(ci, &self.name)
         }
