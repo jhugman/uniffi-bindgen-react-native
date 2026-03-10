@@ -2,9 +2,10 @@
 #include "{{ self.config.project.cpp_filename() }}.h"
 {%- let root = self.project_root() %}
 {%- let bindings = self.config.project.bindings.cpp_path(root) %}
-{%- let bindings = self.relative_to(root, bindings) %}
 {%- for m in self.config.modules %}
-#include "{{ bindings }}/{{ m.hpp_filename() }}"
+{%- let hpp_filename = bindings.join(m.hpp_filename()) %}
+{%- let hpp_filename = self.relative_to(root, hpp_filename) %}
+#include "{{ hpp_filename }}"
 {%- endfor %}
 
 namespace {{ self.config.project.cpp_namespace() }} {
