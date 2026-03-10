@@ -4,15 +4,45 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use extend::ext;
-use heck::ToLowerCamelCase;
+use heck::{ToLowerCamelCase, ToSnakeCase};
 use uniffi_bindgen::{
-    interface::{FfiCallbackFunction, FfiDefinition, FfiField, FfiStruct, FfiType},
+    interface::{FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType},
     ComponentInterface,
 };
 
 use crate::bindings::extensions::{
-    ComponentInterfaceExt as _, FfiArgumentExt as _, FfiCallbackFunctionExt as _, FfiTypeExt as _,
+    FfiArgumentExt as _, FfiCallbackFunctionExt as _, FfiStructExt as _, FfiTypeExt as _,
 };
+
+#[ext(name = CppComponentInterfaceExt)]
+pub(super) impl ComponentInterface {
+    fn cpp_namespace(&self) -> String {
+        format!("uniffi::{}", self.namespace().to_snake_case())
+    }
+
+    fn cpp_namespace_includes(&self) -> String {
+        "uniffi_jsi".to_string()
+    }
+
+    fn iter_ffi_structs(&self) -> impl Iterator<Item = FfiStruct> {
+        self.ffi_definitions().filter_map(|s| match s {
+            FfiDefinition::Struct(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    fn iter_ffi_structs_for_free(&self) -> impl Iterator<Item = FfiStruct> {
+        self.iter_ffi_structs()
+            .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFuture")
+    }
+}
+
+#[ext(name = CppFfiFunctionExt)]
+pub(super) impl FfiFunction {
+    fn is_callback_init(&self) -> bool {
+        self.name().contains("_callback_vtable_")
+    }
+}
 
 #[ext(name = CppFfiTypeExt)]
 pub(super) impl FfiType {
@@ -51,6 +81,13 @@ pub(super) impl FfiType {
 pub(super) impl FfiCallbackFunction {
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
         FfiType::Callback(self.name().to_string()).cpp_namespace(ci)
+    }
+
+    fn is_future_callback(&self) -> bool {
+        // ForeignFutureDroppedCallback is used as a field in ForeignFutureDroppedCallbackStruct,
+        // passed from JS to Rust (fromJs direction). It needs makeCallbackFunction, so it must
+        // go through callback_fn_impl rather than ForeignFuture.cpp (which only generates toJs).
+        self.name().starts_with("ForeignFuture") && self.name() != "ForeignFutureDroppedCallback"
     }
 
     fn is_rust_calling_js(&self) -> bool {
@@ -103,5 +140,20 @@ pub(super) impl FfiField {
             }
         }
         None
+    }
+
+    fn is_free(&self) -> bool {
+        matches!(self.type_(), FfiType::Callback(s) if s == "CallbackInterfaceFree" || s == "ForeignFutureFree")
+    }
+
+    /// Returns true if this field is a user-defined callback interface method or clone function.
+    /// These need per-vtable-field namespaces to avoid rsLambda aliasing across vtable structs.
+    fn is_user_callback(&self) -> bool {
+        match self.type_() {
+            FfiType::Callback(name) => {
+                name.starts_with("CallbackInterface") && name != "CallbackInterfaceFree"
+            }
+            _ => false,
+        }
     }
 }

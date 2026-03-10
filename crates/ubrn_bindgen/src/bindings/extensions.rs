@@ -1,14 +1,20 @@
+//! Extension traits for uniffi_bindgen types used by multiple code generators.
+//!
+//! Only methods needed by 2+ generators (gen_cpp, gen_typescript, gen_rust) belong here.
+//! Generator-specific extensions live in their respective modules:
+//! - `gen_cpp::extensions` — C++ namespace/naming, callable checks
+//! - `gen_typescript::extensions` — type sorting, TS-specific queries
+//! - `gen_rust::extensions` — FFI definition classification for Rust codegen
+
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use extend::ext;
-use heck::ToSnakeCase;
 use uniffi_bindgen::{
     interface::{
-        FfiArgument, FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType,
-        Function, Method, Object,
+        FfiArgument, FfiCallbackFunction, FfiFunction, FfiStruct, FfiType, Function, Method, Object,
     },
     ComponentInterface,
 };
@@ -90,10 +96,6 @@ pub(crate) impl ComponentInterface {
             .chain(self.iter_ffi_function_bless_pointer())
     }
 
-    fn iter_ffi_functions_js_to_abi_rust(&self) -> impl Iterator<Item = FfiFunction> {
-        self.iter_ffi_functions_js_to_rust()
-    }
-
     fn iter_ffi_functions_js_to_rust(&self) -> impl Iterator<Item = FfiFunction> {
         let has_async_calls = self.iter_callables().any(|c| c.is_async());
         self.iter_ffi_function_definitions().filter(move |f| {
@@ -109,38 +111,6 @@ pub(crate) impl ComponentInterface {
         self.object_definitions()
             .iter()
             .map(|o| o.ffi_function_bless_pointer())
-    }
-
-    fn iter_ffi_structs(&self) -> impl Iterator<Item = FfiStruct> {
-        self.ffi_definitions().filter_map(|s| match s {
-            FfiDefinition::Struct(s) => Some(s),
-            _ => None,
-        })
-    }
-
-    fn iter_ffi_structs_for_free(&self) -> impl Iterator<Item = FfiStruct> {
-        self.iter_ffi_structs()
-            .filter(|s| !s.is_foreign_future() || s.name() == "ForeignFuture")
-    }
-
-    fn cpp_namespace(&self) -> String {
-        format!("uniffi::{}", self.namespace().to_snake_case())
-    }
-
-    fn cpp_namespace_includes(&self) -> String {
-        "uniffi_jsi".to_string()
-    }
-
-    fn has_callbacks(&self) -> bool {
-        !self.callback_interface_definitions().is_empty()
-            || self
-                .object_definitions()
-                .iter()
-                .any(|o| o.has_callback_interface())
-    }
-
-    fn has_async_calls(&self) -> bool {
-        self.iter_callables().any(|c| c.is_async())
     }
 }
 
@@ -173,13 +143,6 @@ pub(crate) impl Object {
 
 #[ext]
 pub(crate) impl FfiFunction {
-    fn is_internal(&self) -> bool {
-        let name = self.name();
-        name.contains("ffi__") && name.contains("_internal_")
-    }
-    fn is_callback_init(&self) -> bool {
-        self.name().contains("_callback_vtable_")
-    }
     fn is_future(&self) -> bool {
         self.name().contains("_rust_future_")
     }
@@ -234,17 +197,6 @@ pub(crate) impl FfiCallbackFunction {
 
     fn is_free_callback(&self) -> bool {
         is_free(self.name())
-    }
-
-    fn is_clone_callback(&self) -> bool {
-        self.name() == "CallbackInterfaceClone"
-    }
-
-    fn is_future_callback(&self) -> bool {
-        // ForeignFutureDroppedCallback is used as a field in ForeignFutureDroppedCallbackStruct,
-        // passed from JS to Rust (fromJs direction). It needs makeCallbackFunction, so it must
-        // go through callback_fn_impl rather than ForeignFuture.cpp (which only generates toJs).
-        self.name().starts_with("ForeignFuture") && self.name() != "ForeignFutureDroppedCallback"
     }
 
     fn is_user_callback(&self) -> bool {
@@ -311,21 +263,5 @@ pub(crate) impl FfiStruct {
 
     fn is_vtable(&self) -> bool {
         self.fields().iter().any(|f| f.type_().is_callable())
-    }
-}
-
-#[ext]
-pub(crate) impl FfiField {
-    fn is_free(&self) -> bool {
-        matches!(self.type_(), FfiType::Callback(s) if is_free(&s))
-    }
-
-    /// Returns true if this field is a user-defined callback interface method or clone function.
-    /// These need per-vtable-field namespaces to avoid rsLambda aliasing across vtable structs.
-    fn is_user_callback(&self) -> bool {
-        match self.type_() {
-            FfiType::Callback(name) => name.starts_with("CallbackInterface") && !is_free(&name),
-            _ => false,
-        }
     }
 }

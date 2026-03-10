@@ -17,13 +17,13 @@ use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;
 
 use self::extensions::{
-    CppFfiCallbackFunctionExt as _, CppFfiFieldExt as _, CppFfiStructExt as _, CppFfiTypeExt as _,
+    CppComponentInterfaceExt as _, CppFfiCallbackFunctionExt as _, CppFfiFieldExt as _,
+    CppFfiFunctionExt as _, CppFfiStructExt as _, CppFfiTypeExt as _,
 };
 pub(crate) use self::{config::CppConfig as Config, util::format_directory};
 use crate::bindings::{
     extensions::{
-        ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFieldExt, FfiFunctionExt, FfiStructExt,
-        FfiTypeExt, ObjectExt,
+        ComponentInterfaceExt, FfiCallbackFunctionExt, FfiStructExt, FfiTypeExt, ObjectExt,
     },
     metadata::ModuleMetadata,
 };

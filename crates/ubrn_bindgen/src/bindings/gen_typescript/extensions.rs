@@ -8,12 +8,23 @@ use std::collections::HashMap;
 use extend::ext;
 use topological_sort::TopologicalSort;
 use uniffi_bindgen::{
-    interface::{Enum, FfiCallbackFunction, FfiDefinition, FfiStruct, Object, Record, UniffiTrait},
+    interface::{
+        Enum, FfiCallbackFunction, FfiDefinition, FfiFunction, FfiStruct, Object, Record,
+        UniffiTrait,
+    },
     ComponentInterface,
 };
 use uniffi_meta::Type;
 
 use crate::bindings::extensions::{FfiCallbackFunctionExt as _, FfiStructExt as _};
+
+#[ext(name = TsFfiFunctionExt)]
+pub(super) impl FfiFunction {
+    fn is_internal(&self) -> bool {
+        let name = self.name();
+        name.contains("ffi__") && name.contains("_internal_")
+    }
+}
 
 #[ext(name = TsComponentInterfaceExt)]
 pub(super) impl ComponentInterface {
