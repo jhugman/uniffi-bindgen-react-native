@@ -16,11 +16,6 @@ use crate::config::ProjectConfig;
 
 pub(crate) trait RenderedFile: DynTemplate {
     fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf;
-    fn project_root(&self) -> Utf8PathBuf {
-        // This provides a convenience for templates to calculate
-        // relative paths between one another.
-        Utf8PathBuf::new()
-    }
     fn relative_to(&self, project_root: &Utf8Path, to: &Utf8Path) -> Utf8PathBuf {
         let file = self.path(project_root);
         let from = file
@@ -134,6 +129,9 @@ macro_rules! templated_file {
                 }
                 pub(crate) fn rc_new(config: Rc<TemplateConfig>) -> Rc<dyn RenderedFile> {
                     Rc::new(Self::new(config.clone()))
+                }
+                fn project_root(&self) -> Utf8PathBuf {
+                    self.config.project.project_root().into()
                 }
             }
         }
@@ -258,6 +256,54 @@ mod tests {
         let modules = modules.iter().map(|s| ModuleMetadata::new(s)).collect();
         let template = TemplateConfig::new(project_config, crate_metadata, modules, false);
         Ok(Rc::new(template))
+    }
+
+    // Regression test for https://github.com/jhugman/uniffi-bindgen-react-native/issues/315
+    // When users configure paths with a leading "./" (e.g. `cpp: "./cpp"`), relative_to
+    // must still produce canonical paths like "../cpp", not ".././cpp".
+    #[test]
+    fn test_relative_to_canonicalizes_dot_prefix_paths() -> Result<()> {
+        // Define a test RenderedFile whose path is in android/ (like CMakeLists.txt)
+        templated_file!(AndroidFile, "TemplateTester.txt");
+        impl RenderedFile for AndroidFile {
+            fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+                self.config
+                    .project
+                    .android
+                    .directory(project_root)
+                    .join("CMakeLists.txt")
+            }
+        }
+
+        let manifest_dir: Utf8PathBuf = std::env::var("CARGO_MANIFEST_DIR").unwrap().into();
+        let crate_metadata = CrateMetadata::try_from(manifest_dir.clone())?;
+        let crate_config: CrateConfig = crate_metadata.clone().try_into()?;
+
+        let mut project_config = config::ProjectConfig::empty("test-path-fix", crate_config);
+        // Simulate a user who wrote `cpp: "./cpp"` or `cpp: "./cpp/bindings"` in their config
+        project_config.bindings.cpp = "./cpp/bindings".to_string();
+        project_config.tm.cpp = "./cpp".to_string();
+
+        let config = Rc::new(TemplateConfig::new(
+            project_config,
+            crate_metadata,
+            vec![],
+            false,
+        ));
+        let file = AndroidFile::new(config.clone());
+        let real_root = file.project_root();
+
+        let bindings_abs = file.config.project.bindings.cpp_path(&real_root);
+        let bindings_rel = file.relative_to(&real_root, &bindings_abs);
+        // Canonical: "../cpp/bindings", not ".././cpp/bindings"
+        assert_eq!(bindings_rel.as_str(), "../cpp/bindings");
+
+        let tm_abs = file.config.project.tm.cpp_path(&real_root);
+        let tm_rel = file.relative_to(&real_root, &tm_abs);
+        // Canonical: "../cpp", not ".././cpp"
+        assert_eq!(tm_rel.as_str(), "../cpp");
+
+        Ok(())
     }
 
     #[test]
