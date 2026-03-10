@@ -9,6 +9,10 @@
 
 - Records and enums now support methods in TypeScript bindings, tracking uniffi 0.31's new value-type methods feature. Flat enums use direct method calls; tagged enums use a factory pattern ([#347](https://github.com/jhugman/uniffi-bindgen-react-native/pull/347)).
 
+- Add support for opting out of generating TypeScript interfaces: `bindings.typescript.strictObjectTypes` in
+  `uniffi.toml` ([#341](https://github.com/jhugman/uniffi-bindgen-react-native/pull/341) by
+  [@SimonThormeyer](https://github.com/SimonThormeyer)).
+
 ## 🦊 What's Changed
 
 - Bump `uniffi-rs` to [0.31.0](https://github.com/mozilla/uniffi-rs/blob/main/CHANGELOG.md).
