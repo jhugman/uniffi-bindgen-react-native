@@ -6,7 +6,8 @@
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::{interface::FfiType, ComponentInterface};
 
-use crate::bindings::extensions::{ComponentInterfaceExt, FfiTypeExt};
+use super::extensions::CppFfiTypeExt as _;
+use crate::bindings::extensions::ComponentInterfaceExt;
 
 pub fn ffi_type_name_from_js(ffi_type: &FfiType) -> Result<String, askama::Error> {
     Ok(match ffi_type {

@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod config;
+mod extensions;
 mod filters;
 mod util;
 
@@ -15,6 +16,9 @@ use ubrn_common::CrateMetadata;
 use uniffi_bindgen::interface::{FfiDefinition, FfiType};
 use uniffi_bindgen::ComponentInterface;
 
+use self::extensions::{
+    CppFfiCallbackFunctionExt as _, CppFfiFieldExt as _, CppFfiStructExt as _, CppFfiTypeExt as _,
+};
 pub(crate) use self::{config::CppConfig as Config, util::format_directory};
 use crate::bindings::{
     extensions::{

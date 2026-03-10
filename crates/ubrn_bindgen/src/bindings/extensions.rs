@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use extend::ext;
-use heck::{ToLowerCamelCase, ToSnakeCase};
+use heck::ToSnakeCase;
 use topological_sort::TopologicalSort;
 use uniffi_bindgen::{
     interface::{
@@ -385,36 +385,6 @@ pub(crate) impl FfiType {
             _ => false,
         }
     }
-
-    fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
-        match self {
-            Self::Int8
-            | Self::Int16
-            | Self::Int32
-            | Self::Int64
-            | Self::UInt8
-            | Self::UInt16
-            | Self::UInt32
-            | Self::UInt64
-            | Self::Float32
-            | Self::Float64
-            | Self::Handle
-            | Self::RustCallStatus
-            | Self::RustBuffer(_)
-            | Self::VoidPointer => ci.cpp_namespace_includes(),
-            Self::Callback(name) => format!(
-                "{}::cb::{}",
-                ci.cpp_namespace(),
-                name.to_lower_camel_case().to_lowercase()
-            ),
-            Self::Struct(name) => format!(
-                "{}::st::{}",
-                ci.cpp_namespace(),
-                name.to_lower_camel_case().to_lowercase()
-            ),
-            _ => ci.cpp_namespace(),
-        }
-    }
 }
 
 #[ext]
@@ -430,17 +400,8 @@ pub(crate) impl FfiArgument {
 
 #[ext]
 pub(crate) impl FfiCallbackFunction {
-    fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
-        let ffi_type = FfiType::Callback(self.name().to_string());
-        ffi_type.cpp_namespace(ci)
-    }
-
     fn is_exported(&self) -> bool {
         !self.is_user_callback() && !self.is_free_callback()
-    }
-
-    fn is_rust_calling_js(&self) -> bool {
-        !self.is_future_callback() || self.is_continuation_callback()
     }
 
     fn returns_result(&self) -> bool {
@@ -491,14 +452,6 @@ pub(crate) impl FfiCallbackFunction {
             })
     }
 
-    fn arg_return_cpp_name(&self) -> String {
-        self.arguments()
-            .into_iter()
-            .find(|a| a.is_output_param() && !a.type_().is_void())
-            .map(|a| format!("rs_{}", a.name().to_lower_camel_case()))
-            .unwrap_or_else(|| "rs_uniffiOutReturn".to_string())
-    }
-
     fn is_blocking(&self) -> bool {
         // If the callback returns something, or there's any chance of an error
         // (even unexpected errors), then we should block before returning
@@ -528,19 +481,6 @@ fn is_free(nm: &str) -> bool {
 
 #[ext]
 pub(crate) impl FfiStruct {
-    fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
-        let ffi_type = FfiType::Struct(self.name().to_string());
-        ffi_type.cpp_namespace(ci)
-    }
-
-    fn cpp_namespace_free(&self, ci: &ComponentInterface) -> String {
-        format!(
-            "{}::{}::free",
-            self.cpp_namespace(ci),
-            self.name().to_lower_camel_case().to_lowercase()
-        )
-    }
-
     fn is_exported(&self) -> bool {
         self.is_vtable() || self.is_foreign_future()
     }
@@ -551,10 +491,6 @@ pub(crate) impl FfiStruct {
 
     fn is_vtable(&self) -> bool {
         self.fields().iter().any(|f| f.type_().is_callable())
-    }
-
-    fn ffi_functions(&self) -> impl Iterator<Item = &FfiField> {
-        self.fields().iter().filter(|f| f.type_().is_callable())
     }
 }
 
@@ -571,28 +507,5 @@ pub(crate) impl FfiField {
             FfiType::Callback(name) => name.starts_with("CallbackInterface") && !is_free(&name),
             _ => false,
         }
-    }
-
-    /// Returns a namespace unique to this field within its containing vtable struct.
-    /// This prevents multiple vtable structs that share the same callback type (e.g.
-    /// `CallbackInterfaceClone`) from sharing a single static `rsLambda`.
-    fn cpp_namespace_in_struct(&self, ci: &ComponentInterface, struct_name: &str) -> String {
-        let base_ns = self.type_().cpp_namespace(ci);
-        format!("{}::{}", base_ns, struct_name.to_lowercase())
-    }
-
-    /// Returns the `FfiCallbackFunction` definition for this field's callback type,
-    /// or `None` if the field is not a `Callback` type.
-    fn callback_function(&self, ci: &ComponentInterface) -> Option<FfiCallbackFunction> {
-        if let FfiType::Callback(name) = self.type_() {
-            for def in ci.ffi_definitions() {
-                if let FfiDefinition::CallbackFunction(cb) = def {
-                    if cb.name() == name {
-                        return Some(cb);
-                    }
-                }
-            }
-        }
-        None
     }
 }
