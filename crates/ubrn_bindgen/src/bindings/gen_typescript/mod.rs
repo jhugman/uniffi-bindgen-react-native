@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+mod extensions;
 mod filters;
 mod oracle;
 
@@ -27,6 +28,9 @@ use heck::ToUpperCamelCase;
 use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, UniffiTrait};
 use uniffi_bindgen::ComponentInterface;
 
+use self::extensions::{
+    TsComponentInterfaceExt as _, TsEnumExt as _, TsObjectExt as _, TsRecordExt as _,
+};
 pub(crate) use self::{config::TsConfig as Config, util::format_directory};
 use self::{
     filters::{ffi_converter_name, type_name},
@@ -35,8 +39,7 @@ use self::{
 use crate::{
     bindings::{
         extensions::{
-            ComponentInterfaceExt, EnumExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt,
-            ObjectExt, RecordExt,
+            ComponentInterfaceExt, FfiCallbackFunctionExt, FfiFunctionExt, FfiStructExt, ObjectExt,
         },
         metadata::ModuleMetadata,
         type_map::TypeMap,
