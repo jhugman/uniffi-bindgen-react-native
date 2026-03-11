@@ -72,6 +72,20 @@ function uniffiCheckCallStatus(
   liftString: StringLifter,
   errorHandler?: UniffiErrorHandler,
 ) {
+  // The C++ bridge wraps ArrayBuffer in {buffer: ArrayBuffer}, so we
+  // need to unwrap it to get the actual byte data. This applies to both
+  // CALL_ERROR and CALL_UNEXPECTED_ERROR cases.
+  const errorBuf = callStatus.errorBuf;
+  if (
+    errorBuf &&
+    !(errorBuf instanceof Uint8Array) &&
+    (errorBuf as any).buffer instanceof ArrayBuffer
+  ) {
+    callStatus.errorBuf = new Uint8Array(
+      (errorBuf as any).buffer,
+    ) as UniffiByteArray;
+  }
+
   switch (callStatus.code) {
     case CALL_SUCCESS:
       return;
