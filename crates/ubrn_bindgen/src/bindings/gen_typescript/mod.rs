@@ -30,8 +30,7 @@ use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, 
 use uniffi_bindgen::ComponentInterface;
 
 use self::extensions::{
-    TsComponentInterfaceExt as _, TsEnumExt as _, TsFfiFunctionExt as _, TsObjectExt as _,
-    TsRecordExt as _,
+    TsComponentInterfaceExt as _, TsEnumExt as _, TsObjectExt as _, TsRecordExt as _,
 };
 use self::ffi_module::FfiDefinitionDecl;
 pub(crate) use self::{config::TsConfig as Config, util::format_directory};
@@ -41,7 +40,7 @@ use self::{
 };
 use crate::{
     bindings::{
-        extensions::{ComponentInterfaceExt, FfiCallbackFunctionExt, FfiStructExt, ObjectExt},
+        extensions::{ComponentInterfaceExt, FfiCallbackFunctionExt, ObjectExt},
         metadata::ModuleMetadata,
         type_map::TypeMap,
     },

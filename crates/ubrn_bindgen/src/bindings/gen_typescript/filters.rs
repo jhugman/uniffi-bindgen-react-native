@@ -177,14 +177,6 @@ pub fn variant_discr_literal(
     })
 }
 
-pub fn ffi_native_type_name(type_: &FfiType, is_internal: &bool) -> Result<String, askama::Error> {
-    Ok(if *is_internal {
-        CodeOracle.ffi_type_label_for_native_interface(type_)
-    } else {
-        CodeOracle.ffi_type_label(type_)
-    })
-}
-
 pub fn ffi_type_name(ffi_type: &FfiType) -> Result<String, askama::Error> {
     Ok(CodeOracle.ffi_type_label(ffi_type))
 }
