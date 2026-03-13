@@ -36,6 +36,7 @@ ubrn_bindgen = { path = "../ubrn_bindgen", features = ["wasm"] }
 ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }
 uniffi_meta = { workspace = true }
+path-slash = "0.2.1"
 
 [dev-dependencies]
 ubrn_cli_testing = { path = "../ubrn_cli_testing" }

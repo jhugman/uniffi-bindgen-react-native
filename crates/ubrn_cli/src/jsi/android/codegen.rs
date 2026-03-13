@@ -6,6 +6,7 @@
 use std::rc::Rc;
 
 use camino::{Utf8Path, Utf8PathBuf};
+use path_slash::PathExt;
 
 use crate::codegen::{RenderedFile, TemplateConfig};
 use crate::templated_file;
