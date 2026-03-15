@@ -72,3 +72,6 @@ generated/
 
 # mdbook artifacts
 docs/book
+
+# Superpowers plans and specs (local only)
+docs/superpowers/
