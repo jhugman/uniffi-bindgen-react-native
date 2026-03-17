@@ -1,0 +1,11 @@
+[package]
+name = "ubrn_fixture_testing"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+camino = { workspace = true }
+cargo_metadata = { workspace = true }
+heck = { workspace = true }
+pathdiff = { workspace = true }

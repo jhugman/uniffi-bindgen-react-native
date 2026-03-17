@@ -70,8 +70,15 @@ node_modules/
 # Uniffi
 generated/
 
+# Fixture test artifacts (generated at runtime, cleaned up after tests)
+fixtures/*/tsconfig.json
+examples/*/tsconfig.json
+
 # mdbook artifacts
 docs/book
 
 # Superpowers plans and specs (local only)
 docs/superpowers/
+
+# Git worktrees
+.worktrees/
