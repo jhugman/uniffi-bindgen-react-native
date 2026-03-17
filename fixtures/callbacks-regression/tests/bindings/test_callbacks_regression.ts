@@ -3,20 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-
-/*
-fixture=fixtures/callbacks-regression
-cargo xtask run \
-    --crate $fixture \
-    --ts-dir $fixture/generated \
-    --cpp-dir $fixture/generated/cpp \
-    $fixture/tests/bindings/test_callbacks_regression.ts
-*/
+// To run:
+//   cargo test -p uniffi-example-callbacks-deadlock-regression -- jsi
+//   cargo test -p uniffi-example-callbacks-deadlock-regression -- wasm
 
 import generated, {
   EventSource,
   EventListener,
-} from "../../generated/uniffi_callbacks";
+} from "@/generated/uniffi_callbacks";
 import { asyncTest, AsyncAsserts } from "@/asserts";
 import "@/polyfills";
 

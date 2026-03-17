@@ -3,6 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-async-callbacks -- jsi
+//   cargo test -p uniffi-fixture-async-callbacks -- wasm
 
 import myModule, {
   asStringUsingTrait,
@@ -12,7 +15,7 @@ import myModule, {
   ParserError,
   tryDelayUsingTrait,
   tryFromStringUsingTrait,
-} from "../../generated/async_callbacks";
+} from "@/generated/async_callbacks";
 import { asyncTest, Asserts, test } from "@/asserts";
 import {
   uniffiRustFutureHandleCount,

@@ -3,13 +3,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-trait-methods -- jsi
+//   cargo test -p uniffi-fixture-trait-methods -- wasm
+
 import {
   TraitMethods,
   TraitEnum,
   TraitRecord,
   FlatTraitEnum,
   makeFlatTraitEnum,
-} from "../../generated/trait_methods";
+} from "@/generated/trait_methods";
 import { test } from "@/asserts";
 
 test("toString() is generated", (t) => {

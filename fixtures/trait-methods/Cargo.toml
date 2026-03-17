@@ -18,5 +18,7 @@ thiserror = "1.0"
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }
 

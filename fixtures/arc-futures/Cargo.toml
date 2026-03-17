@@ -1,0 +1,27 @@
+[package]
+name = "uniffi-fixture-arc-futures"
+version = "0.21.0"
+authors = ["zzorba"]
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+name = "arc_futures"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+uniffi = { workspace = true, features = ["cli", "wasm-unstable-single-threaded"] }
+async-trait = "0.1"
+ubrn_testing = { path = "../../crates/ubrn_testing" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build", "wasm-unstable-single-threaded"] }
+
+[dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen-tests", "wasm-unstable-single-threaded"] }

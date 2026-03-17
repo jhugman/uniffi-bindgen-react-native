@@ -18,4 +18,6 @@ thiserror = "1.0"
 uniffi = { workspace = true, features = ["build", "wasm-unstable-single-threaded"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests", "wasm-unstable-single-threaded"] }

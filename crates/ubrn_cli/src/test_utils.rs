@@ -18,7 +18,7 @@ pub fn root_dir() -> Utf8PathBuf {
 }
 
 pub fn integration_fixtures_dir() -> Utf8PathBuf {
-    root_dir().join("../../fixtures")
+    root_dir().join("../../examples")
 }
 
 pub fn fixtures_dir() -> Utf8PathBuf {
