@@ -19,10 +19,7 @@ use uniffi_bindgen::{
 use util::{camel_case_ident, ident, if_or_default, if_then_map, map_or_default, snake_case_ident};
 
 use crate::{
-    bindings::{
-        extensions::{ComponentInterfaceExt as _, FfiCallbackFunctionExt as _},
-        metadata::ModuleMetadata,
-    },
+    bindings::{extensions::FfiCallbackFunctionExt as _, metadata::ModuleMetadata},
     switches::SwitchArgs,
     AbiFlavor,
 };

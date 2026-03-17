@@ -9,7 +9,7 @@ use extend::ext;
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use syn::Ident;
 use uniffi_bindgen::{
-    interface::{FfiCallbackFunction, FfiDefinition, FfiField, FfiStruct, FfiType},
+    interface::{FfiCallbackFunction, FfiDefinition, FfiField, FfiFunction, FfiStruct, FfiType},
     ComponentInterface,
 };
 
@@ -20,6 +20,22 @@ use crate::bindings::extensions::{
 
 #[ext]
 pub(super) impl ComponentInterface {
+    fn has_callbacks(&self) -> bool {
+        !self.callback_interface_definitions().is_empty()
+            || self
+                .object_definitions()
+                .iter()
+                .any(|o| o.has_callback_interface())
+    }
+
+    fn has_async_calls(&self) -> bool {
+        self.iter_callables().any(|c| c.is_async())
+    }
+
+    fn iter_ffi_functions_js_to_abi_rust(&self) -> impl Iterator<Item = FfiFunction> {
+        self.iter_ffi_functions_js_to_rust()
+    }
+
     // This is going to be very difficult to test as FfiStruct and FfiCallbackFunction
     // aren't easily constructable.
     fn ffi_definitions2(&self) -> impl Iterator<Item = FfiDefinition2> {
@@ -32,6 +48,38 @@ pub(super) impl ComponentInterface {
             has_callbacks,
             has_async_callbacks,
         )
+    }
+}
+
+/// Classifies a callback's role in code generation.
+enum CallbackRole {
+    /// Free callback: gets a per-vtable module (one per enclosing struct).
+    Free,
+    /// Clone callback: gets a per-vtable module (one per enclosing struct).
+    Clone,
+    /// User-defined callback method: uses its own module ident.
+    UserMethod,
+    /// Future infrastructure callback: generated globally (not per-vtable).
+    FutureInfra,
+    /// Continuation callback: generated globally.
+    Continuation,
+    /// Function literal (e.g. ForeignFutureComplete*): classified separately.
+    FunctionLiteral,
+}
+
+fn classify_callback(cb: &FfiCallbackFunction) -> CallbackRole {
+    if cb.is_free_callback() {
+        CallbackRole::Free
+    } else if cb.is_clone_callback() {
+        CallbackRole::Clone
+    } else if cb.is_user_callback() {
+        CallbackRole::UserMethod
+    } else if cb.is_function_literal() {
+        CallbackRole::FunctionLiteral
+    } else if cb.is_continuation_callback() {
+        CallbackRole::Continuation
+    } else {
+        CallbackRole::FutureInfra
     }
 }
 
@@ -71,28 +119,30 @@ fn ffi_definitions2(
             let Some(callback) = callbacks.get(name) else {
                 panic!("Missing callback. This is a bug in ubrn");
             };
-            let module_ident = if callback.is_free_callback() {
-                let ident = callback.module_ident_free(&ffi_struct);
-                let callback = callback.clone();
-                let module_ident = ident.clone();
-                let cb = FfiCallbackFunction2 {
-                    callback,
-                    module_ident,
-                };
-                definitions.push(FfiDefinition2::CallbackFunction(cb));
-                ident
-            } else if callback.is_clone_callback() {
-                let ident = callback.module_ident_clone(&ffi_struct);
-                let callback = callback.clone();
-                let module_ident = ident.clone();
-                let cb = FfiCallbackFunction2 {
-                    callback,
-                    module_ident,
-                };
-                definitions.push(FfiDefinition2::CallbackFunction(cb));
-                ident
-            } else {
-                callback.module_ident()
+            let module_ident = match classify_callback(callback) {
+                CallbackRole::Free => {
+                    let ident = callback.module_ident_free(&ffi_struct);
+                    let callback = callback.clone();
+                    let module_ident = ident.clone();
+                    let cb = FfiCallbackFunction2 {
+                        callback,
+                        module_ident,
+                    };
+                    definitions.push(FfiDefinition2::CallbackFunction(cb));
+                    ident
+                }
+                CallbackRole::Clone => {
+                    let ident = callback.module_ident_clone(&ffi_struct);
+                    let callback = callback.clone();
+                    let module_ident = ident.clone();
+                    let cb = FfiCallbackFunction2 {
+                        callback,
+                        module_ident,
+                    };
+                    definitions.push(FfiDefinition2::CallbackFunction(cb));
+                    ident
+                }
+                _ => callback.module_ident(),
             };
             method_module_idents.insert(field.name().to_string(), module_ident);
         }
@@ -103,24 +153,34 @@ fn ffi_definitions2(
     }
 
     for callback in callbacks.into_values() {
-        if callback.is_free_callback() {
-            // this is done above per-vtable.
-            continue;
-        }
-        if callback.is_clone_callback() {
-            // this is done above per-vtable.
-            continue;
-        }
-        if !has_async_callbacks && callback.is_future_callback() {
-            // We don't need to do anything if we have no async callbacks.
-            continue;
-        }
-        if !has_async_calls && callback.is_continuation_callback() {
-            // We don't need to do anything if we have no async functions or methods.
-            continue;
-        }
-        if !has_callbacks && callback.is_user_callback() {
-            continue;
+        match classify_callback(&callback) {
+            CallbackRole::Free | CallbackRole::Clone => {
+                // this is done above per-vtable.
+                continue;
+            }
+            CallbackRole::FutureInfra => {
+                if !has_async_callbacks {
+                    // We don't need to do anything if we have no async callbacks.
+                    continue;
+                }
+            }
+            CallbackRole::Continuation => {
+                if !has_async_calls {
+                    // We don't need to do anything if we have no async functions or methods.
+                    continue;
+                }
+            }
+            CallbackRole::UserMethod => {
+                if !has_callbacks {
+                    continue;
+                }
+            }
+            CallbackRole::FunctionLiteral => {
+                if !has_async_callbacks {
+                    // Function literals (ForeignFutureComplete*) are part of async callback infra.
+                    continue;
+                }
+            }
         }
         let cb = FfiCallbackFunction2 {
             module_ident: callback.module_ident(),
@@ -158,7 +218,7 @@ pub(super) impl FfiStruct {
     }
 }
 
-#[ext]
+#[ext(name = RustFfiCallbackFunctionExt)]
 pub(super) impl FfiCallbackFunction {
     fn module_ident_free(&self, enclosing: &FfiStruct) -> Ident {
         ident(&format!("{}__free", enclosing.name().to_snake_case()))
@@ -168,6 +228,10 @@ pub(super) impl FfiCallbackFunction {
     }
     fn module_ident(&self) -> Ident {
         snake_case_ident(self.name())
+    }
+
+    fn is_clone_callback(&self) -> bool {
+        self.name() == "CallbackInterfaceClone"
     }
 }
 

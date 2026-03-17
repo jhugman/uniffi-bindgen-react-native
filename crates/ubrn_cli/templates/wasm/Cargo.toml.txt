@@ -34,11 +34,10 @@ default = []
 uniffi-runtime-javascript = { version = "{{ runtime_version() }}", features = ["wasm32"] }
 wasm-bindgen = "*"
 
+{% if !config.project.wasm.workspace -%}
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
-
-{%- if !config.project.wasm.workspace %}
 
 [workspace]
 {%- endif %}

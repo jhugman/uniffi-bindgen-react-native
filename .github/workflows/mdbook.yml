@@ -23,13 +23,12 @@ jobs:
   # Build job
   build:
     runs-on: ubuntu-latest
-    env:
-      MDBOOK_VERSION: 0.4.36
     steps:
       - uses: actions/checkout@v4
       - uses: jontze/action-mdbook@v3
         with:
           token: ${{secrets.GITHUB_TOKEN}}
+          mdbook-version: "~0.4.36"
           # Optional Plugins have to be enabled
           use-linkcheck: true
           use-mermaid: false

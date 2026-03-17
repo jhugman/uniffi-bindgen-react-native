@@ -15,8 +15,19 @@
 {%- let methods = obj.methods() %}
 
 {%- let is_error = ci.is_name_used_as_error(name) %}
+{%- let needs_interface = !config.strict_object_types || obj.has_callback_interface() %}
 
+{%- if needs_interface %}
 {%- include "ObjectInterfaceTemplate.ts" %}
+{%- else %}
+export type {{ protocol_name }} = {{ name }};
+{%- endif %}
+{%- if !config.strict_object_types && !obj.has_callback_interface() %}
+/**
+ * @deprecated Use `{{ protocol_name }}` instead.
+ */
+export type {{ name }}Interface = {{ protocol_name }};
+{%- endif %}
 {%- macro private_ctor() %}
 private constructor(pointer: UniffiHandle) {
     super();
@@ -26,7 +37,7 @@ private constructor(pointer: UniffiHandle) {
 {%- endmacro %}
 
 {% call ts::docstring(obj, 0) %}
-export class {{ impl_class_name }} extends UniffiAbstractObject implements {{ protocol_name }} {
+export class {{ impl_class_name }} extends UniffiAbstractObject {%- if needs_interface %} implements {{ protocol_name }}{%- endif %} {
 
     readonly [uniffiTypeNameSymbol] = "{{ impl_class_name }}";
     readonly [destructorGuardSymbol]: UniffiGcObject;

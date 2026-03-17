@@ -1,0 +1,16 @@
+[package]
+name = "uniffi-fixture-value-type-methods"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "uniffi_value_type_methods"
+
+[dependencies]
+uniffi = { workspace = true }
+
+[dev-dependencies]
+uniffi = { workspace = true, features = ["bindgen-tests"] }
