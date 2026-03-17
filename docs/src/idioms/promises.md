@@ -24,7 +24,7 @@ It can be called from Typescript:
 const message = await sayAfter(1000n, "World");
 ```
 
-You can see this in action in the [`futures-example` fixture](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/futures-example/src), and the more complete [`futures` fixture](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/futures).
+You can see this in action in the [`futures-example` example](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/examples/futures-example/src), and the more complete [`futures` fixture](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/futures).
 
 ## Passing Promises across the FFI
 

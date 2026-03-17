@@ -26,16 +26,6 @@ impl TestRunnerCmd {
         Ok(root.join("cpp").join("test-harness"))
     }
 
-    pub(crate) fn hermes_extension_src_dir() -> Result<Utf8PathBuf> {
-        let root = repository_root()?;
-        Ok(root.join("cpp/hermes-extension"))
-    }
-
-    pub(crate) fn hermes_rust_extension_src_dir() -> Result<Utf8PathBuf> {
-        let root = repository_root()?;
-        Ok(root.join("cpp/hermes-rust-extension"))
-    }
-
     fn build_dir() -> Result<Utf8PathBuf> {
         let root = build_root()?;
         Ok(root.join("test-runner"))
@@ -44,16 +34,6 @@ impl TestRunnerCmd {
     fn exe() -> Result<Utf8PathBuf> {
         let root = Self::build_dir()?;
         Ok(root.join("test-runner"))
-    }
-
-    pub(crate) fn run(&self, js_file: &Utf8PathBuf, so_file: Option<&Utf8PathBuf>) -> Result<()> {
-        let mut cmd = Command::new(Self::exe()?);
-        cmd.arg(js_file);
-        if let Some(so_file) = so_file {
-            cmd.arg(so_file);
-        }
-        run_cmd(&mut cmd)?;
-        Ok(())
     }
 }
 
