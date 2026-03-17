@@ -21,7 +21,7 @@ pub(crate) fn get_files(config: Rc<TemplateConfig>) -> Vec<Rc<dyn RenderedFile>>
     ]
 }
 
-templated_file!(WasmCargoToml, "Cargo.toml");
+templated_file!(WasmCargoToml, "Cargo.toml.txt");
 impl RenderedFile for WasmCargoToml {
     fn path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         self.config.project.wasm.manifest_path(project_root)
