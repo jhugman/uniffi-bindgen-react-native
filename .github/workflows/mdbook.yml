@@ -36,6 +36,10 @@ jobs:
           use-opengh: true
           use-admonish: true
           use-katex: false
+          # Pin plugin versions compatible with mdbook 0.4.x
+          # (latest versions target mdbook 0.5.x)
+          opengh-version: "2.4.0"
+          admonish-version: "1.18.0"
       - name: Show mdbook version
         run: mdbook --version
       - name: Show linkchecker version
