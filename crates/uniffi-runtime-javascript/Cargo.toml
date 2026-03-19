@@ -15,4 +15,4 @@ uniffi_core = { workspace = true, default-features = false }
 wasm-bindgen = { version = "0.2.97", optional = true }
 
 [features]
-wasm32 = ["wasm-bindgen"]
+wasm32 = ["dep:wasm-bindgen", "uniffi_core/wasm-unstable-single-threaded"]
