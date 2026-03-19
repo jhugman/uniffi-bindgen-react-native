@@ -1,5 +1,5 @@
 [package]
-name = "uniffi-fixtures-async-traits"
+name = "uniffi-fixture-async-traits"
 version = "0.21.0"
 authors = ["jhugman"]
 edition = "2021"
@@ -23,4 +23,6 @@ ubrn_testing = { path = "../../crates/ubrn_testing" }
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }

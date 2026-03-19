@@ -1,5 +1,5 @@
 [package]
-name = "uniffi-fixtures-async-calls"
+name = "uniffi-fixture-async-calls"
 version = "0.21.0"
 authors = ["jhugman"]
 edition = "2021"
@@ -11,7 +11,7 @@ name = "uniffi_async_calls"
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "uniffi-fixtures-async-calls"
+name = "uniffi-fixture-async-calls"
 path = "src/bin.rs"
 
 [dependencies]
@@ -29,4 +29,6 @@ tokio = { version = "1.24.1", features = ["time", "sync"] }
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }

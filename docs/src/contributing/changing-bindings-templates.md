@@ -23,13 +23,13 @@ Making a change to the templates should be accompanied by an additional test, ei
 Running the tests can be done with:
 
 ```sh
-./scripts/run-tests.sh
+cargo test
 ```
 
-An individual test can be run:
+An individual fixture can be tested:
 
 ```sh
-./scripts/run-tests.sh -f $fixtureName
+cargo test -p uniffi-fixture-$fixtureName
 ```
 
 [ts-templates]: https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/crates/ubrn_bindgen/src/bindings/react_native/gen_typescript/templates

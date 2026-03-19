@@ -19,4 +19,6 @@ chrono = { version = "0.4.23", default-features = false, features = ["alloc", "s
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }

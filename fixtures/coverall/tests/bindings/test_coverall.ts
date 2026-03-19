@@ -3,10 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-
-// fixture=coverall
-// cargo run --manifest-path ./crates/uniffi-bindgen-react-native/Cargo.toml -- bindings ./fixtures/${fixture}/src/${fixture}.udl --cpp-dir ./fixtures/${fixture}/generated --ts-dir ./fixtures/${fixture}/generated
-// cargo xtask run ./fixtures/${fixture}/tests/bindings/test_${fixture}.ts --cpp ./fixtures/${fixture}/generated/${fixture}.cpp --crate ./fixtures/${fixture}
+// To run:
+//   cargo test -p uniffi-fixture-coverall -- jsi
+//   cargo test -p uniffi-fixture-coverall -- wasm
 
 import coverall, {
   CoverallError,
@@ -32,7 +31,7 @@ import coverall, {
   testGetters,
   testRoundTripThroughRust,
   testRoundTripThroughForeign,
-} from "../../generated/coverall";
+} from "@/generated/coverall";
 import { test } from "@/asserts";
 import "@/polyfills";
 

@@ -115,28 +115,28 @@ fn test_happy_path_android() -> Result<()> {
         assert_commands(&[
             Command::new("cargo")
                 .arg("ndk")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "arm64-v8a")
                 .arg_pair("--platform", "23")
                 .arg("--")
                 .arg("build"),
             Command::new("cargo")
                 .arg("ndk")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "armeabi-v7a")
                 .arg_pair("--platform", "23")
                 .arg("--")
                 .arg("build"),
             Command::new("cargo")
                 .arg("ndk")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "x86")
                 .arg_pair("--platform", "23")
                 .arg("--")
                 .arg("build"),
             Command::new("cargo")
                 .arg("ndk")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml")
                 .arg_pair_suffix("--target", "x86_64")
                 .arg_pair("--platform", "23")
                 .arg("--")
@@ -225,7 +225,7 @@ fn test_happy_path_web() -> Result<()> {
         assert_commands(&[
             Command::new("cargo")
                 .arg("build")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml"),
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml"),
             Command::new("prettier"),
             Command::new("cargo")
                 .arg("build")

@@ -3,6 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-error-types -- jsi
+//   cargo test -p uniffi-fixture-error-types -- wasm
+
 import { test } from "@/asserts";
 import {
   ErrorInterface,
@@ -22,7 +26,7 @@ import {
   throwRich,
   toops,
   TupleError,
-} from "../../generated/error_types";
+} from "@/generated/error_types";
 import { UniffiThrownObject } from "../../../../typescript/src/errors";
 
 test("oops: an error _object_ is thrown", (t) => {

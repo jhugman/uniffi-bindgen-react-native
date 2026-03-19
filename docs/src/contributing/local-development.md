@@ -43,37 +43,27 @@ cargo xtask bootstrap
 
 Most of the testing for `uniffi-bindgen-react-native` is done in the `fixtures` directory by testing the generated Typescript and C++ against a Rust crate.
 
-These can be run with:
-
-```sh
-./scripts/run-tests.sh
-```
-
-One or more fixtures may be run using the `-f` flag.
-
-```sh
-./scripts/run-tests.sh -f chronological -f arithmetic
-```
-
-This, in turn, uses the `run` xtask.
-
-The `run-tests.sh` script also runs the Typescript-only tests in the `typescript/tests` directory.
-
-These have been useful to prototype generated Typescript before moving them into templates.
-
-`run-tests.sh` also runs the same fixtures with WASM:
-
-```sh
-./scripts/run-tests.sh --flavor wasm
-```
-
-### Running rust only unit tests
-
-Rust unit tests are encouraged! They can be run as usual with:
+All tests (fixture tests, framework tests, and Rust unit tests) are run with:
 
 ```sh
 cargo test
 ```
+
+Individual fixtures can be tested by package name:
+
+```sh
+cargo test -p uniffi-fixture-chronological
+cargo test -p uniffi-fixture-arithmetic
+```
+
+Tests run under both JSI (Hermes) and WASM flavors. You can filter by flavor:
+
+```sh
+cargo test -p uniffi-fixture-arithmetic -- jsi
+cargo test -p uniffi-fixture-arithmetic -- wasm
+```
+
+The `typescript/tests` directory contains Typescript-only framework tests. These have been useful to prototype generated Typescript before moving them into templates.
 
 ## Formatting and linting
 
@@ -97,6 +87,5 @@ Ensure that the following all run cleanly:
 
 ```sh
 cargo xtask fmt
-./scripts/run-tests.sh --flavor jsi
-./scripts/run-tests.sh --flavor wasm
+cargo test
 ```

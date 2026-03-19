@@ -3,13 +3,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-coverall2 -- jsi
+//   cargo test -p uniffi-fixture-coverall2 -- wasm
+
 import {
   identityArrayBuffer,
   identityArrayBufferForcedRead,
   identityNestedOptional,
   matchNestedOptional,
   wellKnownArrayBuffer,
-} from "../../generated/uniffi_coverall2";
+} from "@/generated/uniffi_coverall2";
 import { test, xtest } from "@/asserts";
 import "@/polyfills";
 

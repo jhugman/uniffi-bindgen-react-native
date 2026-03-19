@@ -3,11 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import {
-  Point,
-  Direction,
-  Shape,
-} from "../../generated/uniffi_value_type_methods";
+// To run:
+//   cargo test -p uniffi-fixture-value-type-methods -- jsi
+//   cargo test -p uniffi-fixture-value-type-methods -- wasm
+
+import { Point, Direction, Shape } from "@/generated/uniffi_value_type_methods";
 import { test } from "@/asserts";
 
 // floats should be "close enough".

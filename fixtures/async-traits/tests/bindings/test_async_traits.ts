@@ -3,8 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-async-traits -- jsi
+//   cargo test -p uniffi-fixture-async-traits -- wasm
 
-import myModule, { getSayAfterTraits } from "../../generated/async_traits";
+import myModule, { getSayAfterTraits } from "@/generated/async_traits";
 import { asyncTest, Asserts, test } from "@/asserts";
 import {
   uniffiRustFutureHandleCount,

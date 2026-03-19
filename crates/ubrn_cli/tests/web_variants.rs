@@ -36,7 +36,7 @@ fn test_release() -> Result<()> {
         assert_commands(&[
             Command::new("cargo")
                 .arg("build")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml"),
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml"),
             Command::new("prettier"),
             Command::new("cargo")
                 .arg("build")
@@ -85,7 +85,7 @@ fn test_monorepo() -> Result<()> {
         assert_commands(&[
             Command::new("cargo")
                 .arg("build")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml")
                 .arg_pair("--features", "wasm32_only"),
             Command::new("prettier"),
             Command::new("cargo")
@@ -141,7 +141,7 @@ fn test_multi_features() -> Result<()> {
         assert_commands(&[
             Command::new("cargo")
                 .arg("build")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml")
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml")
                 .arg_pair("--features", "wasm32_only,some_feature")
                 .arg("--no-default-features"),
             // other commands elided.
@@ -335,7 +335,7 @@ fn test_rustflags() -> Result<()> {
         assert_commands(&[
             Command::new("cargo")
                 .arg("build")
-                .arg_pair_suffix("--manifest-path", "fixtures/arithmetic/Cargo.toml"),
+                .arg_pair_suffix("--manifest-path", "examples/arithmetic/Cargo.toml"),
             Command::new("prettier"),
             Command::new("cargo")
                 .arg("build")

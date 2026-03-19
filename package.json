@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsc",
     "prepare": "yarn build",
-    "test": "./scripts/run-tests.sh"
+    "test": "cargo test"
   },
   "devDependencies": {
     "abortcontroller-polyfill": "^1.7.5",

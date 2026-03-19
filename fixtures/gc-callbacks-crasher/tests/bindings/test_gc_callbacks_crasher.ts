@@ -3,6 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-gc-callbacks-crasher -- jsi
+//   cargo test -p uniffi-fixture-gc-callbacks-crasher -- wasm
+
 import { asyncTest } from "@/asserts";
 import theModule, {
   type BasicDelegate,
@@ -10,7 +14,7 @@ import theModule, {
   createArcDroppingBuilder,
   createDroppingBuilder,
   getBuilder,
-} from "../../generated/gc_callbacks_crasher";
+} from "@/generated/gc_callbacks_crasher";
 
 theModule.initialize();
 

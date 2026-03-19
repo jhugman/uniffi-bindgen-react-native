@@ -3,15 +3,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-ext-types -- jsi
+//   cargo test -p uniffi-fixture-ext-types -- wasm
 
 import { test } from "@/asserts";
 
-import module1 from "../../generated/custom_types";
+import module1 from "@/generated/custom_types";
 import module2, {
   getGuid,
   getNestedOuid,
   getOuid,
-} from "../../generated/ext_types_custom";
+} from "@/generated/ext_types_custom";
 import module3, {
   CombinedType,
   ExternalCrateInterfaceInterface,
@@ -35,14 +38,14 @@ import module3, {
   getUrl,
   getUrls,
   ObjectsType,
-} from "../../generated/imported_types_lib";
+} from "@/generated/imported_types_lib";
 import module4, {
   callTraitImpl,
   getSubType,
   getTraitImpl,
   SubLibType,
   throwUniffiOneError,
-} from "../../generated/imported_types_sublib";
+} from "@/generated/imported_types_sublib";
 import module5, {
   getMyProcMacroType,
   UniffiOneEnum,
@@ -50,7 +53,7 @@ import module5, {
   UniffiOneProcMacroType,
   UniffiOneTrait,
   UniffiOneType,
-} from "../../generated/uniffi_one_ns";
+} from "@/generated/uniffi_one_ns";
 
 import "@/polyfills";
 import { URL } from "@/converters";

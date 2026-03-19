@@ -1,0 +1,21 @@
+[package]
+name = "uniffi-example-rondpoint-procmacro"
+edition = "2021"
+version = "0.22.0"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+name = "uniffi_rondpointpm"
+
+[dependencies]
+uniffi = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen-tests"] }

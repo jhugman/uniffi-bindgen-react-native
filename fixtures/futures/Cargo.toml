@@ -11,7 +11,7 @@ name = "uniffi_futures"
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "uniffi-fixtures-futures"
+name = "uniffi-fixture-futures"
 path = "src/bin.rs"
 
 [dependencies]
@@ -26,4 +26,6 @@ once_cell = "1.18.0"
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }

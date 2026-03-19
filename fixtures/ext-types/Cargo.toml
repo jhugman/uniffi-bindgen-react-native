@@ -30,7 +30,7 @@ uniffi-fixture-ext-types-custom-types = {path = "subcrates/custom-types"}
 uniffi-fixture-ext-types-sub-lib = {path = "subcrates/sub-lib"}
 
 # Reuse one of our examples.
-uniffi-example-custom-types = {path = "../custom-types-example"}
+uniffi-example-custom-types = {path = "../../examples/custom-types-example"}
 
 url = "2.2"
 
@@ -38,4 +38,6 @@ url = "2.2"
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }

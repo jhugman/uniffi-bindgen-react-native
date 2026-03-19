@@ -3,6 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-async-calls -- jsi
+//   cargo test -p uniffi-fixture-async-calls -- wasm
 
 import myModule, {
   alwaysReady,
@@ -21,7 +24,7 @@ import myModule, {
   sleep,
   useSharedResource,
   void_,
-} from "../../generated/futures";
+} from "@/generated/futures";
 import { asyncTest, xasyncTest, setDebug, Asserts, test } from "@/asserts";
 import {
   uniffiRustFutureHandleCount,

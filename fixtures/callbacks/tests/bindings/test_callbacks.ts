@@ -3,6 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-callbacks -- jsi
+//   cargo test -p uniffi-fixture-callbacks -- wasm
+
 import myModule, {
   ComplexError,
   ForeignGetters,
@@ -10,7 +14,7 @@ import myModule, {
   RustStringifier,
   RustGetters,
   StoredForeignStringifier,
-} from "../../generated/callbacks";
+} from "@/generated/callbacks";
 import { test } from "@/asserts";
 
 // Initialize the callbacks for the module.

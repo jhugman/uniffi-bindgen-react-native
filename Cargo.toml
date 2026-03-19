@@ -1,6 +1,7 @@
  [workspace]
 members = [
     "crates/*",
+    "examples/*",
     "fixtures/*",
     "xtask",
 ]
@@ -23,3 +24,5 @@ uniffi = "=0.31.0"
 uniffi_bindgen = "=0.31.0"
 uniffi_core = { version = "=0.31.0", default-features = false }
 uniffi_meta = "=0.31.0"
+ubrn_fixture_testing = { path = "crates/ubrn_fixture_testing" }
+ubrn_macros = { path = "crates/ubrn_macros" }

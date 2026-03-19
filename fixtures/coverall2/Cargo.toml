@@ -1,11 +1,12 @@
 [package]
-name = "uniffi-coverall2"
+name = "uniffi-fixture-coverall2"
 edition = "2021"
 version = "0.22.0"
 license = "MPL-2.0"
 publish = false
 
 [lib]
+name = "uniffi_coverall2"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
@@ -17,4 +18,6 @@ uniffi = { workspace = true }
 uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }

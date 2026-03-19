@@ -3,6 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-time -- jsi
+//   cargo test -p uniffi-fixture-time -- wasm
+
 import {
   now as rustNow,
   toStringTimestamp,
@@ -12,7 +16,7 @@ import {
   diff,
   ChronologicalError,
   optional,
-} from "../../generated/chronological";
+} from "@/generated/chronological";
 import { xasyncTest, test, Asserts, xtest } from "@/asserts";
 
 type Duration = number;

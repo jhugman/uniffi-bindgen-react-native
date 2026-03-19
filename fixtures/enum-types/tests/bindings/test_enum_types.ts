@@ -3,6 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+// To run:
+//   cargo test -p uniffi-fixture-enum-types -- jsi
+//   cargo test -p uniffi-fixture-enum-types -- wasm
+
 import { test } from "@/asserts";
 import {
   Animal,
@@ -23,7 +27,7 @@ import {
   CollidingVariants_Tags,
   identityCollidingVariants,
   AnimalObjectInterface,
-} from "../../generated/enum_types";
+} from "@/generated/enum_types";
 
 test("Enum discriminant", (t) => {
   t.assertEqual(Animal.Dog, 0);

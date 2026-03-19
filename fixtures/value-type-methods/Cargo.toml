@@ -13,4 +13,6 @@ name = "uniffi_value_type_methods"
 uniffi = { workspace = true }
 
 [dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
 uniffi = { workspace = true, features = ["bindgen-tests"] }
