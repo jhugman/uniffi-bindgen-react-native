@@ -44,10 +44,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tests
-        run: cargo test --verbose --workspace --exclude 'uniffi-example-*' --exclude 'uniffi-fixture-*' --exclude 'javascript-runtime-tests'
+        run: cargo test --verbose --workspace --exclude 'uniffi-example-*' --exclude 'uniffi-fixture-*' --exclude 'uniffi-runtime-tests' -- --nocapture
 
       - name: Run tests for binaries
-        run: cargo test --bins
+        run: cargo test --bins -- --nocapture
 
   integration-tests-jsi-bindings:
     name: 🧩 Integration tests (JSI bindings)
@@ -60,11 +60,10 @@ jobs:
 
       - name: Installing hermes and test-runner
         run: |
-          cargo xtask bootstrap hermes --branch rn/0.77-stable
           cargo xtask bootstrap
 
       - name: Run tests of generated JSI bindings
-        run: "cargo test -- jsi::"
+        run: "cargo test -- jsi:: --nocapture"
 
   integration-tests-wasm-bindings:
     name: 🧩 Integration tests (WASM bindings)
@@ -82,7 +81,7 @@ jobs:
         run: cargo install wasm-bindgen-cli --version 0.2.100 --locked
 
       - name: Run tests of generated WASM bindings
-        run: "cargo test -- wasm::"
+        run: "cargo test -- wasm:: --nocapture"
 
   integration-tests-checkout:
     name: 🧩 Integration tests (checkout)
