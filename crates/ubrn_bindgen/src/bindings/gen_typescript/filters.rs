@@ -25,6 +25,23 @@ pub(super) fn type_name(
     Ok(type_.as_codetype().type_label(types.ci))
 }
 
+/// Check if a field's type is Optional (for rendering `?:` in record types)
+pub(super) fn is_optional(as_type: &impl AsType) -> Result<bool, askama::Error> {
+    Ok(matches!(as_type.as_type(), Type::Optional { .. }))
+}
+
+/// For optional fields in records: return just the inner type (without `| undefined`)
+pub(super) fn optional_inner_type_name(
+    as_type: &impl AsType,
+    types: &TypeRenderer,
+) -> Result<String, askama::Error> {
+    let type_ = types.as_type(as_type);
+    match &type_ {
+        Type::Optional { inner_type } => Ok(inner_type.as_codetype().type_label(types.ci)),
+        _ => Ok(type_.as_codetype().type_label(types.ci)),
+    }
+}
+
 pub(super) fn ffi_type_name_from_type(
     as_type: &impl AsType,
     types: &TypeRenderer,

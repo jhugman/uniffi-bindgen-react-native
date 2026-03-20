@@ -36,3 +36,15 @@ test("Allow defaults to be overridden", (t) => {
   t.assertEqual(v.bool, false);
   t.assertEqual(v.optionalBool, true);
 });
+
+test("Allow optional fields to be omitted entirely", (t) => {
+  const v: MyRecord = MyRecord.create({
+    number: 42,
+    bool: true,
+  });
+  t.assertEqual(v.string, "default");
+  t.assertEqual(v.optionalString, undefined);
+  t.assertEqual(v.number, 42);
+  t.assertEqual(v.bool, true);
+  t.assertEqual(v.optionalBool, undefined);
+});
