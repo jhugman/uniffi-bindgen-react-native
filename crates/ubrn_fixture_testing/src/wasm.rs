@@ -25,6 +25,7 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     let test_script = Utf8Path::new(test_script);
     let test_stem = test_script.file_stem().unwrap_or("test");
 
+    let shared_target_dir = Utf8PathBuf::from(target_tmpdir).join("ubrn-tests/wasm-shared-target");
     let out_dir =
         Utf8PathBuf::from(target_tmpdir).join(format!("ubrn-tests/{crate_name}-{test_stem}-wasm"));
     std::fs::create_dir_all(&out_dir).expect("failed to create output dir");
@@ -34,23 +35,43 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     let lib_name = metadata::read_cdylib_name(&fixture_dir);
     let cdylib_path = metadata::find_cdylib_path(&lib_name, target_dir);
 
-    // Always regenerate bindings — the generated output is the source of truth.
     let wasm_crate_dir = out_dir.join("wasm-crate");
     let generated_wasm = fixture_dir.join("generated/wasm");
     let ts_dir = generated_wasm.join("ts");
     let wasm_crate_src = generated_wasm.join("rs");
 
-    let temp_dir = out_dir.join("gen-tmp-wasm");
-    let temp_ts = temp_dir.join("ts");
-    let temp_rs = temp_dir.join("rs");
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    std::fs::create_dir_all(&temp_rs).expect("failed to create temp rs dir");
-    generate_bindings(&cdylib_path, &temp_ts, &temp_rs);
-    crate::sync_dir_write_if_changed(&temp_ts, &ts_dir);
-    crate::sync_dir_write_if_changed(&temp_rs, &wasm_crate_src);
-    let _ = std::fs::remove_dir_all(&temp_dir);
+    // Cache codegen: output is a pure function of cdylib content + ubrn binary.
+    // Skip regeneration when neither has changed.
+    let codegen_stamp_key = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        crate::file_content_hash(cdylib_path.as_std_path()).hash(&mut hasher);
+        // Use ubrn binary mtime (faster than hashing a large binary).
+        if let Ok(meta) = std::fs::metadata(crate::ubrn_binary_path().as_std_path()) {
+            if let Ok(mtime) = meta.modified() {
+                mtime.hash(&mut hasher);
+            }
+        }
+        format!("codegen:{}", hasher.finish())
+    };
 
-    generate_lib_rs(&wasm_crate_src, &lib_name);
+    let codegen_cached = crate::is_cache_valid(&generated_wasm, &codegen_stamp_key)
+        && ts_dir.exists()
+        && wasm_crate_src.exists();
+
+    if !codegen_cached {
+        let temp_dir = out_dir.join("gen-tmp-wasm");
+        let temp_ts = temp_dir.join("ts");
+        let temp_rs = temp_dir.join("rs");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_rs).expect("failed to create temp rs dir");
+        generate_bindings(&cdylib_path, &temp_ts, &temp_rs);
+        crate::sync_dir_write_if_changed(&temp_ts, &ts_dir);
+        crate::sync_dir_write_if_changed(&temp_rs, &wasm_crate_src);
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        generate_lib_rs(&wasm_crate_src, &lib_name);
+        crate::write_cache_stamp(&generated_wasm, &codegen_stamp_key);
+    }
 
     // Hash the generated output — only rebuild if content actually changed.
     let rs_hash = crate::dir_content_hash(&wasm_crate_src);
@@ -75,10 +96,9 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
         );
 
         let cargo_toml = wasm_crate_dir.join("Cargo.toml");
-        compile_wasm32(&cargo_toml);
+        compile_wasm32(&cargo_toml, &shared_target_dir);
 
-        let wasm_file =
-            wasm_crate_dir.join("target/wasm32-unknown-unknown/debug/my_test_crate.wasm");
+        let wasm_file = shared_target_dir.join("wasm32-unknown-unknown/debug/my_test_crate.wasm");
         let wasm_bindgen_dir = ts_dir.join("wasm-bindgen");
         std::fs::create_dir_all(&wasm_bindgen_dir).expect("failed to create wasm-bindgen dir");
         run_wasm_bindgen(&wasm_file, &wasm_bindgen_dir);
@@ -149,14 +169,21 @@ fn generate_cargo_toml(
     crate::write_file_if_changed(&wasm_crate_dir.join("Cargo.toml"), &cargo_toml_content);
 }
 
-fn compile_wasm32(cargo_toml: &Utf8Path) {
+fn compile_wasm32(cargo_toml: &Utf8Path, shared_target_dir: &Utf8Path) {
+    let num_cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    let jobs = std::cmp::max(1, num_cpus / 3);
     run_cmd_quietly(
         Command::new("cargo")
             .arg("build")
             .arg("--target")
             .arg("wasm32-unknown-unknown")
             .arg("--manifest-path")
-            .arg(cargo_toml.as_str()),
+            .arg(cargo_toml.as_str())
+            .arg("--jobs")
+            .arg(jobs.to_string())
+            .env("CARGO_TARGET_DIR", shared_target_dir.as_str()),
     );
 }
 
