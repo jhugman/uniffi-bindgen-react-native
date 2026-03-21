@@ -43,17 +43,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install cargo-nextest
+        run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ~/.cargo/bin
+
       - name: Run tests
-        run: cargo test --verbose --workspace --exclude 'uniffi-example-*' --exclude 'uniffi-fixture-*' --exclude 'uniffi-runtime-tests' -- --nocapture
+        run: cargo nextest run --verbose --workspace --exclude 'uniffi-example-*' --exclude 'uniffi-fixture-*' --exclude 'uniffi-runtime-tests' --no-capture
 
       - name: Run tests for binaries
-        run: cargo test --bins -- --nocapture
+        run: cargo nextest run --bins --no-capture
 
   integration-tests-jsi-bindings:
     name: 🧩 Integration tests (JSI bindings)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@nextest
 
       - name: Install tooling for building C++
         run: sudo apt-get install -y cmake ninja-build
@@ -63,13 +67,14 @@ jobs:
           cargo xtask bootstrap
 
       - name: Run tests of generated JSI bindings
-        run: "cargo test -- jsi:: --nocapture"
+        run: cargo nextest run -E 'test(jsi::)' --no-capture
 
   integration-tests-wasm-bindings:
     name: 🧩 Integration tests (WASM bindings)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@nextest
 
       - name: Installing
         run: cargo xtask bootstrap yarn
@@ -81,7 +86,7 @@ jobs:
         run: cargo install wasm-bindgen-cli --version 0.2.100 --locked
 
       - name: Run tests of generated WASM bindings
-        run: "cargo test -- wasm:: --nocapture"
+        run: cargo nextest run -E 'test(wasm::)' --no-capture
 
   integration-tests-checkout:
     name: 🧩 Integration tests (checkout)
