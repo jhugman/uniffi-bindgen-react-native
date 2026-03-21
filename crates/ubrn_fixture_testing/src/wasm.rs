@@ -52,28 +52,39 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
 
     generate_lib_rs(&wasm_crate_src, &lib_name);
 
-    // Build WASM
-    std::fs::create_dir_all(&wasm_crate_dir).expect("failed to create wasm-crate dir");
-    let canonical_wasm_crate = Utf8PathBuf::try_from(
-        std::path::Path::new(wasm_crate_dir.as_str())
-            .canonicalize()
-            .expect("failed to canonicalize wasm-crate dir"),
-    )
-    .expect("non-UTF-8 path");
-    generate_cargo_toml(
-        &canonical_wasm_crate,
-        crate_name,
-        &fixture_dir,
-        &wasm_crate_src,
-    );
+    // Hash the generated output — only rebuild if content actually changed.
+    let rs_hash = crate::dir_content_hash(&wasm_crate_src);
+    let ts_hash = crate::dir_content_hash(&ts_dir);
+    let stamp_key = format!("wasm-build:{rs_hash}:{ts_hash}");
 
-    let cargo_toml = wasm_crate_dir.join("Cargo.toml");
-    compile_wasm32(&cargo_toml);
+    let wasm_bindgen_index = fixture_dir.join("generated/wasm/ts/wasm-bindgen/index_bg.wasm");
 
-    let wasm_file = wasm_crate_dir.join("target/wasm32-unknown-unknown/debug/my_test_crate.wasm");
-    let wasm_bindgen_dir = ts_dir.join("wasm-bindgen");
-    std::fs::create_dir_all(&wasm_bindgen_dir).expect("failed to create wasm-bindgen dir");
-    run_wasm_bindgen(&wasm_file, &wasm_bindgen_dir);
+    if !(crate::is_cache_valid(&out_dir, &stamp_key) && wasm_bindgen_index.exists()) {
+        std::fs::create_dir_all(&wasm_crate_dir).expect("failed to create wasm-crate dir");
+        let canonical_wasm_crate = Utf8PathBuf::try_from(
+            std::path::Path::new(wasm_crate_dir.as_str())
+                .canonicalize()
+                .expect("failed to canonicalize wasm-crate dir"),
+        )
+        .expect("non-UTF-8 path");
+        generate_cargo_toml(
+            &canonical_wasm_crate,
+            crate_name,
+            &fixture_dir,
+            &wasm_crate_src,
+        );
+
+        let cargo_toml = wasm_crate_dir.join("Cargo.toml");
+        compile_wasm32(&cargo_toml);
+
+        let wasm_file =
+            wasm_crate_dir.join("target/wasm32-unknown-unknown/debug/my_test_crate.wasm");
+        let wasm_bindgen_dir = ts_dir.join("wasm-bindgen");
+        std::fs::create_dir_all(&wasm_bindgen_dir).expect("failed to create wasm-bindgen dir");
+        run_wasm_bindgen(&wasm_file, &wasm_bindgen_dir);
+
+        crate::write_cache_stamp(&out_dir, &stamp_key);
+    }
 
     let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
         &fixture_dir,

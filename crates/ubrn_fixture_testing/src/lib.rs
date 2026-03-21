@@ -29,8 +29,23 @@ impl Flavor {
 
 use std::process::Command;
 
+/// Path to the `uniffi-bindgen-react-native` binary (without building it).
+///
+/// Use this for cache-key computation (mtime checks) where you don't need
+/// the binary to actually be up-to-date. Requires `set_target_dir` to have
+/// been called first.
+pub(crate) fn ubrn_binary_path() -> &'static camino::Utf8Path {
+    use std::sync::LazyLock;
+    static PATH: LazyLock<camino::Utf8PathBuf> = LazyLock::new(|| {
+        let target_dir = target_dir();
+        target_dir.join("debug").join("uniffi-bindgen-react-native")
+    });
+    &PATH
+}
+
 /// Ensure the `uniffi-bindgen-react-native` binary is built and up-to-date.
 ///
+/// Call this before invoking the binary (i.e. on cache miss).
 /// Runs `cargo build` once per process (cached by LazyLock).
 pub(crate) fn ensure_ubrn_binary() -> &'static camino::Utf8Path {
     use std::sync::LazyLock;
@@ -42,9 +57,7 @@ pub(crate) fn ensure_ubrn_binary() -> &'static camino::Utf8Path {
                 .arg("uniffi-bindgen-react-native")
                 .arg("--quiet"),
         );
-        let bin = target_dir()
-            .join("debug")
-            .join("uniffi-bindgen-react-native");
+        let bin = ubrn_binary_path().to_owned();
         assert!(
             bin.exists(),
             "uniffi-bindgen-react-native binary not found at {bin}."
@@ -127,6 +140,40 @@ pub(crate) fn run_cmd(cmd: &mut Command) {
     }
 }
 
+/// Compute a fast content hash of a file. Returns 0 if file doesn't exist.
+pub(crate) fn file_content_hash(path: &std::path::Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    match std::fs::read(path) {
+        Ok(bytes) => {
+            let mut hasher = std::hash::DefaultHasher::new();
+            bytes.hash(&mut hasher);
+            hasher.finish()
+        }
+        Err(_) => 0,
+    }
+}
+
+/// Compute a combined content hash of all files in a flat directory.
+pub(crate) fn dir_content_hash(dir: &camino::Utf8Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::hash::DefaultHasher::new();
+    let mut entries: Vec<_> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .collect();
+    // Sort for deterministic ordering
+    entries.sort_by_key(|e| e.file_name());
+    for entry in entries {
+        entry.file_name().hash(&mut hasher);
+        if let Ok(bytes) = std::fs::read(entry.path()) {
+            bytes.hash(&mut hasher);
+        }
+    }
+    hasher.finish()
+}
+
 /// Sync files from `src` to `dst` using write-if-changed semantics.
 ///
 /// For each file in `src`:
@@ -189,6 +236,21 @@ pub(crate) fn sync_dir_write_if_changed(src: &camino::Utf8Path, dst: &camino::Ut
             }
         }
     }
+}
+
+/// Check if a cache stamp file matches the expected key.
+pub(crate) fn is_cache_valid(out_dir: &camino::Utf8Path, expected_key: &str) -> bool {
+    let stamp_path = out_dir.join(".cache-stamp");
+    match std::fs::read_to_string(&stamp_path) {
+        Ok(s) => s.trim() == expected_key.trim(),
+        Err(_) => false,
+    }
+}
+
+/// Write a cache stamp file with the given key.
+pub(crate) fn write_cache_stamp(out_dir: &camino::Utf8Path, key: &str) {
+    let stamp_path = out_dir.join(".cache-stamp");
+    std::fs::write(&stamp_path, key).expect("failed to write cache stamp");
 }
 
 /// Write `content` to `path` only if the file doesn't already contain identical content.

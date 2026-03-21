@@ -61,7 +61,13 @@ link_libraries(jsi)
 link_directories("${RUST_LIB_DIR}")
 
 # Set C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -frtti -fexceptions -Wall -fstack-protector-all -Werror")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -frtti -fexceptions -Wall -fstack-protector-all -Werror")
 
 add_library(${HERMES_EXTENSION_NAME} SHARED ${HERMES_EXTENSION_CPP})
 target_link_libraries(${HERMES_EXTENSION_NAME} ${RUST_LIB_LINKNAME})
+
+# Precompile heavy Hermes JSI headers — each .cpp file re-parses these otherwise.
+target_precompile_headers(${HERMES_EXTENSION_NAME} PRIVATE
+    <jsi/jsi.h>
+    <jsi/jsi-inl.h>
+)
