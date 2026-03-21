@@ -1571,7 +1571,6 @@ name = "ubrn_fixture_testing"
 version = "0.1.0"
 dependencies = [
  "camino",
- "cargo_metadata",
  "heck",
  "pathdiff",
 ]
