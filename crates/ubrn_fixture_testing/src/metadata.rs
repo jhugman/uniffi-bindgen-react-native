@@ -3,46 +3,82 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use camino::Utf8PathBuf;
-use cargo_metadata::{Metadata, MetadataCommand};
-use std::sync::LazyLock;
+use camino::{Utf8Path, Utf8PathBuf};
 
-static METADATA: LazyLock<Metadata> = LazyLock::new(|| {
-    MetadataCommand::new()
-        .exec()
-        .expect("failed to run cargo metadata")
-});
-
-pub(crate) fn workspace_metadata() -> &'static Metadata {
-    &METADATA
-}
-
-fn find_package(crate_name: &str) -> &'static cargo_metadata::Package {
-    let meta = workspace_metadata();
-    meta.packages
-        .iter()
-        .find(|p| p.name == crate_name)
-        .unwrap_or_else(|| panic!("package {crate_name} not found in workspace"))
-}
-
-/// Find a package in the workspace by name and return its manifest directory.
-pub(crate) fn find_package_dir(crate_name: &str) -> Utf8PathBuf {
-    find_package(crate_name)
-        .manifest_path
+/// Derive the workspace target directory from `CARGO_TARGET_TMPDIR`.
+///
+/// `CARGO_TARGET_TMPDIR` = `<target_dir>/tmp`, so we just strip the last
+/// component. This avoids the ~130ms `cargo metadata` overhead per process.
+pub(crate) fn target_dir_from_tmpdir(target_tmpdir: &str) -> Utf8PathBuf {
+    Utf8PathBuf::from(target_tmpdir)
         .parent()
-        .expect("manifest_path has no parent")
+        .expect("target_tmpdir has no parent")
         .to_path_buf()
 }
 
-/// Find the cdylib target name for a package (e.g. "uniffi_arithmetic").
-pub(crate) fn find_cdylib_name(crate_name: &str) -> String {
-    let pkg = find_package(crate_name);
-    let lib_target = pkg
-        .targets
-        .iter()
-        .find(|t| t.is_cdylib())
-        .unwrap_or_else(|| panic!("no cdylib target in {crate_name}"));
-    lib_target.name.clone()
+/// Derive the fixture directory from the test script path.
+///
+/// The test script is `<CARGO_MANIFEST_DIR>/tests/bindings/test_foo.ts`,
+/// so we walk up until we find a `Cargo.toml`.
+pub(crate) fn fixture_dir_from_script(test_script: &Utf8Path) -> Utf8PathBuf {
+    let mut dir = test_script
+        .parent()
+        .expect("test_script has no parent directory");
+    loop {
+        if dir.join("Cargo.toml").exists() {
+            return dir.to_path_buf();
+        }
+        dir = dir
+            .parent()
+            .unwrap_or_else(|| panic!("Cargo.toml not found above {test_script}"));
+    }
+}
+
+/// Read the cdylib target name from a fixture's Cargo.toml.
+///
+/// Parses the `[lib] name = "..."` field. Falls back to the package name
+/// (with hyphens replaced by underscores) if no explicit lib name is set.
+pub(crate) fn read_cdylib_name(fixture_dir: &Utf8Path) -> String {
+    let cargo_toml_path = fixture_dir.join("Cargo.toml");
+    let contents = std::fs::read_to_string(&cargo_toml_path)
+        .unwrap_or_else(|e| panic!("failed to read {cargo_toml_path}: {e}"));
+
+    // Look for [lib] section and extract `name = "..."`
+    let mut in_lib_section = false;
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_lib_section = trimmed == "[lib]";
+            continue;
+        }
+        if in_lib_section {
+            if let Some(rest) = trimmed.strip_prefix("name") {
+                let rest = rest.trim_start();
+                if let Some(rest) = rest.strip_prefix('=') {
+                    let name = rest.trim().trim_matches('"').trim_matches('\'');
+                    if !name.is_empty() {
+                        return name.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: derive from package name
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("name") {
+            let rest = rest.trim_start();
+            if let Some(rest) = rest.strip_prefix('=') {
+                let name = rest.trim().trim_matches('"').trim_matches('\'');
+                if !name.is_empty() {
+                    return name.replace('-', "_");
+                }
+            }
+        }
+    }
+
+    panic!("could not determine cdylib name from {cargo_toml_path}");
 }
 
 /// Platform-specific shared library extension.
@@ -56,16 +92,20 @@ pub(crate) fn shared_lib_ext() -> &'static str {
     }
 }
 
-/// Find the cdylib artifact for a package.
-pub(crate) fn find_cdylib(crate_name: &str) -> Utf8PathBuf {
-    let lib_name = find_cdylib_name(crate_name);
-    find_cdylib_from_name(&lib_name)
-}
-
-/// Find the cdylib artifact given a library name.
-pub(crate) fn find_cdylib_from_name(lib_name: &str) -> Utf8PathBuf {
-    let target_dir = &workspace_metadata().target_directory;
-    target_dir
-        .join("debug")
-        .join(format!("lib{lib_name}.{}", shared_lib_ext()))
+/// Find the cdylib artifact path given a library name and target directory.
+///
+/// Checks `target/debug/` first (produced by `cargo build`), then
+/// `target/debug/deps/` (produced by `cargo test`).
+pub(crate) fn find_cdylib_path(lib_name: &str, target_dir: &Utf8Path) -> Utf8PathBuf {
+    let filename = format!("lib{lib_name}.{}", shared_lib_ext());
+    let primary = target_dir.join("debug").join(&filename);
+    if primary.exists() {
+        return primary;
+    }
+    let deps = target_dir.join("debug").join("deps").join(&filename);
+    if deps.exists() {
+        return deps;
+    }
+    // Return primary path — will error downstream with a clear message
+    primary
 }

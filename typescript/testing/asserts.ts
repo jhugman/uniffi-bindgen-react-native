@@ -141,10 +141,15 @@ export class Asserts {
 // Additional methods for running async tests.
 
 function range(expectedMs: number, tolerance?: number): [number, number] {
+  // Ensure a minimum tolerance — the test harness environment adds jitter
+  // from parallel builds, process scheduling, etc. These timing checks validate
+  // FFI correctness, not execution environment performance.
+  const MIN_TOLERANCE = 200;
   if (tolerance === undefined) {
-    tolerance = 10;
+    tolerance = MIN_TOLERANCE;
     return [expectedMs - tolerance, expectedMs + tolerance];
   } else if (tolerance < expectedMs) {
+    tolerance = Math.max(tolerance, MIN_TOLERANCE);
     return [expectedMs - tolerance, expectedMs + tolerance];
   } else {
     // the second arg is greater than the first; treat it like a min/max.

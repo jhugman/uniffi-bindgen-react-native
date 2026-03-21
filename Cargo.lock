@@ -895,14 +895,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
 
 [[package]]
-name = "javascript-runtime-tests"
-version = "0.1.0"
-dependencies = [
- "ubrn_fixture_testing",
- "ubrn_macros",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1579,7 +1571,6 @@ name = "ubrn_fixture_testing"
 version = "0.1.0"
 dependencies = [
  "camino",
- "cargo_metadata",
  "heck",
  "pathdiff",
 ]
@@ -1975,6 +1966,14 @@ version = "0.30.0-1"
 dependencies = [
  "uniffi_core",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "uniffi-runtime-tests"
+version = "0.1.0"
+dependencies = [
+ "ubrn_fixture_testing",
+ "ubrn_macros",
 ]
 
 [[package]]
