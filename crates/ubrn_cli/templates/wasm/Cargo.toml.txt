@@ -27,11 +27,9 @@ default = []
     {%- when Some(flag) %}, default-features = {{ flag }}
     {%- else %}
     {%- endmatch %} }
-# We want to ensure that the version of wasm-bindgen is selected by the
-# uniffi-runtime-javascript crate.
-# cargo is smart enough to do this if we don't put any further restrictions
-# on it.
-uniffi-runtime-javascript = { version = "{{ runtime_version() }}", features = ["wasm32"] }
+# Use the runtime crate that ships with the current UBRN install so the
+# generated wasm crate stays in lock-step with the CLI/runtime implementation.
+{{ runtime_dependency() }}
 wasm-bindgen = "*"
 
 {% if !config.project.wasm.workspace -%}

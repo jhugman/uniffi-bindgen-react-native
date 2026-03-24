@@ -11,8 +11,8 @@ keywords = ["ffi", "code-generation", "javascript", "wasm"]
 categories = ["api-bindings", "development-tools::ffi"]
 
 [dependencies]
-uniffi_core = { workspace = true, default-features = false }
+uniffi_core = { version = "=0.31.0", default-features = false }
 wasm-bindgen = { version = "0.2.97", optional = true }
 
 [features]
-wasm32 = ["wasm-bindgen"]
+wasm32 = ["dep:wasm-bindgen", "uniffi_core/wasm-unstable-single-threaded"]

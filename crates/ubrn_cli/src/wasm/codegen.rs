@@ -43,8 +43,21 @@ impl RenderedFile for WasmCargoToml {
     }
 }
 impl WasmCargoToml {
-    fn runtime_version(&self) -> String {
-        self.config.project.wasm.runtime_version()
+    fn runtime_dependency(&self) -> String {
+        let runtime_crate =
+            Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../uniffi-runtime-javascript");
+        if runtime_crate.exists() {
+            let runtime_crate = self.relative_to(&self.project_root(), &runtime_crate);
+            format!(
+                "uniffi-runtime-javascript = {{ path = \"{}\", features = [\"wasm32\"] }}",
+                runtime_crate
+            )
+        } else {
+            format!(
+                "uniffi-runtime-javascript = {{ version = \"{}\", features = [\"wasm32\"] }}",
+                self.config.project.wasm.runtime_version()
+            )
+        }
     }
 }
 
