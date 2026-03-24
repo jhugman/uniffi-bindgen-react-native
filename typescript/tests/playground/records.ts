@@ -9,9 +9,9 @@ import { uniffiCreateRecord } from "../../src/records";
 export type MyRecord = {
   string: string;
   number: number;
-  optionalString: string | undefined;
+  optionalString?: string;
   bool: boolean;
-  optionalBool: boolean | undefined;
+  optionalBool?: boolean;
 };
 
 export const MyRecord = (() => {

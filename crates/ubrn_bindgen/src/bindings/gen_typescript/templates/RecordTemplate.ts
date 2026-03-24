@@ -6,7 +6,11 @@
 export type {{ type_name }} = {
     {%- for field in rec.fields() %}
     {%- call ts::docstring(field, 4) %}
+    {%- if field|is_optional %}
+    {{ field.name()|var_name }}?: {{ field|optional_inner_type_name(self) }}
+    {%- else %}
     {{ field.name()|var_name }}: {{ field|type_name(self) }}
+    {%- endif %}
     {%- if !loop.last %},{% endif %}
     {%- endfor %}
 }

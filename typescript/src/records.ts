@@ -11,7 +11,11 @@
 export const uniffiCreateRecord = <T, D extends Partial<T>>(
   defaults: () => D,
 ) => {
-  type MissingKeys = Omit<T, keyof D>;
+  // OptionalKeys extracts keys declared with `?:` in T
+  type OptionalKeys<O> = {
+    [K in keyof O]-?: undefined extends O[K] ? K : never;
+  }[keyof O];
+  type MissingKeys = Omit<T, keyof D | OptionalKeys<T>>;
   return (partial: Partial<T> & Required<MissingKeys>): T =>
     Object.freeze({ ...defaults(), ...partial } as T);
 };
