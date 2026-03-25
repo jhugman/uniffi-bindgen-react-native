@@ -118,7 +118,7 @@ pub(crate) fn write_fixture_tsconfig(
 
 /// Run a test script with tsx and experimental WASM module support.
 pub(crate) fn run_tsx(test_script: &camino::Utf8Path) {
-    let tsx = paths::node_modules_bin().join("tsx");
+    let tsx = paths::node_bin("tsx");
     run_cmd_quietly(
         Command::new(&tsx)
             .arg("--experimental-wasm-modules")

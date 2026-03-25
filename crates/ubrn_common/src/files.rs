@@ -20,6 +20,25 @@ pub fn resolve<P: AsRef<Utf8Path>>(directory: P, file_suffix: &str) -> Result<Op
     resolve_from_canonical(full_path, file_suffix)
 }
 
+/// Resolve a `node_modules/.bin/<name>` binary, handling Windows where the
+/// actual file is `<name>.cmd` (npm/yarn/pnpm) or `<name>.exe` (bun).
+pub fn resolve_node_bin<P: AsRef<Utf8Path>>(
+    directory: P,
+    name: &str,
+) -> Result<Option<Utf8PathBuf>> {
+    if cfg!(target_os = "windows") {
+        for ext in [".cmd", ".exe", ""] {
+            let suffixed = format!("node_modules/.bin/{name}{ext}");
+            if let Some(path) = resolve(&directory, &suffixed)? {
+                return Ok(Some(path));
+            }
+        }
+        Ok(None)
+    } else {
+        resolve(&directory, &format!("node_modules/.bin/{name}"))
+    }
+}
+
 fn resolve_from_canonical<P: AsRef<Utf8Path>>(
     path: P,
     file_suffix: &str,
