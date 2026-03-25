@@ -5,6 +5,12 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-2...main
+
+---
+
+# 0.31.0-2
+
 ## ✨ What's New ✨
 
 - Records and enums now support methods in TypeScript bindings, tracking uniffi 0.31's new value-type methods feature. Flat enums use direct method calls; tagged enums use a factory pattern ([#347](https://github.com/jhugman/uniffi-bindgen-react-native/pull/347)).
@@ -13,17 +19,26 @@
   `uniffi.toml` ([#341](https://github.com/jhugman/uniffi-bindgen-react-native/pull/341) by
   [@SimonThormeyer](https://github.com/SimonThormeyer)).
 
+- Optional fields in record types no longer need to be explicitly passed as `undefined` ([#358](https://github.com/jhugman/uniffi-bindgen-react-native/pull/358)). Thank you [@Psycarlo](https://github.com/Psycarlo)!
+
 ## 🦊 What's Changed
 
 - Bump `uniffi-rs` to [0.31.0](https://github.com/mozilla/uniffi-rs/blob/main/CHANGELOG.md).
 - Replace deprecated `SwiftBindingGenerator`/`KotlinBindingGenerator` with `bindings::generate` for iOS and Android native bindings.
 - Pin `wasm-bindgen` to 0.2.100 to avoid a compile-time regression in `js-sys`.
+- Enable the `wasm-unstable-single-threaded` feature of `uniffi_core` in the runtime crate, fixing a `Send` bound error when building WASM projects ([#356](https://github.com/jhugman/uniffi-bindgen-react-native/pull/356)). Thank you [@SimonThormeyer](https://github.com/SimonThormeyer)!
+- Fix Windows path separators in generated `CMakeLists.txt`, which was preventing bindings generation on Windows ([#352](https://github.com/jhugman/uniffi-bindgen-react-native/pull/352)). Thank you [@DavJCosby](https://github.com/DavJCosby)!
+- Rename the WASM template `Cargo.toml` to `Cargo.toml.txt` so Cargo doesn't pick it up when traversing dependencies ([#354](https://github.com/jhugman/uniffi-bindgen-react-native/pull/354)). Thank you [@marc2332](https://github.com/marc2332)!
+- Stop emitting `[profile.release]` in generated WASM crates that live inside a workspace ([#350](https://github.com/jhugman/uniffi-bindgen-react-native/pull/350)).
+- Canonicalize relative paths before comparing them, fixing path resolution issues on some setups ([#349](https://github.com/jhugman/uniffi-bindgen-react-native/pull/349)).
+- Split the shared codegen extensions into separate modules for each target language (TypeScript, C++, Rust), preparing for the uniffi pipeline API ([#353](https://github.com/jhugman/uniffi-bindgen-react-native/pull/353)).
+- Replace `xtask run` with a proc-macro test harness so fixture tests run with `cargo test` ([#355](https://github.com/jhugman/uniffi-bindgen-react-native/pull/355)).
 
 ## ⚠️ Breaking Changes
 
 - uniffi 0.31 changes method checksums (the self type is no longer included), so bindings compiled against 0.30.x are not compatible with 0.31.x. Regenerate your bindings after upgrading.
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.30.0-1...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.30.0-1...0.31.0-2
 
 ---
 
