@@ -8,6 +8,7 @@ use std::{cell::OnceCell, collections::BTreeMap, rc::Rc};
 use anyhow::Result;
 use askama::DynTemplate;
 use camino::{Utf8Path, Utf8PathBuf};
+use path_slash::PathExt;
 
 use ubrn_bindgen::ModuleMetadata;
 use ubrn_common::{mk_dir, CrateMetadata};
@@ -21,7 +22,10 @@ pub(crate) trait RenderedFile: DynTemplate {
         let from = file
             .parent()
             .expect("Expected this file to have a directory");
-        pathdiff::diff_utf8_paths(to, from).expect("Should be able to find a relative path")
+        let rel =
+            pathdiff::diff_utf8_paths(to, from).expect("Should be able to find a relative path");
+        // Normalize to forward slashes so templates produce valid paths on Windows.
+        Utf8PathBuf::from(rel.as_std_path().to_slash_lossy().as_ref())
     }
     fn filter_by(&self) -> bool {
         true
