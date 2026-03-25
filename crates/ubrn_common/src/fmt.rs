@@ -35,7 +35,12 @@ pub fn clang_format<P: AsRef<Utf8Path>>(path: P, check_only: bool) -> Result<Opt
 }
 
 pub fn prettier<P: AsRef<Utf8Path>>(out_dir: P, check_only: bool) -> Result<Option<Command>> {
-    let prettier = resolve(&out_dir, "node_modules/.bin/prettier")?;
+    let prettier = if cfg!(windows) {
+        resolve(&out_dir, "node_modules/.bin/prettier.cmd")?
+    } else {
+         resolve(&out_dir, "node_modules/.bin/prettier")?
+    };
+
     Ok(if let Some(prettier) = prettier {
         let mut cmd = Command::new(prettier);
         if check_only {
