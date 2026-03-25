@@ -1,6 +1,6 @@
 [package]
 name = "uniffi-runtime-javascript"
-version = "0.30.0-1"
+version = "0.31.0-2"
 edition = "2021"
 authors = ["James Hugman <james@hugman.tv>"]
 description = "Javascript runtime for UniFFI-generated bindings"

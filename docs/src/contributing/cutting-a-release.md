@@ -22,11 +22,11 @@
 
 ## Version numbers
 
-Uniffi has a `semver` versioning scheme. At time of writing, the current version of `uniffi-rs` is `0.28.3`
+`uniffi-rs` uses a `semver` versioning scheme (e.g. `0.31.0`).
 
-`uniffi-bindgen-react-native` uses this version number with prepended with a `-` and a variant number, starting at `0`.
+`uniffi-bindgen-react-native` tracks the `uniffi-rs` version and appends a `-N` variant number. The variant number increases monotonically across releases and is **not** reset when the `uniffi-rs` version changes.
 
-Thus, at first release, the version of `uniffi-bindgen-react-native` was `0.28.3-0`.
+For example, if the last release was `0.30.0-1` and `uniffi-rs` is bumped to `0.31.0`, the next release is `0.31.0-2` (not `0.31.0-0`).
 
 ### Compatibility with other packages
 
