@@ -38,7 +38,7 @@ pub fn prettier<P: AsRef<Utf8Path>>(out_dir: P, check_only: bool) -> Result<Opti
     let prettier = if cfg!(windows) {
         resolve(&out_dir, "node_modules/.bin/prettier.cmd")?
     } else {
-         resolve(&out_dir, "node_modules/.bin/prettier")?
+        resolve(&out_dir, "node_modules/.bin/prettier")?
     };
 
     Ok(if let Some(prettier) = prettier {
