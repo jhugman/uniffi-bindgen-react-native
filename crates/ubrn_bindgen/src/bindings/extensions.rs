@@ -1,3 +1,8 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ */
 //! Extension traits for uniffi_bindgen types used by multiple code generators.
 //!
 //! Only methods needed by 2+ generators (gen_cpp, gen_typescript, gen_rust) belong here.
@@ -6,11 +11,6 @@
 //! - `gen_typescript::extensions` — type sorting, TS-specific queries
 //! - `gen_rust::extensions` — FFI definition classification for Rust codegen
 
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- */
 use extend::ext;
 use uniffi_bindgen::{
     interface::{

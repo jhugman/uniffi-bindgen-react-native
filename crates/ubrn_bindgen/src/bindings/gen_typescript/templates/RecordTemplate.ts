@@ -1,90 +1,113 @@
-{{- self.import_infra("uniffiCreateRecord", "records") }}
-
-{%- let rec = ci.get_record_definition(name).expect("Record definition not found in this ci") %}
-{%- let tm = rec.uniffi_trait_methods() %}
-{%- call ts::docstring(rec, 0) %}
-export type {{ type_name }} = {
-    {%- for field in rec.fields() %}
-    {%- call ts::docstring(field, 4) %}
-    {%- if field|is_optional %}
-    {{ field.name()|var_name }}?: {{ field|optional_inner_type_name(self) }}
+{%- import "CallBodyMacros.ts" as cb %}
+{%- if let Some(ds) = rec.docstring %}
+{{ ds }}
+{%- endif %}
+export type {{ rec.ts_name }} = {
+    {%- for field in rec.fields %}
+    {%- if let Some(ds) = field.docstring %}
+{{ ds }}
+    {%- endif %}
+    {%- if field.is_optional %}
+    {{ field.name }}?: {{ field.ts_type }}
     {%- else %}
-    {{ field.name()|var_name }}: {{ field|type_name(self) }}
+    {{ field.name }}: {{ field.ts_type }}
     {%- endif %}
     {%- if !loop.last %},{% endif %}
     {%- endfor %}
 }
 
 /**
- * Generated factory for {@link {{ type_name }}} record objects.
+ * Generated factory for {@link {{ rec.ts_name }}} record objects.
  */
-export const {{ decl_type_name }} = (() => {
+export const {{ rec.ts_name }} = (() => {
     const defaults = () => ({
-        {%- for field in rec.fields() %}
-        {%- match field.default_value() %}
-        {%- when Some with(literal) %}
-        {{- field.name()|var_name }}: {{ literal|render_literal(field, ci) }}
+        {%- for field in rec.fields %}
+        {%- if let Some(dv) = field.default_value %}
+        {{ field.name }}: {{ dv }}
         {%- if !loop.last %},{% endif %}
-        {%- else %}
-        {%- endmatch -%}
+        {%- endif %}
         {%- endfor %}
     });
     const create = (() => {
-        return uniffiCreateRecord<{{ type_name }}, ReturnType<typeof defaults>>(defaults);
+        return uniffiCreateRecord<{{ rec.ts_name }}, ReturnType<typeof defaults>>(defaults);
     })();
-{%- let constructors = rec.constructors() %}
-{%- let methods = rec.methods() %}
-{%- let rust_has_create = rec.has_rust_constructor_named("create") %}
-{%- let rust_has_new   = rec.has_rust_constructor_named("new") %}
     return Object.freeze({
-        {%- if !rust_has_create %}
+        {%- if !rec.has_create_constructor %}
         create,
         {%- else %}
         // Note: Rust defines a constructor named 'create', replacing the default TypeScript factory helper.
         {%- endif %}
-        {%- if !rust_has_new %}
+        {%- if !rec.has_new_constructor %}
         new: create,
         {%- endif %}
-        defaults: () => Object.freeze(defaults()) as Partial<{{ type_name }}>,
-{% call ts::uniffi_trait_methods_value_receiver(tm, ffi_converter_name, type_name, "    ", ",") %}
-{%- if !constructors.is_empty() %}
-{% call ts::value_receiver_constructors(constructors, "    ", ",") %}
+        defaults: () => Object.freeze(defaults()) as Partial<{{ rec.ts_name }}>,
+{%- for ut in rec.uniffi_traits %}
+{%- match ut %}
+{%- when TsUniffiTrait::Display { method } %}
+        toString(self_: {{ rec.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+        },
+{%- when TsUniffiTrait::Debug { method } %}
+        toDebugString(self_: {{ rec.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+        },
+{%- if !rec.has_display_trait() %}
+        toString(self_: {{ rec.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+        },
 {%- endif %}
-{%- if !methods.is_empty() %}
-{% call ts::value_receiver_methods(methods, ffi_converter_name, type_name, "    ", ",") %}
-{%- endif %}
+{%- when TsUniffiTrait::Eq { eq, ne } %}
+        equals(self_: {{ rec.ts_name }}, {% call cb::arg_list_decl(eq) %}): {% call cb::return_type(eq) %} {
+        {% call cb::call_body_value(eq) %}
+        },
+{%- when TsUniffiTrait::Hash { method } %}
+        hashCode(self_: {{ rec.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+        },
+{%- when TsUniffiTrait::Ord { cmp } %}
+        compareTo(self_: {{ rec.ts_name }}, {% call cb::arg_list_decl(cmp) %}): {% call cb::return_type(cmp) %} {
+        {% call cb::call_body_value(cmp) %}
+        },
+{%- endmatch %}
+{%- endfor %}
+{%- for cons in rec.constructors %}
+        {{ cons.name }}({% call cb::arg_list_decl(cons) %}): {% call cb::return_type(cons) %} {
+{%- call cb::call_body_function(cons) %}
+        },
+{%- endfor %}
+{%- for method in rec.methods %}
+        {{ method.name }}(self_: {{ rec.ts_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
+{%- call cb::call_body_value(method) %}
+        },
+{%- endfor %}
     });
 })();
 
-const {{ ffi_converter_name }} = (() => {
-    type TypeName = {{ type_name }};
-    {{- self.import_infra("AbstractFfiConverterByteArray", "ffi-converters") }}
+const {{ rec.ffi_converter_name }} = (() => {
+    type TypeName = {{ rec.ts_name }};
     class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
         read(from: RustBuffer): TypeName {
             return {
-            {%- for field in rec.fields() %}
-                {{ field.name()|arg_name }}: {{ field|ffi_converter_name(self) }}.read(from)
+            {%- for field in rec.fields %}
+                {{ field.name }}: {{ field.ffi_converter }}.read(from)
                 {%- if !loop.last %}, {% endif %}
             {%- endfor %}
             };
         }
         write(value: TypeName, into: RustBuffer): void {
-            {%- for field in rec.fields() %}
-            {{ field|ffi_converter_name(self) }}.write(value.{{ field.name()|var_name }}, into);
+            {%- for field in rec.fields %}
+            {{ field.ffi_converter }}.write(value.{{ field.name }}, into);
             {%- endfor %}
         }
         allocationSize(value: TypeName): number {
-            {%- if rec.has_fields() %}
-            return {% for field in rec.fields() -%}
-                {{ field|ffi_converter_name(self) }}.allocationSize(value.{{ field.name()|var_name }})
-            {%- if !loop.last %} + {% else %};{% endif %}
-            {% endfor %}
-            {%- else %}
+            {%- if rec.fields.is_empty() %}
             return 0;
+            {%- else %}
+            return {%- for field in rec.fields %} {{ field.ffi_converter }}.allocationSize(value.{{ field.name }})
+            {%- if !loop.last %} +{% else %};{% endif %}
+            {% endfor %}
             {%- endif %}
         }
     };
     return new FFIConverter();
 })();
-
-{{- self.export_converter(ffi_converter_name) -}}

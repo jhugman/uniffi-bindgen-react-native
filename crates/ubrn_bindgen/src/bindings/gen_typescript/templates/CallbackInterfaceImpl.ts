@@ -1,22 +1,26 @@
-{{- self.import_infra_type("UniffiHandle", "handle-map") }}
-{{- self.import_infra_type("UniffiReferenceHolder", "callbacks") }}
-{{- self.import_infra_type("UniffiByteArray", "ffi-types")}}
-{{- self.import_infra("UniffiRustCaller", "rust-call")}}
-{{- self.import_infra("UniffiResult", "result")}}
-{{- self.import_infra_type("UniffiRustCallStatus", "rust-call")}}
+{#- Callback interface vtable implementation template (v2, IR-driven).
 
-{%- let vtable_methods = cbi.vtable_methods() %}
-{%- let trait_impl = format!("uniffiCallbackInterface{}", name) %}
+    Expected variables:
+    - `vtable: &TsVtable`          — the vtable to register
+    - `vtable_methods: &[TsCallable]` — the callback interface methods (for lifting)
+    - `ffi_converter_name: &str`   — the FfiConverter name (for lift/drop/clone)
+    - `trait_impl: &str`           — the const name (e.g. "uniffiCallbackInterfaceFoo")
+    - `is_verbose: &bool`
+    - `console_import: &Option<String>`
+-#}
+{%- import "CallBodyMacros.ts" as cb %}
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
-const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_name }}{% else %}any{% endif %}; register: () => void; } = {
+const {{ trait_impl }}: { vtable: any; register: () => void; } = {
     // Create the VTable using a series of closures.
     // ts automatically converts these into C callback functions.
     vtable: {
-        {%- for (ffi_callback, meth) in vtable_methods %}
-        {{ meth.name()|fn_name }}: (
-            {%- for arg in ffi_callback.arguments_no_return() %}
-            {{ arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_type_name }}{% if !loop.last || ffi_callback.has_rust_call_status_arg() %},{% endif %}
+        {%- for field in vtable.fields %}
+        {%- match field.method %}
+        {%- when Some with (meth) %}
+        {{ field.name }}: (
+            {%- for arg in field.ffi_closure_args %}
+            {{ arg.name }}: {{ arg.ffi_type }}{% if !loop.last || field.has_rust_call_status_arg %},{% endif %}
             {%- endfor -%}
         ) => {
             const uniffiMakeCall = {# space #}
@@ -25,25 +29,25 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
             {%- else %}
             ()
             {%- endif %}
-            : {% call ts::return_type(meth) %} => {
+            : {% call cb::return_type(meth) %} => {
                 const jsCallback = {{ ffi_converter_name }}.lift(uniffiHandle);
-                return {% call ts::await_kw(meth) %}jsCallback.{{ meth.name()|fn_name }}(
-                    {%- for arg in meth.arguments() %}
-                    {{ arg|ffi_converter_name(self) }}.lift({{ arg.name()|var_name }}){% if !loop.last %}, {% endif %}
+                return {% if meth.is_async() %}await {% endif %}jsCallback.{{ meth.name }}(
+                    {%- for arg in meth.arguments %}
+                    {{ arg.ffi_converter }}.lift({{ arg.name }}){% if !loop.last %}, {% endif %}
                     {%- endfor %}
                     {%- if meth.is_async() -%}
-                    {%-   if !meth.arguments().is_empty() %}, {% endif -%}
+                    {%-   if !meth.arguments.is_empty() %}, {% endif -%}
                     { signal }
                     {%- endif %}
                 )
             };
             {%- if !meth.is_async() %}
             {#- // Synchronous callback method #}
-            {%- match meth.return_type() %}
+            {%- match meth.return_type %}
             {%- when Some(t) %}
-            const uniffiResult = UniffiResult.ready<{{ t|ffi_type_name_from_type(self) }}>();
+            const uniffiResult = UniffiResult.ready<{{ t.ffi_type }}>();
             const uniffiHandleSuccess = (obj: any) => {
-                UniffiResult.writeSuccess(uniffiResult, {{ t|ffi_converter_name(self) }}.lower(obj));
+                UniffiResult.writeSuccess(uniffiResult, {{ t.ffi_converter }}.lower(obj));
             };
             {%- when None %}
             const uniffiResult = UniffiResult.ready<void>();
@@ -53,9 +57,8 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
                 UniffiResult.writeError(uniffiResult, code, errBuf);
             };
 
-            {%- match meth.throws_type() %}
+            {%- match meth.throws %}
             {%- when None %}
-            {{- self.import_infra("uniffiTraitInterfaceCall", "callbacks") }}
             uniffiTraitInterfaceCall(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
@@ -63,52 +66,58 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
                 /*lowerString:*/ FfiConverterString.lower
             )
             {%- when Some(error_type) %}
-            {{- self.import_infra("uniffiTraitInterfaceCallWithError", "callbacks") }}
             uniffiTraitInterfaceCallWithError(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
-                /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
+                /*isErrorType:*/ {{ error_type.decl_type_name }}.instanceOf,
+                /*lowerError:*/ {{ error_type.lower_error_fn }},
                 /*lowerString:*/ FfiConverterString.lower
             );
             {%- endmatch %}
             return uniffiResult;
             {%- else %} {#- // is_async = true #}
             {#- // Asynchronous callback method #}
-            const uniffiHandleSuccess = (returnValue: {% call ts::raw_return_type(meth) %}) => {
+            const uniffiHandleSuccess = (returnValue: {% call cb::raw_return_type(meth) %}) => {
                 uniffiFutureCallback.call(
                     uniffiFutureCallback,
                     uniffiCallbackData,
-                    /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{
-                        {%- match meth.return_type() %}
+                    {%- match field.foreign_future_result %}
+                    {%- when Some with (ffr) %}
+                    /* {{ ffr.struct_name }} */{
+                        {%- match meth.return_type %}
                         {%- when Some(return_type) %}
-                        returnValue: {{ return_type|ffi_converter_name(self) }}.lower(returnValue),
+                        returnValue: {{ return_type.ffi_converter }}.lower(returnValue),
                         {%- when None %}
                         {%- endmatch %}
                         callStatus: uniffiCaller.createCallStatus()
                     }
+                    {%- when None %}
+                    {}
+                    {%- endmatch %}
                 );
             };
             const uniffiHandleError = (code: number, errorBuf: UniffiByteArray) => {
                 uniffiFutureCallback.call(
                     uniffiFutureCallback,
                     uniffiCallbackData,
-                    /* {{ meth.foreign_future_ffi_result_struct().name()|ffi_struct_name }} */{
-                        {%- match meth.return_type().map(FfiType::from) %}
-                        {%- when Some(return_type) %}
-                        returnValue: {{ return_type|ffi_default_value }},
-                        {%- when None %}
-                        {%- endmatch %}
+                    {%- match field.foreign_future_result %}
+                    {%- when Some with (ffr) %}
+                    /* {{ ffr.struct_name }} */{
+                        {%- if !ffr.return_ffi_default_value.is_empty() %}
+                        returnValue: {{ ffr.return_ffi_default_value }},
+                        {%- endif %}
                         // TODO create callstatus with error.
                         callStatus: uniffiCaller.createErrorStatus(code, errorBuf),
                     }
+                    {%- when None %}
+                    {}
+                    {%- endmatch %}
                 );
             };
 
-            {%- match meth.throws_type() %}
+            {%- match meth.throws %}
             {%- when None %}
-            {{- self.import_infra("uniffiTraitInterfaceCallAsync", "async-callbacks") }}
             const uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
@@ -116,22 +125,23 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
                 /*lowerString:*/ FfiConverterString.lower
             );
             {%- when Some(error_type) %}
-            {{- self.import_infra("uniffiTraitInterfaceCallAsyncWithError", "async-callbacks") }}
             const uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*isErrorType:*/ {{ error_type|decl_type_name(self) }}.instanceOf,
-                /*lowerError:*/ {{ error_type|lower_error_fn(self) }},
+                /*isErrorType:*/ {{ error_type.decl_type_name }}.instanceOf,
+                /*lowerError:*/ {{ error_type.lower_error_fn }},
                 /*lowerString:*/ FfiConverterString.lower
             );
             {%- endmatch %}
             return uniffiForeignFuture;
             {%- endif %}
         },
+        {%- when None %}
+        {%- endmatch %}
         {%- endfor %}
         uniffiFree: (uniffiHandle: UniffiHandle): void => {
-            // {{ name }}: this will throw a stale handle error if the handle isn't found.
+            // this will throw a stale handle error if the handle isn't found.
             {{ ffi_converter_name }}.drop(uniffiHandle);
         },
         uniffiClone: (uniffiHandle: UniffiHandle): UniffiHandle => {
@@ -139,7 +149,7 @@ const {{ trait_impl }}: { vtable: {% if flavor.is_jsi() %}{{ vtable|ffi_type_nam
         }
     },
     register: () => {
-        {% call ts::fn_handle(cbi.ffi_init_callback()) %}(
+        {%- call cb::native_method_handle(vtable.ffi_init_fn) %}(
             {{ trait_impl }}.vtable
         );
     },

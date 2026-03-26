@@ -42,4 +42,16 @@ impl AbiFlavor {
             Self::Wasm => "src/lib.rs",
         }
     }
+
+    pub fn is_jsi(&self) -> bool {
+        matches!(self, Self::Jsi)
+    }
+
+    pub fn supports_rust_backtrace(&self) -> bool {
+        !matches!(self, Self::Jsi)
+    }
+
+    pub fn supports_finalization_registry(&self) -> bool {
+        !matches!(self, Self::Jsi)
+    }
 }
