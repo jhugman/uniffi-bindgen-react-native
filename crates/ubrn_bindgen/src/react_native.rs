@@ -48,10 +48,6 @@ impl ReactNativeBindingGenerator {
             )?;
             let api_ts_path = out_dir.join(module.ts_filename());
             ubrn_common::write_file(api_ts_path, api_ts)?;
-
-            let lowlevel_ts = gen_typescript::generate_lowlevel_code(&component.ci, &module)?;
-            let lowlevel_ts_path = out_dir.join(module.ts_ffi_filename());
-            ubrn_common::write_file(lowlevel_ts_path, lowlevel_ts)?;
         }
         if try_format_code {
             gen_typescript::format_directory(out_dir)?;

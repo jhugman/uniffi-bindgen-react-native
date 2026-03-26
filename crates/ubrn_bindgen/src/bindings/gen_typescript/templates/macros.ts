@@ -5,17 +5,6 @@
     // passed to rust via `arg_list_lowered`
     #}
 
-{%- macro arg_list_ffi_decl(func) %}
-    {%- let is_internal = func.is_internal() %}
-    {%- for arg in func.arguments() %}
-        {{- arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_native_type_name(is_internal) }}
-        {%- if !loop.last %}, {% endif %}
-    {%- endfor %}
-    {%- if func.has_rust_call_status_arg() %}
-    {%- if !func.arguments().is_empty() %}, {% endif -%}
-    uniffi_out_err: UniffiRustCallStatus{% endif %}
-{%- endmacro %}
-
 {#
 // Template to call into rust. Used in several places.
 // Variable names in `arg_list_decl` should match up with arg lists

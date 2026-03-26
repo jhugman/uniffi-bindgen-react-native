@@ -15,49 +15,38 @@ import {
  } from 'uniffi-bindgen-react-native';
 
 interface NativeModuleInterface {
-    {%- for func in ci.iter_ffi_functions_js_to_cpp() %}
-    {%- let is_internal = func.is_internal() %}
-    {% call ts::ffi_func_name(func.name()) %}(
-      {%- call ts::arg_list_ffi_decl(func) %}):
-      {%- match func.return_type() %}{% when Some with (return_type) %} {{ return_type.borrow()|ffi_native_type_name(is_internal) }}{% when None %} void{% endmatch %};
+    {%- for func in module.functions %}
+    {{ func.name }}(
+      {%- for arg in func.arguments %}
+        {{- arg.name }}: {{ arg.type_name }}
+        {%- if !loop.last %}, {% endif %}
+      {%- endfor %}):
+      {%- match func.return_type %}{% when Some with (rt) %} {{ rt }}{% when None %} void{% endmatch %};
   {%- endfor %}
 }
 
-// Casting globalThis to any allows us to look for `{{ module.cpp_module() }}`
+// Casting globalThis to any allows us to look for `{{ module.module_name }}`
 // if it was added via JSI.
 //
-// We use a getter here rather than simply `globalThis.{{ module.cpp_module() }}` so that
+// We use a getter here rather than simply `globalThis.{{ module.module_name }}` so that
 // if/when the startup sequence isn't just so, an empty value isn't inadvertantly cached.
-const getter: () => NativeModuleInterface = () => (globalThis as any).{{ module.cpp_module() }};
+const getter: () => NativeModuleInterface = () => (globalThis as any).{{ module.module_name }};
 export default getter;
 
-{%- macro exported(def) %}
-{%- if def.is_exported() -%}export {# space #}
-{%- endif %}
-{%- endmacro %}
-
 // Structs and function types for calling back into Typescript from Rust.
-{%- for def in ci.ffi_definitions() %}
+{%- for def in module.definitions %}
 {%- match def %}
-{%- when FfiDefinition::CallbackFunction(callback) %}
-{% call exported(callback) %}type {{ callback.name()|ffi_callback_name }} = (
-{%-   for arg in callback.arguments_no_return() %}
-{{- arg.name()|var_name }}: {{ arg.type_().borrow()|ffi_type_name }}{% if !loop.last %}, {% endif %}
-{%-   endfor %}) => {# space #}
-{%-   if callback.returns_result() %}
-{%-     match callback.arg_return_type() %}
-{%-       when Some(return_type) %}{{ return_type|ffi_type_name }}
-{%-       when None %}UniffiResult<void>
-{%-     endmatch %}
-{%    else %}void
-{%-   endif %};
-{%- when FfiDefinition::Struct(ffi_struct) %}
-{% call exported(ffi_struct) %}type {{ ffi_struct.name()|ffi_struct_name }} = {
-  {%- for field in ffi_struct.fields() %}
-  {{ field.name()|var_name }}: {{ field.type_().borrow()|ffi_type_name }};
+{%- when FfiDefinitionDecl::Callback(callback) %}
+{% if callback.exported %}export {% endif %}type {{ callback.name }} = (
+{%-   for arg in callback.arguments %}
+{{- arg.name }}: {{ arg.type_name }}{% if !loop.last %}, {% endif %}
+{%-   endfor %}) => {{ callback.return_type }};
+{%- when FfiDefinitionDecl::Struct(ffi_struct) %}
+{% if ffi_struct.exported %}export {% endif %}type {{ ffi_struct.name }} = {
+  {%- for field in ffi_struct.fields %}
+  {{ field.name }}: {{ field.type_name }};
   {%- endfor %}
 };
-{%- else %}
 {%- endmatch %}
 {%- endfor %}
 
@@ -94,5 +83,3 @@ const isUniffiForeignFutureTypeCompatible: UniffiStructuralEquality<
   RuntimeUniffiForeignFuture,
   UniffiForeignFuture
 > = true;
-
-{%- import "macros.ts" as ts %}

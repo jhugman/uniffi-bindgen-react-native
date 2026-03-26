@@ -12,6 +12,7 @@ mod compounds;
 mod config;
 mod custom;
 mod enum_;
+pub(crate) mod ffi_module;
 mod miscellany;
 mod object;
 mod primitives;
@@ -29,9 +30,9 @@ use uniffi_bindgen::interface::{AsType, Callable, FfiDefinition, FfiType, Type, 
 use uniffi_bindgen::ComponentInterface;
 
 use self::extensions::{
-    TsComponentInterfaceExt as _, TsEnumExt as _, TsFfiFunctionExt as _, TsObjectExt as _,
-    TsRecordExt as _,
+    TsComponentInterfaceExt as _, TsEnumExt as _, TsObjectExt as _, TsRecordExt as _,
 };
+use self::ffi_module::FfiDefinitionDecl;
 pub(crate) use self::{config::TsConfig as Config, util::format_directory};
 use self::{
     filters::{ffi_converter_name, type_name},
@@ -39,7 +40,7 @@ use self::{
 };
 use crate::{
     bindings::{
-        extensions::{ComponentInterfaceExt, FfiCallbackFunctionExt, FfiStructExt, ObjectExt},
+        extensions::{ComponentInterfaceExt, FfiCallbackFunctionExt, ObjectExt},
         metadata::ModuleMetadata,
         type_map::TypeMap,
     },
@@ -61,13 +62,10 @@ pub(crate) fn generate_api_code(
         .context("generating frontend typescript failed")
 }
 
-pub(crate) fn generate_lowlevel_code(
-    ci: &ComponentInterface,
-    module: &ModuleMetadata,
-) -> Result<String> {
-    LowlevelTsWrapper::new(ci, module)
+pub(crate) fn generate_lowlevel_code(ffi_module: ffi_module::TsFfiModule) -> Result<String> {
+    LowlevelTsWrapper::new(ffi_module)
         .render()
-        .context("generating lowlevel typescipt failed")
+        .context("generating lowlevel typescript from IR failed")
 }
 
 #[derive(Debug)]
@@ -100,14 +98,13 @@ impl TsFlavorParams<'_> {
 
 #[derive(Template)]
 #[template(syntax = "ts", escape = "none", path = "wrapper-ffi.ts")]
-struct LowlevelTsWrapper<'a> {
-    ci: &'a ComponentInterface,
-    module: &'a ModuleMetadata,
+struct LowlevelTsWrapper {
+    module: ffi_module::TsFfiModule,
 }
 
-impl<'a> LowlevelTsWrapper<'a> {
-    fn new(ci: &'a ComponentInterface, module: &'a ModuleMetadata) -> Self {
-        Self { ci, module }
+impl LowlevelTsWrapper {
+    fn new(module: ffi_module::TsFfiModule) -> Self {
+        Self { module }
     }
 }
 

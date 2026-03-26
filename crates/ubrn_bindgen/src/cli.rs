@@ -10,12 +10,15 @@ use camino::{Utf8Path, Utf8PathBuf};
 use cargo_metadata::Metadata;
 use clap::Args;
 use ubrn_common::{mk_dir, path_or_shim, CrateMetadata, Utf8PathBufExt as _};
-use uniffi_bindgen::{cargo_metadata::CrateConfigSupplier, BindingGenerator};
+use uniffi_bindgen::{
+    cargo_metadata::CrateConfigSupplier, pipeline::general, BindgenLoader, BindgenPaths,
+    BindingGenerator,
+};
 
 #[cfg(feature = "wasm")]
 use super::wasm::WasmBindingGenerator;
 use super::{
-    bindings::metadata::ModuleMetadata,
+    bindings::{gen_typescript, metadata::ModuleMetadata},
     react_native::ReactNativeBindingGenerator,
     switches::{AbiFlavor, SwitchArgs},
 };
@@ -138,23 +141,29 @@ impl BindingsArgs {
         let abi_dir = out.cpp_dir.canonicalize_utf8_or_shim()?;
 
         let switches = self.switches();
-        let abi_dir = abi_dir.clone();
-        let ts_dir = ts_dir.clone();
         let cwd = Utf8PathBuf::from("Cargo.toml");
         let manifest_path = manifest_path.unwrap_or(&cwd);
         let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
 
-        match &switches.flavor {
+        let result = match &switches.flavor {
             AbiFlavor::Jsi => self.generate_bindings(
                 metadata,
-                &ReactNativeBindingGenerator::new(ts_dir, abi_dir, switches),
+                &ReactNativeBindingGenerator::new(ts_dir.clone(), abi_dir, switches.clone()),
             ),
             #[cfg(feature = "wasm")]
             AbiFlavor::Wasm => self.generate_bindings(
                 metadata,
-                &WasmBindingGenerator::new(ts_dir, abi_dir, switches),
+                &WasmBindingGenerator::new(ts_dir.clone(), abi_dir, switches.clone()),
             ),
+        }?;
+
+        if matches!(switches.flavor, AbiFlavor::Jsi) {
+            let source_path = path_or_shim(&self.source.source)?;
+            let general_root = run_general_pipeline(&source_path)?;
+            regenerate_ffi_from_pipeline(&general_root, &ts_dir, !out.no_format)?;
         }
+
+        Ok(result)
     }
 
     fn generate_bindings<Generator: BindingGenerator>(
@@ -198,4 +207,32 @@ impl BindingsArgs {
 
         Ok(configs)
     }
+}
+
+fn run_general_pipeline(source_path: &Utf8Path) -> Result<general::Root> {
+    let mut bindgen_paths = BindgenPaths::default();
+    bindgen_paths.add_cargo_metadata_layer(false)?;
+    let loader = BindgenLoader::new(bindgen_paths);
+    let metadata = loader.load_metadata(source_path)?;
+    let initial_root = loader.load_pipeline_initial_root(source_path, metadata)?;
+    let root = general::pipeline("react-native").execute(initial_root)?;
+    Ok(root)
+}
+
+fn regenerate_ffi_from_pipeline(
+    root: &general::Root,
+    ts_dir: &Utf8Path,
+    try_format_code: bool,
+) -> Result<()> {
+    for (name, namespace) in &root.namespaces {
+        let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(namespace);
+        let code = gen_typescript::generate_lowlevel_code(ffi_module)?;
+        let module = ModuleMetadata::new(name);
+        let path = ts_dir.join(module.ts_ffi_filename());
+        ubrn_common::write_file(path, code)?;
+    }
+    if try_format_code {
+        gen_typescript::format_directory(ts_dir)?;
+    }
+    Ok(())
 }

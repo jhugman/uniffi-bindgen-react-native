@@ -100,19 +100,6 @@ impl CodeOracle {
         }
     }
 
-    /// Returns the FFI type name as declared in the TypeScript native module interface.
-    /// This is how TypeScript describes the C++ boundary types — e.g. `Handle` becomes
-    /// `UniffiGcObject` (an opaque ref-counted wrapper), `RustBuffer` becomes `string`
-    /// (the C++ layer handles the actual buffer conversion).
-    pub(crate) fn ffi_type_label_for_native_interface(&self, ffi_type: &FfiType) -> String {
-        match ffi_type {
-            FfiType::Handle => "UniffiGcObject".to_string(),
-            FfiType::ForeignBytes => "Uint8Array".to_string(),
-            FfiType::RustBuffer(_) => "string".to_string(),
-            _ => self.ffi_type_label(ffi_type),
-        }
-    }
-
     pub(crate) fn ffi_type_label(&self, ffi_type: &FfiType) -> String {
         match ffi_type {
             FfiType::Int8 | FfiType::UInt8 => "number".to_string(),
