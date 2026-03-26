@@ -1,13 +1,20 @@
-{%- let cbi = ci.get_callback_interface_definition(name).expect("Callback Interface definition not found in this ci") %}
-{%- let methods = cbi.methods() %}
-{%- let protocol_name = type_name.clone() %}
-{%- let protocol_docstring = cbi.docstring() %}
-{%- let vtable = cbi.vtable() %}
-{{- self.import_infra("FfiConverterCallback", "callbacks") }}
-{#- obj is used to generate an interface with ObjectInterfaceTemplate.ts #}
+{#- Callback interface template (v2, IR-driven).
+
+    Expected renderer fields:
+    - `cbi: &TsCallbackInterface`
+    - `is_verbose: &bool`
+    - `console_import: &'a Option<String>`
+-#}
+{%- let ffi_converter_name = cbi.ffi_converter_name %}
+{%- let trait_impl = cbi.trait_impl %}
+{%- let vtable = cbi.vtable %}
+
+{#- Render the protocol interface using the same template as objects -#}
 {%- let obj = cbi %}
 {% include "ObjectInterfaceTemplate.ts" %}
+
+{#- Include the vtable implementation -#}
 {% include "CallbackInterfaceImpl.ts" %}
 
 // FfiConverter protocol for callback interfaces
-const {{ ffi_converter_name }} = new FfiConverterCallback<{{ type_name }}>();
+const {{ cbi.ffi_converter_name }} = new FfiConverterCallback<{{ cbi.ts_name }}>();

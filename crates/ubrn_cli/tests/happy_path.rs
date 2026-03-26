@@ -141,8 +141,8 @@ fn test_happy_path_android() -> Result<()> {
                 .arg_pair("--platform", "23")
                 .arg("--")
                 .arg("build"),
-            Command::new("prettier"),
             Command::new("clang-format"),
+            Command::new("prettier"),
         ]);
 
         assert_files(&[
