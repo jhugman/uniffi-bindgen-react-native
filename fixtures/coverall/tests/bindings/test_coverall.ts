@@ -14,6 +14,7 @@ import coverall, {
   Coveralls,
   createNoneDict,
   createSomeDict,
+  DictWithDefaults,
   getNumAlive,
   RootError,
   throwRootError,
@@ -101,6 +102,23 @@ test("test create_none_dict() with default values", (t) => {
   t.assertEqual(d.float64, 0, undefined, almostEquals);
   t.assertEqual(d.maybeFloat64, undefined);
 
+  t.assertEqual(d.coveralls, undefined);
+});
+
+test("DictWithDefaults optional fields are omittable", (t) => {
+  // Optional fields should be declared with `?:` so they can be omitted
+  // from object literals. This is a compile-time check: if the generated
+  // type uses `field: T | undefined` instead of `field?: T`, tsc will
+  // report a missing-property error here.
+  const d: DictWithDefaults = DictWithDefaults.create({
+    name: "test",
+    category: "testing",
+    integer: 31,
+  });
+  t.assertEqual(d.name, "test");
+  t.assertEqual(d.category, "testing");
+  t.assertEqual(d.integer, 31);
+  t.assertEqual(d.boolean, true);
   t.assertEqual(d.coveralls, undefined);
 });
 

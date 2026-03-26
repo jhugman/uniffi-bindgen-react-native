@@ -10,6 +10,7 @@
 /// iterates and interpolates without logic.
 pub(crate) struct TsFfiModule {
     pub module_name: String,
+    pub strict_type_checking: bool,
     pub functions: Vec<FfiFunctionDecl>,
     /// Interleaved in the order from `general::Namespace::ffi_definitions`.
     pub definitions: Vec<FfiDefinitionDecl>,

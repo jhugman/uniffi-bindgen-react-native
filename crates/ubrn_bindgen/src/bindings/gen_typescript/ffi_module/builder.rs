@@ -7,11 +7,12 @@
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::pipeline::general;
 
+use super::super::config::TsConfig;
 use super::nodes::*;
 use super::type_mapping::{ffi_type_to_ts, ffi_type_to_ts_native};
 
 impl TsFfiModule {
-    pub(crate) fn from_general(namespace: &general::Namespace) -> Self {
+    pub(crate) fn from_general(namespace: &general::Namespace, config: &TsConfig) -> Self {
         let module_name = format!("Native{}", namespace.name.to_upper_camel_case());
 
         let has_async = namespace.ffi_definitions.iter().any(|def| {
@@ -31,6 +32,7 @@ impl TsFfiModule {
 
         Self {
             module_name,
+            strict_type_checking: config.strict_type_checking,
             functions,
             definitions,
         }

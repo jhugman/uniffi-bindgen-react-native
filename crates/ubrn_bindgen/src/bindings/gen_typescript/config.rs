@@ -18,6 +18,11 @@ pub(crate) struct TsConfig {
     pub(crate) custom_types: HashMap<String, CustomTypeConfig>,
     #[serde(default)]
     pub(crate) strict_object_types: bool,
+    /// When `true`, omit `// @ts-nocheck` from generated files so that
+    /// `tsc` reports type errors. Defaults to `false` (generated files
+    /// include `@ts-nocheck` to avoid noise in downstream projects).
+    #[serde(default)]
+    pub(crate) strict_type_checking: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

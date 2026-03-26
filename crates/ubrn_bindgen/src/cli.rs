@@ -160,7 +160,8 @@ impl BindingsArgs {
         if matches!(switches.flavor, AbiFlavor::Jsi) {
             let source_path = path_or_shim(&self.source.source)?;
             let general_root = run_general_pipeline(&source_path)?;
-            regenerate_ffi_from_pipeline(&general_root, &ts_dir, !out.no_format)?;
+            let ts_config = load_ts_config(self.source.config.as_deref())?;
+            regenerate_ffi_from_pipeline(&general_root, &ts_dir, !out.no_format, &ts_config)?;
         }
 
         Ok(result)
@@ -219,13 +220,29 @@ fn run_general_pipeline(source_path: &Utf8Path) -> Result<general::Root> {
     Ok(root)
 }
 
+fn load_ts_config(config_path: Option<&Utf8Path>) -> Result<gen_typescript::Config> {
+    let Some(path) = config_path else {
+        return Ok(Default::default());
+    };
+    let contents = std::fs::read_to_string(path)?;
+    let toml_value: toml::Value = toml::from_str(&contents)?;
+    Ok(toml_value
+        .get("bindings")
+        .and_then(|b| b.get("typescript").or_else(|| b.get("ts")))
+        .map(|v| v.clone().try_into())
+        .transpose()?
+        .unwrap_or_default())
+}
+
 fn regenerate_ffi_from_pipeline(
     root: &general::Root,
     ts_dir: &Utf8Path,
     try_format_code: bool,
+    ts_config: &gen_typescript::Config,
 ) -> Result<()> {
     for (name, namespace) in &root.namespaces {
-        let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(namespace);
+        let ffi_module =
+            gen_typescript::ffi_module::TsFfiModule::from_general(namespace, ts_config);
         let code = gen_typescript::generate_lowlevel_code(ffi_module)?;
         let module = ModuleMetadata::new(name);
         let path = ts_dir.join(module.ts_ffi_filename());
