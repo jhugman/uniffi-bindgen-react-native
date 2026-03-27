@@ -112,7 +112,7 @@ fn prepare_tsconfig(
 /// The test script is listed in the tsconfig's `"files"` array and `outDir` is
 /// set in the tsconfig, so no extra CLI flags are needed beyond `--project`.
 fn compile_ts(tsconfig: &Utf8Path) {
-    let tsc = paths::node_modules_bin().join("tsc");
+    let tsc = paths::node_bin("tsc");
     run_cmd_quietly(Command::new(&tsc).arg("--project").arg(tsconfig));
 }
 
@@ -254,7 +254,7 @@ fn find_file_recursive(dir: &Utf8Path, filename: &str) -> Option<Utf8PathBuf> {
 /// discover files that live under `target/` (which watchman normally ignores
 /// because it is listed in `.gitignore`).
 fn bundle_with_metro(js_file: &Utf8Path, bundle_path: &Utf8Path, tsc_dir: &Utf8Path) {
-    let metro = paths::node_modules_bin().join("metro");
+    let metro = paths::node_bin("metro");
     let repo_root = paths::repo_root();
 
     // Generate a metro config that:

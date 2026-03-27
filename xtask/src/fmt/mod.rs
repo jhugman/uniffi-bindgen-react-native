@@ -7,7 +7,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use ubrn_common::{run_cmd, run_cmd_quietly};
+use ubrn_common::{resolve_node_bin, run_cmd, run_cmd_quietly};
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
@@ -192,13 +192,17 @@ impl CodeFormatter for LicenceArgs {
         }
         YarnCmd.ensure_ready()?;
         let root = repository_root()?;
-        run_cmd_quietly(
-            Command::new("./node_modules/.bin/source-licenser")
-                .arg(".")
-                .arg("--config-file")
-                .arg(".licence-config.yaml")
-                .current_dir(root),
-        )?;
+        if let Some(source_licenser) = resolve_node_bin(&root, "source-licenser")? {
+            run_cmd_quietly(
+                Command::new(source_licenser)
+                    .arg(".")
+                    .arg("--config-file")
+                    .arg(".licence-config.yaml")
+                    .current_dir(root),
+            )?;
+        } else {
+            unreachable!("Is source-licenser in package.json dependencies?")
+        }
         Ok(())
     }
 }

@@ -25,6 +25,21 @@ pub(crate) fn node_modules_bin() -> Utf8PathBuf {
     repo_root().join("node_modules").join(".bin")
 }
 
+/// Resolve a binary under `node_modules/.bin`, handling Windows where the
+/// actual file is `<name>.cmd` (npm/yarn/pnpm) or `<name>.exe` (bun).
+pub(crate) fn node_bin(name: &str) -> Utf8PathBuf {
+    let bin_dir = node_modules_bin();
+    if cfg!(target_os = "windows") {
+        for ext in [".cmd", ".exe", ""] {
+            let candidate = bin_dir.join(format!("{name}{ext}"));
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+    }
+    bin_dir.join(name)
+}
+
 pub(crate) fn hermes_src_dir() -> Utf8PathBuf {
     repo_root().join("cpp_modules").join("hermes")
 }

@@ -8,7 +8,7 @@ use camino::Utf8Path;
 use std::process::Command;
 use which::which;
 
-use crate::{file_paths, resolve};
+use crate::{file_paths, resolve_node_bin};
 
 pub fn clang_format<P: AsRef<Utf8Path>>(path: P, check_only: bool) -> Result<Option<Command>> {
     if which("clang-format").is_err() {
@@ -35,7 +35,8 @@ pub fn clang_format<P: AsRef<Utf8Path>>(path: P, check_only: bool) -> Result<Opt
 }
 
 pub fn prettier<P: AsRef<Utf8Path>>(out_dir: P, check_only: bool) -> Result<Option<Command>> {
-    let prettier = resolve(&out_dir, "node_modules/.bin/prettier")?;
+    let prettier = resolve_node_bin(&out_dir, "prettier")?;
+
     Ok(if let Some(prettier) = prettier {
         let mut cmd = Command::new(prettier);
         if check_only {
