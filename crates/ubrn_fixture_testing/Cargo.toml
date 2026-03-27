@@ -7,5 +7,6 @@ publish = false
 [dependencies]
 camino = { workspace = true }
 cargo_metadata = { workspace = true }
+dunce = "1.0.5"
 heck = { workspace = true }
 pathdiff = { workspace = true }
