@@ -28,20 +28,24 @@ if (NOT EXISTS "${HERMES_BUILD_DIR}/bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
     message(FATAL_ERROR "HERMES_BUILD_DIR does not contain bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
 endif ()
 
-# Build the rust crate of our choice.
-set(RUST_LIB_NAME "" CACHE STRING "Name of the Rust library")
-set(RUST_TARGET_DIR "" CACHE PATH "Path to the Rust target dylib directory")
+# The Rust cdylib to link against.
+set(RUST_CDYLIB "" CACHE FILEPATH "Full path to the Rust cdylib (e.g. libfoo.dylib)")
 set(HERMES_EXTENSION_NAME "" CACHE STRING "Name of Hermes extension library")
 set(HERMES_EXTENSION_CPP "" CACHE PATH "Extension cpp (generated)")
 
-if (NOT RUST_LIB_NAME)
-    message(FATAL_ERROR "Please specify RUST_LIB_NAME")
+if (NOT RUST_CDYLIB)
+    message(FATAL_ERROR "Please specify RUST_CDYLIB")
+endif ()
+if (NOT EXISTS "${RUST_CDYLIB}")
+    message(FATAL_ERROR "RUST_CDYLIB does not exist: ${RUST_CDYLIB}")
 endif ()
 
-# Validate RUST_TARGET_DIR by checking for the Rust library
-if (NOT EXISTS "${RUST_TARGET_DIR}/lib${RUST_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    message(FATAL_ERROR "RUST_TARGET_DIR does not contain lib${RUST_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-endif ()
+# Extract the directory and filename for linking
+get_filename_component(RUST_LIB_DIR "${RUST_CDYLIB}" DIRECTORY)
+get_filename_component(RUST_LIB_FULLNAME "${RUST_CDYLIB}" NAME)
+# Strip lib prefix and .dylib/.so/.dll suffix to get the linker name
+string(REGEX REPLACE "^lib" "" RUST_LIB_LINKNAME "${RUST_LIB_FULLNAME}")
+string(REGEX REPLACE "\\.(dylib|so|dll)$" "" RUST_LIB_LINKNAME "${RUST_LIB_LINKNAME}")
 
 # Add Hermes include directories
 include_directories("${HERMES_SRC_DIR}/API")
@@ -54,10 +58,16 @@ include_directories("../stubs")
 link_directories("${HERMES_BUILD_DIR}/API/hermes")
 link_directories("${HERMES_BUILD_DIR}/jsi")
 link_libraries(jsi)
-link_directories("${RUST_TARGET_DIR}")
+link_directories("${RUST_LIB_DIR}")
 
 # Set C++ compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -frtti -fexceptions -Wall -fstack-protector-all -Werror")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -frtti -fexceptions -Wall -fstack-protector-all -Werror")
 
 add_library(${HERMES_EXTENSION_NAME} SHARED ${HERMES_EXTENSION_CPP})
-target_link_libraries(${HERMES_EXTENSION_NAME} ${RUST_LIB_NAME})
+target_link_libraries(${HERMES_EXTENSION_NAME} ${RUST_LIB_LINKNAME})
+
+# Precompile heavy Hermes JSI headers — each .cpp file re-parses these otherwise.
+target_precompile_headers(${HERMES_EXTENSION_NAME} PRIVATE
+    <jsi/jsi.h>
+    <jsi/jsi-inl.h>
+)

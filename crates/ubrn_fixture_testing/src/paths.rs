@@ -6,13 +6,30 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use std::sync::LazyLock;
 
-use crate::metadata;
-
-/// Repository root, derived from workspace metadata.
+/// Repository root, derived from target directory.
+///
+/// `target_dir` is typically `<repo_root>/target`, so repo_root is its parent.
+/// For custom CARGO_TARGET_DIR locations this falls back to walking up from
+/// the target dir to find the workspace Cargo.toml.
 pub(crate) fn repo_root() -> &'static Utf8Path {
     static ROOT: LazyLock<Utf8PathBuf> = LazyLock::new(|| {
-        let meta = metadata::workspace_metadata();
-        meta.workspace_root.clone()
+        let target = crate::target_dir();
+        // Common case: target dir is <repo_root>/target
+        if let Some(parent) = target.parent() {
+            if parent.join("Cargo.toml").exists() {
+                return parent.to_path_buf();
+            }
+        }
+        // Fallback: walk up from target dir
+        let mut dir = target;
+        loop {
+            if dir.join("Cargo.toml").exists() {
+                return dir.to_path_buf();
+            }
+            dir = dir
+                .parent()
+                .expect("workspace Cargo.toml not found above target dir");
+        }
     });
     &ROOT
 }

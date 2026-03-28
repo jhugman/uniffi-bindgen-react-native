@@ -44,7 +44,7 @@ pub fn prepare_for_jsi(
     let bundle_dir = out_dir.join("bundles");
     std::fs::create_dir_all(&bundle_dir).expect("failed to create bundle dir");
     let bundle_path = bundle_dir.join(format!("{stem}.bundle.js"));
-    bundle_with_metro(&js_file, &bundle_path, &tsc_dir);
+    bundle_with_esbuild(&js_file, &bundle_path, &tsc_dir);
 
     bundle_path
 }
@@ -107,13 +107,24 @@ fn prepare_tsconfig(
     tsconfig
 }
 
-/// Run `tsc --project <tsconfig>`.
+/// Run `tsc --project <tsconfig>` with incremental compilation.
 ///
 /// The test script is listed in the tsconfig's `"files"` array and `outDir` is
 /// set in the tsconfig, so no extra CLI flags are needed beyond `--project`.
+/// Incremental compilation caches type-checking work in `.tsbuildinfo`, halving
+/// compile time when the generated bindings haven't changed.
 fn compile_ts(tsconfig: &Utf8Path) {
     let tsc = paths::node_modules_bin().join("tsc");
-    run_cmd_quietly(Command::new(&tsc).arg("--project").arg(tsconfig));
+    let tsc_dir = tsconfig.parent().expect("tsconfig has no parent directory");
+    let buildinfo = tsc_dir.join(".tsbuildinfo");
+    run_cmd_quietly(
+        Command::new(&tsc)
+            .arg("--project")
+            .arg(tsconfig)
+            .arg("--incremental")
+            .arg("--tsBuildInfoFile")
+            .arg(buildinfo.as_str()),
+    );
 }
 
 /// Rewrite tsconfig path aliases in all JS files under `tsc_dir`.
@@ -253,43 +264,24 @@ fn find_file_recursive(dir: &Utf8Path, filename: &str) -> Option<Utf8PathBuf> {
 /// A temporary `metro.config.js` is generated in `tsc_dir` so that Metro can
 /// discover files that live under `target/` (which watchman normally ignores
 /// because it is listed in `.gitignore`).
-fn bundle_with_metro(js_file: &Utf8Path, bundle_path: &Utf8Path, tsc_dir: &Utf8Path) {
-    let metro = paths::node_modules_bin().join("metro");
-    let repo_root = paths::repo_root();
+fn bundle_with_esbuild(js_file: &Utf8Path, bundle_path: &Utf8Path, tsc_dir: &Utf8Path) {
+    let esbuild = paths::node_modules_bin().join("esbuild");
 
-    // Generate a metro config that:
-    //  - adds tsc_dir to watchFolders (files live under target/ which
-    //    watchman ignores because it is in .gitignore)
-    //  - disables watchman for the same reason
-    //  - resolves `@/*` imports to the compiled `typescript/testing/*` tree
-    //    (tsc-alias cannot reliably rewrite these when outDir == configDir)
-    let testing_dir = tsc_dir.join("typescript/testing");
-    let metro_config_path = tsc_dir.join("metro.config.cjs");
-    let metro_config = format!(
-        r#"const path = require("path");
-module.exports = {{
-  projectRoot: path.resolve("{repo_root}"),
-  watchFolders: [path.resolve("{tsc_dir}")],
-  resolver: {{
-    useWatchman: false,
-    extraNodeModules: {{
-      "@": path.resolve("{testing_dir}"),
-    }},
-  }},
-}};
-"#,
-    );
-    std::fs::write(&metro_config_path, metro_config).expect("failed to write metro.config.js");
+    // Write a package.json in tsc_dir to tell esbuild these are CommonJS files.
+    // The workspace package.json has "type": "module" which confuses esbuild.
+    let pkg_json_path = tsc_dir.join("package.json");
+    std::fs::write(&pkg_json_path, r#"{"type":"commonjs"}"#)
+        .expect("failed to write tsc package.json");
+    let _pkg_guard = crate::CleanupFile::new(pkg_json_path);
 
     run_cmd_quietly(
-        Command::new(&metro)
-            .arg("build")
-            .arg("--minify")
-            .arg("false")
-            .arg("--config")
-            .arg(&metro_config_path)
-            .arg("--out")
-            .arg(bundle_path)
-            .arg(js_file),
+        Command::new(&esbuild)
+            .arg(js_file.as_str())
+            .arg("--bundle")
+            .arg("--format=iife")
+            .arg("--platform=neutral")
+            .arg("--define:global=globalThis")
+            .arg(format!("--outfile={bundle_path}"))
+            .arg("--log-level=error"),
     );
 }
