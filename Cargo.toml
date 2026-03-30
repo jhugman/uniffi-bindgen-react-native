@@ -3,7 +3,11 @@ members = [
     "crates/*",
     "examples/*",
     "fixtures/*",
+    "runtimes/*",
     "xtask",
+]
+exclude = [
+    "runtimes/napi/fixtures/*",
 ]
 
 resolver = "2"

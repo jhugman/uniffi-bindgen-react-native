@@ -82,3 +82,6 @@ docs/superpowers/
 
 # Git worktrees
 .worktrees/
+
+# napi-rs build artifacts
+*.node
