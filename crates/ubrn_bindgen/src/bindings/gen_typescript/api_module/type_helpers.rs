@@ -9,6 +9,8 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
+use heck::ToUpperCamelCase;
+
 use heck::ToLowerCamelCase;
 use uniffi_bindgen::pipeline::general;
 
@@ -61,16 +63,17 @@ pub(super) fn type_label_for(ty: &general::Type) -> String {
         general::Type::Timestamp => "Date".into(),
         general::Type::Duration => "number".into(),
         general::Type::Interface { name, imp, .. } => {
+            let name = name.to_upper_camel_case();
             if matches!(imp, general::ObjectImpl::Struct) {
                 format!("{name}Like")
             } else {
-                name.clone()
+                name
             }
         }
         general::Type::Record { name, .. }
         | general::Type::Enum { name, .. }
         | general::Type::CallbackInterface { name, .. }
-        | general::Type::Custom { name, .. } => rewrite_js_builtins(name),
+        | general::Type::Custom { name, .. } => rewrite_js_builtins(&name.to_upper_camel_case()),
         general::Type::Optional { inner_type } => {
             format!("{} | undefined", type_label_for(inner_type))
         }
@@ -177,7 +180,7 @@ pub(super) fn ffi_default_value_for(ffi_type: &general::FfiType) -> String {
         | general::FfiType::UInt32
         | general::FfiType::Int32 => "0".into(),
         general::FfiType::UInt64 | general::FfiType::Int64 | general::FfiType::Handle(_) => {
-            "new Uint8Array(0)".into()
+            "BigInt(0)".into()
         }
         general::FfiType::Float32 | general::FfiType::Float64 => "0.0".into(),
         general::FfiType::RustBuffer(_) => "/*empty*/ new Uint8Array(0)".into(),

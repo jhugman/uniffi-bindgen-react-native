@@ -90,7 +90,7 @@ pub(super) fn build_custom_type(
 
 pub(super) fn build_external_type(external: &general::ExternalType) -> TsExternalType {
     let module_path = external.namespace.clone();
-    let type_name = external.name.clone();
+    let type_name = type_label_for(&external.self_type.ty);
     let converter_name = ffi_converter_name_for(&external.self_type);
     let is_enum_type = matches!(external.self_type.ty, general::Type::Enum { .. });
 
