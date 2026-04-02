@@ -1,4 +1,5 @@
 [bindings.typescript]
+strictTypeChecking = true
 logLevel = "debug"
 consoleImport = "@/hermes"
 

@@ -9,7 +9,7 @@ use std::process::Command;
 use camino::{Utf8Path, Utf8PathBuf};
 use heck::ToUpperCamelCase;
 
-use crate::{metadata, paths, run_cmd_quietly, typescript};
+use crate::{metadata, paths, run_cmd, run_cmd_quietly, typescript};
 
 /// Run a fixture test under the JSI (Hermes) flavor.
 ///
@@ -192,7 +192,7 @@ fn compile_cpp(
 /// Run the test-runner binary.
 fn run_test_runner(bundle: &Utf8Path, so_file: &Utf8Path) {
     let runner = paths::test_runner_binary();
-    run_cmd_quietly(
+    run_cmd(
         Command::new(runner.as_str())
             .arg(bundle.as_str())
             .arg(so_file.as_str()),
