@@ -11,7 +11,9 @@ pub(crate) enum TsTypeDefinition {
     StringHelper(TsStringHelper),
     Custom(TsCustomType),
     External(TsExternalType),
-    Enum(TsEnum),
+    FlatEnum(TsEnum),
+    FlatError(TsEnum),
+    TaggedEnum(TsEnum),
     Record(TsRecord),
     Object(Box<TsObject>),
     CallbackInterface(TsCallbackInterface),
@@ -266,8 +268,8 @@ pub(crate) struct TsFfiArg {
 /// JS-implemented interface passed to Rust via vtable (opposite of `TsObject`).
 pub(crate) struct TsCallbackInterface {
     pub ts_name: String,
-    /// Alias for `ts_name`; needed because `CallbackInterfaceTemplate.ts`
-    /// includes `ObjectInterfaceTemplate.ts` which references `obj.protocol_name`.
+    /// Alias for `ts_name`; the duck-typed `object_interface` macro
+    /// accesses `obj.protocol_name` for both `TsObject` and `TsCallbackInterface`.
     pub protocol_name: String,
     pub ffi_converter_name: String,
     pub trait_impl: String,
@@ -290,8 +292,17 @@ pub(crate) struct TsChecksum {
     pub expected_value: String,
 }
 
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(crate) enum ImportedItem {
-    Type(String),
-    Value(String),
+/// A single `import { ... } from "path"` statement.
+pub(crate) struct TsFileImport {
+    pub path: String,
+    pub types: Vec<String>,
+    pub values: Vec<String>,
+}
+
+/// A converter default-import plus destructuring:
+/// `import name from "path"; const { ... } = name.converters;`
+pub(crate) struct TsConverterImport {
+    pub path: String,
+    pub default_name: String,
+    pub converters: Vec<String>,
 }

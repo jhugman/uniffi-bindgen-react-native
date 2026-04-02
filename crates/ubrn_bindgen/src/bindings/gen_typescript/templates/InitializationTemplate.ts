@@ -1,3 +1,4 @@
+{%- macro initialization(init) %}
 /**
  * This should be called before anything else.
  *
@@ -27,3 +28,4 @@ function uniffiEnsureInitialized() {
     {{ func }}();
     {% endfor -%}
 }
+{%- endmacro %}

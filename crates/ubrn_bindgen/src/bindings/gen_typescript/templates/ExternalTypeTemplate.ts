@@ -1,1 +1,0 @@
-{# External types produce no visible output — their import side-effects are pre-computed. #}

@@ -12,7 +12,7 @@ mod util;
 use anyhow::{Context, Result};
 use askama::Template;
 
-use self::api_module::ImportedItem;
+use self::api_module::{TsTypeDefinition, TsUniffiTrait};
 use self::ffi_module::FfiDefinitionDecl;
 pub(crate) use self::{config::TsConfig as Config, util::format_directory};
 

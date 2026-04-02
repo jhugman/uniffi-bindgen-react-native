@@ -1,5 +1,5 @@
 {%- import "CallBodyMacros.ts" as cb %}
-{% if e.is_flat && !e.is_error %}
+{%- macro flat_enum(e) %}
 {%- if let Some(ds) = e.docstring %}
 {{ ds }}
 {%- endif %}
@@ -84,9 +84,4 @@ const {{ e.ffi_converter_name }} = (() => {
     }
     return new FFIConverter();
 })();
-
-{%- else if e.is_flat && e.is_error %}
-{%- include "ErrorTemplate.ts" %}
-{%- else %}
-{%- include "TaggedEnumTemplate.ts" %}
-{%- endif %}
+{%- endmacro %}

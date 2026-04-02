@@ -1,4 +1,5 @@
 {%- import "CallBodyMacros.ts" as cb %}
+{%- macro record(rec) %}
 {%- if let Some(ds) = rec.docstring %}
 {{ ds }}
 {%- endif %}
@@ -111,3 +112,4 @@ const {{ rec.ffi_converter_name }} = (() => {
     };
     return new FFIConverter();
 })();
+{%- endmacro %}

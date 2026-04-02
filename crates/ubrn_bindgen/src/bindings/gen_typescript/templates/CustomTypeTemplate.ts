@@ -1,3 +1,4 @@
+{%- macro custom_type(custom) %}
 {%- match custom.custom_config %}
 {%-   when None %}
 {#- No config, just forward all methods to our builtin type #}
@@ -53,3 +54,4 @@ const {{ custom.ffi_converter_name }} = (() => {
     return new FFIConverter();
 })();
 {%- endmatch %}
+{%- endmacro %}

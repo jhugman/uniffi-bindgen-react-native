@@ -1,3 +1,4 @@
+{%- macro flat_error(e) %}
 {%- let type_name = e.ts_name %}
 {%- let type_name__Tags = format!("{type_name}_Tags") %}
 
@@ -60,7 +61,7 @@ export const {{ type_name }} = (() => {
 {{ ds }}
 {%- endif %}
 export type {{ type_name }} = InstanceType<
-    typeof {{ type_name }}[keyof Omit<typeof {{ type_name }}, 'instanceOf'>]
+    typeof {{ type_name }}[{%- for variant in e.variants %}'{{ variant.name }}'{% if !loop.last %} | {% endif %}{%- endfor %}]
 >;
 
 const {{ e.ffi_converter_name }} = (() => {
@@ -88,3 +89,4 @@ const {{ e.ffi_converter_name }} = (() => {
     }
     return new FfiConverter();
 })();
+{%- endmacro %}

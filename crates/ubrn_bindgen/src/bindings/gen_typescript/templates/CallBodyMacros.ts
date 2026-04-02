@@ -1,14 +1,11 @@
 {#- Shared macros for rendering sync and async call bodies from TsCallable IR nodes.
 
-    These macros expect the following variables to be in the template context:
-    - `is_verbose: bool`
-    - `supports_rust_backtrace: bool`
-    - `console_import: &Option<String>`
+    These macros expect `module: &TsApiModule` to be in the template context.
 -#}
 
 {#- The main ffi function handle, optionally wrapped in a verbose IIFE. -#}
 {%- macro native_method_handle(ffi_name) %}
-{%- if *is_verbose -%}
+{%- if module.is_verbose -%}
 (() => {
     {% call log_call(ffi_name) %}
     return nativeModule().{{ ffi_name }};
@@ -20,9 +17,9 @@ nativeModule().{{ ffi_name }}
 
 {#- Log a call in verbose mode. -#}
 {%- macro log_call(ffi_name) %}
-{%- if *is_verbose %}
-{%- if let Some(module) = console_import %}
-// import console from "{{ module }}";
+{%- if module.is_verbose %}
+{%- if let Some(console_mod) = module.console_import %}
+// import console from "{{ console_mod }}";
 {%- endif %}
 console.debug(`-- {{ ffi_name }}`);
 {%- endif %}
@@ -190,7 +187,7 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- Async call body: wraps uniffiRustCallAsync with optional stack trace capture. -#}
 {%- macro call_body_async(callable, obj_factory) %}
-{%- if *supports_rust_backtrace %}
+{%- if module.supports_rust_backtrace %}
     return {# space #}{%- call to_ffi_async_call(callable, obj_factory) %};
 {%- else %}
     const __stack = uniffiIsDebug ? new Error().stack : undefined;
@@ -246,7 +243,7 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- Verbose-mode poll handle wrapper. -#}
 {%- macro native_method_handle_poll(method_name) %}
-{%- if *is_verbose -%}
+{%- if module.is_verbose -%}
 (rustFuture: bigint, cb: UniffiRustFutureContinuationCallback, handle: UniffiHandle): void => {
     {% call log_message("   poll    : ", method_name, "") %}
     return nativeModule().{{ method_name }}(rustFuture, cb, handle);
@@ -258,7 +255,7 @@ nativeModule().{{ method_name }}
 
 {#- Verbose-mode cancel handle wrapper. -#}
 {%- macro native_method_handle_cancel(method_name) %}
-{%- if *is_verbose -%}
+{%- if module.is_verbose -%}
 (rustFuture: bigint): void => {
     {% call log_message("   cancel  : ", method_name, "") %}
     return nativeModule().{{ method_name }}(rustFuture);
@@ -270,7 +267,7 @@ nativeModule().{{ method_name }}
 
 {#- Verbose-mode complete handle wrapper. -#}
 {%- macro native_method_handle_complete(method_name) %}
-{%- if *is_verbose -%}
+{%- if module.is_verbose -%}
 (rustFuture: bigint, status: UniffiRustCallStatus) => {
     {% call log_message("   complete: ", method_name, "") %}
     return nativeModule().{{ method_name }}(rustFuture, status);
@@ -282,7 +279,7 @@ nativeModule().{{ method_name }}
 
 {#- Verbose-mode free handle wrapper. -#}
 {%- macro native_method_handle_free(method_name) %}
-{%- if *is_verbose -%}
+{%- if module.is_verbose -%}
 (rustFuture: bigint) => {
     {% call log_message("   free    : ", method_name, "") %}
     return nativeModule().{{ method_name }}(rustFuture);
@@ -294,9 +291,9 @@ nativeModule().{{ method_name }}
 
 {#- Log a verbose message. -#}
 {%- macro log_message(prefix, middle, suffix) %}
-{%- if *is_verbose %}
-{%- if let Some(module) = console_import %}
-// import console from "{{ module }}";
+{%- if module.is_verbose %}
+{%- if let Some(console_mod) = module.console_import %}
+// import console from "{{ console_mod }}";
 {%- endif %}
 console.debug(`-- {{ prefix }}{{ middle }}{{ suffix }}`);
 {%- endif %}
@@ -309,9 +306,42 @@ console.debug(`-- {{ prefix }}{{ middle }}{{ suffix }}`);
 {%- endif %}
 {%- endmacro %}
 
-{#- Docstring rendering at a specific indentation (already pre-formatted). -#}
-{%- macro docstring_indented(maybe_docstring) %}
-{%- if let Some(ds) = maybe_docstring %}
-{{ ds }}
+{#- Variant inner type shape: Readonly<{ name: Type; ... }> or Readonly<[Type, ...]>. -#}
+{%- macro variant_inner_type(variant) %}
+Readonly<{%- if !variant.has_nameless_fields %}{
+{%-   for field in variant.fields %}
+{{-     field.name }}: {{ field.ts_type }}
+{%-     if !loop.last %}; {% endif -%}
+{%- endfor %}}
+{%- else %}
+[
+{%-   for field in variant.fields %}
+{{-     field.ts_type }}
+{%-     if !loop.last %}, {% endif -%}
+{%- endfor %}
+]
+{%- endif %}>
+{%- endmacro %}
+
+{#- Variant inner value shape for constructor parameters: { name: Type; ... } or unnamed positional args. -#}
+{%- macro variant_fields_decl(variant) %}
+{%- if !variant.has_nameless_fields %}
+inner: { {%- for field in variant.fields %}{{ field.name }}: {{ field.ts_type }}{%- if !loop.last %}; {% endif %}{%- endfor %} }
+{%- else %}
+{%- for field in variant.fields %}v{{ loop.index0 }}: {{ field.ts_type }}{%- if !loop.last %}, {% endif %}{%- endfor %}
 {%- endif %}
+{%- endmacro %}
+
+{#- Variant constructor body: freeze inner. -#}
+{%- macro variant_ctor_body(variant) %}
+{%- if !variant.has_nameless_fields %}
+            this.inner = Object.freeze(inner);
+{%- else %}
+            this.inner = Object.freeze([{%- for field in variant.fields %}v{{ loop.index0 }}{%- if !loop.last %}, {% endif %}{%- endfor -%}]);
+{%- endif %}
+{%- endmacro %}
+
+{#- Variant static new() forwarding args. -#}
+{%- macro variant_new_args(variant) %}
+{%- if !variant.has_nameless_fields %}inner{%- else %}{%- for field in variant.fields %}v{{ loop.index0 }}{%- if !loop.last %}, {% endif %}{%- endfor %}{%- endif %}
 {%- endmacro %}

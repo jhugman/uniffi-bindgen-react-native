@@ -1,20 +1,10 @@
-{#- Callback interface template (v2, IR-driven).
+{%- import "ObjectInterfaceTemplate.ts" as oi %}
+{%- import "CallbackInterfaceImpl.ts" as cbi_impl %}
+{%- macro callback_interface(cbi) %}
+{% call oi::object_interface(cbi) %}
 
-    Expected renderer fields:
-    - `cbi: &TsCallbackInterface`
-    - `is_verbose: &bool`
-    - `console_import: &'a Option<String>`
--#}
-{%- let ffi_converter_name = cbi.ffi_converter_name %}
-{%- let trait_impl = cbi.trait_impl %}
-{%- let vtable = cbi.vtable %}
-
-{#- Render the protocol interface using the same template as objects -#}
-{%- let obj = cbi %}
-{% include "ObjectInterfaceTemplate.ts" %}
-
-{#- Include the vtable implementation -#}
-{% include "CallbackInterfaceImpl.ts" %}
+{% call cbi_impl::callback_interface_impl(cbi.vtable, cbi.ffi_converter_name, cbi.trait_impl) %}
 
 // FfiConverter protocol for callback interfaces
 const {{ cbi.ffi_converter_name }} = new FfiConverterCallback<{{ cbi.ts_name }}>();
+{%- endmacro %}

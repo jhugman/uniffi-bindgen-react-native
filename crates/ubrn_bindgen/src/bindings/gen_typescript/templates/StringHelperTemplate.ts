@@ -1,3 +1,4 @@
+{%- macro string_helper(helper) %}
 {%- if helper.supports_text_encoder %}
 const stringConverter = (() => {
     const encoder = new TextEncoder();
@@ -19,3 +20,4 @@ const stringConverter = {
 };
 {%- endif %}
 const FfiConverterString = uniffiCreateFfiConverterString(stringConverter);
+{%- endmacro %}

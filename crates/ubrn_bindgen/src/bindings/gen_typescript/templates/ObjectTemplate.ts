@@ -1,8 +1,11 @@
 {%- import "CallBodyMacros.ts" as cb %}
+{%- import "ObjectInterfaceTemplate.ts" as oi %}
+{%- import "CallbackInterfaceImpl.ts" as cbi_impl %}
+{%- macro object(obj) %}
 
 {#- Render the protocol: interface (default) or type alias (strict) -#}
 {%- if !obj.strict_object_types || obj.has_callback_interface %}
-{%- include "ObjectInterfaceTemplate.ts" %}
+{%- call oi::object_interface(obj) %}
 {%- else %}
 export type {{ obj.protocol_name }} = {{ obj.impl_class_name }};
 {%- endif %}
@@ -12,13 +15,6 @@ export type {{ obj.protocol_name }} = {{ obj.impl_class_name }};
  */
 export type {{ obj.impl_class_name }}Interface = {{ obj.protocol_name }};
 {%- endif %}
-{%- macro private_ctor() %}
-private constructor(pointer: UniffiHandle) {
-    super();
-    this[pointerLiteralSymbol] = pointer;
-    this[destructorGuardSymbol] = {{ obj.obj_factory }}.bless(pointer);
-}
-{%- endmacro %}
 
 {% call cb::docstring(obj.docstring) %}
 export class {{ obj.impl_class_name }} extends UniffiAbstractObject
@@ -31,24 +27,24 @@ export class {{ obj.impl_class_name }} extends UniffiAbstractObject
     {%- match obj.primary_constructor %}
     {%- when Some with (cons) %}
     {%- if !cons.is_async() %}
-    {%-   call ctor_decl(cons) %}
+    {%-   call _object_ctor_decl(obj, cons) %}
     {%- else %}
-    {%- call private_ctor() %}
+    {%- call _object_private_ctor(obj) %}
 
     // Async primary constructor declared for this class.
-    {%-   call method_decl("static", cons) %}
+    {%-   call _object_method_decl(obj, "static", cons) %}
     {%- endif %}
     {%- when None %}
     // No primary constructor declared for this class.
-    {%- call private_ctor() %}
+    {%- call _object_private_ctor(obj) %}
     {%- endmatch %}
 
     {% for cons in obj.alternate_constructors %}
-    {%- call method_decl("static", cons) %}
+    {%- call _object_method_decl(obj, "static", cons) %}
     {% endfor %}
 
     {% for meth in obj.methods -%}
-    {%- call method_decl("", meth) %}
+    {%- call _object_method_decl(obj, "", meth) %}
     {% endfor %}
 
     {%- for tm in obj.uniffi_traits %}
@@ -186,18 +182,16 @@ const {{ obj.ffi_converter_name }} = new FfiConverterObject({{ obj.obj_factory }
 const {{ obj.ffi_converter_name }} = new FfiConverterObjectWithCallbacks({{ obj.obj_factory }});
 
 // Add a vtable for the callbacks that go in {{ obj.ts_name }}.
-{%- let vtable = obj.vtable.as_ref().expect("trait interface should have a vtable") %}
-{%- let ffi_converter_name = obj.ffi_converter_name %}
-{%- let trait_impl = obj.trait_impl %}
-{% include "CallbackInterfaceImpl.ts" %}
+{%- call cbi_impl::callback_interface_impl(obj.vtable.as_ref().expect("trait interface should have a vtable"), obj.ffi_converter_name, obj.trait_impl) %}
 {%- endif %}
 
 {%- if obj.is_error %}
 const {{ obj.ffi_error_converter_name }} = new FfiConverterObjectAsError("{{ obj.decl_type_name }}", {{ obj.ffi_converter_name }});
 {%- endif %}
+{%- endmacro %}
 
 {#- Macro: primary constructor declaration -#}
-{%- macro ctor_decl(cons) %}
+{%- macro _object_ctor_decl(obj, cons) %}
 {%- call cb::docstring(cons.docstring) %}
     constructor(
     {%- call cb::arg_list_decl(cons) -%}) {%- call cb::throws_kw(cons) %} {
@@ -210,7 +204,7 @@ const {{ obj.ffi_error_converter_name }} = new FfiConverterObjectAsError("{{ obj
 {%- endmacro %}
 
 {#- Macro: method or static method declaration -#}
-{%- macro method_decl(func_decl, callable) %}
+{%- macro _object_method_decl(obj, func_decl, callable) %}
 {%- call cb::docstring(callable.docstring) %}
     {% if !func_decl.is_empty() %}{{ func_decl }} {% endif %}{% if callable.is_async() %}async {% endif %}{{ callable.name }}(
     {%- call cb::arg_list_decl(callable) -%}): {# space #}
@@ -222,4 +216,13 @@ const {{ obj.ffi_error_converter_name }} = new FfiConverterObjectAsError("{{ obj
     {%- call cb::call_body_function(callable) %}
     {%- endif %}
     }
+{%- endmacro %}
+
+{#- Macro: private constructor -#}
+{%- macro _object_private_ctor(obj) %}
+private constructor(pointer: UniffiHandle) {
+    super();
+    this[pointerLiteralSymbol] = pointer;
+    this[destructorGuardSymbol] = {{ obj.obj_factory }}.bless(pointer);
+}
 {%- endmacro %}

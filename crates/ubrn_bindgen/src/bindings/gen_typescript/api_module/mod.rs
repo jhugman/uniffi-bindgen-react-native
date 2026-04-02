@@ -13,7 +13,6 @@
 mod builders;
 mod docstring;
 mod nodes;
-mod rendering;
 mod type_helpers;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -31,9 +30,8 @@ use self::docstring::format_docstring;
 use self::nodes::*;
 
 pub(crate) use self::nodes::{
-    ImportedItem, InitializationIR, TsCallable, TsCallbackInterface, TsCustomType, TsEnum,
-    TsExternalType, TsFunction, TsObject, TsRecord, TsSimpleWrapper, TsTypeDefinition,
-    TsUniffiTrait,
+    InitializationIR, TsCallable, TsCallbackInterface, TsCustomType, TsEnum, TsExternalType,
+    TsFunction, TsObject, TsRecord, TsSimpleWrapper, TsTypeDefinition, TsUniffiTrait,
 };
 
 pub(crate) struct TsApiModule {
@@ -45,13 +43,18 @@ pub(crate) struct TsApiModule {
     pub is_verbose: bool,
     pub supports_rust_backtrace: bool,
     pub console_import: Option<String>,
-    pub ffi_exported_definitions: Vec<ffi_module::FfiExportedName>,
-    pub type_imports: BTreeMap<String, BTreeSet<ImportedItem>>,
+    pub file_imports: Vec<TsFileImport>,
+    pub converter_imports: Vec<TsConverterImport>,
     pub exported_converters: BTreeSet<String>,
-    pub imported_converters: BTreeMap<(String, String), BTreeSet<String>>,
     pub type_definitions: Vec<TsTypeDefinition>,
     pub functions: Vec<TsFunction>,
     pub initialization: InitializationIR,
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum ImportedItem {
+    Type(String),
+    Value(String),
 }
 
 pub(crate) struct ImportAccumulator {
@@ -151,7 +154,9 @@ impl ImportAccumulator {
             TsTypeDefinition::StringHelper(_) => self.collect_string_helper(),
             TsTypeDefinition::Custom(c) => self.collect_custom(c),
             TsTypeDefinition::External(e) => self.collect_external(e),
-            TsTypeDefinition::Enum(e) => self.collect_enum(e),
+            TsTypeDefinition::FlatEnum(e)
+            | TsTypeDefinition::FlatError(e)
+            | TsTypeDefinition::TaggedEnum(e) => self.collect_enum(e),
             TsTypeDefinition::Record(r) => self.collect_record(r),
             TsTypeDefinition::Object(o) => self.collect_object(o),
             TsTypeDefinition::CallbackInterface(cbi) => self.collect_callback_interface(cbi),
@@ -393,7 +398,14 @@ impl TsApiModule {
                     defs.push(TsTypeDefinition::External(build_external_type(ext)));
                 }
                 general::TypeDefinition::Enum(e) => {
-                    defs.push(TsTypeDefinition::Enum(build_enum(e)));
+                    let ts_enum = build_enum(e);
+                    if ts_enum.is_flat && ts_enum.is_error {
+                        defs.push(TsTypeDefinition::FlatError(ts_enum));
+                    } else if ts_enum.is_flat {
+                        defs.push(TsTypeDefinition::FlatEnum(ts_enum));
+                    } else {
+                        defs.push(TsTypeDefinition::TaggedEnum(ts_enum));
+                    }
                 }
                 general::TypeDefinition::Record(r) => {
                     defs.push(TsTypeDefinition::Record(build_record(r)));
@@ -495,10 +507,9 @@ impl TsApiModule {
             is_verbose: config.is_verbose(),
             supports_rust_backtrace,
             console_import: config.console_import.clone(),
-            ffi_exported_definitions,
-            type_imports: BTreeMap::new(),
+            file_imports: Vec::new(),
+            converter_imports: Vec::new(),
             exported_converters: BTreeSet::new(),
-            imported_converters: BTreeMap::new(),
             type_definitions,
             functions,
             initialization,
@@ -506,9 +517,51 @@ impl TsApiModule {
 
         let mut acc = module.collect_all_imports();
         acc.merge(primitive_imports);
-        module.type_imports = acc.imports;
+
+        // Build file imports: FFI types first, then cross-module imports
+        let mut file_imports = Vec::new();
+
+        if !ffi_exported_definitions.is_empty() {
+            file_imports.push(TsFileImport {
+                path: format!("./{}-ffi", module.module_name),
+                types: ffi_exported_definitions
+                    .iter()
+                    .map(|def| def.name().to_string())
+                    .collect(),
+                values: Vec::new(),
+            });
+        }
+
+        for (file, things) in acc.imports {
+            let mut types = Vec::new();
+            let mut values = Vec::new();
+            for thing in things {
+                match thing {
+                    ImportedItem::Type(t) => types.push(t),
+                    ImportedItem::Value(v) => values.push(v),
+                }
+            }
+            file_imports.push(TsFileImport {
+                path: file,
+                types,
+                values,
+            });
+        }
+
+        module.file_imports = file_imports;
+
+        // Build converter imports
+        module.converter_imports = acc
+            .imported_converters
+            .into_iter()
+            .map(|((path, default_name), converters)| TsConverterImport {
+                path,
+                default_name,
+                converters: converters.into_iter().collect(),
+            })
+            .collect();
+
         module.exported_converters = acc.exported_converters;
-        module.imported_converters = acc.imported_converters;
 
         module
     }

@@ -1,14 +1,5 @@
-{#- Callback interface vtable implementation template (v2, IR-driven).
-
-    Expected variables:
-    - `vtable: &TsVtable`          — the vtable to register
-    - `vtable_methods: &[TsCallable]` — the callback interface methods (for lifting)
-    - `ffi_converter_name: &str`   — the FfiConverter name (for lift/drop/clone)
-    - `trait_impl: &str`           — the const name (e.g. "uniffiCallbackInterfaceFoo")
-    - `is_verbose: &bool`
-    - `console_import: &Option<String>`
--#}
 {%- import "CallBodyMacros.ts" as cb %}
+{%- macro callback_interface_impl(vtable, ffi_converter_name, trait_impl) %}
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
 const {{ trait_impl }}: { vtable: any; register: () => void; } = {
@@ -154,3 +145,4 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
         );
     },
 };
+{%- endmacro %}

@@ -1,3 +1,5 @@
+{%- import "CallBodyMacros.ts" as cb %}
+{%- macro tagged_enum(e) %}
 {%- let type_name = e.ts_name %}
 {%- let type_name__Tags = format!("{type_name}_Tags") %}
 
@@ -24,19 +26,7 @@ export const {{ type_name }} = (() => {
     type {{ variant_interface }} = {
         tag: {{ variant_tag }}
         {%- if has_fields %};
-        inner: Readonly<{%- if !is_tuple %}{
-{%-   for field in variant.fields %}
-{{-     field.name }}: {{ field.ts_type }}
-{%-     if !loop.last %}; {% endif -%}
-{%- endfor %}}
-{%- else %}
-[
-{%-   for field in variant.fields %}
-{{-     field.ts_type }}
-{%-     if !loop.last %}, {% endif -%}
-{%- endfor %}
-]
-{%- endif %}>
+        inner: {% call cb::variant_inner_type(variant) %}
         {%- endif %}
     };
 
@@ -51,38 +41,15 @@ export const {{ type_name }} = (() => {
         readonly [uniffiTypeNameSymbol] = "{{ type_name }}";
         readonly tag = {{ variant_tag }};
         {%- if has_fields %}
-        readonly inner: Readonly<{%- if !is_tuple %}{
-{%-   for field in variant.fields %}
-{{-     field.name }}: {{ field.ts_type }}
-{%-     if !loop.last %}; {% endif -%}
-{%- endfor %}}
-{%- else %}
-[
-{%-   for field in variant.fields %}
-{{-     field.ts_type }}
-{%-     if !loop.last %}, {% endif -%}
-{%- endfor %}
-]
-{%- endif %}>;
-        {%-   if !is_tuple %}
-        constructor(inner: { {%- for field in variant.fields %}{{ field.name }}: {{ field.ts_type }}{%- if !loop.last %}; {% endif %}{%- endfor %} }) {
+        readonly inner: {% call cb::variant_inner_type(variant) %};
+        constructor({% call cb::variant_fields_decl(variant) %}) {
             super("{{ type_name }}", "{{ external_name }}");
-            this.inner = Object.freeze(inner);
+{% call cb::variant_ctor_body(variant) %}
         }
 
-        static new(inner: { {%- for field in variant.fields %}{{ field.name }}: {{ field.ts_type }}{%- if !loop.last %}; {% endif %}{%- endfor %} }): {{ variant_class }} {
-            return new {{ variant_class }}(inner);
+        static new({% call cb::variant_fields_decl(variant) %}): {{ variant_class }} {
+            return new {{ variant_class }}({% call cb::variant_new_args(variant) %});
         }
-        {%-   else %}
-        constructor({%- for field in variant.fields %}v{{ loop.index0 }}: {{ field.ts_type }}{%- if !loop.last %}, {% endif %}{%- endfor -%}) {
-            super("{{ type_name }}", "{{ external_name }}");
-            this.inner = Object.freeze([{%- for field in variant.fields %}v{{ loop.index0 }}{%- if !loop.last %}, {% endif %}{%- endfor -%}]);
-        }
-
-        static new({%- for field in variant.fields %}v{{ loop.index0 }}: {{ field.ts_type }}{%- if !loop.last %}, {% endif %}{%- endfor -%}): {{ variant_class }} {
-            return new {{ variant_class }}({%- for field in variant.fields %}v{{ loop.index0 }}{%- if !loop.last %}, {% endif %}{%- endfor -%});
-        }
-        {%-   endif %}
         {%- else %}
         constructor() {
             super("{{ type_name }}", "{{ external_name }}");
@@ -133,19 +100,7 @@ export const {{ type_name }} = (() => {
             return {{ variant_class }}.instanceOf(obj);
         }
 
-        static getInner(obj: {{ variant_class }}): Readonly<{%- if !is_tuple %}{
-{%-   for field in variant.fields %}
-{{-     field.name }}: {{ field.ts_type }}
-{%-     if !loop.last %}; {% endif -%}
-{%- endfor %}}
-{%- else %}
-[
-{%-   for field in variant.fields %}
-{{-     field.ts_type }}
-{%-     if !loop.last %}, {% endif -%}
-{%- endfor %}
-]
-{%- endif %}> {
+        static getInner(obj: {{ variant_class }}): {% call cb::variant_inner_type(variant) %} {
             return obj.inner;
         }
         {%- else %}
@@ -190,7 +145,7 @@ export const {{ type_name }} = (() => {
 {{ ds }}
 {%- endif %}
 export type {{ type_name }} = InstanceType<
-    typeof {{ type_name }}[keyof Omit<typeof {{ type_name }}, 'instanceOf'>]
+    typeof {{ type_name }}[{%- for variant in e.variants %}'{{ variant.name }}'{% if !loop.last %} | {% endif %}{%- endfor %}]
 >;
 
 // FfiConverter for enum {{ type_name }}
@@ -269,3 +224,4 @@ const {{ e.ffi_converter_name }} = (() => {
     }
     return new FFIConverter();
 })();
+{%- endmacro %}
