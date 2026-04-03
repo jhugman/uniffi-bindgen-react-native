@@ -33,7 +33,11 @@ impl TestRunnerCmd {
 
     fn exe() -> Result<Utf8PathBuf> {
         let root = Self::build_dir()?;
-        Ok(root.join("test-runner"))
+        if cfg!(target_os = "windows") {
+            Ok(root.join("Debug").join("test-runner.exe"))
+        } else {
+            Ok(root.join("test-runner"))
+        }
     }
 }
 
@@ -60,15 +64,24 @@ impl Bootstrap for TestRunnerCmd {
         let mut cmd = Command::new("cmake");
         cmd.current_dir(&dir)
             .arg("-G")
-            .arg("Ninja")
+            .arg(if cfg!(target_os = "windows") {
+                "Visual Studio 16 2019"
+            } else {
+                "Ninja"
+            })
             .arg(format!("-DHERMES_SRC_DIR={hermes_src}"))
             .arg(format!("-DHERMES_BUILD_DIR={hermes_build}"))
             .arg(&src_dir);
 
         run_cmd(&mut cmd)?;
 
-        let mut cmd = Command::new("ninja");
-        run_cmd(cmd.current_dir(&dir))?;
+        if cfg!(target_os = "windows") {
+            let mut cmd = Command::new("cmake");
+            run_cmd(cmd.current_dir(&dir).arg("--build").arg(&dir))?;
+        } else {
+            let mut cmd = Command::new("ninja");
+            run_cmd(cmd.current_dir(&dir))?;
+        }
 
         Ok(())
     }
