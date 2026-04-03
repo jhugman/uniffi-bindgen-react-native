@@ -1,3 +1,4 @@
+{%- macro initialization(init) %}
 /**
  * This should be called before anything else.
  *
@@ -9,22 +10,22 @@
  * It also initializes the machinery to enable Rust to talk back to Javascript.
  */
 function uniffiEnsureInitialized() {
-    {{- self.import_infra("UniffiInternalError", "errors") }}
     // Get the bindings contract version from our ComponentInterface
-    const bindingsContractVersion = {{ ci.uniffi_contract_version() }};
+    const bindingsContractVersion = {{ init.bindings_contract_version }};
     // Get the scaffolding contract version by calling the into the dylib
-    const scaffoldingContractVersion = {% call ts::fn_handle(ci.ffi_uniffi_contract_version()) %}();
+    const scaffoldingContractVersion = nativeModule().{{ init.ffi_contract_version_fn }}();
     if (bindingsContractVersion !== scaffoldingContractVersion) {
         throw new UniffiInternalError.ContractVersionMismatch(scaffoldingContractVersion, bindingsContractVersion);
     }
 
-    {%- for (name, expected_checksum) in ci.iter_checksums() %}
-    if ({% call ts::fn_handle_with_name(name) %}() !== {{ expected_checksum }}) {
-        throw new UniffiInternalError.ApiChecksumMismatch("{{ name }}");
+    {%- for checksum in init.checksums %}
+    if (nativeModule().{{ checksum.ffi_fn_name }}() !== {{ checksum.expected_value }}) {
+        throw new UniffiInternalError.ApiChecksumMismatch("{{ checksum.raw_name }}");
     }
     {%- endfor %}
 
-    {% for func in self.initialization_fns() -%}
+    {% for func in init.initialization_fns -%}
     {{ func }}();
     {% endfor -%}
 }
+{%- endmacro %}

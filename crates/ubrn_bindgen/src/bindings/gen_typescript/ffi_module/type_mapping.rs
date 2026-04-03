@@ -4,28 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use heck::ToUpperCamelCase;
 use uniffi_bindgen::pipeline::general;
 
-pub(super) fn ffi_type_to_ts(ffi_type: &general::FfiType) -> String {
-    match ffi_type {
-        general::FfiType::Int8 | general::FfiType::UInt8 => "number".into(),
-        general::FfiType::Int16 | general::FfiType::UInt16 => "number".into(),
-        general::FfiType::Int32 | general::FfiType::UInt32 => "number".into(),
-        general::FfiType::Int64 | general::FfiType::UInt64 => "bigint".into(),
-        general::FfiType::Float32 | general::FfiType::Float64 => "number".into(),
-        general::FfiType::Handle(_) => "bigint".into(),
-        general::FfiType::RustBuffer(_) => "Uint8Array".into(),
-        general::FfiType::RustCallStatus => "UniffiRustCallStatus".into(),
-        general::FfiType::ForeignBytes => "ForeignBytes".into(),
-        general::FfiType::Function(name) => format!("Uniffi{}", name.0.to_upper_camel_case()),
-        general::FfiType::Struct(name) => format!("Uniffi{}", name.0.to_upper_camel_case()),
-        general::FfiType::Reference(inner) | general::FfiType::MutReference(inner) => {
-            ffi_type_to_ts(inner)
-        }
-        general::FfiType::VoidPointer => "/*pointer*/ bigint".into(),
-    }
-}
+pub(super) use crate::bindings::gen_typescript::type_mapping::ffi_type_to_ts;
 
 /// Overrides for the native module interface (C++/JSI boundary).
 pub(super) fn ffi_type_to_ts_native(ffi_type: &general::FfiType) -> String {

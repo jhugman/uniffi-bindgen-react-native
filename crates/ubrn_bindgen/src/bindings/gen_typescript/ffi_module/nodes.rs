@@ -10,9 +10,43 @@
 /// iterates and interpolates without logic.
 pub(crate) struct TsFfiModule {
     pub module_name: String,
+    pub strict_type_checking: bool,
+    pub is_jsi: bool,
     pub functions: Vec<FfiFunctionDecl>,
     /// Interleaved in the order from `general::Namespace::ffi_definitions`.
     pub definitions: Vec<FfiDefinitionDecl>,
+    pub has_continuation_callback: bool,
+    pub has_foreign_future: bool,
+}
+
+pub(crate) enum FfiExportedName {
+    Callback(String),
+    Struct(String),
+}
+
+impl FfiExportedName {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Callback(n) | Self::Struct(n) => n,
+        }
+    }
+}
+
+impl TsFfiModule {
+    pub(crate) fn exported_names(&self) -> Vec<FfiExportedName> {
+        self.definitions
+            .iter()
+            .filter_map(|def| match def {
+                FfiDefinitionDecl::Callback(cb) if cb.exported => {
+                    Some(FfiExportedName::Callback(cb.name.clone()))
+                }
+                FfiDefinitionDecl::Struct(s) if s.exported => {
+                    Some(FfiExportedName::Struct(s.name.clone()))
+                }
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 pub(crate) struct FfiFunctionDecl {

@@ -11,6 +11,5 @@ pub(crate) mod gen_cpp;
 pub(crate) mod gen_rust;
 pub(crate) mod gen_typescript;
 pub(crate) mod metadata;
-pub(crate) mod type_map;
 
 pub use self::entrypoint::generate_entrypoint;

@@ -1,51 +1,80 @@
-{{- self.import_infra("AbstractFfiConverterByteArray", "ffi-converters") -}}
-{{- self.import_infra("FfiConverterInt32", "ffi-converters") -}}
-{{- self.import_infra("UniffiInternalError", "errors") -}}
-
-{% if e.is_flat() %}
-{%- call ts::docstring(e, 0) %}
-export enum {{ type_name }} {
-    {%- for variant in e.variants() %}
-    {%- call ts::docstring(variant, 4) %}
-    {{ variant|variant_name }}
-    {%- match e.variant_discr_type() %}
-    {%- when Some with (_) %} = {{ e|variant_discr_literal(loop.index0, ci) }}
-    {%- else %}{% endmatch %}
+{%- import "CallBodyMacros.ts" as cb %}
+{%- macro flat_enum(e) %}
+{%- if let Some(ds) = e.docstring %}
+{{ ds }}
+{%- endif %}
+export enum {{ e.ts_name }} {
+    {%- for variant in e.variants %}
+    {%- if let Some(ds) = variant.docstring %}
+{{ ds }}
+    {%- endif %}
+    {{ variant.name }}
+    {%- if e.discr_type.is_some() %} = {{ variant.discriminant }}
+    {%- endif %}
     {%- if !loop.last %},{% endif -%}
     {% endfor %}
 }
-{%- let tm = e.uniffi_trait_methods() %}
-{%- let constructors = e.constructors() %}
-{%- let methods = e.methods() %}
-{%- if e.has_uniffi_traits() || !constructors.is_empty() || !methods.is_empty() %}
+{%- if e.has_callables() %}
 
-export namespace {{ type_name }} {
-{% call ts::uniffi_trait_methods_value_receiver(tm, ffi_converter_name, type_name, "    export function ", "") %}
-{%- if !constructors.is_empty() %}
-{% call ts::value_receiver_constructors(constructors, "    export function ", "") %}
+export namespace {{ e.ts_name }} {
+{%- for ut in e.uniffi_traits %}
+{%- match ut %}
+{%- when TsUniffiTrait::Display { method } %}
+    export function toString(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+    }
+{%- when TsUniffiTrait::Debug { method } %}
+    export function toDebugString(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+    }
+{%- if !e.has_display_trait() %}
+    export function toString(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+    }
 {%- endif %}
-{%- if !methods.is_empty() %}
-{% call ts::value_receiver_methods(methods, ffi_converter_name, type_name, "    export function ", "") %}
-{%- endif %}
+{%- when TsUniffiTrait::Eq { eq, ne } %}
+    export function equals(self_: {{ e.ts_name }}, {% call cb::arg_list_decl(eq) %}): {% call cb::return_type(eq) %} {
+        {% call cb::call_body_value(eq) %}
+    }
+{%- when TsUniffiTrait::Hash { method } %}
+    export function hashCode(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+        {% call cb::call_body_value(method) %}
+    }
+{%- when TsUniffiTrait::Ord { cmp } %}
+    export function compareTo(self_: {{ e.ts_name }}, {% call cb::arg_list_decl(cmp) %}): {% call cb::return_type(cmp) %} {
+        {% call cb::call_body_value(cmp) %}
+    }
+{%- endmatch %}
+{%- endfor %}
+{%- for cons in e.constructors %}
+    export function {{ cons.name }}({% call cb::arg_list_decl(cons) %}): {% call cb::return_type(cons) %} {
+{%- call cb::call_body_function(cons) %}
+    }
+{%- endfor %}
+{%- for method in e.methods %}
+    export function {{ method.name }}(self_: {{ e.ts_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
+{%- call cb::call_body_value(method) %}
+    }
+{%- endfor %}
 }
 {%- endif %}
 
-const {{ ffi_converter_name }} = (() => {
+const {{ e.ffi_converter_name }} = (() => {
     const ordinalConverter = FfiConverterInt32;
-    type TypeName = {{ type_name }};
+    type TypeName = {{ e.ts_name }};
     class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
         read(from: RustBuffer): TypeName {
             switch (ordinalConverter.read(from)) {
-                {%- for variant in e.variants() %}
-                case {{ loop.index0 + 1}}: return {{ type_name }}.{{ variant|variant_name }};
+                {%- for variant in e.variants %}
+                case {{ loop.index }}: return {{ e.ts_name }}.{{ variant.name }};
                 {%- endfor %}
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
         }
         write(value: TypeName, into: RustBuffer): void {
             switch (value) {
-                {%- for variant in e.variants() %}
-                case {{ type_name }}.{{ variant|variant_name }}: return ordinalConverter.write({{ loop.index0 + 1 }}, into);
+                {%- for variant in e.variants %}
+                case {{ e.ts_name }}.{{ variant.name }}: return ordinalConverter.write({{ loop.index }}, into);
                 {%- endfor %}
             }
         }
@@ -55,12 +84,4 @@ const {{ ffi_converter_name }} = (() => {
     }
     return new FFIConverter();
 })();
-
-{% else %}
-{{- self.import_infra("UniffiEnum", "enums") }}
-{%- let superclass = "UniffiEnum" %}
-{% let is_error = false %}
-{%- include "TaggedEnumTemplate.ts" %}
-{%- endif %}{# endif e.is_flat() #}
-
-{{- self.export_converter(ffi_converter_name) -}}
+{%- endmacro %}

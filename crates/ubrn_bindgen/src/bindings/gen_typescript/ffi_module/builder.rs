@@ -9,9 +9,15 @@ use uniffi_bindgen::pipeline::general;
 
 use super::nodes::*;
 use super::type_mapping::{ffi_type_to_ts, ffi_type_to_ts_native};
+use crate::switches::AbiFlavor;
 
 impl TsFfiModule {
-    pub(crate) fn from_general(namespace: &general::Namespace) -> Self {
+    pub(crate) fn from_general(
+        namespace: &general::Namespace,
+        flavor: &AbiFlavor,
+        config: &super::super::Config,
+    ) -> Self {
+        let is_jsi = matches!(flavor, AbiFlavor::Jsi);
         let module_name = format!("Native{}", namespace.name.to_upper_camel_case());
 
         let has_async = namespace.ffi_definitions.iter().any(|def| {
@@ -29,10 +35,25 @@ impl TsFfiModule {
         let functions = Self::build_functions(namespace, has_async);
         let definitions = Self::build_definitions(namespace);
 
+        let has_continuation_callback = definitions.iter().any(|d| {
+            matches!(d,
+                FfiDefinitionDecl::Callback(cb) if cb.name == "UniffiRustFutureContinuationCallback"
+            )
+        });
+        let has_foreign_future = definitions.iter().any(|d| {
+            matches!(d,
+                FfiDefinitionDecl::Struct(s) if s.name == "UniffiForeignFuture"
+            )
+        });
+
         Self {
             module_name,
+            strict_type_checking: config.strict_type_checking,
+            is_jsi,
             functions,
             definitions,
+            has_continuation_callback,
+            has_foreign_future,
         }
     }
 
