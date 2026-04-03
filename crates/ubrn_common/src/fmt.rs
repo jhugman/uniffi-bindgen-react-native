@@ -43,7 +43,7 @@ pub fn prettier<P: AsRef<Utf8Path>>(out_dir: P, check_only: bool) -> Result<Opti
         } else {
             cmd.arg("--write");
         }
-        cmd.args(["**/*.js", "**/*.ts"])
+        cmd.args(["**/*.js", "**/*.ts", "**/*.json", "--no-error-on-unmatched-pattern"])
             .current_dir(out_dir.as_ref());
         Some(cmd)
     } else {
