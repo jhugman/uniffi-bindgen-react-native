@@ -188,11 +188,7 @@ fn compile_cpp(
 
     // Build
     if cfg!(target_os = "windows") {
-        run_cmd_quietly(
-            Command::new("cmake")
-                .arg("--build")
-                .arg(build_dir.as_str()),
-        );
+        run_cmd_quietly(Command::new("cmake").arg("--build").arg(build_dir.as_str()));
     } else {
         run_cmd_quietly(Command::new("ninja").arg("-C").arg(build_dir.as_str()));
     }
