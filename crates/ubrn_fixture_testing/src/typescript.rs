@@ -7,9 +7,8 @@
 // Shared TypeScript compilation utilities (tsc, tsc-alias, metro).
 
 use camino::{Utf8Path, Utf8PathBuf};
-use pathdiff::diff_utf8_paths;
 
-use crate::{command, paths, run_cmd_quietly};
+use crate::{command, paths, relative_path, run_cmd_quietly};
 
 /// Full JSI preparation: compile TS → rewrite paths → bundle with Metro.
 /// Returns the path to the Metro bundle.
@@ -68,8 +67,7 @@ fn prepare_tsconfig(
 
     // Compute a relative path from tsc_dir back to the repo root so the
     // `paths` aliases in the template resolve correctly.
-    let rel_root =
-        diff_utf8_paths(repo_root, tsc_dir).expect("cannot compute relative path to repo root");
+    let rel_root = relative_path(repo_root, tsc_dir);
 
     let mut contents = template
         .replace("{{repository_root}}", rel_root.as_str())
@@ -79,8 +77,7 @@ fn prepare_tsconfig(
 
     // Add @generated/* path mapping if a generated dir was provided.
     if let Some(gen_dir) = generated_dir {
-        let rel_gen = diff_utf8_paths(gen_dir, tsc_dir)
-            .expect("cannot compute relative path to generated dir");
+        let rel_gen = relative_path(gen_dir, tsc_dir);
         contents = contents.replace(
             "\"@/*\":",
             &format!("\"@/generated/*\": [\"{rel_gen}/*\"],\n      \"@/*\":"),
@@ -130,8 +127,7 @@ fn rewrite_at_paths(tsc_dir: &Utf8Path, generated_dir: Option<&Utf8Path>) {
     // a common root. The generated files end up mirrored under tsc_dir.
     let generated_in_tsc = generated_dir.map(|gen_dir| {
         let repo_root = paths::repo_root();
-        let rel = diff_utf8_paths(gen_dir, repo_root)
-            .expect("cannot compute relative path from repo root to generated dir");
+        let rel = relative_path(gen_dir, repo_root);
         tsc_dir.join(rel)
     });
     rewrite_paths_recursive(
@@ -179,26 +175,20 @@ fn rewrite_paths_recursive(
             // matches first (both start with "@/").
             if needs_generated {
                 if let Some(gen_dir) = generated_dir {
-                    let rel = diff_utf8_paths(gen_dir, file_dir).unwrap_or_else(|| {
-                        panic!("cannot compute relative path from {file_dir} to {gen_dir}")
-                    });
+                    let rel = relative_path(gen_dir, file_dir);
                     let rel_str = make_relative(&rel);
                     rewritten = rewritten.replace("\"@/generated/", &format!("\"{rel_str}/"));
                 }
             }
 
             if needs_at {
-                let rel = diff_utf8_paths(testing_dir, file_dir).unwrap_or_else(|| {
-                    panic!("cannot compute relative path from {file_dir} to {testing_dir}")
-                });
+                let rel = relative_path(testing_dir, file_dir);
                 let rel_str = make_relative(&rel);
                 rewritten = rewritten.replace("\"@/", &format!("\"{rel_str}/"));
             }
 
             if needs_ubrn {
-                let rel = diff_utf8_paths(ubrn_index, file_dir).unwrap_or_else(|| {
-                    panic!("cannot compute relative path from {file_dir} to {ubrn_index}")
-                });
+                let rel = relative_path(ubrn_index, file_dir);
                 let rel_str = make_relative(&rel);
                 rewritten =
                     rewritten.replace("\"uniffi-bindgen-react-native\"", &format!("\"{rel_str}\""));

@@ -31,6 +31,8 @@ use std::ffi::OsStr;
 use std::process::Command;
 use std::sync::Mutex;
 
+use camino::{Utf8Path, Utf8PathBuf};
+
 /// Serialize test flavors within a fixture.
 ///
 /// Both JSI and WASM generate TypeScript bindings into the fixture's
@@ -56,6 +58,16 @@ impl Drop for CleanupFile {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
     }
+}
+
+/// Compute a relative path between two paths, using forward slashes.
+///
+/// On Windows, `diff_utf8_paths` returns backslash paths which break
+/// certain tools
+pub(crate) fn relative_path(path: impl AsRef<Utf8Path>, base: impl AsRef<Utf8Path>) -> Utf8PathBuf {
+    let rel = pathdiff::diff_utf8_paths(path.as_ref(), base.as_ref())
+        .unwrap_or_else(|| panic!("cannot compute relative path from {} to {}", base.as_ref(), path.as_ref()));
+    Utf8PathBuf::from(rel.as_str().replace('\\', "/"))
 }
 
 /// Create a [`Command`] that works on Windows for `.cmd`/`.bat` scripts.
@@ -119,8 +131,7 @@ pub(crate) fn write_fixture_tsconfig(
 ) -> camino::Utf8PathBuf {
     let flavor = flavor.as_str();
     let repo_root = paths::repo_root();
-    let rel_root = pathdiff::diff_utf8_paths(repo_root, fixture_dir)
-        .expect("cannot compute relative path to repo root");
+    let rel_root = relative_path(repo_root, fixture_dir);
     let tsconfig_path = fixture_dir.join("tsconfig.json");
     let contents = format!(
         r#"{{
