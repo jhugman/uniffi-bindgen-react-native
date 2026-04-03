@@ -11,7 +11,7 @@
     "name": "James Hugman",
     "email": "james@hugman.tv"
   },
-  "type": "module",
+  "type": "commonjs",
   "main": "./typescript/dist/index.js",
   "types": "./typescript/dist/index.d.ts",
   "bin": {
