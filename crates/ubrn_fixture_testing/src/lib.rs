@@ -57,6 +57,17 @@ impl Drop for CleanupFile {
     }
 }
 
+/// Run a command, inheriting stdout/stderr so output is visible.
+pub(crate) fn run_cmd(cmd: &mut Command) {
+    let status = cmd
+        .status()
+        .unwrap_or_else(|e| panic!("failed to launch {:?}: {e}", cmd.get_program()));
+
+    if !status.success() {
+        panic!("{:?} failed (exit status: {})", cmd.get_program(), status);
+    }
+}
+
 /// Run a command, capturing stdout/stderr. Only display output on failure.
 pub(crate) fn run_cmd_quietly(cmd: &mut Command) {
     let output = cmd
@@ -119,7 +130,7 @@ pub(crate) fn write_fixture_tsconfig(
 /// Run a test script with tsx and experimental WASM module support.
 pub(crate) fn run_tsx(test_script: &camino::Utf8Path) {
     let tsx = paths::node_modules_bin().join("tsx");
-    run_cmd_quietly(
+    run_cmd(
         Command::new(&tsx)
             .arg("--experimental-wasm-modules")
             .arg(test_script.as_str()),
