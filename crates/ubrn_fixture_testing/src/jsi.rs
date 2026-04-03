@@ -155,8 +155,7 @@ fn compile_cpp(
         let path = entry.path();
         if let Some(ext) = path.extension() {
             if ext == "cpp" {
-                let canonical = path
-                    .canonicalize()
+                let canonical = dunce::canonicalize(&path)
                     .expect("failed to canonicalize cpp path");
                 cpp_files.push(canonical.to_string_lossy().to_string());
             }
