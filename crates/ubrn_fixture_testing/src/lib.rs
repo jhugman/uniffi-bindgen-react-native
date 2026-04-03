@@ -27,6 +27,7 @@ impl Flavor {
     }
 }
 
+use std::ffi::OsStr;
 use std::process::Command;
 use std::sync::Mutex;
 
@@ -54,6 +55,17 @@ impl CleanupFile {
 impl Drop for CleanupFile {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// Create a [`Command`] that works on Windows for `.cmd`/`.bat` scripts.
+pub(crate) fn command(program: impl AsRef<OsStr>) -> Command {
+    if cfg!(target_os = "windows") {
+        let mut cmd = Command::new("cmd");
+        cmd.arg("/C").arg(program);
+        cmd
+    } else {
+        Command::new(program)
     }
 }
 
@@ -120,7 +132,7 @@ pub(crate) fn write_fixture_tsconfig(
 pub(crate) fn run_tsx(test_script: &camino::Utf8Path) {
     let tsx = paths::node_modules_bin().join("tsx");
     run_cmd_quietly(
-        Command::new(&tsx)
+        command(&tsx)
             .arg("--experimental-wasm-modules")
             .arg(test_script.as_str()),
     );

@@ -6,12 +6,10 @@
 
 // Shared TypeScript compilation utilities (tsc, tsc-alias, metro).
 
-use std::process::Command;
-
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
 
-use crate::{paths, run_cmd_quietly};
+use crate::{command, paths, run_cmd_quietly};
 
 /// Full JSI preparation: compile TS → rewrite paths → bundle with Metro.
 /// Returns the path to the Metro bundle.
@@ -113,7 +111,7 @@ fn prepare_tsconfig(
 /// set in the tsconfig, so no extra CLI flags are needed beyond `--project`.
 fn compile_ts(tsconfig: &Utf8Path) {
     let tsc = paths::node_modules_bin().join("tsc");
-    run_cmd_quietly(Command::new(&tsc).arg("--project").arg(tsconfig));
+    run_cmd_quietly(command(&tsc).arg("--project").arg(tsconfig));
 }
 
 /// Rewrite tsconfig path aliases in all JS files under `tsc_dir`.
@@ -282,7 +280,7 @@ module.exports = {{
     std::fs::write(&metro_config_path, metro_config).expect("failed to write metro.config.js");
 
     run_cmd_quietly(
-        Command::new(&metro)
+        command(&metro)
             .arg("build")
             .arg("--minify")
             .arg("false")
