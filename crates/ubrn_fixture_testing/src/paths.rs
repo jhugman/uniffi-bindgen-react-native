@@ -34,7 +34,12 @@ pub(crate) fn hermes_build_dir() -> Utf8PathBuf {
 }
 
 pub(crate) fn test_runner_binary() -> Utf8PathBuf {
-    build_root().join("test-runner").join("test-runner")
+    let dir = build_root().join("test-runner");
+    if cfg!(target_os = "windows") {
+        dir.join("Debug").join("test-runner.exe")
+    } else {
+        dir.join("test-runner")
+    }
 }
 
 /// Panics with a helpful message if required bootstrap artifacts are missing.
