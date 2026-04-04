@@ -7,7 +7,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(${HERMES_EXTENSION_NAME})
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set(HERMES_SRC_DIR "" CACHE PATH "Path to Hermes source directory")
 set(HERMES_BUILD_DIR "" CACHE PATH "Path to Hermes build directory")
