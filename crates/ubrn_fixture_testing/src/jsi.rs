@@ -206,16 +206,6 @@ fn run_test_runner(bundle: &Utf8Path, so_file: &Utf8Path) {
     let runner = paths::test_runner_binary();
     let mut cmd = Command::new(runner.as_str());
     cmd.arg(bundle.as_str()).arg(so_file.as_str());
-
-    // On Windows, shared libraries (hermesvm.dll, the Rust cdylib, etc.) must
-    // be discoverable at runtime. Add their directories to PATH.
-    if cfg!(target_os = "windows") {
-        let hermes_dll_dir = paths::hermes_build_dir().join("API/hermes/Debug");
-        let rust_dll_dir = so_file.parent().unwrap_or(so_file);
-        let path = std::env::var("PATH").unwrap_or_default();
-        let new_path = format!("{};{};{}", hermes_dll_dir, rust_dll_dir, path);
-        cmd.env("PATH", new_path);
-    }
-
+    paths::add_hermes_dll_paths(&mut cmd);
     run_cmd(&mut cmd);
 }

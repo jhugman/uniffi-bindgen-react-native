@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use camino::{Utf8Path, Utf8PathBuf};
+use std::process::Command;
 use std::sync::LazyLock;
 
 use crate::metadata;
@@ -59,6 +60,16 @@ pub(crate) fn assert_jsi_bootstrap() {
 
 pub(crate) fn assert_wasm_bootstrap() {
     assert_node_modules();
+}
+
+/// On Windows, DLLs must be on PATH at runtime (no rpath equivalent).
+/// This adds the Hermes DLL directory to PATH on the given command.
+pub(crate) fn add_hermes_dll_paths(cmd: &mut Command) {
+    if cfg!(target_os = "windows") {
+        let hermes_dll_dir = hermes_build_dir().join("API/hermes/Debug");
+        let path = std::env::var("PATH").unwrap_or_default();
+        cmd.env("PATH", format!("{};{}", hermes_dll_dir, path));
+    }
 }
 
 fn assert_node_modules() {
