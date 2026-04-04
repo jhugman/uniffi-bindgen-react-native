@@ -62,7 +62,8 @@ pub(crate) fn assert_wasm_bootstrap() {
     assert_node_modules();
 }
 
-/// On Windows, DLLs must be on PATH at runtime (no rpath equivalent).
+/// On Windows, DLLs must be on PATH at runtime. This is not an issue on Linux/macOS as the
+/// binary's rpath tells the linker where to find the shared libraries.
 /// This adds the Hermes DLL directory to PATH on the given command.
 pub(crate) fn add_hermes_dll_paths(cmd: &mut Command) {
     if cfg!(target_os = "windows") {
