@@ -77,4 +77,10 @@ add_library(${HERMES_EXTENSION_NAME} SHARED ${HERMES_EXTENSION_CPP})
 if (MSVC)
     target_compile_definitions(${HERMES_EXTENSION_NAME} PRIVATE NOMINMAX)
 endif ()
-target_link_libraries(${HERMES_EXTENSION_NAME} ${RUST_LIB_NAME})
+# On Windows, Rust produces both a static lib (.lib) and a DLL import lib (.dll.lib).
+# We must link the import lib so the DLL resolves Rust's runtime dependencies itself.
+if (MSVC)
+    target_link_libraries(${HERMES_EXTENSION_NAME} "${RUST_TARGET_DIR}/${RUST_LIB_NAME}.dll.lib")
+else ()
+    target_link_libraries(${HERMES_EXTENSION_NAME} ${RUST_LIB_NAME})
+endif ()
