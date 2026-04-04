@@ -193,7 +193,12 @@ fn compile_cpp(
         run_cmd_quietly(Command::new("ninja").arg("-C").arg(build_dir.as_str()));
     }
 
-    build_dir.join(format!("librn-{lib_name}.{}", metadata::shared_lib_ext()))
+    let ext = metadata::shared_lib_ext();
+    if cfg!(target_os = "windows") {
+        build_dir.join(format!("Debug/rn-{lib_name}.{ext}"))
+    } else {
+        build_dir.join(format!("librn-{lib_name}.{ext}"))
+    }
 }
 
 /// Run the test-runner binary.
