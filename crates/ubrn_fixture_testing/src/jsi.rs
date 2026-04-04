@@ -169,32 +169,43 @@ fn compile_cpp(
     let cmake_lists_dir = repo_root.join("cpp/hermes-rust-extension");
 
     // Run cmake
-    run_cmd_quietly(
-        Command::new("cmake")
-            .arg("-G")
-            .arg("Ninja")
-            .arg(format!("-DHERMES_SRC_DIR={}", paths::hermes_src_dir()))
-            .arg(format!("-DHERMES_BUILD_DIR={}", paths::hermes_build_dir()))
-            .arg(format!("-DHERMES_EXTENSION_NAME=rn-{lib_name}"))
-            .arg(format!("-DRUST_LIB_NAME={lib_name}"))
-            .arg(format!("-DRUST_TARGET_DIR={}/debug", target_dir))
-            .arg(format!("-DHERMES_EXTENSION_CPP={cpp_files_str}"))
-            .arg(cmake_lists_dir.as_str())
-            .current_dir(&build_dir),
-    );
+    let mut cmd = Command::new("cmake");
+    cmd.arg("-G")
+        .arg(if cfg!(target_os = "windows") {
+            "Visual Studio 16 2019"
+        } else {
+            "Ninja"
+        })
+        .arg(format!("-DHERMES_SRC_DIR={}", paths::hermes_src_dir()))
+        .arg(format!("-DHERMES_BUILD_DIR={}", paths::hermes_build_dir()))
+        .arg(format!("-DHERMES_EXTENSION_NAME=rn-{lib_name}"))
+        .arg(format!("-DRUST_LIB_NAME={lib_name}"))
+        .arg(format!("-DRUST_TARGET_DIR={}/debug", target_dir))
+        .arg(format!("-DHERMES_EXTENSION_CPP={cpp_files_str}"))
+        .arg(cmake_lists_dir.as_str())
+        .current_dir(&build_dir);
+    run_cmd_quietly(&mut cmd);
 
-    // Run ninja
-    run_cmd_quietly(Command::new("ninja").arg("-C").arg(build_dir.as_str()));
+    // Build
+    if cfg!(target_os = "windows") {
+        run_cmd_quietly(Command::new("cmake").arg("--build").arg(build_dir.as_str()));
+    } else {
+        run_cmd_quietly(Command::new("ninja").arg("-C").arg(build_dir.as_str()));
+    }
 
-    build_dir.join(format!("librn-{lib_name}.{}", metadata::shared_lib_ext()))
+    let ext = metadata::shared_lib_ext();
+    if cfg!(target_os = "windows") {
+        build_dir.join(format!("Debug/rn-{lib_name}.{ext}"))
+    } else {
+        build_dir.join(format!("librn-{lib_name}.{ext}"))
+    }
 }
 
 /// Run the test-runner binary.
 fn run_test_runner(bundle: &Utf8Path, so_file: &Utf8Path) {
     let runner = paths::test_runner_binary();
-    run_cmd(
-        Command::new(runner.as_str())
-            .arg(bundle.as_str())
-            .arg(so_file.as_str()),
-    );
+    let mut cmd = Command::new(runner.as_str());
+    cmd.arg(bundle.as_str()).arg(so_file.as_str());
+    paths::add_hermes_dll_paths(&mut cmd);
+    run_cmd(&mut cmd);
 }

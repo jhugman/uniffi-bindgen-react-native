@@ -88,17 +88,30 @@ impl Bootstrap for HermesCmd {
         ubrn_common::mk_dir(&dir)?;
 
         let mut cmd = Command::new("cmake");
-        run_cmd(
-            cmd.current_dir(&dir)
-                .arg("-G")
-                .arg("Ninja")
-                .arg("-DHERMES_BUILD_APPLE_FRAMEWORK=OFF")
-                .arg("-DCMAKE_BUILD_TYPE=Debug")
-                .arg(&src),
-        )?;
+        cmd.current_dir(&dir)
+            .arg("-G")
+            .arg(if cfg!(target_os = "windows") {
+                "Visual Studio 16 2019"
+            } else {
+                "Ninja"
+            })
+            .arg("-DHERMES_BUILD_APPLE_FRAMEWORK=OFF")
+            .arg("-DCMAKE_BUILD_TYPE=Debug");
+        if cfg!(target_os = "windows") {
+            // The VS generator defaults to static libs, which would require
+            // consumers to link the entire Hermes transitive dependency chain.
+            // Shared libs avoid this by resolving their own dependencies.
+            cmd.arg("-DBUILD_SHARED_LIBS=ON");
+        }
+        run_cmd(cmd.arg(&src))?;
 
-        let mut cmd = Command::new("ninja");
-        run_cmd(cmd.current_dir(&dir))?;
+        if cfg!(target_os = "windows") {
+            let mut cmd = Command::new("cmake");
+            run_cmd(cmd.current_dir(&dir).arg("--build").arg(&dir))?;
+        } else {
+            let mut cmd = Command::new("ninja");
+            run_cmd(cmd.current_dir(&dir))?;
+        }
         Ok(())
     }
 }

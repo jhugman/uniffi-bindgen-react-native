@@ -3,12 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::process::Command;
-
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Args;
-use ubrn_common::{rm_dir, run_cmd};
+use ubrn_common::{command, rm_dir, run_cmd};
 
 use crate::util::repository_root;
 
@@ -34,7 +32,7 @@ impl Bootstrap for YarnCmd {
     }
 
     fn prepare(&self) -> Result<()> {
-        let mut cmd = Command::new("yarn");
+        let mut cmd = command("yarn");
         run_cmd(
             cmd.current_dir(repository_root()?)
                 .arg("--frozen-lockfile")
