@@ -60,6 +60,25 @@ impl Drop for CleanupFile {
     }
 }
 
+/// Extension trait to convert paths to forward slashes for use in file content.
+///
+/// On Windows, paths use backslashes which break certain tools.
+pub(crate) trait ForwardSlashPath {
+    fn to_forward_slash(&self) -> String;
+}
+
+impl ForwardSlashPath for Utf8Path {
+    fn to_forward_slash(&self) -> String {
+        self.as_str().replace('\\', "/")
+    }
+}
+
+impl ForwardSlashPath for Utf8PathBuf {
+    fn to_forward_slash(&self) -> String {
+        self.as_path().to_forward_slash()
+    }
+}
+
 /// Compute a relative path between two paths, using forward slashes.
 ///
 /// On Windows, `diff_utf8_paths` returns backslash paths which break
@@ -67,7 +86,7 @@ impl Drop for CleanupFile {
 pub(crate) fn relative_path(path: impl AsRef<Utf8Path>, base: impl AsRef<Utf8Path>) -> Utf8PathBuf {
     let rel = pathdiff::diff_utf8_paths(path.as_ref(), base.as_ref())
         .unwrap_or_else(|| panic!("cannot compute relative path from {} to {}", base.as_ref(), path.as_ref()));
-    Utf8PathBuf::from(rel.as_str().replace('\\', "/"))
+    Utf8PathBuf::from(rel.to_forward_slash())
 }
 
 /// Create a [`Command`] that works on Windows for `.cmd`/`.bat` scripts.

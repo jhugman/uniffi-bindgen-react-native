@@ -8,7 +8,7 @@
 
 use camino::{Utf8Path, Utf8PathBuf};
 
-use crate::{command, paths, relative_path, run_cmd_quietly};
+use crate::{command, paths, relative_path, run_cmd_quietly, ForwardSlashPath};
 
 /// Full JSI preparation: compile TS → rewrite paths → bundle with Metro.
 /// Returns the path to the Metro bundle.
@@ -93,7 +93,7 @@ fn prepare_tsconfig(
     // (comments), so we do a simple approach: strip the trailing `}` and
     // append the files array.
     let contents = contents.trim_end().trim_end_matches('}');
-    let contents = format!("{contents},\n  \"files\": [\"{}\"]\n}}\n", test_script,);
+    let contents = format!("{contents},\n  \"files\": [\"{}\"]\n}}\n", test_script.to_forward_slash());
 
     // Write the tsconfig into tsc_dir (the output directory) to avoid polluting the source tree.
     let tsconfig = tsc_dir.join("tsconfig.json");
@@ -253,11 +253,14 @@ fn bundle_with_metro(js_file: &Utf8Path, bundle_path: &Utf8Path, tsc_dir: &Utf8P
     //    (tsc-alias cannot reliably rewrite these when outDir == configDir)
     let testing_dir = tsc_dir.join("typescript/testing");
     let metro_config_path = tsc_dir.join("metro.config.cjs");
+    let repo_root = repo_root.to_forward_slash();
+    let tsc_dir_fwd = tsc_dir.to_forward_slash();
+    let testing_dir = testing_dir.to_forward_slash();
     let metro_config = format!(
         r#"const path = require("path");
 module.exports = {{
   projectRoot: path.resolve("{repo_root}"),
-  watchFolders: [path.resolve("{tsc_dir}")],
+  watchFolders: [path.resolve("{tsc_dir_fwd}")],
   resolver: {{
     useWatchman: false,
     extraNodeModules: {{
