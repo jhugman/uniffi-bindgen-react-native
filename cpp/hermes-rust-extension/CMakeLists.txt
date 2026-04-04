@@ -72,6 +72,10 @@ else ()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -frtti -fexceptions -Wall -fstack-protector-all -Werror")
 endif ()
 
+# This is built as a shared library. On Windows, MSVC doesn't export symbols
+# from DLLs by default (unlike Linux/macOS), so we need CMake to do it for us.
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 add_library(${HERMES_EXTENSION_NAME} SHARED ${HERMES_EXTENSION_CPP})
 # Prevent windows.h from defining min/max macros that conflict with Hermes headers.
 if (MSVC)
