@@ -6,6 +6,7 @@
 
 mod builder;
 mod nodes;
-pub(crate) mod type_mapping;
+mod type_mapping;
 
-pub(crate) use nodes::*;
+pub(crate) use builder::namespace_has_async;
+pub(crate) use nodes::PlayerFfiModule;

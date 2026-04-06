@@ -6,6 +6,7 @@
 pub(crate) mod api_module;
 mod config;
 pub(crate) mod ffi_module;
+pub(crate) mod ffi_module_player;
 mod type_mapping;
 mod util;
 
