@@ -23,7 +23,7 @@ impl PlayerFfiModule {
     ) -> Self {
         let has_async = namespace_has_async(namespace);
 
-        let symbols = Self::build_symbols(&namespace.name);
+        let symbols = Self::build_symbols(namespace);
         let functions = Self::build_functions(namespace, has_async);
         let callbacks = Self::build_callbacks(namespace);
         let structs = Self::build_structs(namespace);
@@ -44,11 +44,11 @@ impl PlayerFfiModule {
         }
     }
 
-    fn build_symbols(namespace: &str) -> PlayerSymbols {
+    fn build_symbols(namespace: &general::Namespace) -> PlayerSymbols {
         PlayerSymbols {
-            rustbuffer_alloc: format!("ffi_{namespace}_rustbuffer_alloc"),
-            rustbuffer_free: format!("ffi_{namespace}_rustbuffer_free"),
-            rustbuffer_from_bytes: format!("ffi_{namespace}_rustbuffer_from_bytes"),
+            rustbuffer_alloc: namespace.ffi_rustbuffer_alloc.0.clone(),
+            rustbuffer_free: namespace.ffi_rustbuffer_free.0.clone(),
+            rustbuffer_from_bytes: namespace.ffi_rustbuffer_from_bytes.0.clone(),
         }
     }
 
