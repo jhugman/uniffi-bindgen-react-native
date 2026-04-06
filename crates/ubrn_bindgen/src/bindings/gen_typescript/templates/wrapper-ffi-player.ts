@@ -5,8 +5,8 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { UniffiNativeModule } from "uniffi-runtime-napi";
-const { FfiType } = require("uniffi-runtime-napi/lib.js");
+import lib from "uniffi-runtime-napi/lib.js";
+const { UniffiNativeModule, FfiType } = lib;
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
@@ -31,6 +31,7 @@ const DEFINITIONS = {
       {%- when Some with (ret) %}
       ret: {{ ret }},
       {%- when None %}
+      ret: FfiType.Void,
       {%- endmatch %}
       hasRustCallStatus: {{ func.has_rust_call_status }},
     },
@@ -44,6 +45,7 @@ const DEFINITIONS = {
       {%- when Some with (ret) %}
       ret: {{ ret }},
       {%- when None %}
+      ret: FfiType.Void,
       {%- endmatch %}
       hasRustCallStatus: {{ cb.has_rust_call_status }},
       {%- if cb.out_return %}
