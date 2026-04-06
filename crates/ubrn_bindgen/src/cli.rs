@@ -270,15 +270,16 @@ fn generate_ffi_from_pipeline(
         let module = ModuleMetadata::new(name);
         let path = ts_dir.join(module.ts_ffi_filename());
 
+        let config = extract_ts_config(namespace)?;
         let code = match &switches.flavor {
             AbiFlavor::Napi => {
-                let config = extract_ts_config(namespace)?;
                 let player_module =
-                    gen_typescript::ffi_module_player::PlayerFfiModule::from_general(namespace, &config, None);
+                    gen_typescript::ffi_module_player::PlayerFfiModule::from_general(
+                        namespace, &config, None,
+                    );
                 gen_typescript::generate_player_lowlevel_code(player_module)?
             }
             _ => {
-                let config = extract_ts_config(namespace)?;
                 let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
                     namespace,
                     &switches.flavor,

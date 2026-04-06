@@ -8,4 +8,5 @@ mod builder;
 mod nodes;
 pub(crate) mod type_mapping;
 
+pub(crate) use builder::namespace_has_async;
 pub(crate) use nodes::*;

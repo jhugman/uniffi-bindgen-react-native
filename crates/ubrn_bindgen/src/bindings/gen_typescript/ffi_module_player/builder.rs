@@ -218,25 +218,9 @@ impl PlayerFfiModule {
             .map(|rt| ffi_type_to_ts(&rt.ty));
 
         FfiFunctionDecl {
-            name: func.name.0.clone(), // raw symbol name, no ubrn_ prefix
+            name: func.name.0.clone(),
             arguments,
             return_type,
         }
     }
-}
-
-/// Check whether a namespace has async functions.
-/// Shared between ffi_module and ffi_module_player builders.
-pub(crate) fn namespace_has_async(namespace: &general::Namespace) -> bool {
-    namespace.ffi_definitions.iter().any(|def| {
-        matches!(
-            def,
-            general::FfiDefinition::RustFunction(f)
-                if matches!(
-                    f.kind,
-                    general::FfiFunctionKind::RustFuturePoll
-                        | general::FfiFunctionKind::RustFutureComplete
-                )
-        )
-    })
 }

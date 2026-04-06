@@ -9,7 +9,7 @@ use std::sync::Once;
 
 use camino::Utf8Path;
 
-use crate::{metadata, paths, run_cmd_quietly};
+use crate::{metadata, paths, run_cmd, run_cmd_quietly};
 
 static BUILD_NAPI_RUNTIME: Once = Once::new();
 
@@ -42,7 +42,7 @@ pub fn run_test(crate_name: &str, test_script: &str, _target_tmpdir: &str) {
         &fixture_dir,
         crate::Flavor::Napi,
     ));
-    run_tsx_with_lib(test_script, &cdylib_path);
+    run_test_runner(test_script, &cdylib_path);
 }
 
 /// Build the N-API runtime (debug mode) if not already built.
@@ -77,9 +77,9 @@ fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path) {
 }
 
 /// Run tsx with UNIFFI_LIB_PATH set so the generated code can find the library.
-fn run_tsx_with_lib(test_script: &Utf8Path, cdylib_path: &Utf8Path) {
+fn run_test_runner(test_script: &Utf8Path, cdylib_path: &Utf8Path) {
     let tsx = paths::node_modules_bin().join("tsx");
-    run_cmd_quietly(
+    run_cmd(
         Command::new(tsx.as_str())
             .env("UNIFFI_LIB_PATH", cdylib_path.as_str())
             .arg(test_script.as_str()),
