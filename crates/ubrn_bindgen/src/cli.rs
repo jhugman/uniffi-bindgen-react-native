@@ -267,15 +267,26 @@ fn generate_ffi_from_pipeline(
     ts_dir: &Utf8Path,
 ) -> Result<()> {
     for (name, namespace) in &root.namespaces {
-        let config = extract_ts_config(namespace)?;
-        let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
-            namespace,
-            &switches.flavor,
-            &config,
-        );
-        let code = gen_typescript::generate_lowlevel_code(ffi_module)?;
         let module = ModuleMetadata::new(name);
         let path = ts_dir.join(module.ts_ffi_filename());
+
+        let code = match &switches.flavor {
+            AbiFlavor::Napi => {
+                let player_module =
+                    gen_typescript::ffi_module_player::PlayerFfiModule::from_general(namespace);
+                gen_typescript::generate_player_lowlevel_code(player_module)?
+            }
+            _ => {
+                let config = extract_ts_config(namespace)?;
+                let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
+                    namespace,
+                    &switches.flavor,
+                    &config,
+                );
+                gen_typescript::generate_lowlevel_code(ffi_module)?
+            }
+        };
+
         ubrn_common::write_file(path, code)?;
     }
     Ok(())
