@@ -23,6 +23,14 @@ pub(crate) fn generate_lowlevel_code(ffi_module: ffi_module::TsFfiModule) -> Res
         .context("generating lowlevel typescript from IR failed")
 }
 
+pub(crate) fn generate_player_lowlevel_code(
+    player_module: ffi_module_player::PlayerFfiModule,
+) -> Result<String> {
+    PlayerLowlevelTsWrapper::new(player_module)
+        .render()
+        .context("generating player lowlevel typescript from IR failed")
+}
+
 pub(crate) fn generate_api_code_from_ir(api_module: api_module::TsApiModule) -> Result<String> {
     TsApiWrapperV2::new(api_module)
         .render()
@@ -49,6 +57,18 @@ struct LowlevelTsWrapper {
 
 impl LowlevelTsWrapper {
     fn new(module: ffi_module::TsFfiModule) -> Self {
+        Self { module }
+    }
+}
+
+#[derive(Template)]
+#[template(syntax = "ts", escape = "none", path = "wrapper-ffi-player.ts")]
+struct PlayerLowlevelTsWrapper {
+    module: ffi_module_player::PlayerFfiModule,
+}
+
+impl PlayerLowlevelTsWrapper {
+    fn new(module: ffi_module_player::PlayerFfiModule) -> Self {
         Self { module }
     }
 }
