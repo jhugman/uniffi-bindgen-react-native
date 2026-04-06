@@ -77,7 +77,7 @@ impl TsFfiModule {
         functions
     }
 
-    fn should_include_function(func: &general::FfiFunction, has_async: bool) -> bool {
+    pub(crate) fn should_include_function(func: &general::FfiFunction, has_async: bool) -> bool {
         match func.kind {
             general::FfiFunctionKind::RustBufferFromBytes
             | general::FfiFunctionKind::RustBufferFree
@@ -197,7 +197,7 @@ impl TsFfiModule {
         }
     }
 
-    fn build_definitions(namespace: &general::Namespace) -> Vec<FfiDefinitionDecl> {
+    pub(crate) fn build_definitions(namespace: &general::Namespace) -> Vec<FfiDefinitionDecl> {
         namespace
             .ffi_definitions
             .iter()
