@@ -17,7 +17,7 @@ use crate::wasm;
 use crate::{
     codegen::{files, get_template_config, render_files},
     config::ProjectConfig,
-    jsi, Platform,
+    jsi, napi, Platform,
 };
 
 use super::ConfigArgs;
@@ -50,6 +50,10 @@ pub(crate) enum GenerateCmd {
     #[clap(aliases = ["react-native", "rn"])]
     Jsi(jsi::CmdArg),
 
+    /// Commands to generate N-API (Node.js) bindings.
+    #[clap(aliases = ["node"])]
+    Napi(napi::CmdArg),
+
     /// Commands to generate a WASM crate.
     #[cfg(feature = "wasm")]
     #[clap(aliases = ["web"])]
@@ -74,6 +78,10 @@ impl GenerateCmd {
             }
             Self::Jsi(jsi) => {
                 jsi.run()?;
+                Ok(())
+            }
+            Self::Napi(napi) => {
+                napi.run()?;
                 Ok(())
             }
             #[cfg(feature = "wasm")]
