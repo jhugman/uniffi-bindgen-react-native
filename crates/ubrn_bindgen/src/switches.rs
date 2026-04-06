@@ -61,8 +61,9 @@ impl AbiFlavor {
     }
 
     /// Whether FFI function names on the native module use the `ubrn_` prefix.
+    /// JSI and WASM both use this prefix; the Napi player uses raw symbol names.
     pub fn supports_ubrn_prefix(&self) -> bool {
-        matches!(self, Self::Jsi)
+        !matches!(self, Self::Napi)
     }
 
     /// Whether the runtime uses a plain `{ code: 0 }` object for RustCallStatus.

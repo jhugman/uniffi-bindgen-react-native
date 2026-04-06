@@ -40,8 +40,8 @@ pub(crate) struct PlayerFunctionDef {
     pub name: String,
     /// Player FfiType expressions for arguments (e.g. "FfiType.UInt32").
     pub args: Vec<String>,
-    /// Player FfiType expression for return, or None for void.
-    pub ret: Option<String>,
+    /// Player FfiType expression for return (e.g. "FfiType.UInt32" or "FfiType.Void").
+    pub ret: String,
     /// Whether this function has a trailing RustCallStatus argument.
     pub has_rust_call_status: bool,
 }
@@ -51,8 +51,8 @@ pub(crate) struct PlayerCallbackDef {
     pub name: String,
     /// Player FfiType expressions for arguments.
     pub args: Vec<String>,
-    /// Player FfiType expression for return.
-    pub ret: Option<String>,
+    /// Player FfiType expression for return (e.g. "FfiType.UInt32" or "FfiType.Void").
+    pub ret: String,
     /// Whether this callback has a trailing RustCallStatus argument.
     pub has_rust_call_status: bool,
     /// Whether this callback uses the out-return convention.

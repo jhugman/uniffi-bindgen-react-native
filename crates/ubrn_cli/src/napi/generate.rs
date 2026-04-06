@@ -5,6 +5,7 @@
  */
 
 use anyhow::Result;
+use camino::Utf8PathBuf;
 use clap::{Args, Subcommand};
 use ubrn_bindgen::{AbiFlavor, OutputArgs, SourceArgs, SwitchArgs};
 
@@ -42,18 +43,25 @@ impl Cmd {
 pub(crate) struct BindingsArgs {
     #[command(flatten)]
     pub(crate) source: SourceArgs,
-    #[command(flatten)]
-    pub(crate) output: OutputArgs,
+
+    /// By default, bindgen will attempt to format the code with prettier.
+    #[clap(long)]
+    pub(crate) no_format: bool,
+
+    /// The directory in which to put the generated Typescript.
+    #[clap(long)]
+    pub(crate) ts_dir: Utf8PathBuf,
 }
 
 impl From<&BindingsArgs> for ubrn_bindgen::BindingsArgs {
     fn from(value: &BindingsArgs) -> Self {
+        // Napi doesn't generate C++, so we pass ts_dir as a dummy for cpp_dir.
         ubrn_bindgen::BindingsArgs::new(
             SwitchArgs {
                 flavor: AbiFlavor::Napi,
             },
             value.source.clone(),
-            value.output.clone(),
+            OutputArgs::new(&value.ts_dir, &value.ts_dir, value.no_format),
         )
     }
 }

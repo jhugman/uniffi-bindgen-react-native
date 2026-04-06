@@ -72,8 +72,6 @@ fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path) {
             .arg("--library")
             .arg("--ts-dir")
             .arg(ts_dir.as_str())
-            .arg("--cpp-dir")
-            .arg(ts_dir.as_str())
             .arg(cdylib_path.as_str()),
     );
 }
