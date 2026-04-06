@@ -154,6 +154,7 @@ impl BindingsArgs {
                 }
                 generate_cpp(&components, &abi_dir, !out.no_format)?;
             }
+            AbiFlavor::Napi => { /* No C++ generation for Napi */ }
             #[cfg(feature = "wasm")]
             AbiFlavor::Wasm => {
                 let metadata = loader.load_metadata(&source_path)?;
