@@ -68,7 +68,8 @@ impl PlayerFfiModule {
                         .return_type
                         .ty
                         .as_ref()
-                        .map(|rt| ffi_type_to_player(&rt.ty));
+                        .map(|rt| ffi_type_to_player(&rt.ty))
+                        .unwrap_or_else(|| "FfiType.Void".into());
 
                     result.push(PlayerFunctionDef {
                         name: func.name.0.clone(),
@@ -115,11 +116,13 @@ impl PlayerFfiModule {
                             };
                             ffi_type_to_player(inner)
                         })
+                        .unwrap_or_else(|| "FfiType.Void".into())
                 } else {
                     ft.return_type
                         .ty
                         .as_ref()
                         .map(|rt| ffi_type_to_player(&rt.ty))
+                        .unwrap_or_else(|| "FfiType.Void".into())
                 };
 
                 result.push(PlayerCallbackDef {
