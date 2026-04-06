@@ -76,7 +76,7 @@ impl AbiFlavor {
     }
 
     pub fn supports_rust_backtrace(&self) -> bool {
-        false
+        !matches!(self, Self::Jsi | Self::Napi)
     }
 
     pub fn supports_finalization_registry(&self) -> bool {

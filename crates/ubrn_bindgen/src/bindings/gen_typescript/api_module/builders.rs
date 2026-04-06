@@ -60,7 +60,7 @@ fn ffi_name(flavor: &AbiFlavor, raw_name: &str) -> String {
 pub(super) fn build_string_helper(flavor: &AbiFlavor) -> TsStringHelper {
     // JSI has no global TextEncoder/TextDecoder, so it uses Rust-provided
     // string conversion functions instead.
-    let supports_text_encoder = !matches!(flavor, AbiFlavor::Jsi);
+    let supports_text_encoder = flavor.supports_text_encoder();
     TsStringHelper {
         supports_text_encoder,
         ffi_string_to_arraybuffer: "ubrn_uniffi_internal_fn_func_ffi__string_to_arraybuffer".into(),
@@ -440,7 +440,9 @@ pub(super) fn build_uniffi_traits_value(
     ffi_converter: &str,
     flavor: &AbiFlavor,
 ) -> Vec<TsUniffiTrait> {
-    collect_uniffi_traits(tm, |m| build_value_method_callable(m, ffi_converter, flavor))
+    collect_uniffi_traits(tm, |m| {
+        build_value_method_callable(m, ffi_converter, flavor)
+    })
 }
 
 pub(super) fn build_object(
@@ -472,17 +474,13 @@ pub(super) fn build_object(
 
     let ffi_clone = ffi_name(flavor, &interface.ffi_func_clone.0);
     let ffi_free = ffi_name(flavor, &interface.ffi_func_free.0);
-    let ffi_bless_pointer = if flavor.supports_ubrn_prefix() {
-        format!(
-            "ubrn_uniffi_internal_fn_method_{}_ffi__bless_pointer",
-            interface.name.to_ascii_lowercase()
-        )
-    } else {
-        format!(
+    let ffi_bless_pointer = ffi_name(
+        flavor,
+        &format!(
             "uniffi_internal_fn_method_{}_ffi__bless_pointer",
             interface.name.to_ascii_lowercase()
-        )
-    };
+        ),
+    );
 
     let (primary_constructor, alternate_constructors) = {
         let mut primary = None;
