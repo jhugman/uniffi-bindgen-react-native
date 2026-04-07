@@ -84,8 +84,13 @@ impl ForwardSlashPath for Utf8PathBuf {
 /// On Windows, `diff_utf8_paths` returns backslash paths which break
 /// certain tools
 pub(crate) fn relative_path(path: impl AsRef<Utf8Path>, base: impl AsRef<Utf8Path>) -> Utf8PathBuf {
-    let rel = pathdiff::diff_utf8_paths(path.as_ref(), base.as_ref())
-        .unwrap_or_else(|| panic!("cannot compute relative path from {} to {}", base.as_ref(), path.as_ref()));
+    let rel = pathdiff::diff_utf8_paths(path.as_ref(), base.as_ref()).unwrap_or_else(|| {
+        panic!(
+            "cannot compute relative path from {} to {}",
+            base.as_ref(),
+            path.as_ref()
+        )
+    });
     Utf8PathBuf::from(rel.to_forward_slash())
 }
 

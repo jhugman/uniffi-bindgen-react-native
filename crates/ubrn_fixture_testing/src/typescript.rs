@@ -93,7 +93,10 @@ fn prepare_tsconfig(
     // (comments), so we do a simple approach: strip the trailing `}` and
     // append the files array.
     let contents = contents.trim_end().trim_end_matches('}');
-    let contents = format!("{contents},\n  \"files\": [\"{}\"]\n}}\n", test_script.to_forward_slash());
+    let contents = format!(
+        "{contents},\n  \"files\": [\"{}\"]\n}}\n",
+        test_script.to_forward_slash()
+    );
 
     // Write the tsconfig into tsc_dir (the output directory) to avoid polluting the source tree.
     let tsconfig = tsc_dir.join("tsconfig.json");

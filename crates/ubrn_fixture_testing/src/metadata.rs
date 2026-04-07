@@ -65,7 +65,11 @@ pub(crate) fn find_cdylib(crate_name: &str) -> Utf8PathBuf {
 /// Find the cdylib artifact given a library name.
 pub(crate) fn find_cdylib_from_name(lib_name: &str) -> Utf8PathBuf {
     let target_dir = &workspace_metadata().target_directory;
-    let prefix = if cfg!(target_os = "windows") { "" } else { "lib" };
+    let prefix = if cfg!(target_os = "windows") {
+        ""
+    } else {
+        "lib"
+    };
     target_dir
         .join("debug")
         .join(format!("{prefix}{lib_name}.{}", shared_lib_ext()))
