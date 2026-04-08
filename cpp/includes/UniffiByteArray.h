@@ -26,8 +26,14 @@ template <> struct Bridging<jsi::ArrayBuffer> {
   static jsi::Value arraybuffer_to_value(jsi::Runtime &rt,
                                          const jsi::ArrayBuffer &arrayBuffer) {
     try {
+      // Return an object that resembles a Uint8Array: it has a .buffer property
+      // (the underlying ArrayBuffer) as well as .byteOffset and .byteLength so
+      // callers can treat it uniformly with a real Uint8Array view.
+      auto size = static_cast<double>(arrayBuffer.size(rt));
       jsi::Object obj(rt);
       obj.setProperty(rt, "buffer", arrayBuffer);
+      obj.setProperty(rt, "byteOffset", jsi::Value(0.0));
+      obj.setProperty(rt, "byteLength", jsi::Value(size));
       return jsi::Value(rt, obj);
     } catch (const std::logic_error &e) {
       throw jsi::JSError(rt, e.what());

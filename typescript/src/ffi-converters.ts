@@ -367,20 +367,14 @@ export function uniffiCreateFfiConverterString(
     }
     read(from: RustBuffer): string {
       const length = lengthConverter.read(from);
-      // TODO Currently, RustBufferHelper.cpp is pretty dumb,
-      // and copies all the bytes in the underlying ArrayBuffer.
-      // Making a better shim for Uint8Array would allow us to use
-      // readByteArray here, and eliminate a copy.
-      const bytes = from.readArrayBuffer(length);
-      return converter.bytesToString(new Uint8Array(bytes));
+      const bytes = from.readByteArray(length);
+      return converter.bytesToString(bytes);
     }
     write(value: string, into: RustBuffer): void {
-      // TODO: work on RustBufferHelper.cpp is needed to avoid
-      // the extra copy and use writeByteArray.
-      const buffer = converter.stringToBytes(value).buffer;
-      const numBytes = buffer.byteLength;
+      const bytes = converter.stringToBytes(value);
+      const numBytes = bytes.byteLength;
       lengthConverter.write(numBytes, into);
-      into.writeArrayBuffer(buffer);
+      into.writeByteArray(bytes);
     }
     allocationSize(value: string): number {
       return (
