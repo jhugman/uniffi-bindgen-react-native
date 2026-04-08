@@ -102,8 +102,8 @@ test("bench: takeBytes (lowering bytes into Rust)", (_t) => {
   console.log("\n--- takeBytes: lowering bytes into Rust ---");
   const ITERS = 100;
   for (const { label, bytes } of SIZES) {
-    // const b = new Uint8Array(bytes);
-    const b = new ArrayBuffer(bytes);
+    const b = new Uint8Array(bytes);
+    // const b = new ArrayBuffer(bytes);
     const ms = bench(() => takeBytes(b), ITERS, RUNS);
     console.log(
       `  ${label.padEnd(7)} x${ITERS}: ${ms}ms  (~${(ms / ITERS).toFixed(2)} ms/call)`,
