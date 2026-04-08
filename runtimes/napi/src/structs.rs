@@ -360,7 +360,11 @@ unsafe fn vtable_trampoline_main_thread(
         // `*mut RustCallStatusForVTable` is layout-compatible because `code: i8`
         // is the first field of both structs.
         status_ptr = *(rcs_arg_ptr as *const *mut RustCallStatusForVTable);
+    }
 
+    // When out_return is true, the JS callback uses the UniffiResult protocol:
+    // it returns { code, pointee?, errorBuf? } instead of accepting a status arg.
+    if userdata.has_rust_call_status && !userdata.out_return {
         let code = if !status_ptr.is_null() {
             (*status_ptr).code as i32
         } else {
@@ -381,33 +385,47 @@ unsafe fn vtable_trampoline_main_thread(
 
     let call_result = js_fn.call(None, &js_args);
 
-    // Write back the (possibly updated) RustCallStatus code from JS.
-    if userdata.has_rust_call_status && !status_ptr.is_null() {
-        if let Some(js_status_unknown) = js_args.last() {
-            if let Ok(js_status_obj) = JsObject::from_raw(userdata.raw_env, js_status_unknown.raw())
-            {
-                if let Ok(code_val) = js_status_obj.get_named_property::<i32>("code") {
-                    // SAFETY: `status_ptr` is non-null (checked above) and points
-                    // to the caller's stack-allocated RustCallStatus.
-                    (*status_ptr).code = code_val as i8;
+    if userdata.out_return {
+        // UniffiResult protocol: extract code, pointee, and errorBuf from the
+        // returned JS object and write them to the C out-pointers.
+        if let Ok(js_ret) = call_result {
+            if let Ok(result_obj) = JsObject::from_raw(userdata.raw_env, js_ret.raw()) {
+                write_uniffi_result_status(
+                    &result_obj,
+                    status_ptr,
+                    userdata.raw_env,
+                    userdata.rb_ops.from_bytes_ptr,
+                );
+                if !out_return_ptr.is_null() {
+                    if let Ok(pointee) = result_obj.get_named_property::<napi::JsUnknown>("pointee")
+                    {
+                        write_return_value(
+                            out_return_ptr,
+                            &userdata.ret_type,
+                            userdata.raw_env,
+                            pointee,
+                            userdata.rb_ops.from_bytes_ptr,
+                            false,
+                        );
+                    }
                 }
             }
         }
-    }
+    } else {
+        // Pass-by-reference status protocol: read back the mutated status object.
+        if userdata.has_rust_call_status && !status_ptr.is_null() {
+            if let Some(js_status_unknown) = js_args.last() {
+                if let Ok(js_status_obj) =
+                    JsObject::from_raw(userdata.raw_env, js_status_unknown.raw())
+                {
+                    if let Ok(code_val) = js_status_obj.get_named_property::<i32>("code") {
+                        (*status_ptr).code = code_val as i8;
+                    }
+                }
+            }
+        }
 
-    if let Ok(js_ret) = call_result {
-        if userdata.out_return && !out_return_ptr.is_null() {
-            // Write the return value to the out-pointer at natural type width
-            // (no ffi_arg widening — the out-pointer is a concrete typed variable).
-            write_return_value(
-                out_return_ptr,
-                &userdata.ret_type,
-                userdata.raw_env,
-                js_ret,
-                userdata.rb_ops.from_bytes_ptr,
-                false,
-            );
-        } else {
+        if let Ok(js_ret) = call_result {
             write_return_value(
                 result as *mut c_void,
                 &userdata.ret_type,
@@ -546,6 +564,37 @@ unsafe fn vtable_trampoline_cross_thread(
         };
 
         tsfn.call(request, ThreadsafeFunctionCallMode::NonBlocking);
+    }
+}
+
+/// Extract the `code` and `errorBuf` fields from a JS UniffiResult object and
+/// write them into the C `RustCallStatus` via `status_ptr`.
+///
+/// # Safety
+///
+/// `status_ptr` must be null or point to a valid `RustCallStatus` on the caller's stack.
+unsafe fn write_uniffi_result_status(
+    result_obj: &JsObject,
+    status_ptr: *mut RustCallStatusForVTable,
+    raw_env: napi::sys::napi_env,
+    rb_from_bytes_ptr: *const c_void,
+) {
+    if status_ptr.is_null() {
+        return;
+    }
+    let Ok(code_val) = result_obj.get_named_property::<i32>("code") else {
+        return;
+    };
+    (*status_ptr).code = code_val as i8;
+    // Only propagate error details when the status indicates failure.
+    if code_val != 0 {
+        if let Ok(err_buf) = result_obj.get_named_property::<napi::JsUnknown>("errorBuf") {
+            if let Ok(rb) =
+                napi_utils::js_uint8array_to_rust_buffer(raw_env, err_buf, rb_from_bytes_ptr)
+            {
+                (*status_ptr).error_buf = rb;
+            }
+        }
     }
 }
 
@@ -895,7 +944,8 @@ fn vtable_tsfn_handler(env: &Env, userdata: &VTableTrampolineUserdata, request: 
         js_args.push(js_val);
     }
 
-    if userdata.has_rust_call_status {
+    // When out_return is true, the JS callback uses the UniffiResult protocol.
+    if userdata.has_rust_call_status && !userdata.out_return {
         let mut js_status = match env.create_object() {
             Ok(o) => o,
             Err(_) => {
@@ -923,45 +973,81 @@ fn vtable_tsfn_handler(env: &Env, userdata: &VTableTrampolineUserdata, request: 
         return;
     }
 
-    let rcs_code = if userdata.has_rust_call_status {
-        if let Some(js_status_unknown) = js_args.last() {
-            if let Ok(js_status_obj) =
-                unsafe { JsObject::from_raw(userdata.raw_env, js_status_unknown.raw()) }
-            {
-                js_status_obj
-                    .get_named_property::<i32>("code")
-                    .map(|c| c as i8)
-                    .unwrap_or(request.rust_call_status_code)
+    if userdata.out_return {
+        // UniffiResult protocol: extract code and pointee from the returned object.
+        let (rcs_code, return_value) = match call_result {
+            Ok(js_ret) => {
+                if let Ok(result_obj) =
+                    unsafe { JsObject::from_raw(userdata.raw_env, js_ret.raw()) }
+                {
+                    let code = result_obj
+                        .get_named_property::<i32>("code")
+                        .map(|c| c as i8)
+                        .unwrap_or(request.rust_call_status_code);
+                    let pointee = if matches!(userdata.ret_type, FfiTypeDesc::Void) {
+                        None
+                    } else {
+                        result_obj
+                            .get_named_property::<napi::JsUnknown>("pointee")
+                            .ok()
+                            .and_then(|v| js_return_to_raw(env, &userdata.ret_type, v))
+                    };
+                    (code, pointee)
+                } else {
+                    (request.rust_call_status_code, None)
+                }
+            }
+            Err(_) => (request.rust_call_status_code, None),
+        };
+
+        if let Some(tx) = request.response_tx {
+            let _ = tx.send(VTableCallResponse {
+                return_value,
+                rust_call_status_code: rcs_code,
+            });
+        }
+    } else {
+        // Pass-by-reference status protocol.
+        let rcs_code = if userdata.has_rust_call_status {
+            if let Some(js_status_unknown) = js_args.last() {
+                if let Ok(js_status_obj) =
+                    unsafe { JsObject::from_raw(userdata.raw_env, js_status_unknown.raw()) }
+                {
+                    js_status_obj
+                        .get_named_property::<i32>("code")
+                        .map(|c| c as i8)
+                        .unwrap_or(request.rust_call_status_code)
+                } else {
+                    request.rust_call_status_code
+                }
             } else {
                 request.rust_call_status_code
             }
         } else {
-            request.rust_call_status_code
-        }
-    } else {
-        0
-    };
+            0
+        };
 
-    let return_value = match call_result {
-        Ok(js_ret) => {
-            if matches!(userdata.ret_type, FfiTypeDesc::Void) {
-                None
-            } else {
-                js_return_to_raw(env, &userdata.ret_type, js_ret)
+        let return_value = match call_result {
+            Ok(js_ret) => {
+                if matches!(userdata.ret_type, FfiTypeDesc::Void) {
+                    None
+                } else {
+                    js_return_to_raw(env, &userdata.ret_type, js_ret)
+                }
             }
-        }
-        Err(_) => None,
-    };
+            Err(_) => None,
+        };
 
-    if let Some(tx) = request.response_tx {
-        let _ = tx.send(VTableCallResponse {
-            return_value,
-            rust_call_status_code: rcs_code,
-        });
+        if let Some(tx) = request.response_tx {
+            let _ = tx.send(VTableCallResponse {
+                return_value,
+                rust_call_status_code: rcs_code,
+            });
+        }
     }
 }
 
-/// Minimal `#[repr(C)]` projection of `RustCallStatus`, containing only the `code` field.
+/// `#[repr(C)]` projection of `RustCallStatus`, layout-compatible with the real struct.
 ///
 /// The full `RustCallStatus` struct (defined in the UniFFI runtime) looks like:
 ///
@@ -973,15 +1059,12 @@ fn vtable_tsfn_handler(env: &Env, userdata: &VTableTrampolineUserdata, request: 
 /// }
 /// ```
 ///
-/// The trampoline only needs to read and write the `code` field. Because `code` is the
-/// *first* field and both structs are `#[repr(C)]`, this partial view is layout-compatible:
-/// a `*mut RustCallStatus` can be safely cast to `*mut RustCallStatusForVTable` and the
-/// `code` field will be at the correct offset (zero).
+/// Because both structs are `#[repr(C)]` and the fields match, a `*mut RustCallStatus`
+/// can be safely cast to `*mut RustCallStatusForVTable`.
 #[repr(C)]
 struct RustCallStatusForVTable {
     code: i8,
-    // The `error_buf: RustBuffer` field follows in the full struct, but we never
-    // touch it in the trampoline — the Rust caller manages it.
+    error_buf: RustBufferC,
 }
 
 /// Build a C-compatible VTable struct from a JS object implementing a UniFFI trait.
