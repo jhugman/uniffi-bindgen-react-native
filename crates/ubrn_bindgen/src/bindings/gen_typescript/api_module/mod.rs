@@ -398,7 +398,7 @@ impl TsApiModule {
                     defs.push(TsTypeDefinition::External(build_external_type(ext)));
                 }
                 general::TypeDefinition::Enum(e) => {
-                    let ts_enum = build_enum(e);
+                    let ts_enum = build_enum(e, flavor);
                     if ts_enum.is_flat && ts_enum.is_error {
                         defs.push(TsTypeDefinition::FlatError(ts_enum));
                     } else if ts_enum.is_flat {
@@ -408,7 +408,7 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::Record(r) => {
-                    defs.push(TsTypeDefinition::Record(build_record(r)));
+                    defs.push(TsTypeDefinition::Record(build_record(r, flavor)));
                 }
                 general::TypeDefinition::Interface(i) => {
                     defs.push(TsTypeDefinition::Object(Box::new(build_object(
@@ -420,7 +420,7 @@ impl TsApiModule {
                 }
                 general::TypeDefinition::CallbackInterface(cbi) => {
                     defs.push(TsTypeDefinition::CallbackInterface(
-                        build_callback_interface(cbi, &ffi_fn_types),
+                        build_callback_interface(cbi, &ffi_fn_types, flavor),
                     ));
                 }
             }
@@ -489,7 +489,7 @@ impl TsApiModule {
             config.strict_object_types,
         );
         let functions = build_functions(namespace, &flavor);
-        let initialization = build_initialization(namespace);
+        let initialization = build_initialization(namespace, &flavor);
 
         let mut primitive_imports = ImportAccumulator::new();
         for td in &namespace.type_definitions {

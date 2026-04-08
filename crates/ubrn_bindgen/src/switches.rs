@@ -30,6 +30,7 @@ impl SwitchArgs {
 #[derive(Clone, Debug, ValueEnum, PartialEq)]
 pub enum AbiFlavor {
     Jsi,
+    Napi,
     #[cfg(feature = "wasm")]
     Wasm,
 }
@@ -38,6 +39,7 @@ impl AbiFlavor {
     pub fn entrypoint(&self) -> &str {
         match self {
             Self::Jsi => "Entrypoint.cpp",
+            Self::Napi => "", // No native entrypoint needed
             #[cfg(feature = "wasm")]
             Self::Wasm => "src/lib.rs",
         }
@@ -47,8 +49,34 @@ impl AbiFlavor {
         matches!(self, Self::Jsi)
     }
 
-    pub fn supports_rust_backtrace(&self) -> bool {
+    /// Whether the native module is found on globalThis (JSI installs it there).
+    pub fn supports_globalthis_native_module(&self) -> bool {
+        matches!(self, Self::Jsi)
+    }
+
+    /// Whether the runtime uses a player (dlopen + register) rather than
+    /// compiled-in bindings.
+    pub fn supports_player(&self) -> bool {
+        matches!(self, Self::Napi)
+    }
+
+    /// Whether FFI function names on the native module use the `ubrn_` prefix.
+    /// JSI and WASM both use this prefix; the Napi player uses raw symbol names.
+    pub fn supports_ubrn_prefix(&self) -> bool {
+        !matches!(self, Self::Napi)
+    }
+
+    /// Whether the runtime uses a plain `{ code: 0 }` object for RustCallStatus.
+    pub fn supports_plain_call_status(&self) -> bool {
+        matches!(self, Self::Jsi | Self::Napi)
+    }
+
+    pub fn supports_text_encoder(&self) -> bool {
         !matches!(self, Self::Jsi)
+    }
+
+    pub fn supports_rust_backtrace(&self) -> bool {
+        !matches!(self, Self::Jsi | Self::Napi)
     }
 
     pub fn supports_finalization_registry(&self) -> bool {

@@ -19,6 +19,7 @@ pub fn generate_entrypoint(
 ) -> Result<String> {
     match &switches.flavor {
         AbiFlavor::Jsi => gen_cpp::generate_entrypoint(crate_, modules),
+        AbiFlavor::Napi => Ok(String::new()),
         #[cfg(feature = "wasm")]
         AbiFlavor::Wasm => gen_rust::generate_entrypoint(crate_, modules),
     }
