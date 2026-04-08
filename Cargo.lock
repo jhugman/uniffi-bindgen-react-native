@@ -1548,7 +1548,6 @@ dependencies = [
  "syn",
  "textwrap",
  "toml 0.9.12+spec-1.1.0",
- "topological-sort",
  "ubrn_common",
  "uniffi_bindgen",
  "uniffi_meta",
@@ -1801,6 +1800,15 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "ubrn_testing",
+ "uniffi",
+]
+
+[[package]]
+name = "uniffi-fixture-benchmark"
+version = "0.1.0"
+dependencies = [
+ "ubrn_fixture_testing",
+ "ubrn_macros",
  "uniffi",
 ]
 
