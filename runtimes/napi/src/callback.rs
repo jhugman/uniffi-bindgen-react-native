@@ -123,6 +123,9 @@ pub enum RawCallbackArg {
     RustBuffer(Vec<u8>),
     /// A raw C pointer (function pointer or opaque reference) transported as usize.
     Pointer(usize),
+    /// Pre-marshalled struct bytes for cross-thread transport.
+    /// Used when a callback returns a by-value struct (e.g. ForeignFutureDroppedCallbackStruct).
+    StructBytes(Vec<u8>),
 }
 
 /// Per-closure state passed to the libffi trampoline as the `userdata` pointer.
@@ -428,6 +431,15 @@ pub fn raw_arg_to_js(env: &Env, raw_arg: &RawCallbackArg) -> napi::Result<napi::
             Ok(unsafe { napi::JsUnknown::from_raw(raw_env, typedarray)? })
         }
         RawCallbackArg::Pointer(v) => Ok(env.create_bigint_from_u64(*v as u64)?.into_unknown()?),
+        RawCallbackArg::StructBytes(data) => {
+            let raw_env = env.raw();
+            // SAFETY: `raw_env` is valid (main thread). `data` is an owned
+            // `Vec<u8>` that outlives this call.
+            let typedarray =
+                unsafe { napi_utils::create_uint8array(raw_env, data.as_ptr(), data.len())? };
+            // SAFETY: `raw_env` is valid and `typedarray` is a live napi_value.
+            Ok(unsafe { napi::JsUnknown::from_raw(raw_env, typedarray)? })
+        }
     }
 }
 

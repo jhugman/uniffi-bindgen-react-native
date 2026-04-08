@@ -65,7 +65,16 @@ pub fn ffi_type_for(
         | FfiTypeDesc::MutReference(_)
         | FfiTypeDesc::Callback(_) => Ok(Type::pointer()),
         FfiTypeDesc::Void => Ok(Type::void()),
-        FfiTypeDesc::RustCallStatus => Ok(Type::pointer()), // always passed as &mut
+        // When RustCallStatus appears as a struct field, it is an inline value
+        // with layout {i8, u64, u64, pointer} matching RustCallStatusC.
+        // Function-level CIF builders push Type::pointer() directly for &mut args,
+        // so this only affects struct field layout computation.
+        FfiTypeDesc::RustCallStatus => Ok(Type::structure(vec![
+            Type::i8(),
+            Type::u64(),
+            Type::u64(),
+            Type::pointer(),
+        ])),
         FfiTypeDesc::RustBuffer => Ok(Type::structure(vec![
             Type::u64(),
             Type::u64(),

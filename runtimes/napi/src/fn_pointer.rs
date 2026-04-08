@@ -58,7 +58,7 @@ use crate::structs::StructDef;
 /// are only populated when `ffi_prep_cif` walks the type tree. This function creates
 /// a minimal dummy CIF with the struct as a parameter type, which triggers the
 /// in-place initialization of the struct's `ffi_type` and all nested struct types.
-fn prep_struct_type(struct_type: &Type) -> Result<()> {
+pub fn prep_struct_type(struct_type: &Type) -> Result<()> {
     unsafe {
         let raw = struct_type.as_raw_ptr();
         // Build a minimal arg types array: [struct_type_ptr, null]
@@ -85,7 +85,7 @@ fn prep_struct_type(struct_type: &Type) -> Result<()> {
 /// After `Type::structure()` is called, libffi populates the internal `ffi_type`
 /// with size, alignment, and element information. This function walks the elements
 /// array and computes the byte offset of each field, respecting alignment padding.
-fn struct_field_offsets(struct_type: &Type) -> Vec<usize> {
+pub fn struct_field_offsets(struct_type: &Type) -> Vec<usize> {
     let raw = struct_type.as_raw_ptr();
     let mut offsets = Vec::new();
     let mut offset = 0usize;
@@ -105,7 +105,7 @@ fn struct_field_offsets(struct_type: &Type) -> Vec<usize> {
 }
 
 /// Get the total size of a libffi type.
-fn ffi_type_size(t: &Type) -> usize {
+pub fn ffi_type_size(t: &Type) -> usize {
     unsafe { (*t.as_raw_ptr()).size }
 }
 
@@ -229,6 +229,50 @@ pub fn marshal_js_struct_to_bytes(
                     rb_from_bytes_ptr,
                 )?;
                 buffer[offset..offset + nested_bytes.len()].copy_from_slice(&nested_bytes);
+            }
+            FfiTypeDesc::RustCallStatus => {
+                // RustCallStatus is an inline struct: {code: i8, error_buf: RustBuffer}
+                // C layout (RustCallStatusC): {i8, u64, u64, *mut u8}
+                // JS shape: {code: number, errorBuf?: Uint8Array}
+                let status_obj: JsObject = js_val.try_into()?;
+                let code: i32 = status_obj.get_named_property("code")?;
+                buffer[offset] = code as i8 as u8;
+
+                let status_type = ffi_type_for(&FfiTypeDesc::RustCallStatus, struct_defs)?;
+                prep_struct_type(&status_type)?;
+                let status_offsets = struct_field_offsets(&status_type);
+
+                // errorBuf → RustBuffer fields (capacity, len, data), default to zero
+                let has_error_buf: bool = status_obj.has_named_property("errorBuf")?;
+                if has_error_buf && code != 0 {
+                    let err_val: JsUnknown = status_obj.get_named_property("errorBuf")?;
+                    // SAFETY: `env.raw()` is valid (main thread), `err_val` is a
+                    // live JsUnknown from JS, `rb_from_bytes_ptr` is the library's
+                    // `rustbuffer_from_bytes` function pointer.
+                    let rb = unsafe {
+                        napi_utils::js_uint8array_to_rust_buffer(
+                            env.raw(),
+                            err_val,
+                            rb_from_bytes_ptr,
+                        )?
+                    };
+                    // SAFETY: `RustBufferC` is `#[repr(C)]` with a fixed layout of
+                    // {u64, u64, *mut u8} = 24 bytes on 64-bit. Transmuting to a
+                    // byte array of the same size is sound.
+                    let rb_bytes: [u8; std::mem::size_of::<RustBufferC>()] =
+                        unsafe { std::mem::transmute(rb) };
+                    // Write capacity at status_offsets[1], len at [2], data at [3]
+                    buffer[offset + status_offsets[1]
+                        ..offset + status_offsets[1] + std::mem::size_of::<u64>()]
+                        .copy_from_slice(&rb_bytes[..8]);
+                    buffer[offset + status_offsets[2]
+                        ..offset + status_offsets[2] + std::mem::size_of::<u64>()]
+                        .copy_from_slice(&rb_bytes[8..16]);
+                    let ptr_size = std::mem::size_of::<*mut u8>();
+                    buffer[offset + status_offsets[3]..offset + status_offsets[3] + ptr_size]
+                        .copy_from_slice(&rb_bytes[16..16 + ptr_size]);
+                }
+                // else: zero-initialized buffer is already correct for success status
             }
             other => {
                 return Err(napi::Error::from_reason(format!(
