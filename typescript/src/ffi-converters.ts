@@ -331,17 +331,17 @@ export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
 
 export const FfiConverterArrayBuffer = (() => {
   const lengthConverter = FfiConverterInt32;
-  class FFIConverter extends AbstractFfiConverterByteArray<ArrayBuffer> {
-    read(from: RustBuffer): ArrayBuffer {
+  class FFIConverter extends AbstractFfiConverterByteArray<UniffiByteArray> {
+    read(from: RustBuffer): UniffiByteArray {
       const length = lengthConverter.read(from);
-      return from.readArrayBuffer(length);
+      return from.readByteArray(length);
     }
-    write(value: ArrayBuffer, into: RustBuffer): void {
+    write(value: UniffiByteArray, into: RustBuffer): void {
       const length = value.byteLength;
       lengthConverter.write(length, into);
-      into.writeByteArray(new Uint8Array(value));
+      into.writeByteArray(value);
     }
-    allocationSize(value: ArrayBuffer): number {
+    allocationSize(value: UniffiByteArray): number {
       return lengthConverter.allocationSize(0) + value.byteLength;
     }
   }

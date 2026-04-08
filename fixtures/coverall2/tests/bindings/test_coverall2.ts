@@ -23,41 +23,43 @@ test("well known array buffer returned", (t) => {
 });
 
 test("array buffer equals", (t) => {
-  t.assertEqual(arrayBuffer(16).byteLength, 16);
-  t.assertEqual(arrayBuffer(16), arrayBuffer(16), undefined, abEquals);
+  t.assertEqual(makeBytes(16).byteLength, 16);
+  t.assertEqual(makeBytes(16), makeBytes(16), undefined, u8Equals);
 
-  const mutated = new Uint32Array(arrayBuffer(32), 0).reverse().buffer;
-  t.assertNotEqual(mutated, arrayBuffer(32), undefined, abEquals);
+  const mutated = new Uint8Array(
+    new Uint32Array(makeBytes(32).buffer, 0).reverse().buffer,
+  );
+  t.assertNotEqual(mutated, makeBytes(32), undefined, u8Equals);
 });
 
 test("array buffer roundtrip using lift/lower", (t) => {
-  function rt(ab: ArrayBuffer) {
-    t.assertEqual(ab, identityArrayBuffer(ab), undefined, abEquals);
+  function rt(u8: Uint8Array) {
+    t.assertEqual(u8, identityArrayBuffer(u8), undefined, u8Equals);
   }
   for (let i = 0; i < 64; i++) {
-    rt(arrayBuffer(i));
+    rt(makeBytes(i));
   }
 });
 
 test("array buffer roundtrip using read/write", (t) => {
-  function rt(ab: ArrayBuffer) {
-    t.assertEqual(ab, identityArrayBufferForcedRead(ab)!, undefined, abEquals);
+  function rt(u8: Uint8Array) {
+    t.assertEqual(u8, identityArrayBufferForcedRead(u8)!, undefined, u8Equals);
   }
   for (let i = 0; i < 64; i++) {
-    rt(arrayBuffer(i));
+    rt(makeBytes(i));
   }
 });
 
 test("ArrayBuffer roundtrip of different sizes", (t) => {
-  function rt(ab: ArrayBuffer) {
-    t.assertNotNull(identityArrayBuffer(ab)!);
+  function rt(u8: Uint8Array) {
+    t.assertNotNull(identityArrayBuffer(u8)!);
   }
   // 1 kB = 1<<10
   // 1 MB = 1<<20
   // 16 MB = 1<<24
   for (let i = 0; i < 26; i++) {
     const byteLength = 1 << i;
-    const buffer = new ArrayBuffer(byteLength);
+    const buffer = new Uint8Array(byteLength);
     const start = Date.now();
     rt(buffer);
     const end = Date.now();
@@ -84,16 +86,16 @@ function bytes(n: number): string {
 }
 
 test("array buffer roundtrip with ArrayBufferView", (t) => {
-  function rt(ab: ArrayBuffer) {
+  function rt(u8: Uint8Array) {
     t.assertEqual(
-      ab,
-      identityArrayBuffer(new Uint32Array(ab).buffer),
+      u8,
+      identityArrayBuffer(new Uint8Array(new Uint32Array(u8.buffer).buffer)),
       undefined,
-      abEquals,
+      u8Equals,
     );
   }
   for (let i = 0; i < 64; i += 4) {
-    rt(arrayBuffer(i));
+    rt(makeBytes(i));
   }
 });
 
@@ -101,15 +103,16 @@ xtest("array buffer roundtrip with ArrayBufferView of different sizes", (t) => {
   // Typescript before 5.7, accepted typed arrays as ArrayBuffer.
   // This is no longer the case.
   // Now: ArrayBufferView is a distinct union type.
-  function rt(viewName: string, ta: ArrayBufferView, slice: ArrayBuffer) {
+  function rt(viewName: string, ta: ArrayBufferView, slice: Uint8Array) {
     t.assertEqual(
       slice,
       identityArrayBuffer(slice),
       `${viewName} didn't match`,
-      abEquals,
+      u8Equals,
     );
   }
-  const base = arrayBuffer(64);
+  const base = makeBytes(64);
+  const baseBuffer = base.buffer as ArrayBuffer;
   const arrayTypes = [
     {
       name: "Uint8Array",
@@ -186,28 +189,26 @@ xtest("array buffer roundtrip with ArrayBufferView of different sizes", (t) => {
         byteOffset += byteLength
       ) {
         const typedArray = arrayType.new(
-          base,
+          baseBuffer,
           byteOffset,
           byteLength / bytesPerElement,
         );
-        const slice = base.slice(byteOffset, byteOffset + byteLength);
+        const slice = new Uint8Array(base.buffer, byteOffset, byteLength);
         rt(viewName, typedArray, slice);
       }
     }
   }
 });
 
-function abEquals(a: ArrayBuffer, b: ArrayBuffer): boolean {
+function u8Equals(a: Uint8Array, b: Uint8Array): boolean {
   if (a.byteLength !== b.byteLength) {
     return false;
   }
 
   const len = a.byteLength;
-  const aArray = new Uint8Array(a);
-  const bArray = new Uint8Array(b);
 
   for (let i = 0; i < len; i++) {
-    if (aArray.at(i) !== bArray.at(i)) {
+    if (a.at(i) !== b.at(i)) {
       return false;
     }
   }
@@ -215,9 +216,8 @@ function abEquals(a: ArrayBuffer, b: ArrayBuffer): boolean {
   return true;
 }
 
-function arrayBuffer(numBytes: number): ArrayBuffer {
-  const array = Uint8Array.from({ length: numBytes }, (_v, i) => i % 255);
-  return array.buffer;
+function makeBytes(numBytes: number): Uint8Array {
+  return Uint8Array.from({ length: numBytes }, (_v, i) => i % 255);
 }
 
 test("Test nested optionals", (t) => {
