@@ -45,6 +45,16 @@ files:
       startBlock: "#"
       linePrefix: "# "
       endBlock: "#"
+  "**/*.mjs":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
+  "**/*.js":
+    header:
+      startBlock: "/* "
+      linePrefix: " * "
+      endBlock: " */"
 
   package.json:
     # Forced & default JSON key values for package.json
@@ -78,6 +88,8 @@ ignore:
   - test
   - ./**/generated
   - ./**/templates
+  - runtimes/napi/index.d.ts
+  - runtimes/napi/index.js
 
 # Default license text
 license: |
