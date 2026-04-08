@@ -16,7 +16,7 @@ use uniffi_bindgen::{
     interface::{FfiArgument, FfiCallbackFunction, FfiFunction, FfiType},
     ComponentInterface,
 };
-use util::{camel_case_ident, ident, if_or_default, if_then_map, map_or_default, snake_case_ident};
+use util::{ident, if_or_default, if_then_map, map_or_default, snake_case_ident};
 
 use crate::{
     bindings::{extensions::FfiCallbackFunctionExt as _, metadata::ModuleMetadata},
@@ -511,19 +511,18 @@ impl<'a> ComponentTemplate<'a> {
             .map(|field| {
                 let field_name = field.name();
                 let field_ident = ident(field_name);
-                let js_field_ident = camel_case_ident(field_name);
                 if st.is_callback_method(field_name) {
                     let callback_fn_ident = callback_fn_ident();
                     let alias_ident = st.method_alias_ident(field_name);
                     quote! {
-                        #[wasm_bindgen(method, getter, js_name = #js_field_ident)]
+                        #[wasm_bindgen(method, getter)]
                         fn #field_ident(this: &VTableJs) -> #alias_ident::#callback_fn_ident;
                     }
                 } else {
                     let field_type = field.type_();
                     let type_ = self.ffi_type_foreign_future(&field_type);
                     quote! {
-                        #[wasm_bindgen(method, getter, js_name = #js_field_ident)]
+                        #[wasm_bindgen(method, getter)]
                         fn #field_ident(this: &VTableJs) -> #type_;
                     }
                 }

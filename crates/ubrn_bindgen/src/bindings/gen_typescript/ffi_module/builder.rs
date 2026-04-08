@@ -291,7 +291,7 @@ impl TsFfiModule {
             .fields
             .iter()
             .map(|f| FfiFieldDecl {
-                name: f.name.to_lower_camel_case(),
+                name: f.name.clone(),
                 type_name: ffi_type_to_ts(&f.ty.ty),
             })
             .collect();

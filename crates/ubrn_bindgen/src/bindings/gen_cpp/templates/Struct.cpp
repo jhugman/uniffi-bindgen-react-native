@@ -22,18 +22,17 @@ template <> struct Bridging<{{ struct_name }}> {
     // Create the vtable from the js callbacks.
     {%- for field in ffi_struct.fields() %}
     {%-   let rs_field_name = field.name() %}
-    {%-   let ts_field_name = field.name()|var_name %}
     {%-   if field.type_().is_callable() %}
     rsObject.{{ rs_field_name }} = {# space #}
     {%-     call cpp::callback_fn_namespace(ffi_struct, field) -%}
         ::makeCallbackFunction(
-          rt, callInvoker, jsObject.getProperty(rt, "{{ ts_field_name }}")
+          rt, callInvoker, jsObject.getProperty(rt, "{{ rs_field_name }}")
         );
     {%-   else %}
     rsObject.{{ rs_field_name }} = {# space -#}
       {{ field.type_().borrow()|bridging_class(ci) }}::fromJs(
         rt, callInvoker,
-        jsObject.getProperty(rt, "{{ ts_field_name }}")
+        jsObject.getProperty(rt, "{{ rs_field_name }}")
       );
     {%-   endif %}
     {%- endfor %}
