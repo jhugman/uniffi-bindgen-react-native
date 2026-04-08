@@ -48,8 +48,7 @@ template <> struct Bridging<std::string> {
       auto payload =
           std::make_shared<CMutableBuffer>(CMutableBuffer(bytes, len));
       auto arrayBuffer = jsi::ArrayBuffer(rt, payload);
-      auto uint8ArrayCtor =
-          rt.global().getPropertyAsFunction(rt, "Uint8Array");
+      auto uint8ArrayCtor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
       return uint8ArrayCtor.callAsConstructor(
           rt, jsi::Value(rt, std::move(arrayBuffer)));
     } catch (const std::logic_error &e) {
