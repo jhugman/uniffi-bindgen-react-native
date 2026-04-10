@@ -6,12 +6,9 @@
 
 // Shared TypeScript compilation utilities (tsc, tsc-alias, metro).
 
-use std::process::Command;
-
 use camino::{Utf8Path, Utf8PathBuf};
-use pathdiff::diff_utf8_paths;
 
-use crate::{paths, run_cmd_quietly};
+use crate::{command, paths, relative_path, run_cmd_quietly, ForwardSlashPath};
 
 /// Full JSI preparation: compile TS → rewrite paths → bundle with Metro.
 /// Returns the path to the Metro bundle.
@@ -70,8 +67,7 @@ fn prepare_tsconfig(
 
     // Compute a relative path from tsc_dir back to the repo root so the
     // `paths` aliases in the template resolve correctly.
-    let rel_root =
-        diff_utf8_paths(repo_root, tsc_dir).expect("cannot compute relative path to repo root");
+    let rel_root = relative_path(repo_root, tsc_dir);
 
     let mut contents = template
         .replace("{{repository_root}}", rel_root.as_str())
@@ -81,8 +77,7 @@ fn prepare_tsconfig(
 
     // Add @generated/* path mapping if a generated dir was provided.
     if let Some(gen_dir) = generated_dir {
-        let rel_gen = diff_utf8_paths(gen_dir, tsc_dir)
-            .expect("cannot compute relative path to generated dir");
+        let rel_gen = relative_path(gen_dir, tsc_dir);
         contents = contents.replace(
             "\"@/*\":",
             &format!("\"@/generated/*\": [\"{rel_gen}/*\"],\n      \"@/*\":"),
@@ -98,7 +93,10 @@ fn prepare_tsconfig(
     // (comments), so we do a simple approach: strip the trailing `}` and
     // append the files array.
     let contents = contents.trim_end().trim_end_matches('}');
-    let contents = format!("{contents},\n  \"files\": [\"{}\"]\n}}\n", test_script,);
+    let contents = format!(
+        "{contents},\n  \"files\": [\"{}\"]\n}}\n",
+        test_script.to_forward_slash()
+    );
 
     // Write the tsconfig into tsc_dir (the output directory) to avoid polluting the source tree.
     let tsconfig = tsc_dir.join("tsconfig.json");
@@ -113,7 +111,7 @@ fn prepare_tsconfig(
 /// set in the tsconfig, so no extra CLI flags are needed beyond `--project`.
 fn compile_ts(tsconfig: &Utf8Path) {
     let tsc = paths::node_modules_bin().join("tsc");
-    run_cmd_quietly(Command::new(&tsc).arg("--project").arg(tsconfig));
+    run_cmd_quietly(command(&tsc).arg("--project").arg(tsconfig));
 }
 
 /// Rewrite tsconfig path aliases in all JS files under `tsc_dir`.
@@ -132,8 +130,7 @@ fn rewrite_at_paths(tsc_dir: &Utf8Path, generated_dir: Option<&Utf8Path>) {
     // a common root. The generated files end up mirrored under tsc_dir.
     let generated_in_tsc = generated_dir.map(|gen_dir| {
         let repo_root = paths::repo_root();
-        let rel = diff_utf8_paths(gen_dir, repo_root)
-            .expect("cannot compute relative path from repo root to generated dir");
+        let rel = relative_path(gen_dir, repo_root);
         tsc_dir.join(rel)
     });
     rewrite_paths_recursive(
@@ -181,26 +178,20 @@ fn rewrite_paths_recursive(
             // matches first (both start with "@/").
             if needs_generated {
                 if let Some(gen_dir) = generated_dir {
-                    let rel = diff_utf8_paths(gen_dir, file_dir).unwrap_or_else(|| {
-                        panic!("cannot compute relative path from {file_dir} to {gen_dir}")
-                    });
+                    let rel = relative_path(gen_dir, file_dir);
                     let rel_str = make_relative(&rel);
                     rewritten = rewritten.replace("\"@/generated/", &format!("\"{rel_str}/"));
                 }
             }
 
             if needs_at {
-                let rel = diff_utf8_paths(testing_dir, file_dir).unwrap_or_else(|| {
-                    panic!("cannot compute relative path from {file_dir} to {testing_dir}")
-                });
+                let rel = relative_path(testing_dir, file_dir);
                 let rel_str = make_relative(&rel);
                 rewritten = rewritten.replace("\"@/", &format!("\"{rel_str}/"));
             }
 
             if needs_ubrn {
-                let rel = diff_utf8_paths(ubrn_index, file_dir).unwrap_or_else(|| {
-                    panic!("cannot compute relative path from {file_dir} to {ubrn_index}")
-                });
+                let rel = relative_path(ubrn_index, file_dir);
                 let rel_str = make_relative(&rel);
                 rewritten =
                     rewritten.replace("\"uniffi-bindgen-react-native\"", &format!("\"{rel_str}\""));
@@ -265,11 +256,14 @@ fn bundle_with_metro(js_file: &Utf8Path, bundle_path: &Utf8Path, tsc_dir: &Utf8P
     //    (tsc-alias cannot reliably rewrite these when outDir == configDir)
     let testing_dir = tsc_dir.join("typescript/testing");
     let metro_config_path = tsc_dir.join("metro.config.cjs");
+    let repo_root = repo_root.to_forward_slash();
+    let tsc_dir_fwd = tsc_dir.to_forward_slash();
+    let testing_dir = testing_dir.to_forward_slash();
     let metro_config = format!(
         r#"const path = require("path");
 module.exports = {{
   projectRoot: path.resolve("{repo_root}"),
-  watchFolders: [path.resolve("{tsc_dir}")],
+  watchFolders: [path.resolve("{tsc_dir_fwd}")],
   resolver: {{
     useWatchman: false,
     extraNodeModules: {{
@@ -282,7 +276,7 @@ module.exports = {{
     std::fs::write(&metro_config_path, metro_config).expect("failed to write metro.config.js");
 
     run_cmd_quietly(
-        Command::new(&metro)
+        command(&metro)
             .arg("build")
             .arg("--minify")
             .arg("false")
