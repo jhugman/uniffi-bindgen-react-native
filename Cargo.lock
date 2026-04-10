@@ -1548,7 +1548,6 @@ dependencies = [
  "syn",
  "textwrap",
  "toml 0.9.12+spec-1.1.0",
- "topological-sort",
  "ubrn_common",
  "uniffi_bindgen",
  "uniffi_meta",
