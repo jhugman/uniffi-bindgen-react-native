@@ -3,12 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-module.exports = {
-  dependency: {
-    platforms: {
-      android: {
-        cmakeListsPath: "tmp/jni/CMakeLists.txt",
-      },
-    },
-  },
-};
+extern crate napi_build;
+
+fn main() {
+    napi_build::setup();
+}

@@ -84,6 +84,33 @@ jobs:
       - name: Run tests of generated WASM bindings
         run: "cargo test -- wasm::"
 
+  integration-tests-napi-runtime:
+    name: 🧩 Integration tests (N-API runtime)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install npm dependencies
+        run: cd runtimes/napi && npm ci
+
+      - name: Build napi addon
+        run: cd runtimes/napi && npm run build:debug
+
+      - name: Build test fixtures
+        run: |
+          cargo build -p uniffi-napi-test-lib
+          cargo build -p uniffi-fixture-simple
+
+      - name: Build arithmetic example
+        run: cargo build -p uniffi-example-arithmetic
+
+      - name: Run runtime tests
+        run: cd runtimes/napi && npm test
+
   integration-tests-checkout:
     name: 🧩 Integration tests (checkout)
     runs-on: ubuntu-latest

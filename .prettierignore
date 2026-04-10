@@ -5,3 +5,6 @@ build/
 *.md
 package.json
 *.js.inc
+# napi-rs auto-generated loader (formatting controlled by napi-rs, not us)
+runtimes/napi/index.js
+runtimes/napi/index.d.ts
