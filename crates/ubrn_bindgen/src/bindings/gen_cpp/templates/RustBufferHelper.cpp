@@ -30,10 +30,18 @@ template <> struct Bridging<RustBuffer> {
   static RustBuffer fromJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
                            const jsi::Value &value) {
     try {
-      auto buffer = uniffi_jsi::Bridging<jsi::ArrayBuffer>::value_to_arraybuffer(rt, value);
+      // value is a Uint8Array (or Uint8Array-shaped object with .buffer,
+      // .byteOffset, .byteLength). Read byteOffset and byteLength so that a
+      // view into a larger buffer is handled correctly.
+      auto obj = value.asObject(rt);
+      auto buffer = obj.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
+      auto byteOffset =
+          static_cast<int32_t>(obj.getProperty(rt, "byteOffset").asNumber());
+      auto byteLength =
+          static_cast<int32_t>(obj.getProperty(rt, "byteLength").asNumber());
       auto bytes = ForeignBytes{
-          .len = static_cast<int32_t>(buffer.length(rt)),
-          .data = buffer.data(rt),
+          .len = byteLength,
+          .data = buffer.data(rt) + byteOffset,
       };
 
       // This buffer is constructed from foreign bytes. Rust scaffolding copies

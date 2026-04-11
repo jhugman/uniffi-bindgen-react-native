@@ -328,7 +328,7 @@ test("Dummy coveralls implement the Coveralls interface", (t) => {
     panic(message: string): void {
       throw new Error("Method not implemented.");
     }
-    reverse(value: ArrayBuffer): ArrayBuffer {
+    reverse(value: Uint8Array): Uint8Array {
       throw new Error("Method not implemented.");
     }
     setAndGetEmptyStruct(emptyStruct: EmptyStruct): EmptyStruct {

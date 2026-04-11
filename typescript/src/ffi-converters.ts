@@ -331,17 +331,17 @@ export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
 
 export const FfiConverterArrayBuffer = (() => {
   const lengthConverter = FfiConverterInt32;
-  class FFIConverter extends AbstractFfiConverterByteArray<ArrayBuffer> {
-    read(from: RustBuffer): ArrayBuffer {
+  class FFIConverter extends AbstractFfiConverterByteArray<UniffiByteArray> {
+    read(from: RustBuffer): UniffiByteArray {
       const length = lengthConverter.read(from);
-      return from.readArrayBuffer(length);
+      return from.readByteArray(length);
     }
-    write(value: ArrayBuffer, into: RustBuffer): void {
+    write(value: UniffiByteArray, into: RustBuffer): void {
       const length = value.byteLength;
       lengthConverter.write(length, into);
-      into.writeByteArray(new Uint8Array(value));
+      into.writeByteArray(value);
     }
-    allocationSize(value: ArrayBuffer): number {
+    allocationSize(value: UniffiByteArray): number {
       return lengthConverter.allocationSize(0) + value.byteLength;
     }
   }
@@ -367,20 +367,14 @@ export function uniffiCreateFfiConverterString(
     }
     read(from: RustBuffer): string {
       const length = lengthConverter.read(from);
-      // TODO Currently, RustBufferHelper.cpp is pretty dumb,
-      // and copies all the bytes in the underlying ArrayBuffer.
-      // Making a better shim for Uint8Array would allow us to use
-      // readByteArray here, and eliminate a copy.
-      const bytes = from.readArrayBuffer(length);
-      return converter.bytesToString(new Uint8Array(bytes));
+      const bytes = from.readByteArray(length);
+      return converter.bytesToString(bytes);
     }
     write(value: string, into: RustBuffer): void {
-      // TODO: work on RustBufferHelper.cpp is needed to avoid
-      // the extra copy and use writeByteArray.
-      const buffer = converter.stringToBytes(value).buffer;
-      const numBytes = buffer.byteLength;
+      const bytes = converter.stringToBytes(value);
+      const numBytes = bytes.byteLength;
       lengthConverter.write(numBytes, into);
-      into.writeArrayBuffer(buffer);
+      into.writeByteArray(bytes);
     }
     allocationSize(value: string): number {
       return (

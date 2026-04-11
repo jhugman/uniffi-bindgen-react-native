@@ -59,7 +59,7 @@ pub(super) fn type_label_for(ty: &general::Type) -> String {
         general::Type::Float64 => "number".into(),
         general::Type::Boolean => "boolean".into(),
         general::Type::String => "string".into(),
-        general::Type::Bytes => "ArrayBuffer".into(),
+        general::Type::Bytes => "Uint8Array".into(),
         general::Type::Timestamp => "Date".into(),
         general::Type::Duration => "number".into(),
         general::Type::Interface { name, imp, .. } => {
