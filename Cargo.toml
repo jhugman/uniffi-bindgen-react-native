@@ -3,6 +3,8 @@ members = [
     "crates/*",
     "examples/*",
     "fixtures/*",
+    "runtimes/*",
+    "runtimes/napi/fixtures/*",
     "xtask",
 ]
 
