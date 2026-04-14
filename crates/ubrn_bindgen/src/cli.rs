@@ -3,20 +3,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::str::FromStr;
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
-use cargo_metadata::Metadata;
 use clap::Args;
+use serde::Deserialize;
 use ubrn_common::{mk_dir, path_or_shim, CrateMetadata, Utf8PathBufExt as _};
-use uniffi_bindgen::{cargo_metadata::CrateConfigSupplier, BindingGenerator};
+use uniffi_bindgen::{
+    cargo_metadata::CrateConfigSupplier, pipeline::general, BindgenLoader, BindgenPaths,
+    ComponentInterface,
+};
 
 #[cfg(feature = "wasm")]
-use super::wasm::WasmBindingGenerator;
+use super::{bindings::gen_rust, wasm::generate_rs};
 use super::{
-    bindings::metadata::ModuleMetadata,
-    react_native::ReactNativeBindingGenerator,
+    bindings::{gen_cpp, gen_typescript, metadata::ModuleMetadata},
+    react_native::generate_cpp,
     switches::{AbiFlavor, SwitchArgs},
 };
 
@@ -136,66 +138,176 @@ impl BindingsArgs {
         mk_dir(&out.cpp_dir)?;
         let ts_dir = out.ts_dir.canonicalize_utf8_or_shim()?;
         let abi_dir = out.cpp_dir.canonicalize_utf8_or_shim()?;
-
         let switches = self.switches();
-        let abi_dir = abi_dir.clone();
-        let ts_dir = ts_dir.clone();
-        let cwd = Utf8PathBuf::from("Cargo.toml");
-        let manifest_path = manifest_path.unwrap_or(&cwd);
-        let metadata = CrateMetadata::cargo_metadata(manifest_path)?;
 
+        let source_path = path_or_shim(&self.source.source)?;
+        let loader = self.create_loader(manifest_path)?;
+
+        // C++/Rust generation via ComponentInterface
         match &switches.flavor {
-            AbiFlavor::Jsi => self.generate_bindings(
-                metadata,
-                &ReactNativeBindingGenerator::new(ts_dir, abi_dir, switches),
-            ),
+            AbiFlavor::Jsi => {
+                let metadata = loader.load_metadata(&source_path)?;
+                let cis = loader.load_cis(metadata)?;
+                let mut components = loader.load_components(cis, parse_cpp_config)?;
+                for c in components.iter_mut() {
+                    c.ci.derive_ffi_funcs()?;
+                }
+                generate_cpp(&components, &abi_dir, !out.no_format)?;
+            }
+            AbiFlavor::Napi => { /* No C++ generation for Napi */ }
             #[cfg(feature = "wasm")]
-            AbiFlavor::Wasm => self.generate_bindings(
-                metadata,
-                &WasmBindingGenerator::new(ts_dir, abi_dir, switches),
-            ),
+            AbiFlavor::Wasm => {
+                let metadata = loader.load_metadata(&source_path)?;
+                let cis = loader.load_cis(metadata)?;
+                let mut components = loader.load_components(cis, parse_rust_config)?;
+                for c in components.iter_mut() {
+                    c.ci.derive_ffi_funcs()?;
+                }
+                generate_rs(&components, &switches, &abi_dir, !out.no_format)?;
+            }
         }
+
+        // TypeScript generation via pipeline
+        // The pipeline needs per-crate configs (not the --config override) so that
+        // each namespace gets its own crate's uniffi.toml (e.g. custom type mappings).
+        // TODO check this is the desired behavior in uniffi-rs 0.31.x.
+        let pipeline_loader = self.create_pipeline_loader(manifest_path)?;
+        let metadata = pipeline_loader.load_metadata(&source_path)?;
+        let initial_root = pipeline_loader.load_pipeline_initial_root(&source_path, metadata)?;
+        let general_root = general::pipeline("react-native").execute(initial_root)?;
+
+        generate_ffi_from_pipeline(&general_root, &switches, &ts_dir)?;
+        let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
+        if !out.no_format {
+            gen_typescript::format_directory(&ts_dir)?;
+        }
+        Ok(modules)
     }
 
-    fn generate_bindings<Generator: BindingGenerator>(
-        &self,
-        metadata: Metadata,
-        binding_generator: &Generator,
-    ) -> std::result::Result<Vec<ModuleMetadata>, anyhow::Error> {
-        let input = &self.source;
-        let out = &self.output;
-        let dummy_dir = Utf8PathBuf::from_str(".")?;
+    fn create_loader(&self, manifest_path: Option<&Utf8PathBuf>) -> Result<BindgenLoader> {
+        let mut bindgen_paths = BindgenPaths::default();
+        if let Some(config_path) = &self.source.config {
+            bindgen_paths.add_config_override_layer(config_path.clone());
+        }
+        let cwd = Utf8PathBuf::from("Cargo.toml");
+        let manifest_path = manifest_path.unwrap_or(&cwd);
+        let cargo_metadata = CrateMetadata::cargo_metadata(manifest_path)?;
+        let config_supplier = CrateConfigSupplier::from(cargo_metadata);
+        bindgen_paths.add_layer(config_supplier);
+        Ok(BindgenLoader::new(bindgen_paths))
+    }
 
-        let try_format_code = !out.no_format;
+    /// Create a loader for the pipeline that uses only per-crate configs.
+    ///
+    /// The `--config` override applies a single TOML to ALL crates, which breaks
+    /// multi-crate scenarios where each dependency has its own `uniffi.toml`
+    /// (e.g. custom type mappings). The pipeline needs each namespace to get its
+    /// own crate's config.
+    fn create_pipeline_loader(&self, manifest_path: Option<&Utf8PathBuf>) -> Result<BindgenLoader> {
+        let mut bindgen_paths = BindgenPaths::default();
+        let cwd = Utf8PathBuf::from("Cargo.toml");
+        let manifest_path = manifest_path.unwrap_or(&cwd);
+        let cargo_metadata = CrateMetadata::cargo_metadata(manifest_path)?;
+        let config_supplier = CrateConfigSupplier::from(cargo_metadata);
+        bindgen_paths.add_layer(config_supplier);
+        Ok(BindgenLoader::new(bindgen_paths))
+    }
+}
 
-        let config_supplier = CrateConfigSupplier::from(metadata);
+fn generate_api_from_pipeline(
+    general_root: &general::Root,
+    switches: &SwitchArgs,
+    ts_dir: &Utf8Path,
+) -> Result<Vec<ModuleMetadata>> {
+    let mut modules = Vec::new();
+    for (name, namespace) in &general_root.namespaces {
+        let config = extract_ts_config(namespace)?;
+        let module = ModuleMetadata::new(name);
+        let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
+            namespace,
+            &switches.flavor,
+            &config,
+        );
+        let ffi_exports = ffi_module.exported_names();
+        let api_module = gen_typescript::api_module::TsApiModule::from_general(
+            namespace,
+            switches.flavor.clone(),
+            &config,
+            ffi_exports,
+        );
+        let code = gen_typescript::generate_api_code_from_ir(api_module)?;
+        let path = ts_dir.join(module.ts_filename());
+        ubrn_common::write_file(path, code)?;
+        modules.push(module);
+    }
+    Ok(modules)
+}
 
-        let configs: Vec<ModuleMetadata> = if input.library_mode {
-            uniffi_bindgen::library_mode::generate_bindings(
-                &path_or_shim(&input.source)?,
-                input.crate_name.clone(),
-                binding_generator,
-                &config_supplier,
-                input.config.as_deref(),
-                &dummy_dir,
-                try_format_code,
-            )?
-            .iter()
-            .map(|s| s.into())
-            .collect()
-        } else {
-            uniffi_bindgen::generate_external_bindings(
-                binding_generator,
-                input.source.clone(),
-                input.config.as_deref(),
-                Some(&dummy_dir),
-                input.lib_file.clone(),
-                input.crate_name.as_deref(),
-                try_format_code,
-            )?;
-            Default::default()
+fn extract_ts_config(namespace: &general::Namespace) -> Result<gen_typescript::Config> {
+    #[derive(Default, Deserialize)]
+    struct BindingsSection {
+        #[serde(default, alias = "javascript", alias = "js", alias = "ts")]
+        typescript: gen_typescript::Config,
+    }
+    #[derive(Default, Deserialize)]
+    struct ConfigRoot {
+        #[serde(default)]
+        bindings: BindingsSection,
+    }
+    let Some(ref config_toml) = namespace.config_toml else {
+        return Ok(Default::default());
+    };
+    let root: ConfigRoot = toml::from_str(config_toml)?;
+    Ok(root.bindings.typescript)
+}
+
+fn generate_ffi_from_pipeline(
+    root: &general::Root,
+    switches: &SwitchArgs,
+    ts_dir: &Utf8Path,
+) -> Result<()> {
+    for (name, namespace) in &root.namespaces {
+        let module = ModuleMetadata::new(name);
+        let path = ts_dir.join(module.ts_ffi_filename());
+
+        let config = extract_ts_config(namespace)?;
+        let code = match &switches.flavor {
+            AbiFlavor::Napi => {
+                let player_module =
+                    gen_typescript::ffi_module_player::PlayerFfiModule::from_general(
+                        namespace, &config, None,
+                    );
+                gen_typescript::generate_player_lowlevel_code(player_module)?
+            }
+            _ => {
+                let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
+                    namespace,
+                    &switches.flavor,
+                    &config,
+                );
+                gen_typescript::generate_lowlevel_code(ffi_module)?
+            }
         };
 
-        Ok(configs)
+        ubrn_common::write_file(path, code)?;
+    }
+    Ok(())
+}
+
+fn parse_cpp_config(_ci: &ComponentInterface, toml: toml::Value) -> Result<gen_cpp::Config> {
+    match toml.get("bindings").and_then(|b| b.get("cpp")) {
+        Some(v) => Ok(v.clone().try_into()?),
+        None => Ok(Default::default()),
+    }
+}
+
+#[cfg(feature = "wasm")]
+fn parse_rust_config(_ci: &ComponentInterface, toml: toml::Value) -> Result<gen_rust::Config> {
+    let value = toml
+        .get("bindings")
+        .and_then(|b| b.get("rust").or_else(|| b.get("rs")));
+    match value {
+        Some(v) => Ok(v.clone().try_into()?),
+        None => Ok(Default::default()),
     }
 }

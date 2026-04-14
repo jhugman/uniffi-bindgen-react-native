@@ -9,6 +9,7 @@ pub(crate) mod codegen;
 pub(crate) mod commands;
 pub(crate) mod config;
 pub(crate) mod jsi;
+pub(crate) mod napi;
 #[cfg(feature = "wasm")]
 pub(crate) mod wasm;
 pub(crate) mod workspace;

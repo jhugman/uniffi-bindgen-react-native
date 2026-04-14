@@ -8,14 +8,16 @@ mod paths;
 pub mod typescript;
 
 pub mod jsi;
+pub mod napi;
 pub mod ts;
 pub mod wasm;
 
-/// Test flavor: JSI (Hermes native) or WASM (Node.js).
+/// Test flavor: JSI (Hermes native), WASM (Node.js), or Napi (Node.js N-API).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
     Wasm,
+    Napi,
 }
 
 impl Flavor {
@@ -23,6 +25,7 @@ impl Flavor {
         match self {
             Flavor::Jsi => "jsi",
             Flavor::Wasm => "wasm",
+            Flavor::Napi => "napi",
         }
     }
 }
@@ -54,6 +57,17 @@ impl CleanupFile {
 impl Drop for CleanupFile {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// Run a command, inheriting stdout/stderr so output is visible.
+pub(crate) fn run_cmd(cmd: &mut Command) {
+    let status = cmd
+        .status()
+        .unwrap_or_else(|e| panic!("failed to launch {:?}: {e}", cmd.get_program()));
+
+    if !status.success() {
+        panic!("{:?} failed (exit status: {})", cmd.get_program(), status);
     }
 }
 
@@ -94,19 +108,28 @@ pub(crate) fn write_fixture_tsconfig(
     fixture_dir: &camino::Utf8Path,
     flavor: Flavor,
 ) -> camino::Utf8PathBuf {
-    let flavor = flavor.as_str();
+    let flavor_str = flavor.as_str();
     let repo_root = paths::repo_root();
     let rel_root = pathdiff::diff_utf8_paths(repo_root, fixture_dir)
         .expect("cannot compute relative path to repo root");
+
+    let napi_runtime_path = if flavor == Flavor::Napi {
+        format!(
+            ",\n      \"uniffi-runtime-napi\": [\"{rel_root}/runtimes/napi\"],\n      \"uniffi-runtime-napi/*\": [\"{rel_root}/runtimes/napi/*\"]"
+        )
+    } else {
+        String::new()
+    };
+
     let tsconfig_path = fixture_dir.join("tsconfig.json");
     let contents = format!(
         r#"{{
   "compilerOptions": {{
     "baseUrl": ".",
     "paths": {{
-      "@/generated/*": ["./generated/{flavor}/ts/*"],
+      "@/generated/*": ["./generated/{flavor_str}/ts/*"],
       "@/*": ["{rel_root}/typescript/testing/*"],
-      "uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]
+      "uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]{napi_runtime_path}
     }}
   }}
 }}
@@ -119,7 +142,7 @@ pub(crate) fn write_fixture_tsconfig(
 /// Run a test script with tsx and experimental WASM module support.
 pub(crate) fn run_tsx(test_script: &camino::Utf8Path) {
     let tsx = paths::node_modules_bin().join("tsx");
-    run_cmd_quietly(
+    run_cmd(
         Command::new(&tsx)
             .arg("--experimental-wasm-modules")
             .arg(test_script.as_str()),
