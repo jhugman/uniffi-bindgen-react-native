@@ -154,6 +154,7 @@ impl BindingsArgs {
                 }
                 generate_cpp(&components, &abi_dir, !out.no_format)?;
             }
+            AbiFlavor::Napi => { /* No C++ generation for Napi */ }
             #[cfg(feature = "wasm")]
             AbiFlavor::Wasm => {
                 let metadata = loader.load_metadata(&source_path)?;
@@ -266,15 +267,28 @@ fn generate_ffi_from_pipeline(
     ts_dir: &Utf8Path,
 ) -> Result<()> {
     for (name, namespace) in &root.namespaces {
-        let config = extract_ts_config(namespace)?;
-        let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
-            namespace,
-            &switches.flavor,
-            &config,
-        );
-        let code = gen_typescript::generate_lowlevel_code(ffi_module)?;
         let module = ModuleMetadata::new(name);
         let path = ts_dir.join(module.ts_ffi_filename());
+
+        let config = extract_ts_config(namespace)?;
+        let code = match &switches.flavor {
+            AbiFlavor::Napi => {
+                let player_module =
+                    gen_typescript::ffi_module_player::PlayerFfiModule::from_general(
+                        namespace, &config, None,
+                    );
+                gen_typescript::generate_player_lowlevel_code(player_module)?
+            }
+            _ => {
+                let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
+                    namespace,
+                    &switches.flavor,
+                    &config,
+                );
+                gen_typescript::generate_lowlevel_code(ffi_module)?
+            }
+        };
+
         ubrn_common::write_file(path, code)?;
     }
     Ok(())

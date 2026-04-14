@@ -85,7 +85,7 @@ jobs:
         run: "cargo test -- wasm::"
 
   integration-tests-napi-runtime:
-    name: 🧩 Integration tests (N-API runtime)
+    name: 🧩 Integration tests (N-API runtime and bindings)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +110,12 @@ jobs:
 
       - name: Run runtime tests
         run: cd runtimes/napi && npm test
+
+      - name: Run bootstrap for N-API bindings
+        run: cargo xtask bootstrap yarn
+
+      - name: Run tests of generated N-API bindings
+        run: "cargo test -- napi::"
 
   integration-tests-checkout:
     name: 🧩 Integration tests (checkout)

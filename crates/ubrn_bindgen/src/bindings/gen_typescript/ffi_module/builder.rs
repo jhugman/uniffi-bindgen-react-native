@@ -11,6 +11,21 @@ use super::nodes::*;
 use super::type_mapping::{ffi_type_to_ts, ffi_type_to_ts_native};
 use crate::switches::AbiFlavor;
 
+/// Check whether a namespace has async functions.
+pub(crate) fn namespace_has_async(namespace: &general::Namespace) -> bool {
+    namespace.ffi_definitions.iter().any(|def| {
+        matches!(
+            def,
+            general::FfiDefinition::RustFunction(f)
+                if matches!(
+                    f.kind,
+                    general::FfiFunctionKind::RustFuturePoll
+                        | general::FfiFunctionKind::RustFutureComplete
+                )
+        )
+    })
+}
+
 impl TsFfiModule {
     pub(crate) fn from_general(
         namespace: &general::Namespace,
@@ -20,17 +35,7 @@ impl TsFfiModule {
         let is_jsi = matches!(flavor, AbiFlavor::Jsi);
         let module_name = format!("Native{}", namespace.name.to_upper_camel_case());
 
-        let has_async = namespace.ffi_definitions.iter().any(|def| {
-            matches!(
-                def,
-                general::FfiDefinition::RustFunction(f)
-                    if matches!(
-                        f.kind,
-                        general::FfiFunctionKind::RustFuturePoll
-                            | general::FfiFunctionKind::RustFutureComplete
-                    )
-            )
-        });
+        let has_async = namespace_has_async(namespace);
 
         let functions = Self::build_functions(namespace, has_async);
         let definitions = Self::build_definitions(namespace);
@@ -77,7 +82,7 @@ impl TsFfiModule {
         functions
     }
 
-    fn should_include_function(func: &general::FfiFunction, has_async: bool) -> bool {
+    pub(crate) fn should_include_function(func: &general::FfiFunction, has_async: bool) -> bool {
         match func.kind {
             general::FfiFunctionKind::RustBufferFromBytes
             | general::FfiFunctionKind::RustBufferFree
@@ -197,7 +202,7 @@ impl TsFfiModule {
         }
     }
 
-    fn build_definitions(namespace: &general::Namespace) -> Vec<FfiDefinitionDecl> {
+    pub(crate) fn build_definitions(namespace: &general::Namespace) -> Vec<FfiDefinitionDecl> {
         namespace
             .ffi_definitions
             .iter()
