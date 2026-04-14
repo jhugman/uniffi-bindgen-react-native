@@ -152,7 +152,7 @@ impl TsFfiModule {
                 return_type: Some("number".into()),
             },
             FfiFunctionDecl {
-                name: "ubrn_uniffi_internal_fn_func_ffi__string_to_arraybuffer".into(),
+                name: "ubrn_uniffi_internal_fn_func_ffi__string_to_buffer".into(),
                 arguments: vec![
                     FfiArgDecl {
                         name: "string".into(),
@@ -166,7 +166,7 @@ impl TsFfiModule {
                 return_type: Some("Uint8Array".into()),
             },
             FfiFunctionDecl {
-                name: "ubrn_uniffi_internal_fn_func_ffi__arraybuffer_to_string".into(),
+                name: "ubrn_uniffi_internal_fn_func_ffi__string_from_buffer".into(),
                 arguments: vec![
                     FfiArgDecl {
                         name: "buffer".into(),
@@ -175,6 +175,24 @@ impl TsFfiModule {
                     FfiArgDecl {
                         name: "uniffi_out_err".into(),
                         type_name: "UniffiRustCallStatus".into(),
+                    },
+                ],
+                return_type: Some("string".into()),
+            },
+            FfiFunctionDecl {
+                name: "ubrn_uniffi_internal_fn_func_ffi__read_string_from_buffer".into(),
+                arguments: vec![
+                    FfiArgDecl {
+                        name: "buffer".into(),
+                        type_name: "any".into(),
+                    },
+                    FfiArgDecl {
+                        name: "offset".into(),
+                        type_name: "number".into(),
+                    },
+                    FfiArgDecl {
+                        name: "length".into(),
+                        type_name: "number".into(),
                     },
                 ],
                 return_type: Some("string".into()),

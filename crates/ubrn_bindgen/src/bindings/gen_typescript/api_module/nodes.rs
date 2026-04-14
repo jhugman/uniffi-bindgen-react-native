@@ -28,9 +28,10 @@ pub(crate) struct TsSimpleWrapper {
 
 pub(crate) struct TsStringHelper {
     pub supports_text_encoder: bool,
-    pub ffi_string_to_arraybuffer: String,
-    pub ffi_arraybuffer_to_string: String,
+    pub ffi_string_to_buffer: String,
+    pub ffi_string_from_buffer: String,
     pub ffi_string_to_bytelength: String,
+    pub ffi_read_string_from_buffer: String,
 }
 
 pub(crate) struct TsCustomType {

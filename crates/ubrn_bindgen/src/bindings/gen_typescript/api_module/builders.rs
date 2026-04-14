@@ -65,9 +65,11 @@ pub(super) fn build_string_helper(flavor: &AbiFlavor) -> TsStringHelper {
     let supports_text_encoder = flavor.supports_text_encoder();
     TsStringHelper {
         supports_text_encoder,
-        ffi_string_to_arraybuffer: "ubrn_uniffi_internal_fn_func_ffi__string_to_arraybuffer".into(),
-        ffi_arraybuffer_to_string: "ubrn_uniffi_internal_fn_func_ffi__arraybuffer_to_string".into(),
+        ffi_string_to_buffer: "ubrn_uniffi_internal_fn_func_ffi__string_to_buffer".into(),
+        ffi_string_from_buffer: "ubrn_uniffi_internal_fn_func_ffi__string_from_buffer".into(),
         ffi_string_to_bytelength: "ubrn_uniffi_internal_fn_func_ffi__string_to_byte_length".into(),
+        ffi_read_string_from_buffer: "ubrn_uniffi_internal_fn_func_ffi__read_string_from_buffer"
+            .into(),
     }
 }
 
