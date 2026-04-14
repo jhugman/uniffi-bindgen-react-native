@@ -58,8 +58,9 @@ fn ffi_name(flavor: &AbiFlavor, raw_name: &str) -> String {
 
 /// FFI function names match the `ffi_module` synthetic declarations.
 pub(super) fn build_string_helper(flavor: &AbiFlavor) -> TsStringHelper {
-    // JSI has no global TextEncoder/TextDecoder, so it uses Rust-provided
-    // string conversion functions instead.
+    // Most backends have a global TextEncoder/TextDecoder. But, some do not e.g. JSI.
+    // In these cases we provide C++ (or Rust) implementations for the string conversion
+    // functions instead.
     let supports_text_encoder = flavor.supports_text_encoder();
     TsStringHelper {
         supports_text_encoder,
