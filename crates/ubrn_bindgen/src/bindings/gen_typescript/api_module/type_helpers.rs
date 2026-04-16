@@ -82,18 +82,18 @@ pub(super) fn type_label_for(cfg: &Config, ty: &general::Type) -> String {
         | general::Type::CallbackInterface { name, .. }
         | general::Type::Custom { name, .. } => rewrite_js_builtins(&name.to_upper_camel_case()),
         general::Type::Optional { inner_type } => {
-            format!("{} | undefined", type_label_for(inner_type))
+            format!("{} | undefined", type_label_for(cfg, inner_type))
         }
         general::Type::Sequence { inner_type } => {
-            format!("Array<{}>", type_label_for(inner_type))
+            format!("Array<{}>", type_label_for(cfg, inner_type))
         }
         general::Type::Map {
             key_type,
             value_type,
         } => format!(
             "Map<{}, {}>",
-            type_label_for(key_type),
-            type_label_for(value_type)
+            type_label_for(cfg, key_type),
+            type_label_for(cfg, value_type)
         ),
     }
 }

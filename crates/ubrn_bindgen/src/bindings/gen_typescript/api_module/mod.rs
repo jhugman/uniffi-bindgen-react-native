@@ -21,7 +21,7 @@ use heck::ToUpperCamelCase;
 use uniffi_bindgen::pipeline::general;
 
 use crate::{
-    bindings::gen_typescript::{config::CustomTypeConfig, ffi_module},
+    bindings::gen_typescript::{ffi_module, Config},
     switches::AbiFlavor,
 };
 
@@ -340,10 +340,9 @@ impl ImportAccumulator {
 
 impl TsApiModule {
     fn build_type_definitions(
+        cfg: &Config,
         namespace: &general::Namespace,
         flavor: &AbiFlavor,
-        custom_type_configs: &HashMap<String, CustomTypeConfig>,
-        strict_object_types: bool,
     ) -> Vec<TsTypeDefinition> {
         let mut defs = Vec::new();
 
@@ -372,17 +371,19 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::Optional(opt) => {
-                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_optional(opt)));
+                    deferred_wrappers
+                        .push(TsTypeDefinition::SimpleWrapper(build_optional(cfg, opt)));
                 }
                 general::TypeDefinition::Sequence(seq) => {
-                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_sequence(seq)));
+                    deferred_wrappers
+                        .push(TsTypeDefinition::SimpleWrapper(build_sequence(cfg, seq)));
                 }
                 general::TypeDefinition::Map(map) => {
-                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_map(map)));
+                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_map(cfg, map)));
                 }
                 general::TypeDefinition::Custom(custom) => {
-                    let config = custom_type_configs.get(custom.name.as_str());
-                    let td = TsTypeDefinition::Custom(build_custom_type(custom, config));
+                    let config = cfg.custom_types.get(custom.name.as_str());
+                    let td = TsTypeDefinition::Custom(build_custom_type(cfg, custom, config));
                     if matches!(
                         custom.builtin.ty,
                         general::Type::Map { .. }
@@ -395,10 +396,10 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::External(ext) => {
-                    defs.push(TsTypeDefinition::External(build_external_type(ext)));
+                    defs.push(TsTypeDefinition::External(build_external_type(cfg, ext)));
                 }
                 general::TypeDefinition::Enum(e) => {
-                    let ts_enum = build_enum(e, flavor);
+                    let ts_enum = build_enum(cfg, e, flavor);
                     if ts_enum.is_flat && ts_enum.is_error {
                         defs.push(TsTypeDefinition::FlatError(ts_enum));
                     } else if ts_enum.is_flat {
@@ -408,19 +409,20 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::Record(r) => {
-                    defs.push(TsTypeDefinition::Record(build_record(r, flavor)));
+                    defs.push(TsTypeDefinition::Record(build_record(cfg, r, flavor)));
                 }
                 general::TypeDefinition::Interface(i) => {
                     defs.push(TsTypeDefinition::Object(Box::new(build_object(
+                        cfg,
                         i,
                         flavor,
                         &ffi_fn_types,
-                        strict_object_types,
+                        cfg.strict_object_types,
                     ))));
                 }
                 general::TypeDefinition::CallbackInterface(cbi) => {
                     defs.push(TsTypeDefinition::CallbackInterface(
-                        build_callback_interface(cbi, &ffi_fn_types, flavor),
+                        build_callback_interface(cfg, cbi, &ffi_fn_types, flavor),
                     ));
                 }
             }
@@ -474,21 +476,16 @@ impl TsApiModule {
     }
 
     pub(crate) fn from_general(
+        cfg: &Config,
         namespace: &general::Namespace,
         flavor: AbiFlavor,
-        config: &super::Config,
         ffi_exported_definitions: Vec<ffi_module::FfiExportedName>,
     ) -> Self {
         let module_name = namespace.name.clone();
         let namespace_docstring = namespace.docstring.as_deref().map(format_docstring);
         let supports_rust_backtrace = flavor.supports_rust_backtrace();
-        let type_definitions = Self::build_type_definitions(
-            namespace,
-            &flavor,
-            &config.custom_types,
-            config.strict_object_types,
-        );
-        let functions = build_functions(namespace, &flavor);
+        let type_definitions = Self::build_type_definitions(cfg, namespace, &flavor);
+        let functions = build_functions(cfg, namespace, &flavor);
         let initialization = build_initialization(namespace, &flavor);
 
         let mut primitive_imports = ImportAccumulator::new();
@@ -501,12 +498,12 @@ impl TsApiModule {
         let mut module = Self {
             module_name,
             namespace_docstring,
-            strict_type_checking: config.strict_type_checking,
+            strict_type_checking: cfg.strict_type_checking,
             flavor,
-            is_debug: config.is_debug(),
-            is_verbose: config.is_verbose(),
+            is_debug: cfg.is_debug(),
+            is_verbose: cfg.is_verbose(),
             supports_rust_backtrace,
-            console_import: config.console_import.clone(),
+            console_import: cfg.console_import.clone(),
             file_imports: Vec::new(),
             converter_imports: Vec::new(),
             exported_converters: BTreeSet::new(),
