@@ -2123,6 +2123,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "uniffi-fixture-strict-byte-arrays"
+version = "0.22.0"
+dependencies = [
+ "async-std",
+ "thiserror 1.0.69",
+ "ubrn_fixture_testing",
+ "ubrn_macros",
+ "uniffi",
+]
+
+[[package]]
 name = "uniffi-fixture-time"
 version = "0.22.0"
 dependencies = [
