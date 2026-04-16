@@ -348,6 +348,25 @@ export const FfiConverterArrayBuffer = (() => {
   return new FFIConverter();
 })();
 
+export const FfiConverterUint8Array = (() => {
+  const lengthConverter = FfiConverterInt32;
+  class FFIConverter extends AbstractFfiConverterByteArray<Uint8Array> {
+    read(from: RustBuffer): Uint8Array {
+      const length = lengthConverter.read(from);
+      return new Uint8Array(from.readArrayBuffer(length));
+    }
+    write(value: Uint8Array, into: RustBuffer): void {
+      const length = value.byteLength;
+      lengthConverter.write(length, into);
+      into.writeByteArray(value);
+    }
+    allocationSize(value: Uint8Array): number {
+      return lengthConverter.allocationSize(0) + value.byteLength;
+    }
+  }
+  return new FFIConverter();
+})();
+
 type StringConverter = {
   stringToBytes: (s: string) => UniffiByteArray;
   bytesToString: (ab: UniffiByteArray) => string;
