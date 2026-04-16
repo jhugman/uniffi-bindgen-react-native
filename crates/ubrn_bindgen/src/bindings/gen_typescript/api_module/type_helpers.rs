@@ -15,6 +15,7 @@ use heck::ToLowerCamelCase;
 use uniffi_bindgen::pipeline::general;
 
 pub(super) use crate::bindings::gen_typescript::type_mapping::ffi_type_to_ts as ffi_type_to_ts_name;
+use crate::bindings::gen_typescript::Config;
 
 /// Primitives use short names (`FfiConverterBool`); all others use `FfiConverter{canonical_name}`.
 pub(super) fn ffi_converter_name_for(node: &general::TypeNode) -> String {
@@ -45,7 +46,7 @@ pub(super) fn ffi_converter_name_for_type(ty: &general::Type) -> Option<String> 
     Some(name.to_string())
 }
 
-pub(super) fn type_label_for(ty: &general::Type) -> String {
+pub(super) fn type_label_for(cfg: &Config, ty: &general::Type) -> String {
     match ty {
         general::Type::UInt8 => "number".into(),
         general::Type::Int8 => "number".into(),
@@ -59,7 +60,13 @@ pub(super) fn type_label_for(ty: &general::Type) -> String {
         general::Type::Float64 => "number".into(),
         general::Type::Boolean => "boolean".into(),
         general::Type::String => "string".into(),
-        general::Type::Bytes => "ArrayBuffer".into(),
+        general::Type::Bytes => {
+            if cfg.strict_byte_arrays {
+                "Uint8Array".into()
+            } else {
+                "ArrayBuffer".into()
+            }
+        }
         general::Type::Timestamp => "Date".into(),
         general::Type::Duration => "number".into(),
         general::Type::Interface { name, imp, .. } => {
