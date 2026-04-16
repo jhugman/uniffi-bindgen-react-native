@@ -18,8 +18,8 @@ pub(super) use crate::bindings::gen_typescript::type_mapping::ffi_type_to_ts as 
 use crate::bindings::gen_typescript::Config;
 
 /// Primitives use short names (`FfiConverterBool`); all others use `FfiConverter{canonical_name}`.
-pub(super) fn ffi_converter_name_for(node: &general::TypeNode) -> String {
-    ffi_converter_name_for_type(&node.ty)
+pub(super) fn ffi_converter_name_for(cfg: &Config, node: &general::TypeNode) -> String {
+    ffi_converter_name_for_type(cfg, &node.ty)
         .unwrap_or_else(|| format!("FfiConverter{}", node.canonical_name))
 }
 

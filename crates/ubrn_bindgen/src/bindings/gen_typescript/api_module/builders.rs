@@ -21,29 +21,29 @@ use super::type_helpers::*;
 pub(super) fn build_optional(cfg: &Config, opt: &general::OptionalType) -> TsSimpleWrapper {
     TsSimpleWrapper {
         infra_class: "FfiConverterOptional".into(),
-        ffi_converter_name: ffi_converter_name_for(&opt.self_type),
+        ffi_converter_name: ffi_converter_name_for(cfg, &opt.self_type),
         type_label: type_label_for(cfg, &opt.self_type.ty),
-        inner_converters: vec![ffi_converter_name_for(&opt.inner)],
+        inner_converters: vec![ffi_converter_name_for(cfg, &opt.inner)],
     }
 }
 
 pub(super) fn build_sequence(cfg: &Config, seq: &general::SequenceType) -> TsSimpleWrapper {
     TsSimpleWrapper {
         infra_class: "FfiConverterArray".into(),
-        ffi_converter_name: ffi_converter_name_for(&seq.self_type),
+        ffi_converter_name: ffi_converter_name_for(cfg, &seq.self_type),
         type_label: type_label_for(cfg, &seq.self_type.ty),
-        inner_converters: vec![ffi_converter_name_for(&seq.inner)],
+        inner_converters: vec![ffi_converter_name_for(cfg, &seq.inner)],
     }
 }
 
 pub(super) fn build_map(cfg: &Config, map: &general::MapType) -> TsSimpleWrapper {
     TsSimpleWrapper {
         infra_class: "FfiConverterMap".into(),
-        ffi_converter_name: ffi_converter_name_for(&map.self_type),
+        ffi_converter_name: ffi_converter_name_for(cfg, &map.self_type),
         type_label: type_label_for(cfg, &map.self_type.ty),
         inner_converters: vec![
-            ffi_converter_name_for(&map.key),
-            ffi_converter_name_for(&map.value),
+            ffi_converter_name_for(cfg, &map.key),
+            ffi_converter_name_for(cfg, &map.value),
         ],
     }
 }
@@ -78,9 +78,9 @@ pub(super) fn build_custom_type(
     type_config: Option<&CustomTypeConfig>,
 ) -> TsCustomType {
     let type_name = custom.name.clone();
-    let ffi_converter_name = ffi_converter_name_for(&custom.self_type);
+    let ffi_converter_name = ffi_converter_name_for(cfg, &custom.self_type);
     let builtin_type_name = type_label_for(cfg, &custom.builtin.ty);
-    let builtin_ffi_converter = ffi_converter_name_for(&custom.builtin);
+    let builtin_ffi_converter = ffi_converter_name_for(cfg, &custom.builtin);
     let ffi_type_name = ffi_type_to_ts_name(&custom.builtin.ffi_type.ty);
 
     let custom_config = type_config.map(|cfg| TsCustomConfig {
@@ -106,7 +106,7 @@ pub(super) fn build_external_type(
 ) -> TsExternalType {
     let module_path = external.namespace.clone();
     let type_name = type_label_for(cfg, &external.self_type.ty);
-    let converter_name = ffi_converter_name_for(&external.self_type);
+    let converter_name = ffi_converter_name_for(cfg, &external.self_type);
     let is_enum_type = matches!(external.self_type.ty, general::Type::Enum { .. });
 
     TsExternalType {
@@ -191,7 +191,7 @@ pub(super) fn build_field(cfg: &Config, field: &general::Field) -> TsField {
     } else {
         type_label_for(cfg, &field.ty.ty)
     };
-    let ffi_converter = ffi_converter_name_for(&field.ty);
+    let ffi_converter = ffi_converter_name_for(cfg, &field.ty);
     let default_value = field
         .default
         .as_ref()
@@ -235,7 +235,7 @@ fn discr_type_for(cfg: &Config, en: &general::Enum) -> Option<String> {
 
 pub(super) fn build_enum(cfg: &Config, en: &general::Enum, flavor: &AbiFlavor) -> TsEnum {
     let ts_name = rewrite_js_builtins(&en.name.to_upper_camel_case());
-    let ffi_converter_name = ffi_converter_name_for(&en.self_type);
+    let ffi_converter_name = ffi_converter_name_for(cfg, &en.self_type);
     let docstring = en.docstring.as_deref().map(format_docstring);
 
     let is_error = matches!(en.shape, general::EnumShape::Error { .. });
@@ -278,7 +278,7 @@ pub(super) fn build_enum(cfg: &Config, en: &general::Enum, flavor: &AbiFlavor) -
 
 pub(super) fn build_record(cfg: &Config, rec: &general::Record, flavor: &AbiFlavor) -> TsRecord {
     let ts_name = rewrite_js_builtins(&rec.name.to_upper_camel_case());
-    let ffi_converter_name = ffi_converter_name_for(&rec.self_type);
+    let ffi_converter_name = ffi_converter_name_for(cfg, &rec.self_type);
     let docstring = rec.docstring.as_deref().map(format_docstring);
 
     let fields: Vec<TsField> = rec
@@ -318,8 +318,8 @@ pub(super) fn build_record(cfg: &Config, rec: &general::Record, flavor: &AbiFlav
 }
 
 /// Objects get `FfiConverter{name}__as_error`; other types use the regular converter name.
-fn ffi_error_converter_for(type_node: &general::TypeNode) -> String {
-    let mut name = ffi_converter_name_for(type_node);
+fn ffi_error_converter_for(cfg: &Config, type_node: &general::TypeNode) -> String {
+    let mut name = ffi_converter_name_for(cfg, type_node);
     if matches!(&type_node.ty, general::Type::Interface { .. }) {
         name.push_str("__as_error");
     }
@@ -327,7 +327,7 @@ fn ffi_error_converter_for(type_node: &general::TypeNode) -> String {
 }
 
 fn build_error_type(cfg: &Config, type_node: &general::TypeNode) -> TsErrorType {
-    let ffi_error_converter = ffi_error_converter_for(type_node);
+    let ffi_error_converter = ffi_error_converter_for(cfg, type_node);
     let lift_error_fn = format!("{ffi_error_converter}.lift.bind({ffi_error_converter})");
     let lower_error_fn = format!("{ffi_error_converter}.lower.bind({ffi_error_converter})");
     // Enums use type_label; objects use the class name directly.
@@ -346,7 +346,7 @@ pub(super) fn build_arg(cfg: &Config, arg: &general::Argument) -> TsArg {
     TsArg {
         name: arg_name(&arg.name),
         ts_type: type_label_for(cfg, &arg.ty.ty),
-        ffi_converter: ffi_converter_name_for(&arg.ty),
+        ffi_converter: ffi_converter_name_for(cfg, &arg.ty),
         default_value: arg
             .default
             .as_ref()
@@ -371,7 +371,7 @@ pub(super) fn build_callable(
         .collect();
     let return_type = callable.return_type.ty.as_ref().map(|tn| TsReturnType {
         ts_type: type_label_for(cfg, &tn.ty),
-        ffi_converter: ffi_converter_name_for(tn),
+        ffi_converter: ffi_converter_name_for(cfg, tn),
         ffi_type: ffi_type_to_ts_name(&tn.ffi_type.ty),
     });
     let throws = callable
@@ -510,7 +510,7 @@ pub(super) fn build_object(
     let ts_name = class_name.clone();
     let decl_type_name = impl_class_name.clone();
     let obj_factory = format!("uniffiType{impl_class_name}ObjectFactory");
-    let ffi_converter_name = ffi_converter_name_for(&interface.self_type);
+    let ffi_converter_name = ffi_converter_name_for(cfg, &interface.self_type);
     let ffi_error_converter_name = format!("{ffi_converter_name}__as_error");
 
     let docstring = interface.docstring.as_deref().map(format_docstring);

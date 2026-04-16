@@ -134,11 +134,11 @@ impl ImportAccumulator {
         self.add_infra_value("UniffiRustCaller");
     }
 
-    pub fn collect_primitive(&mut self, ty: &general::Type) {
+    pub fn collect_primitive(&mut self, cfg: &Config, ty: &general::Type) {
         if matches!(ty, general::Type::String) {
             return;
         }
-        if let Some(name) = type_helpers::ffi_converter_name_for_type(ty) {
+        if let Some(name) = type_helpers::ffi_converter_name_for_type(cfg, ty) {
             self.add_infra_value(&name);
         }
         match ty {
@@ -491,7 +491,7 @@ impl TsApiModule {
         let mut primitive_imports = ImportAccumulator::new();
         for td in &namespace.type_definitions {
             if let general::TypeDefinition::Simple(node) = td {
-                primitive_imports.collect_primitive(&node.ty);
+                primitive_imports.collect_primitive(cfg, &node.ty);
             }
         }
 
