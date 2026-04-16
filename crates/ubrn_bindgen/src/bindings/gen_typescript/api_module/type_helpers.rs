@@ -24,11 +24,17 @@ pub(super) fn ffi_converter_name_for(node: &general::TypeNode) -> String {
 }
 
 /// Returns `None` for non-primitive types.
-pub(super) fn ffi_converter_name_for_type(ty: &general::Type) -> Option<String> {
+pub(super) fn ffi_converter_name_for_type(cfg: &Config, ty: &general::Type) -> Option<String> {
     let name = match ty {
         general::Type::Boolean => "FfiConverterBool",
         general::Type::String => "FfiConverterString",
-        general::Type::Bytes => "FfiConverterArrayBuffer",
+        general::Type::Bytes => {
+            if cfg.strict_byte_arrays {
+                "FfiConverterUint8Array"
+            } else {
+                "FfiConverterArrayBuffer"
+            }
+        }
         general::Type::Int8 => "FfiConverterInt8",
         general::Type::Int16 => "FfiConverterInt16",
         general::Type::Int32 => "FfiConverterInt32",
