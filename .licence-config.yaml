@@ -88,6 +88,7 @@ ignore:
   - test
   - ./**/generated
   - ./**/templates
+  - ./**/node_modules
   - runtimes/napi/index.d.ts
   - runtimes/napi/index.js
 
