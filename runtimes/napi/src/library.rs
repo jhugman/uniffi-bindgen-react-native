@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use std::ffi::c_void;
+use std::mem::ManuallyDrop;
 
 use dlopen2::raw::Library;
 use napi::Result;
@@ -14,8 +15,24 @@ use napi::Result;
 /// stored inside the napi struct for the lifetime of the Node.js module. All
 /// symbol lookups go through [`lookup_symbol`](Self::lookup_symbol), which
 /// returns raw function pointers that libffi later invokes.
+///
+/// The library is wrapped in [`ManuallyDrop`] so that `dlclose` is **never**
+/// called when the napi struct is garbage-collected. This is necessary because:
+///
+/// 1. Leaked closures and userdata hold raw function pointers into the library.
+/// 2. The library's tokio runtime may still have worker threads executing its
+///    code when Node.js GC runs during shutdown.
+///
+/// On macOS `dlclose` is typically a no-op, but on Linux it actually unmaps
+/// the library's code pages — causing SIGSEGV if any thread is still running
+/// library code or if a callback trampoline dereferences a function pointer
+/// into the unmapped region.
+///
+/// When issue #379 adds a proper resource registry and coordinated shutdown,
+/// this can be replaced with an explicit `close()` that waits for the tokio
+/// runtime to drain before calling `dlclose`.
 pub struct LibraryHandle {
-    pub lib: Library,
+    pub lib: ManuallyDrop<Library>,
 }
 
 // SAFETY: `LibraryHandle` wraps a `dlopen2::raw::Library`, which does not
@@ -34,7 +51,9 @@ impl LibraryHandle {
         let lib = Library::open(path)
             .map_err(|e| napi::Error::from_reason(format!("dlopen failed for '{path}': {e}")))?;
 
-        Ok(Self { lib })
+        Ok(Self {
+            lib: ManuallyDrop::new(lib),
+        })
     }
 
     /// Look up a symbol by name in the loaded library, returning a raw pointer.
