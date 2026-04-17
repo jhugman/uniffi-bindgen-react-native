@@ -42,7 +42,8 @@
 //! initialization time, and [`is_main_thread`] is the single predicate that every
 //! callback path consults to choose between these two strategies.
 
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::thread::ThreadId;
 
 use napi::bindgen_prelude::*;
@@ -68,11 +69,103 @@ use library::LibraryHandle;
 /// values directly or must dispatch through a threadsafe function.
 static MAIN_THREAD_ID: OnceLock<ThreadId> = OnceLock::new();
 
+/// Global module state for coordinating shutdown and tracking VTable TSFNs.
+///
+/// During env cleanup (triggered when Node.js is shutting down), the cleanup hook
+/// sets `shutdown` to `true` and aborts all tracked TSFNs. Aborting drops pending
+/// calls and their `SyncSender`s, which unblocks any Rust worker threads that are
+/// waiting on `rx.recv()`. This prevents SIGSEGV crashes on Linux where the shared
+/// library would otherwise be `dlclose()`'d while Rust threads still hold function
+/// pointers into it.
+struct ModuleState {
+    /// Set to `true` when the env cleanup hook fires.
+    shutdown: AtomicBool,
+    /// Raw handles of VTable TSFNs, so the cleanup hook can abort them all.
+    tsfn_handles: Mutex<Vec<napi::sys::napi_threadsafe_function>>,
+}
+
+// SAFETY: `napi_threadsafe_function` (a raw pointer) is designed to be used
+// across threads — napi's threadsafe function APIs are explicitly thread-safe.
+// The `Mutex` synchronizes access to the `Vec`.
+unsafe impl Send for ModuleState {}
+unsafe impl Sync for ModuleState {}
+
+static MODULE_STATE: OnceLock<ModuleState> = OnceLock::new();
+
+/// Returns `true` if the Node.js environment is shutting down.
+///
+/// Callback trampolines check this before attempting any work, so they can
+/// bail out early rather than touching a half-torn-down JS environment.
+pub fn is_shutting_down() -> bool {
+    MODULE_STATE
+        .get()
+        .is_some_and(|s| s.shutdown.load(Ordering::Acquire))
+}
+
+/// Register a VTable TSFN raw handle so the env cleanup hook can abort it.
+pub fn register_tsfn(raw: napi::sys::napi_threadsafe_function) {
+    if let Some(state) = MODULE_STATE.get() {
+        state
+            .tsfn_handles
+            .lock()
+            .expect("tsfn_handles lock poisoned")
+            .push(raw);
+    }
+}
+
+/// Env cleanup hook called by Node.js during shutdown.
+///
+/// # Safety
+/// Called by the napi runtime with the `data` pointer we registered (null in our case).
+unsafe extern "C" fn env_cleanup_hook(_data: *mut std::ffi::c_void) {
+    if let Some(state) = MODULE_STATE.get() {
+        // Signal all trampoline code to stop processing.
+        state.shutdown.store(true, Ordering::Release);
+
+        // Abort every tracked VTable TSFN. This drops any pending calls
+        // (and their SyncSenders), which unblocks Rust worker threads
+        // waiting on `rx.recv()`.
+        let handles = state
+            .tsfn_handles
+            .lock()
+            .expect("tsfn_handles lock poisoned");
+        for &handle in handles.iter() {
+            unsafe {
+                napi::sys::napi_release_threadsafe_function(
+                    handle,
+                    napi::sys::ThreadsafeFunctionReleaseMode::abort,
+                );
+            }
+        }
+    }
+}
+
+/// Install the env cleanup hook (idempotent — only the first call has effect).
+fn install_env_cleanup_hook(env: &Env) {
+    static INSTALLED: AtomicBool = AtomicBool::new(false);
+    if INSTALLED
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_ok()
+    {
+        unsafe {
+            napi::sys::napi_add_env_cleanup_hook(
+                env.raw(),
+                Some(env_cleanup_hook),
+                std::ptr::null_mut(),
+            );
+        }
+    }
+}
+
 #[module_init]
 fn init() {
     MAIN_THREAD_ID
         .set(std::thread::current().id())
         .expect("module_init called twice");
+    let _ = MODULE_STATE.set(ModuleState {
+        shutdown: AtomicBool::new(false),
+        tsfn_handles: Mutex::new(Vec::new()),
+    });
 }
 
 /// Returns `true` if the calling thread is the main Node.js event-loop thread.
@@ -111,6 +204,10 @@ impl UniffiNativeModule {
     /// are bound to the foreign functions found in the loaded library.
     #[napi]
     pub fn register(&self, env: Env, definitions: JsObject) -> napi::Result<JsObject> {
+        // Install the env cleanup hook on the first register call. This is the
+        // earliest point where we have a valid `Env` (the `#[module_init]` ctor
+        // runs before the napi env exists).
+        install_env_cleanup_hook(&env);
         register::register(env, &self.handle, definitions)
     }
 }
