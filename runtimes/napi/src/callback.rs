@@ -199,6 +199,10 @@ pub unsafe extern "C" fn trampoline_callback(
     args: *const *const c_void,
     userdata: &TrampolineUserdata,
 ) {
+    if crate::is_shutting_down() {
+        return;
+    }
+
     if is_main_thread() {
         // Same-thread path: call JS function directly.
         trampoline_main_thread(_cif, _result, args, userdata);

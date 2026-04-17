@@ -226,6 +226,10 @@ pub unsafe extern "C" fn vtable_trampoline_callback(
     args: *const *const c_void,
     userdata: &VTableTrampolineUserdata,
 ) {
+    if crate::is_shutting_down() {
+        return;
+    }
+
     // Zero-initialize the result buffer so that early returns (from error paths
     // in the main-thread or cross-thread trampolines) produce a deterministic
     // zero value rather than leaving uninitialized memory that the Rust caller
@@ -1389,6 +1393,16 @@ pub fn create_callback_closure(
         )?
     };
     let mut tsfn = tsfn;
+
+    // Register the raw TSFN handle so the env cleanup hook can abort it at shutdown.
+    // This ensures that any Rust worker threads blocked on `rx.recv()` are unblocked
+    // when Node.js exits, preventing SIGSEGV on Linux from `dlclose()` racing with
+    // threads that still hold function pointers into the unloaded library.
+    crate::register_tsfn(tsfn.raw());
+
+    // Unref the TSFN so it does not prevent the Node.js event loop from exiting.
+    // The env cleanup hook will abort it if the process shuts down while Rust
+    // worker threads are still waiting.
     tsfn.unref(env)?;
 
     // SAFETY: `userdata_ptr` is a valid, uniquely-owned heap allocation.
