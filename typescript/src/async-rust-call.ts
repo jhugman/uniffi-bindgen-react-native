@@ -80,6 +80,19 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   const abortFunc = createAbortFunction(rustFuture, cancelFunc);
   asyncOpts?.signal.addEventListener("abort", abortFunc);
 
+  // Keep the Node.js event loop alive while polling the Rust future.
+  // The napi runtime's callback TSFNs are deliberately unref'd (so leaked TSFNs
+  // don't prevent process exit). Without a ref'd handle here, the event loop may
+  // exit before the callback fires — especially on Linux where event loop
+  // draining is more aggressive than on macOS.
+  // Only needed when setInterval is natively available (i.e. Node.js / napi
+  // runtime); Hermes/JSI provides timers via a polyfill that may not be loaded
+  // yet at import time, and WASM has its own event loop.
+  const keepAlive =
+    typeof setTimeout === "function"
+      ? setTimeout(() => {}, 2_147_483_647)
+      : undefined;
+
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
@@ -101,6 +114,7 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
       ),
     );
   } finally {
+    if (keepAlive !== undefined) clearTimeout(keepAlive);
     // We remove the abortFunc now so we don't trigger a use-after-free
     // panic.
     asyncOpts?.signal.removeEventListener("abort", abortFunc);
