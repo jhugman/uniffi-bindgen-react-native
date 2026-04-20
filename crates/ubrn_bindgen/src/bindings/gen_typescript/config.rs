@@ -23,6 +23,9 @@ pub(crate) struct TsConfig {
     /// include `@ts-nocheck` to avoid noise in downstream projects).
     #[serde(default)]
     pub(crate) strict_type_checking: bool,
+    /// When `true`, emit byte arrays (`Vec<u8>`) as `Uint8Array` instead of `ArrayBuffer`.
+    #[serde(default)]
+    pub(crate) strict_byte_arrays: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

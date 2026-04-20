@@ -1,0 +1,23 @@
+[package]
+name = "uniffi-fixture-strict-byte-arrays"
+edition = "2021"
+version = "0.22.0"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+name = "uniffi_strict_byte_arrays"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+async-std = "1.12.0"
+thiserror = "1.0"
+uniffi = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen-tests"] }

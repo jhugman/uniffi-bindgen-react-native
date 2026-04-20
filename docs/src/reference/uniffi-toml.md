@@ -15,6 +15,17 @@ this behavior, set `bindings.typescript.strictObjectTypes` to `true`.
 strictObjectTypes = true
 ```
 
+### Typescript strict byte arrays
+
+By default, byte arrays in Rust (i.e. `Vec<u8>`) are translated into Typescript [`ArrayBuffer`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer) instances. This is advantageous when it is desirable to use a byte array to transport a sequence of more complex types. 
+
+However, not all projects use or want that functionality. To globally translate `Vec<u8>` into [`Uint8Array`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array) instead, set the `strictByteArrays` property of the typescript bindings to `true`.
+
+```toml
+[bindings.typescript]
+strictByteArrays = true
+```
+
 ### Logging the FFI
 
 The generated Typescript code can optionally be created to generate logging.

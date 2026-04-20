@@ -230,9 +230,9 @@ fn generate_api_from_pipeline(
         );
         let ffi_exports = ffi_module.exported_names();
         let api_module = gen_typescript::api_module::TsApiModule::from_general(
+            &config,
             namespace,
             switches.flavor.clone(),
-            &config,
             ffi_exports,
         );
         let code = gen_typescript::generate_api_code_from_ir(api_module)?;
