@@ -12,7 +12,7 @@ use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::pipeline::general;
 
 use crate::bindings::gen_typescript::Config;
-use crate::{bindings::gen_typescript::config::CustomTypeConfig, switches::AbiFlavor};
+use crate::switches::AbiFlavor;
 
 use super::docstring::{format_docstring, format_docstring_indented};
 use super::nodes::*;
@@ -71,24 +71,26 @@ pub(super) fn build_string_helper(flavor: &AbiFlavor) -> TsStringHelper {
     }
 }
 
-/// `config` = `None` means no custom lift/lower; falls back to the builtin converter.
-pub(super) fn build_custom_type(
-    cfg: &Config,
-    custom: &general::CustomType,
-    type_config: Option<&CustomTypeConfig>,
-) -> TsCustomType {
+/// Custom lift/lower instructions are stored within the configuration table within the `custom_types` section,
+/// keyed by the custom type's name.
+///
+/// If no such instructions are present in the configuration, falls back to the builtin converter.
+pub(super) fn build_custom_type(cfg: &Config, custom: &general::CustomType) -> TsCustomType {
     let type_name = custom.name.clone();
     let ffi_converter_name = ffi_converter_name_for(cfg, &custom.self_type);
     let builtin_type_name = type_label_for(cfg, &custom.builtin.ty);
     let builtin_ffi_converter = ffi_converter_name_for(cfg, &custom.builtin);
     let ffi_type_name = ffi_type_to_ts_name(&custom.builtin.ffi_type.ty);
 
-    let custom_config = type_config.map(|cfg| TsCustomConfig {
-        concrete_type_name: cfg.type_name.clone(),
-        imports: cfg.imports.clone(),
-        lift_expr: cfg.lift("intermediate"),
-        lower_expr: cfg.lower("value"),
-    });
+    let custom_config = cfg
+        .custom_types
+        .get(&custom.name)
+        .map(|cfg| TsCustomConfig {
+            concrete_type_name: cfg.type_name.clone(),
+            imports: cfg.imports.clone(),
+            lift_expr: cfg.lift("intermediate"),
+            lower_expr: cfg.lower("value"),
+        });
 
     TsCustomType {
         type_name,

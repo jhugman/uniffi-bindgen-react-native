@@ -382,8 +382,7 @@ impl TsApiModule {
                     deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_map(cfg, map)));
                 }
                 general::TypeDefinition::Custom(custom) => {
-                    let config = cfg.custom_types.get(custom.name.as_str());
-                    let td = TsTypeDefinition::Custom(build_custom_type(cfg, custom, config));
+                    let td = TsTypeDefinition::Custom(build_custom_type(cfg, custom));
                     if matches!(
                         custom.builtin.ty,
                         general::Type::Map { .. }
