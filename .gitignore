@@ -85,3 +85,4 @@ docs/superpowers/
 
 # napi-rs build artifacts
 *.node
+core
