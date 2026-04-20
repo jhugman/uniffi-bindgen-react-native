@@ -18,32 +18,32 @@ use super::docstring::{format_docstring, format_docstring_indented};
 use super::nodes::*;
 use super::type_helpers::*;
 
-pub(super) fn build_optional(cfg: &Config, opt: &general::OptionalType) -> TsSimpleWrapper {
+pub(super) fn build_optional(config: &Config, opt: &general::OptionalType) -> TsSimpleWrapper {
     TsSimpleWrapper {
         infra_class: "FfiConverterOptional".into(),
-        ffi_converter_name: ffi_converter_name_for(cfg, &opt.self_type),
-        type_label: type_label_for(cfg, &opt.self_type.ty),
-        inner_converters: vec![ffi_converter_name_for(cfg, &opt.inner)],
+        ffi_converter_name: ffi_converter_name_for(config, &opt.self_type),
+        type_label: type_label_for(config, &opt.self_type.ty),
+        inner_converters: vec![ffi_converter_name_for(config, &opt.inner)],
     }
 }
 
-pub(super) fn build_sequence(cfg: &Config, seq: &general::SequenceType) -> TsSimpleWrapper {
+pub(super) fn build_sequence(config: &Config, seq: &general::SequenceType) -> TsSimpleWrapper {
     TsSimpleWrapper {
         infra_class: "FfiConverterArray".into(),
-        ffi_converter_name: ffi_converter_name_for(cfg, &seq.self_type),
-        type_label: type_label_for(cfg, &seq.self_type.ty),
-        inner_converters: vec![ffi_converter_name_for(cfg, &seq.inner)],
+        ffi_converter_name: ffi_converter_name_for(config, &seq.self_type),
+        type_label: type_label_for(config, &seq.self_type.ty),
+        inner_converters: vec![ffi_converter_name_for(config, &seq.inner)],
     }
 }
 
-pub(super) fn build_map(cfg: &Config, map: &general::MapType) -> TsSimpleWrapper {
+pub(super) fn build_map(config: &Config, map: &general::MapType) -> TsSimpleWrapper {
     TsSimpleWrapper {
         infra_class: "FfiConverterMap".into(),
-        ffi_converter_name: ffi_converter_name_for(cfg, &map.self_type),
-        type_label: type_label_for(cfg, &map.self_type.ty),
+        ffi_converter_name: ffi_converter_name_for(config, &map.self_type),
+        type_label: type_label_for(config, &map.self_type.ty),
         inner_converters: vec![
-            ffi_converter_name_for(cfg, &map.key),
-            ffi_converter_name_for(cfg, &map.value),
+            ffi_converter_name_for(config, &map.key),
+            ffi_converter_name_for(config, &map.value),
         ],
     }
 }
@@ -75,14 +75,14 @@ pub(super) fn build_string_helper(flavor: &AbiFlavor) -> TsStringHelper {
 /// keyed by the custom type's name.
 ///
 /// If no such instructions are present in the configuration, falls back to the builtin converter.
-pub(super) fn build_custom_type(cfg: &Config, custom: &general::CustomType) -> TsCustomType {
+pub(super) fn build_custom_type(config: &Config, custom: &general::CustomType) -> TsCustomType {
     let type_name = custom.name.clone();
-    let ffi_converter_name = ffi_converter_name_for(cfg, &custom.self_type);
-    let builtin_type_name = type_label_for(cfg, &custom.builtin.ty);
-    let builtin_ffi_converter = ffi_converter_name_for(cfg, &custom.builtin);
+    let ffi_converter_name = ffi_converter_name_for(config, &custom.self_type);
+    let builtin_type_name = type_label_for(config, &custom.builtin.ty);
+    let builtin_ffi_converter = ffi_converter_name_for(config, &custom.builtin);
     let ffi_type_name = ffi_type_to_ts_name(&custom.builtin.ffi_type.ty);
 
-    let custom_config = cfg
+    let custom_config = config
         .custom_types
         .get(&custom.name)
         .map(|cfg| TsCustomConfig {
@@ -103,12 +103,12 @@ pub(super) fn build_custom_type(cfg: &Config, custom: &general::CustomType) -> T
 }
 
 pub(super) fn build_external_type(
-    cfg: &Config,
+    config: &Config,
     external: &general::ExternalType,
 ) -> TsExternalType {
     let module_path = external.namespace.clone();
-    let type_name = type_label_for(cfg, &external.self_type.ty);
-    let converter_name = ffi_converter_name_for(cfg, &external.self_type);
+    let type_name = type_label_for(config, &external.self_type.ty);
+    let converter_name = ffi_converter_name_for(config, &external.self_type);
     let is_enum_type = matches!(external.self_type.ty, general::Type::Enum { .. });
 
     TsExternalType {
@@ -119,7 +119,7 @@ pub(super) fn build_external_type(
     }
 }
 
-fn render_literal(cfg: &Config, lit: &general::Literal) -> String {
+fn render_literal(config: &Config, lit: &general::Literal) -> String {
     match lit {
         general::Literal::Boolean(b) => b.to_string(),
         general::Literal::String(s) => format!("\"{}\"", s),
@@ -134,27 +134,27 @@ fn render_literal(cfg: &Config, lit: &general::Literal) -> String {
         general::Literal::Float(s, _) => s.clone(),
         general::Literal::Enum(variant, type_node) => {
             // No containing enum context here, so just use the UpperCamelCase variant name.
-            let type_name = type_label_for(cfg, &type_node.ty);
+            let type_name = type_label_for(config, &type_node.ty);
             let variant_name = variant.to_upper_camel_case();
             format!("{type_name}.{variant_name}")
         }
         general::Literal::EmptySequence => "[]".into(),
         general::Literal::EmptyMap => "new Map()".into(),
         general::Literal::None => "undefined".into(),
-        general::Literal::Some { inner } => render_default_value(cfg, inner),
+        general::Literal::Some { inner } => render_default_value(config, inner),
     }
 }
 
-fn render_default_value(cfg: &Config, dv: &general::DefaultValue) -> String {
+fn render_default_value(config: &Config, dv: &general::DefaultValue) -> String {
     match dv {
-        general::DefaultValue::Literal(lit_node) => render_literal(cfg, &lit_node.lit),
+        general::DefaultValue::Literal(lit_node) => render_literal(config, &lit_node.lit),
         general::DefaultValue::Default(_) => "undefined".into(),
     }
 }
 
 /// Discriminants stay in JS (not sent across the FFI), so large integers
 /// can be safely narrowed to JS numbers when they fit.
-fn render_variant_discr(cfg: &Config, discr: &general::LiteralNode) -> String {
+fn render_variant_discr(config: &Config, discr: &general::LiteralNode) -> String {
     match &discr.lit {
         general::Literal::String(s) => format!("\"{}\"", s),
         general::Literal::UInt(n, _, type_node) => match &type_node.ty {
@@ -177,27 +177,27 @@ fn render_variant_discr(cfg: &Config, discr: &general::LiteralNode) -> String {
             }
             _ => n.to_string(),
         },
-        other => format!("\"{}\"", render_literal(cfg, other)),
+        other => format!("\"{}\"", render_literal(config, other)),
     }
 }
 
-pub(super) fn build_field(cfg: &Config, field: &general::Field) -> TsField {
+pub(super) fn build_field(config: &Config, field: &general::Field) -> TsField {
     let name = field.name.to_lower_camel_case();
     let is_optional = matches!(&field.ty.ty, general::Type::Optional { .. });
     let ts_type = if is_optional {
         // Unwrap Optional<T> to just T; the `?:` in the type declaration handles optionality.
         match &field.ty.ty {
-            general::Type::Optional { inner_type } => type_label_for(cfg, inner_type),
+            general::Type::Optional { inner_type } => type_label_for(config, inner_type),
             _ => unreachable!(),
         }
     } else {
-        type_label_for(cfg, &field.ty.ty)
+        type_label_for(config, &field.ty.ty)
     };
-    let ffi_converter = ffi_converter_name_for(cfg, &field.ty);
+    let ffi_converter = ffi_converter_name_for(config, &field.ty);
     let default_value = field
         .default
         .as_ref()
-        .map(|default| render_default_value(cfg, default));
+        .map(|default| render_default_value(config, default));
     let docstring = field.docstring.as_deref().map(format_docstring_indented);
     TsField {
         name,
@@ -209,14 +209,14 @@ pub(super) fn build_field(cfg: &Config, field: &general::Field) -> TsField {
     }
 }
 
-pub(super) fn build_variant(cfg: &Config, variant: &general::Variant) -> TsVariant {
+pub(super) fn build_variant(config: &Config, variant: &general::Variant) -> TsVariant {
     let name = variant.name.to_upper_camel_case();
     let docstring = variant.docstring.as_deref().map(format_docstring_indented);
-    let discriminant = render_variant_discr(cfg, &variant.discr);
+    let discriminant = render_variant_discr(config, &variant.discr);
     let fields: Vec<TsField> = variant
         .fields
         .iter()
-        .map(|field| build_field(cfg, field))
+        .map(|field| build_field(config, field))
         .collect();
     let has_nameless_fields = matches!(variant.fields_kind, general::FieldsKind::Unnamed);
     TsVariant {
@@ -229,39 +229,43 @@ pub(super) fn build_variant(cfg: &Config, variant: &general::Variant) -> TsVaria
 }
 
 /// `Some` only when Rust declares an explicit discriminant type (e.g. `#[repr(u8)]`).
-fn discr_type_for(cfg: &Config, en: &general::Enum) -> Option<String> {
+fn discr_type_for(config: &Config, en: &general::Enum) -> Option<String> {
     en.meta_discr_type
         .as_ref()
-        .map(|t| type_label_for(cfg, &t.ty))
+        .map(|t| type_label_for(config, &t.ty))
 }
 
-pub(super) fn build_enum(cfg: &Config, en: &general::Enum, flavor: &AbiFlavor) -> TsEnum {
+pub(super) fn build_enum(config: &Config, en: &general::Enum, flavor: &AbiFlavor) -> TsEnum {
     let ts_name = rewrite_js_builtins(&en.name.to_upper_camel_case());
-    let ffi_converter_name = ffi_converter_name_for(cfg, &en.self_type);
+    let ffi_converter_name = ffi_converter_name_for(config, &en.self_type);
     let docstring = en.docstring.as_deref().map(format_docstring);
 
     let is_error = matches!(en.shape, general::EnumShape::Error { .. });
     let is_flat = en.is_flat;
 
-    let discr_type = discr_type_for(cfg, en);
+    let discr_type = discr_type_for(config, en);
 
     let variants: Vec<TsVariant> = en
         .variants
         .iter()
-        .map(|variant| build_variant(cfg, variant))
+        .map(|variant| build_variant(config, variant))
         .collect();
 
-    let uniffi_traits =
-        build_uniffi_traits_value(cfg, &en.uniffi_trait_methods, &ffi_converter_name, flavor);
+    let uniffi_traits = build_uniffi_traits_value(
+        config,
+        &en.uniffi_trait_methods,
+        &ffi_converter_name,
+        flavor,
+    );
     let constructors = en
         .constructors
         .iter()
-        .map(|c| build_constructor_callable(cfg, c, flavor))
+        .map(|c| build_constructor_callable(config, c, flavor))
         .collect();
     let methods = en
         .methods
         .iter()
-        .map(|m| build_value_method_callable(cfg, m, &ffi_converter_name, flavor))
+        .map(|m| build_value_method_callable(config, m, &ffi_converter_name, flavor))
         .collect();
 
     TsEnum {
@@ -278,32 +282,36 @@ pub(super) fn build_enum(cfg: &Config, en: &general::Enum, flavor: &AbiFlavor) -
     }
 }
 
-pub(super) fn build_record(cfg: &Config, rec: &general::Record, flavor: &AbiFlavor) -> TsRecord {
+pub(super) fn build_record(config: &Config, rec: &general::Record, flavor: &AbiFlavor) -> TsRecord {
     let ts_name = rewrite_js_builtins(&rec.name.to_upper_camel_case());
-    let ffi_converter_name = ffi_converter_name_for(cfg, &rec.self_type);
+    let ffi_converter_name = ffi_converter_name_for(config, &rec.self_type);
     let docstring = rec.docstring.as_deref().map(format_docstring);
 
     let fields: Vec<TsField> = rec
         .fields
         .iter()
-        .map(|field| build_field(cfg, field))
+        .map(|field| build_field(config, field))
         .collect();
 
     // Suppress default TS factory helpers when Rust defines a constructor with the same name.
     let has_create_constructor = rec.constructors.iter().any(|c| c.callable.name == "create");
     let has_new_constructor = rec.constructors.iter().any(|c| c.callable.name == "new");
 
-    let uniffi_traits =
-        build_uniffi_traits_value(cfg, &rec.uniffi_trait_methods, &ffi_converter_name, flavor);
+    let uniffi_traits = build_uniffi_traits_value(
+        config,
+        &rec.uniffi_trait_methods,
+        &ffi_converter_name,
+        flavor,
+    );
     let constructors = rec
         .constructors
         .iter()
-        .map(|c| build_constructor_callable(cfg, c, flavor))
+        .map(|c| build_constructor_callable(config, c, flavor))
         .collect();
     let methods = rec
         .methods
         .iter()
-        .map(|m| build_value_method_callable(cfg, m, &ffi_converter_name, flavor))
+        .map(|m| build_value_method_callable(config, m, &ffi_converter_name, flavor))
         .collect();
 
     TsRecord {
@@ -320,22 +328,22 @@ pub(super) fn build_record(cfg: &Config, rec: &general::Record, flavor: &AbiFlav
 }
 
 /// Objects get `FfiConverter{name}__as_error`; other types use the regular converter name.
-fn ffi_error_converter_for(cfg: &Config, type_node: &general::TypeNode) -> String {
-    let mut name = ffi_converter_name_for(cfg, type_node);
+fn ffi_error_converter_for(config: &Config, type_node: &general::TypeNode) -> String {
+    let mut name = ffi_converter_name_for(config, type_node);
     if matches!(&type_node.ty, general::Type::Interface { .. }) {
         name.push_str("__as_error");
     }
     name
 }
 
-fn build_error_type(cfg: &Config, type_node: &general::TypeNode) -> TsErrorType {
-    let ffi_error_converter = ffi_error_converter_for(cfg, type_node);
+fn build_error_type(config: &Config, type_node: &general::TypeNode) -> TsErrorType {
+    let ffi_error_converter = ffi_error_converter_for(config, type_node);
     let lift_error_fn = format!("{ffi_error_converter}.lift.bind({ffi_error_converter})");
     let lower_error_fn = format!("{ffi_error_converter}.lower.bind({ffi_error_converter})");
     // Enums use type_label; objects use the class name directly.
     let decl_type_name = match &type_node.ty {
         general::Type::Interface { name, .. } => name.to_upper_camel_case(),
-        _ => type_label_for(cfg, &type_node.ty),
+        _ => type_label_for(config, &type_node.ty),
     };
     TsErrorType {
         lift_error_fn,
@@ -344,22 +352,22 @@ fn build_error_type(cfg: &Config, type_node: &general::TypeNode) -> TsErrorType 
     }
 }
 
-pub(super) fn build_arg(cfg: &Config, arg: &general::Argument) -> TsArg {
+pub(super) fn build_arg(config: &Config, arg: &general::Argument) -> TsArg {
     TsArg {
         name: arg_name(&arg.name),
-        ts_type: type_label_for(cfg, &arg.ty.ty),
-        ffi_converter: ffi_converter_name_for(cfg, &arg.ty),
+        ts_type: type_label_for(config, &arg.ty.ty),
+        ffi_converter: ffi_converter_name_for(config, &arg.ty),
         default_value: arg
             .default
             .as_ref()
-            .map(|default| render_default_value(cfg, default)),
+            .map(|default| render_default_value(config, default)),
     }
 }
 
 /// `receiver`: `None` for top-level functions and constructors,
 /// `Some(Pointer)` for object methods.
 pub(super) fn build_callable(
-    cfg: &Config,
+    config: &Config,
     callable: &general::Callable,
     docstring: &Option<String>,
     receiver: Option<TsReceiver>,
@@ -369,18 +377,18 @@ pub(super) fn build_callable(
     let arguments: Vec<TsArg> = callable
         .arguments
         .iter()
-        .map(|arg| build_arg(cfg, arg))
+        .map(|arg| build_arg(config, arg))
         .collect();
     let return_type = callable.return_type.ty.as_ref().map(|tn| TsReturnType {
-        ts_type: type_label_for(cfg, &tn.ty),
-        ffi_converter: ffi_converter_name_for(cfg, tn),
+        ts_type: type_label_for(config, &tn.ty),
+        ffi_converter: ffi_converter_name_for(config, tn),
         ffi_type: ffi_type_to_ts_name(&tn.ffi_type.ty),
     });
     let throws = callable
         .throws_type
         .ty
         .as_ref()
-        .map(|type_node| build_error_type(cfg, type_node));
+        .map(|type_node| build_error_type(config, type_node));
     let callable_ffi_name = ffi_name(flavor, &callable.ffi_func.0);
     let ffi_async = callable.async_data.as_ref().map(|ad| TsAsyncFfi {
         poll: ffi_name(flavor, &ad.ffi_rust_future_poll.0),
@@ -402,21 +410,27 @@ pub(super) fn build_callable(
 }
 
 pub(super) fn build_method_callable(
-    cfg: &Config,
+    config: &Config,
     method: &general::Method,
     _ffi_clone_name: &str,
     flavor: &AbiFlavor,
 ) -> TsCallable {
     let receiver = Some(TsReceiver::Pointer);
-    build_callable(cfg, &method.callable, &method.docstring, receiver, flavor)
+    build_callable(
+        config,
+        &method.callable,
+        &method.docstring,
+        receiver,
+        flavor,
+    )
 }
 
 pub(super) fn build_constructor_callable(
-    cfg: &Config,
+    config: &Config,
     cons: &general::Constructor,
     flavor: &AbiFlavor,
 ) -> TsCallable {
-    build_callable(cfg, &cons.callable, &cons.docstring, None, flavor)
+    build_callable(config, &cons.callable, &cons.docstring, None, flavor)
 }
 
 fn collect_uniffi_traits(
@@ -456,18 +470,18 @@ fn collect_uniffi_traits(
 }
 
 pub(super) fn build_uniffi_traits(
-    cfg: &Config,
+    config: &Config,
     tm: &general::UniffiTraitMethods,
     ffi_clone_name: &str,
     flavor: &AbiFlavor,
 ) -> Vec<TsUniffiTrait> {
     collect_uniffi_traits(tm, |m| {
-        build_method_callable(cfg, m, ffi_clone_name, flavor)
+        build_method_callable(config, m, ffi_clone_name, flavor)
     })
 }
 
 pub(super) fn build_value_method_callable(
-    cfg: &Config,
+    config: &Config,
     method: &general::Method,
     ffi_converter: &str,
     flavor: &AbiFlavor,
@@ -475,22 +489,28 @@ pub(super) fn build_value_method_callable(
     let receiver = Some(TsReceiver::Value {
         ffi_converter: ffi_converter.to_string(),
     });
-    build_callable(cfg, &method.callable, &method.docstring, receiver, flavor)
+    build_callable(
+        config,
+        &method.callable,
+        &method.docstring,
+        receiver,
+        flavor,
+    )
 }
 
 pub(super) fn build_uniffi_traits_value(
-    cfg: &Config,
+    config: &Config,
     tm: &general::UniffiTraitMethods,
     ffi_converter: &str,
     flavor: &AbiFlavor,
 ) -> Vec<TsUniffiTrait> {
     collect_uniffi_traits(tm, |m| {
-        build_value_method_callable(cfg, m, ffi_converter, flavor)
+        build_value_method_callable(config, m, ffi_converter, flavor)
     })
 }
 
 pub(super) fn build_object(
-    cfg: &Config,
+    config: &Config,
     interface: &general::Interface,
     flavor: &AbiFlavor,
     ffi_fn_types: &HashMap<String, &general::FfiFunctionType>,
@@ -512,7 +532,7 @@ pub(super) fn build_object(
     let ts_name = class_name.clone();
     let decl_type_name = impl_class_name.clone();
     let obj_factory = format!("uniffiType{impl_class_name}ObjectFactory");
-    let ffi_converter_name = ffi_converter_name_for(cfg, &interface.self_type);
+    let ffi_converter_name = ffi_converter_name_for(config, &interface.self_type);
     let ffi_error_converter_name = format!("{ffi_converter_name}__as_error");
 
     let docstring = interface.docstring.as_deref().map(format_docstring);
@@ -531,7 +551,7 @@ pub(super) fn build_object(
         let mut primary = None;
         let mut alternates = Vec::new();
         for cons in &interface.constructors {
-            let built = build_constructor_callable(cfg, cons, flavor);
+            let built = build_constructor_callable(config, cons, flavor);
             if matches!(
                 cons.callable.kind,
                 general::CallableKind::Constructor { primary: true, .. }
@@ -547,18 +567,18 @@ pub(super) fn build_object(
     let methods: Vec<TsMethod> = interface
         .methods
         .iter()
-        .map(|m| build_method_callable(cfg, m, &ffi_clone, flavor))
+        .map(|m| build_method_callable(config, m, &ffi_clone, flavor))
         .collect();
 
     let uniffi_traits =
-        build_uniffi_traits(cfg, &interface.uniffi_trait_methods, &ffi_clone, flavor);
+        build_uniffi_traits(config, &interface.uniffi_trait_methods, &ffi_clone, flavor);
 
     let supports_finalization_registry = flavor.supports_finalization_registry();
 
     let vtable = interface
         .vtable
         .as_ref()
-        .map(|vt| build_vtable(cfg, vt, ffi_fn_types, flavor));
+        .map(|vt| build_vtable(config, vt, ffi_fn_types, flavor));
 
     let trait_impl = format!("uniffiCallbackInterface{}", class_name);
 
@@ -588,7 +608,7 @@ pub(super) fn build_object(
 }
 
 pub(super) fn build_vtable(
-    cfg: &Config,
+    config: &Config,
     vt: &general::VTable,
     ffi_fn_types: &HashMap<String, &general::FfiFunctionType>,
     flavor: &AbiFlavor,
@@ -597,7 +617,7 @@ pub(super) fn build_vtable(
     let fields = vt
         .methods
         .iter()
-        .map(|vm| build_vtable_field(cfg, vm, ffi_fn_types, flavor))
+        .map(|vm| build_vtable_field(config, vm, ffi_fn_types, flavor))
         .collect();
     TsVtable {
         ffi_init_fn,
@@ -606,13 +626,13 @@ pub(super) fn build_vtable(
 }
 
 fn build_vtable_field(
-    cfg: &Config,
+    config: &Config,
     vm: &general::VTableMethod,
     ffi_fn_types: &HashMap<String, &general::FfiFunctionType>,
     flavor: &AbiFlavor,
 ) -> TsVtableField {
     let name = fn_name(&vm.callable.name);
-    let method = Some(build_callable(cfg, &vm.callable, &None, None, flavor));
+    let method = Some(build_callable(config, &vm.callable, &None, None, flavor));
 
     let general::FfiType::Function(ref ffi_fn_name) = vm.ffi_type.ty else {
         return TsVtableField {
@@ -687,7 +707,7 @@ fn build_closure_args(
 }
 
 pub(super) fn build_callback_interface(
-    cfg: &Config,
+    config: &Config,
     cbi: &general::CallbackInterface,
     ffi_fn_types: &HashMap<String, &general::FfiFunctionType>,
     flavor: &AbiFlavor,
@@ -702,12 +722,12 @@ pub(super) fn build_callback_interface(
     let methods: Vec<TsCallable> = cbi
         .methods
         .iter()
-        .map(|m| build_callable(cfg, &m.callable, &m.docstring, None, flavor))
+        .map(|m| build_callable(config, &m.callable, &m.docstring, None, flavor))
         .collect();
 
     let has_async_methods = cbi.methods.iter().any(|m| m.callable.is_async());
 
-    let vtable = build_vtable(cfg, &cbi.vtable, ffi_fn_types, flavor);
+    let vtable = build_vtable(config, &cbi.vtable, ffi_fn_types, flavor);
 
     let trait_impl = format!("uniffiCallbackInterface{ts_name}");
 
@@ -724,14 +744,14 @@ pub(super) fn build_callback_interface(
 }
 
 pub(super) fn build_functions(
-    cfg: &Config,
+    config: &Config,
     namespace: &general::Namespace,
     flavor: &AbiFlavor,
 ) -> Vec<TsFunction> {
     namespace
         .functions
         .iter()
-        .map(|f| build_callable(cfg, &f.callable, &f.docstring, None, flavor))
+        .map(|f| build_callable(config, &f.callable, &f.docstring, None, flavor))
         .collect()
 }
 
