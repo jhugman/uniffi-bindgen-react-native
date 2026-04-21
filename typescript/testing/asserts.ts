@@ -17,6 +17,15 @@ export class AssertError extends Error {
   }
 }
 
+// Messages can be strings or thunks. Thunks let callers defer work (e.g.
+// `stringify` of a large value) until the assertion actually fails.
+export type Message = string | (() => string);
+
+function resolveMessage(m: Message | undefined, fallback: string): string {
+  if (m === undefined) return fallback;
+  return typeof m === "function" ? m() : m;
+}
+
 let isDebugging = false;
 export function setDebug(flag: boolean) {
   isDebugging = flag;
@@ -57,60 +66,66 @@ function getErrorName(error: Error): string {
 
 // All the assert methods in a single class
 export class Asserts {
-  fail(message?: string, error?: Error): never {
-    throw new AssertError(message ?? "Assertion failed", error);
+  fail(message?: Message, error?: Error): never {
+    throw new AssertError(resolveMessage(message, "Assertion failed"), error);
   }
-  assertTrue(condition: boolean, message?: string): void {
+  assertTrue(condition: boolean, message?: Message): void {
     if (condition) {
       return;
     }
     this.fail(message ?? "Expected true, was false");
   }
-  assertFalse(condition: boolean, message?: string): void {
+  assertFalse(condition: boolean, message?: Message): void {
     this.assertTrue(!condition, message ?? "Expected false, was true");
   }
-  assertNotNull(thing: any | undefined | null, message?: string): void {
-    const m = message ?? "Expected to be defined, but was";
-    this.assertTrue(thing !== undefined && thing !== null, `${m}: ${thing}`);
+  assertNotNull(thing: any | undefined | null, message?: Message): void {
+    this.assertTrue(
+      thing !== undefined && thing !== null,
+      () =>
+        `${resolveMessage(message, "Expected to be defined, but was")}: ${thing}`,
+    );
   }
-  assertNull(thing: any | undefined | null, message?: string): void {
-    const m = message ?? "Expected to be null or undefined, but was";
-    this.assertTrue(thing === undefined || thing === null, `${m}: ${thing}`);
+  assertNull(thing: any | undefined | null, message?: Message): void {
+    this.assertTrue(
+      thing === undefined || thing === null,
+      () =>
+        `${resolveMessage(message, "Expected to be null or undefined, but was")}: ${thing}`,
+    );
   }
   assertEqual<T>(
     left: T,
     right: T,
-    message?: string,
+    message?: Message,
     equality: (a: T, b: T) => boolean = isEqual,
   ): void {
-    const m = message ?? "Expected left and right to be equal";
     this.assertTrue(
       equality(left, right),
-      `${m}: ${stringify(left)} !== ${stringify(right)}`,
+      () =>
+        `${resolveMessage(message, "Expected left and right to be equal")}: ${stringify(left)} !== ${stringify(right)}`,
     );
   }
   assertNotEqual<T>(
     left: T,
     right: T,
-    message?: string,
+    message?: Message,
     equality: (a: T, b: T) => boolean = isEqual,
   ): void {
-    const m = message ?? "Expected left and right to not be equal";
     this.assertFalse(
       equality(left, right),
-      `${m}: ${stringify(left)} === ${stringify(right)}`,
+      () =>
+        `${resolveMessage(message, "Expected left and right to not be equal")}: ${stringify(left)} === ${stringify(right)}`,
     );
   }
   assertInRange<T = number | bigint>(
     left: T,
     min: T,
     max: T,
-    message?: string,
+    message?: Message,
   ): void {
-    const m = message ?? "Not in range";
     this.assertTrue(
       min <= left && left <= max,
-      `${m}: ${min} <= ${left} <= ${max}`,
+      () =>
+        `${resolveMessage(message, "Not in range")}: ${min} <= ${left} <= ${max}`,
     );
   }
 
@@ -126,7 +141,7 @@ export class Asserts {
     checkThrown(this, errorVariant, error);
   }
 
-  measure<T>(fn: () => T, minMs: number, maxMs?: number, message?: string): T {
+  measure<T>(fn: () => T, minMs: number, maxMs?: number, message?: Message): T {
     const m = message ?? "Duration out of range";
     const [min, max] = range(minMs, maxMs);
     const start = Date.now();
@@ -188,7 +203,7 @@ export class AsyncAsserts extends Asserts {
     fn: () => Promise<T>,
     minMs: number,
     maxMs?: number,
-    message?: string,
+    message?: Message,
   ): Promise<T> {
     const m = message ?? "Duration out of range";
     const [min, max] = range(minMs, maxMs);
