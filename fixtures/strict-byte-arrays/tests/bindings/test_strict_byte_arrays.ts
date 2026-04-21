@@ -49,7 +49,12 @@ test("array roundtrip using read/write", (t) => {
 
 test("Uint8Array roundtrip of different sizes", (t) => {
   function rt(ab: Uint8Array) {
-    t.assertNotNull(identityBytes(ab)!);
+    const result = identityBytes(ab);
+    // Avoid assertions that would stringify the Uint8Array (e.g. via a
+    // template literal in the failure message) — that's O(N) per call and
+    // thrashes the Hermes GC at MB scale.
+    t.assertTrue(result !== null && result !== undefined);
+    t.assertEqual(result!.byteLength, ab.byteLength);
   }
   // 1 kB = 1<<10
   // 1 MB = 1<<20
