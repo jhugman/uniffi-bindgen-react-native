@@ -306,11 +306,16 @@ console.debug(`-- {{ prefix }}{{ middle }}{{ suffix }}`);
 {%- endif %}
 {%- endmacro %}
 
+{#- Render a single named field declaration: `name?: T` when optional, else `name: T`. -#}
+{%- macro field_decl(field) -%}
+{{ field.name }}{% if field.is_optional %}?{% endif %}: {{ field.ts_type }}
+{%- endmacro %}
+
 {#- Variant inner type shape: Readonly<{ name: Type; ... }> or Readonly<[Type, ...]>. -#}
 {%- macro variant_inner_type(variant) %}
 Readonly<{%- if !variant.has_nameless_fields %}{
 {%-   for field in variant.fields %}
-{{-     field.name }}: {{ field.ts_type }}
+{%-     call field_decl(field) %}
 {%-     if !loop.last %}; {% endif -%}
 {%- endfor %}}
 {%- else %}
@@ -326,7 +331,7 @@ Readonly<{%- if !variant.has_nameless_fields %}{
 {#- Variant inner value shape for constructor parameters: { name: Type; ... } or unnamed positional args. -#}
 {%- macro variant_fields_decl(variant) %}
 {%- if !variant.has_nameless_fields %}
-inner: { {%- for field in variant.fields %}{{ field.name }}: {{ field.ts_type }}{%- if !loop.last %}; {% endif %}{%- endfor %} }
+inner: { {%- for field in variant.fields %}{% call field_decl(field) %}{%- if !loop.last %}; {% endif %}{%- endfor %} }
 {%- else %}
 {%- for field in variant.fields %}v{{ loop.index0 }}: {{ field.ts_type }}{%- if !loop.last %}, {% endif %}{%- endfor %}
 {%- endif %}

@@ -96,6 +96,37 @@ export class RustBuffer {
     this.writeOffset = end;
   }
 
+  /**
+   * Advance the read cursor by `numBytes` and return the starting offset.
+   * Used to construct a typed-array view directly over the backing store.
+   */
+  advanceReadOffset(numBytes: number): number {
+    const start = this.readOffset;
+    this.readOffset = this.checkOverflow(start, numBytes);
+    return start;
+  }
+
+  /**
+   * Advance the write cursor by `numBytes` and return the starting offset.
+   * Used to construct a typed-array view directly over the backing store.
+   */
+  advanceWriteOffset(numBytes: number): number {
+    const start = this.writeOffset;
+    this.writeOffset = this.checkOverflow(start, numBytes);
+    return start;
+  }
+
+  /**
+   * Set the write cursor to an absolute position. Used to backfill after an
+   * in-place encode reports the actual number of bytes written.
+   */
+  setWriteOffset(offset: number): void {
+    if (offset > this.capacity) {
+      throw new UniffiInternalError.BufferOverflow();
+    }
+    this.writeOffset = offset;
+  }
+
   protected checkOverflow(start: number, numBytes: number): number {
     const end = start + numBytes;
     if (this.capacity < end) {

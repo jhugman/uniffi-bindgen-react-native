@@ -70,6 +70,16 @@ jobs:
     name: 🧩 Integration tests (WASM bindings)
     runs-on: ubuntu-latest
     steps:
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          swap-storage: false
+
       - uses: actions/checkout@v4
 
       - name: Installing

@@ -24,7 +24,10 @@ use crate::{
     AbiFlavor,
 };
 pub(crate) use config::RustConfig as Config;
-use extensions::{ComponentInterfaceExt as _, FfiCallbackFunction2, FfiDefinition2, FfiStruct2};
+use extensions::{
+    ComponentInterfaceExt as _, FfiCallbackFunction2, FfiDefinition2, FfiStruct2,
+    RustFfiCallbackFunctionExt as _,
+};
 
 #[allow(unused_variables)]
 pub(crate) fn generate_rs(
@@ -472,7 +475,7 @@ impl<'a> ComponentTemplate<'a> {
 
         let cb_ident = cb.module_ident();
         let non_snake_case = if_or_default(
-            cb.callback().is_free_callback(),
+            cb.callback().is_free_callback() || cb.callback().is_clone_callback(),
             quote! {
                 #[allow(non_snake_case)]
             },

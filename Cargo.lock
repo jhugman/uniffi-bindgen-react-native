@@ -1972,6 +1972,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "uniffi-fixture-benchmark"
+version = "0.1.0"
+dependencies = [
+ "ubrn_fixture_testing",
+ "ubrn_macros",
+ "uniffi",
+]
+
+[[package]]
 name = "uniffi-fixture-callbacks"
 version = "0.22.0"
 dependencies = [

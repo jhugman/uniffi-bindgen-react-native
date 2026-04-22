@@ -196,7 +196,9 @@ impl ImportAccumulator {
         self.add_infra_value("AbstractFfiConverterByteArray");
         self.add_infra_value("FfiConverterInt32");
         self.add_infra_value("UniffiInternalError");
-
+        if !e.is_flat {
+            self.add_infra_value("uniffiTypeNameSymbol");
+        }
         if e.is_error {
             self.add_infra_value("UniffiError");
             self.add_infra_value("uniffiTypeNameSymbol");

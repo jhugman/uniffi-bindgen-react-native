@@ -112,6 +112,21 @@ fn identity_colliding_variants(value: CollidingVariants) -> CollidingVariants {
     value
 }
 
+#[derive(uniffi::Enum)]
+pub(crate) enum OptionalFields {
+    Named {
+        required: String,
+        maybe_string: Option<String>,
+        maybe_record: Option<AnimalRecord>,
+    },
+    Empty,
+}
+
+#[uniffi::export]
+fn identity_optional_fields(value: OptionalFields) -> OptionalFields {
+    value
+}
+
 uniffi::include_scaffolding!("enum_types");
 
 #[cfg(test)]
