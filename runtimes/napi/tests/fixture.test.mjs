@@ -205,13 +205,11 @@ const CALCULATOR_STRUCT = {
 const CALCULATOR_VTABLE_JS = {
   uniffi_free: (handle) => {},
   uniffi_clone: (handle) => handle,
-  add: (handle, a, b, callStatus) => {
-    callStatus.code = 0;
-    return a + b;
+  add: (handle, a, b) => {
+    return { code: 0, pointee: a + b };
   },
-  concatenate: (handle, aBuf, bBuf, callStatus) => {
-    callStatus.code = 0;
-    return lowerString(liftString(aBuf) + liftString(bBuf));
+  concatenate: (handle, aBuf, bBuf) => {
+    return { code: 0, pointee: lowerString(liftString(aBuf) + liftString(bBuf)) };
   },
 };
 

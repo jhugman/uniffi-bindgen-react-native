@@ -4,5 +4,5 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 ubrn_macros::build_foreign_language_testcases! {
-    "tests/bindings/test_futures.ts" => [Jsi],
+    "tests/bindings/test_futures.ts" => [Jsi, Napi],
 }

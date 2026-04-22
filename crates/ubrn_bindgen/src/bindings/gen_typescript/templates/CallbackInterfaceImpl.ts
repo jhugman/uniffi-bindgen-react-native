@@ -78,10 +78,10 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                     /* {{ ffr.struct_name }} */{
                         {%- match meth.return_type %}
                         {%- when Some(return_type) %}
-                        returnValue: {{ return_type.ffi_converter }}.lower(returnValue),
+                        return_value: {{ return_type.ffi_converter }}.lower(returnValue),
                         {%- when None %}
                         {%- endmatch %}
-                        callStatus: uniffiCaller.createCallStatus()
+                        call_status: uniffiCaller.createCallStatus()
                     }
                     {%- when None %}
                     {}
@@ -96,10 +96,10 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                     {%- when Some with (ffr) %}
                     /* {{ ffr.struct_name }} */{
                         {%- if !ffr.return_ffi_default_value.is_empty() %}
-                        returnValue: {{ ffr.return_ffi_default_value }},
+                        return_value: {{ ffr.return_ffi_default_value }},
                         {%- endif %}
                         // TODO create callstatus with error.
-                        callStatus: uniffiCaller.createErrorStatus(code, errorBuf),
+                        call_status: uniffiCaller.createErrorStatus(code, errorBuf),
                     }
                     {%- when None %}
                     {}
@@ -131,11 +131,11 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
         {%- when None %}
         {%- endmatch %}
         {%- endfor %}
-        uniffiFree: (uniffiHandle: UniffiHandle): void => {
+        uniffi_free: (uniffiHandle: UniffiHandle): void => {
             // this will throw a stale handle error if the handle isn't found.
             {{ ffi_converter_name }}.drop(uniffiHandle);
         },
-        uniffiClone: (uniffiHandle: UniffiHandle): UniffiHandle => {
+        uniffi_clone: (uniffiHandle: UniffiHandle): UniffiHandle => {
             return {{ ffi_converter_name }}.clone(uniffiHandle);
         }
     },

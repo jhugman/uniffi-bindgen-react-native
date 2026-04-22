@@ -633,7 +633,7 @@ fn build_vtable_field(
     ffi_fn_types: &HashMap<String, &general::FfiFunctionType>,
     flavor: &AbiFlavor,
 ) -> TsVtableField {
-    let name = fn_name(&vm.callable.name);
+    let name = vm.callable.name.clone();
     let method = Some(build_callable(config, &vm.callable, &None, None, flavor));
 
     let general::FfiType::Function(ref ffi_fn_name) = vm.ffi_type.ty else {
