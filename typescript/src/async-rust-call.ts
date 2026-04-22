@@ -85,7 +85,7 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   // don't prevent process exit). Without a ref'd handle here, the event loop may
   // exit before the callback fires — especially on Linux where event loop
   // draining is more aggressive than on macOS.
-  // Only needed when setInterval is natively available (i.e. Node.js / napi
+  // Only needed when setTimeout is natively available (i.e. Node.js / napi
   // runtime); Hermes/JSI provides timers via a polyfill that may not be loaded
   // yet at import time, and WASM has its own event loop.
   const keepAlive =
