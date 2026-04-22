@@ -55,6 +55,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use libffi::middle::{arg, Arg, Cif, Closure, CodePtr};
 use napi::bindgen_prelude::*;
@@ -80,8 +81,8 @@ struct ResolvedFfiFunc {
 
 /// Shared definition context: callback and struct definitions parsed at registration time.
 struct DefinitionContext {
-    callbacks: Rc<HashMap<String, CallbackDef>>,
-    structs: Rc<HashMap<String, structs::StructDef>>,
+    callbacks: Arc<HashMap<String, CallbackDef>>,
+    structs: Arc<HashMap<String, structs::StructDef>>,
 }
 
 /// Resolve the three RustBuffer management symbols (`alloc`, `free`, `from_bytes`)
@@ -131,11 +132,11 @@ pub fn register(env: Env, handle: &LibraryHandle, definitions: JsObject) -> Resu
 
     // Parse callback definitions if present
     let callback_defs = parse_callbacks(&definitions)?;
-    let callback_defs = Rc::new(callback_defs);
+    let callback_defs = Arc::new(callback_defs);
 
     // Parse struct definitions if present
     let struct_defs = structs::parse_structs(&definitions)?;
-    let struct_defs = Rc::new(struct_defs);
+    let struct_defs = Arc::new(struct_defs);
 
     let functions: JsObject = definitions.get_named_property("functions")?;
     let mut result = env.create_object()?;
@@ -312,8 +313,8 @@ fn call_ffi_function(
                     env,
                     struct_def,
                     &js_obj,
-                    &defs.callbacks,
-                    &defs.structs,
+                    defs.callbacks.clone(),
+                    defs.structs.clone(),
                     rb_ops,
                 )?;
                 struct_ptrs.push(struct_ptr);

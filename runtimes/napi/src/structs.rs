@@ -58,6 +58,7 @@
 
 use std::collections::HashMap;
 use std::ffi::c_void;
+use std::sync::Arc;
 
 use libffi::low;
 use libffi::middle::{Cif, Closure};
@@ -187,10 +188,10 @@ pub struct VTableTrampolineUserdata {
     pub rb_ops: RustBufferOps,
     /// All callback definitions, needed for wrapping `Callback`-typed arguments
     /// (C function pointers) as callable JS functions.
-    pub callback_defs: HashMap<String, CallbackDef>,
+    pub callback_defs: Arc<HashMap<String, CallbackDef>>,
     /// All struct definitions, needed for struct-by-value marshalling when
     /// wrapping C function pointers.
-    pub struct_defs: HashMap<String, StructDef>,
+    pub struct_defs: Arc<HashMap<String, StructDef>>,
 }
 
 // SAFETY: `raw_env` and `fn_ref` are only dereferenced on the main (JS) thread.
@@ -424,8 +425,8 @@ unsafe fn vtable_trampoline_main_thread(
                     &userdata.ret_type,
                     &env,
                     js_ret,
-                    &userdata.callback_defs,
-                    &userdata.struct_defs,
+                    userdata.callback_defs.clone(),
+                    userdata.struct_defs.clone(),
                     &userdata.rb_ops,
                 );
             }
@@ -775,8 +776,8 @@ fn marshal_js_struct_to_c_bytes(
     env: &Env,
     ret_type: &FfiTypeDesc,
     js_ret: napi::JsUnknown,
-    callback_defs: &HashMap<String, CallbackDef>,
-    struct_defs: &HashMap<String, StructDef>,
+    callback_defs: Arc<HashMap<String, CallbackDef>>,
+    struct_defs: Arc<HashMap<String, StructDef>>,
     rb_ops: &RustBufferOps,
 ) -> Option<Vec<u8>> {
     let FfiTypeDesc::Struct(struct_name) = ret_type else {
@@ -790,7 +791,7 @@ fn marshal_js_struct_to_c_bytes(
     let field_ffi_types: Vec<libffi::middle::Type> = struct_def
         .fields
         .iter()
-        .map(|f| crate::cif::ffi_type_for(&f.field_type, struct_defs))
+        .map(|f| crate::cif::ffi_type_for(&f.field_type, &struct_defs))
         .collect::<napi::Result<Vec<_>>>()
         .ok()?;
     let struct_type = libffi::middle::Type::structure(field_ffi_types);
@@ -821,8 +822,8 @@ fn marshal_js_struct_to_c_bytes(
                     env,
                     unsafe { js_val.raw() },
                     cb_def,
-                    callback_defs,
-                    struct_defs,
+                    callback_defs.clone(),
+                    struct_defs.clone(),
                     rb_ops,
                 )
                 .ok()?;
@@ -854,8 +855,8 @@ unsafe fn write_struct_to_out_pointer(
     ret_type: &FfiTypeDesc,
     env: &Env,
     js_ret: napi::JsUnknown,
-    callback_defs: &HashMap<String, CallbackDef>,
-    struct_defs: &HashMap<String, StructDef>,
+    callback_defs: Arc<HashMap<String, CallbackDef>>,
+    struct_defs: Arc<HashMap<String, StructDef>>,
     rb_ops: &RustBufferOps,
 ) -> bool {
     let Some(bytes) =
@@ -878,8 +879,8 @@ fn marshal_struct_return_to_bytes(
         env,
         ret_type,
         js_ret,
-        &userdata.callback_defs,
-        &userdata.struct_defs,
+        userdata.callback_defs.clone(),
+        userdata.struct_defs.clone(),
         &userdata.rb_ops,
     )
     .map(RawCallbackArg::StructBytes)
@@ -1264,8 +1265,8 @@ pub fn build_vtable_struct(
     env: &Env,
     struct_def: &StructDef,
     js_obj: &JsObject,
-    callback_defs: &HashMap<String, CallbackDef>,
-    struct_defs: &HashMap<String, StructDef>,
+    callback_defs: Arc<HashMap<String, CallbackDef>>,
+    struct_defs: Arc<HashMap<String, StructDef>>,
     rb_ops: &RustBufferOps,
 ) -> Result<*const c_void> {
     let field_count = struct_def.fields.len();
@@ -1287,8 +1288,8 @@ pub fn build_vtable_struct(
                     env,
                     unsafe { js_fn_val.raw() },
                     cb_def,
-                    callback_defs,
-                    struct_defs,
+                    callback_defs.clone(),
+                    struct_defs.clone(),
                     rb_ops,
                 )?;
                 vtable_data.push(fn_ptr);
@@ -1328,8 +1329,8 @@ pub fn create_callback_closure(
     env: &Env,
     js_fn_val: napi::sys::napi_value,
     cb_def: &CallbackDef,
-    callback_defs: &HashMap<String, CallbackDef>,
-    struct_defs: &HashMap<String, StructDef>,
+    callback_defs: Arc<HashMap<String, CallbackDef>>,
+    struct_defs: Arc<HashMap<String, StructDef>>,
     rb_ops: &RustBufferOps,
 ) -> napi::Result<*const c_void> {
     // Create a persistent reference (refcount=1) to prevent GC.
@@ -1348,7 +1349,7 @@ pub fn create_callback_closure(
     let mut cif_arg_types: Vec<libffi::middle::Type> = cb_def
         .args
         .iter()
-        .map(|a| crate::cif::ffi_type_for(a, struct_defs))
+        .map(|a| crate::cif::ffi_type_for(a, &struct_defs))
         .collect::<napi::Result<Vec<_>>>()?;
     if cb_def.out_return {
         cif_arg_types.push(libffi::middle::Type::pointer());
@@ -1359,7 +1360,7 @@ pub fn create_callback_closure(
     let cif_ret_type = if cb_def.out_return {
         libffi::middle::Type::void()
     } else {
-        crate::cif::ffi_type_for(&cb_def.ret, struct_defs)?
+        crate::cif::ffi_type_for(&cb_def.ret, &struct_defs)?
     };
     let cif = Cif::new(cif_arg_types, cif_ret_type);
 
