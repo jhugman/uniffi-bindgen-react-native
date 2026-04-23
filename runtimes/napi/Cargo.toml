@@ -7,11 +7,9 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-dlopen2 = "0.7"
-libffi = "5.0"
-libffi-sys = "4.0"
 napi = { version = "2.16", default-features = false, features = ["napi6"] }
 napi-derive = "2.16"
+uniffi-runtime-core = { path = "../core" }
 
 [build-dependencies]
 napi-build = "2.1"

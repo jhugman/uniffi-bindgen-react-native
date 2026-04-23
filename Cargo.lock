@@ -2198,12 +2198,10 @@ dependencies = [
 name = "uniffi-runtime-napi"
 version = "0.1.0"
 dependencies = [
- "dlopen2",
- "libffi",
- "libffi-sys",
  "napi",
  "napi-build",
  "napi-derive",
+ "uniffi-runtime-core",
 ]
 
 [[package]]

@@ -10,8 +10,8 @@
 //! [UniFFI](https://mozilla.github.io/uniffi-rs/). Unlike conventional approaches that
 //! require compile-time code generation for each target library, this bridge operates
 //! entirely at runtime: it loads shared libraries via `dlopen`, resolves their exported
-//! C symbols via `dlsym`, and invokes them through [libffi](https://docs.rs/libffi)'s
-//! call-interface (CIF) mechanism.
+//! C symbols via `dlsym`, and invokes them through trampolines built by
+//! `uniffi-runtime-core`.
 //!
 //! ## How it works
 //!
@@ -19,11 +19,12 @@
 //! generation is needed per target library. The flow is:
 //!
 //! 1. JS describes function signatures as tagged objects (e.g., `{ tag: 'Int32' }`).
-//! 2. Rust parses these into [`FfiTypeDesc`](ffi_type::FfiTypeDesc) values.
-//! 3. The CIF layer ([`cif`]) maps each `FfiTypeDesc` to a concrete `libffi::middle::Type`,
-//!    constructing the call-interface descriptor that libffi needs.
+//! 2. Rust parses these into [`FfiTypeDesc`](uniffi_runtime_core::FfiTypeDesc) values
+//!    via [`spec_from_js`].
+//! 3. `uniffi-runtime-core` maps each `FfiTypeDesc` to native types and builds the
+//!    call-interface descriptors needed to invoke foreign functions.
 //! 4. At call time, Rust marshals JS values into C-compatible argument buffers, invokes
-//!    the foreign function through libffi, and unmarshals the result back to JS.
+//!    the foreign function via core, and unmarshals the result back to JS.
 //!
 //! ## Main-thread detection and the two-path callback design
 //!
@@ -51,18 +52,18 @@ use napi::module_init;
 use napi::JsObject;
 use napi_derive::napi;
 
+mod call;
 mod callback;
-mod cif;
-mod ffi_c_types;
-mod ffi_type;
-mod fn_pointer;
-mod library;
-mod marshal;
 mod napi_utils;
 mod register;
-mod structs;
 
-use library::LibraryHandle;
+use std::sync::Arc;
+use uniffi_runtime_core::Module;
+
+/// Convert a core error into a napi error.
+pub(crate) fn core_err(e: uniffi_runtime_core::Error) -> napi::Error {
+    napi::Error::from_reason(e.to_string())
+}
 
 /// The identity of the main Node.js thread, captured once at module initialization.
 /// Used by [`is_main_thread`] to determine whether callback code can access napi
@@ -85,7 +86,7 @@ struct ModuleState {
 }
 
 // SAFETY: `napi_threadsafe_function` (a raw pointer) is designed to be used
-// across threads — napi's threadsafe function APIs are explicitly thread-safe.
+// across threads—napi's threadsafe function APIs are explicitly thread-safe.
 // The `Mutex` synchronizes access to the `Vec`.
 unsafe impl Send for ModuleState {}
 unsafe impl Sync for ModuleState {}
@@ -140,7 +141,7 @@ unsafe extern "C" fn env_cleanup_hook(_data: *mut std::ffi::c_void) {
     }
 }
 
-/// Install the env cleanup hook (idempotent — only the first call has effect).
+/// Install the env cleanup hook (idempotent—only the first call has effect).
 fn install_env_cleanup_hook(env: &Env) {
     static INSTALLED: AtomicBool = AtomicBool::new(false);
     if INSTALLED
@@ -183,31 +184,79 @@ pub fn is_main_thread() -> bool {
 ///
 /// `UniffiNativeModule` is the entry point for loading a UniFFI shared library
 /// and registering its function definitions. JS code calls `open(path)` to
-/// dlopen the library, then `register(definitions)` to parse the type
-/// descriptions and produce a JS object whose methods invoke the foreign
-/// functions through libffi.
+/// store the library path, then `register(definitions)` to parse the type
+/// descriptions, create a `Module` (which opens the library), and produce a
+/// JS object whose methods invoke the foreign functions.
 #[napi]
 pub struct UniffiNativeModule {
-    handle: LibraryHandle,
+    /// The filesystem path to the shared library. Stored by `open()`, used by
+    /// `register()` to create a `Module` (which handles `dlopen` internally).
+    library_path: String,
+    /// The `Module` created by `register()`. `None` until `register()` is called.
+    module: Option<Arc<Module>>,
 }
 
 #[napi]
 impl UniffiNativeModule {
-    /// Load a shared library from the given filesystem path via `dlopen`.
+    /// Validate the library path and store it for later use by `register()`.
+    ///
+    /// The library is not fully opened here — `Module::new()` in `register()`
+    /// handles `dlopen`, symbol resolution, and CIF construction in one step.
+    /// However, we do a trial `dlopen` to validate the path eagerly, so that
+    /// callers get an immediate error for invalid paths rather than a deferred
+    /// error at `register()` time.
+    ///
+    /// The trial `LibraryHandle` is simply dropped. Because `LibraryHandle`
+    /// wraps `ManuallyDrop<Library>`, dropping it does NOT call `dlclose` —
+    /// the library stays mapped, which is fine because `Module::new()` will
+    /// re-open (or find the already-mapped) library shortly after.
     #[napi(factory)]
     pub fn open(path: String) -> napi::Result<Self> {
-        let handle = LibraryHandle::open(&path)?;
-        Ok(Self { handle })
+        // Trial open to validate the path. Drop does not dlclose.
+        let _handle = uniffi_runtime_core::LibraryHandle::open(&path).map_err(core_err)?;
+        Ok(Self {
+            library_path: path,
+            module: None,
+        })
     }
 
     /// Parse JS-provided type definitions and produce a JS object whose methods
     /// are bound to the foreign functions found in the loaded library.
     #[napi]
-    pub fn register(&self, env: Env, definitions: JsObject) -> napi::Result<JsObject> {
+    pub fn register(&mut self, env: Env, definitions: JsObject) -> napi::Result<JsObject> {
         // Install the env cleanup hook on the first register call. This is the
         // earliest point where we have a valid `Env` (the `#[module_init]` ctor
         // runs before the napi env exists).
         install_env_cleanup_hook(&env);
-        register::register(env, &self.handle, definitions)
+        let (result, module) = register::register(env, &self.library_path, definitions)?;
+        self.module = Some(module);
+        Ok(result)
+    }
+
+    /// Unload the native module, draining in-flight calls and optionally force-closing
+    /// the shared library.
+    ///
+    /// Accepts an optional options object with a `force` boolean field. When
+    /// `{ force: true }` is passed, `dlclose` is called on the library after
+    /// all in-flight calls have drained. Without `force`, the unloading flag is
+    /// set and callbacks are aborted, but the library mapping is left in place.
+    ///
+    /// After `unload()` returns, this `UniffiNativeModule` no longer holds a
+    /// reference to the `Module` — any JS closures that captured the module will
+    /// still hold their `Arc<Module>` references until they are garbage-collected.
+    #[napi]
+    pub fn unload(&mut self, options: Option<JsObject>) -> napi::Result<()> {
+        let force = match &options {
+            Some(o) => o.get_named_property::<bool>("force").unwrap_or(false),
+            None => false,
+        };
+        if let Some(module) = self.module.take() {
+            if force {
+                module.unload_force().map_err(core_err)?;
+            } else {
+                module.unload().map_err(core_err)?;
+            }
+        }
+        Ok(())
     }
 }

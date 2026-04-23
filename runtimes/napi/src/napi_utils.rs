@@ -18,22 +18,22 @@
 //! requires three raw napi calls in sequence (create `ArrayBuffer`, copy data,
 //! create `TypedArray` view), and reading TypedArray data requires a
 //! five-out-parameter call to `napi_get_typedarray_info`. These operations
-//! appear throughout the crate — in callback argument marshalling, return value
-//! handling, error buffer extraction, and `RustBuffer` conversion — making
+//! appear throughout the crate—in callback argument marshalling, return value
+//! handling, error buffer extraction, and `RustBuffer` conversion—making
 //! shared helpers essential.
 
 use std::ffi::c_void;
 
 use napi::{JsUnknown, NapiRaw};
 
-use crate::ffi_c_types::{
+use uniffi_runtime_core::ffi_c_types::{
     ForeignBytesC, RustBufferC, RustBufferFreeFn, RustBufferFromBytesFn, RustCallStatusC,
 };
 
 /// Create a JS `Uint8Array` from raw bytes.
 ///
-/// The two-step construction — first an `ArrayBuffer`, then a `TypedArray` view
-/// over it — is the only way to create a `Uint8Array` via the napi C API.
+/// The two-step construction—first an `ArrayBuffer`, then a `TypedArray` view
+/// over it—is the only way to create a `Uint8Array` via the napi C API.
 /// The `ArrayBuffer` owns the backing memory; the `TypedArray` is a lightweight
 /// view with zero additional allocation. We copy `len` bytes from `data` into
 /// the newly allocated `ArrayBuffer` and return the `Uint8Array` view as a raw
@@ -91,7 +91,7 @@ pub unsafe fn create_uint8array(
 /// On success, returns `Some((data_ptr, length))` where `data_ptr` points into
 /// the `ArrayBuffer`'s backing store. **The returned pointer borrows the
 /// ArrayBuffer's internal storage and is valid only while the JS value is
-/// alive** — that is, within the current napi callback scope. Callers must
+/// alive**—that is, within the current napi callback scope. Callers must
 /// finish reading before returning control to the JS engine, because a GC cycle
 /// could relocate or free the backing store afterward.
 ///
@@ -112,7 +112,7 @@ pub unsafe fn read_typedarray_data(
     let mut ta_type: i32 = 0;
     // SAFETY: raw_env and raw_val are valid (precondition); output pointers
     // are to local stack variables. The returned data pointer is into the
-    // ArrayBuffer's backing store, which the JS engine manages — we do not
+    // ArrayBuffer's backing store, which the JS engine manages—we do not
     // free it ourselves.
     let status = napi::sys::napi_get_typedarray_info(
         raw_env,
@@ -131,7 +131,7 @@ pub unsafe fn read_typedarray_data(
 
 /// Allocate a [`RustBufferC`] by copying raw bytes through `rustbuffer_from_bytes`.
 ///
-/// This is the shared core of all "bytes → RustBuffer" conversions in the crate.
+/// This is the shared core of all "bytes -> RustBuffer" conversions in the crate.
 /// It wraps the provided bytes in a [`ForeignBytesC`] (a borrowed view) and calls
 /// the library's `rustbuffer_from_bytes` to produce a Rust-owned copy.
 ///
@@ -155,7 +155,7 @@ pub unsafe fn rustbuffer_from_raw_bytes(
     };
     // SAFETY: `rb_from_bytes_ptr` was obtained via `dlsym` for the symbol whose name
     // was provided under `symbols.rustbufferFromBytes` in the JS definitions. We
-    // transmute it to `RustBufferFromBytesFn` — the correct signature for UniFFI's
+    // transmute it to `RustBufferFromBytesFn`—the correct signature for UniFFI's
     // `rustbuffer_from_bytes`.
     let from_bytes: RustBufferFromBytesFn = std::mem::transmute(rb_from_bytes_ptr);
     let mut call_status = RustCallStatusC::default();
@@ -189,7 +189,7 @@ pub unsafe fn js_uint8array_to_rust_buffer(
 
 /// Free a [`RustBufferC`] via the provided free function pointer.
 ///
-/// The triple guard — data not null, capacity > 0, free pointer not null —
+/// The triple guard—data not null, capacity > 0, free pointer not null—
 /// prevents double-frees and no-ops for empty buffers. A zero-capacity buffer
 /// was never allocated, so there is nothing to free; a null data pointer
 /// signals the same. A null `free_ptr` occurs when the symbol could not be
