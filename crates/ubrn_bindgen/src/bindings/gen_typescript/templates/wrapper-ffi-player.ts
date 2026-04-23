@@ -7,7 +7,7 @@
 // @ts-nocheck
 {%- endif %}
 
-import lib from "uniffi-runtime-napi/lib.js";
+import lib from "@uniffi-runtime/napi/lib.js";
 const { UniffiNativeModule, FfiType } = lib;
 
 import {
