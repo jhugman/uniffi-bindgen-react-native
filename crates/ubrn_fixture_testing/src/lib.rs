@@ -115,7 +115,7 @@ pub(crate) fn write_fixture_tsconfig(
 
     let napi_runtime_path = if flavor == Flavor::Napi {
         format!(
-            ",\n      \"uniffi-runtime-napi\": [\"{rel_root}/runtimes/napi\"],\n      \"uniffi-runtime-napi/*\": [\"{rel_root}/runtimes/napi/*\"]"
+            ",\n      \"@uniffi-runtime/napi\": [\"{rel_root}/runtimes/napi\"],\n      \"@uniffi-runtime/napi/*\": [\"{rel_root}/runtimes/napi/*\"]"
         )
     } else {
         String::new()
