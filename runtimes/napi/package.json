@@ -1,7 +1,7 @@
 {
-  "name": "uniffi-runtime-napi",
+  "name": "@uniffi-runtime/napi",
   "version": "0.1.0",
-  "main": "index.js",
+  "main": "lib.js",
   "types": "index.d.ts",
   "napi": {
     "name": "uniffi-runtime-napi",
@@ -9,13 +9,28 @@
       "defaults": true,
       "additional": [
         "aarch64-apple-darwin",
-        "aarch64-unknown-linux-gnu"
+        "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
+        "x86_64-unknown-linux-musl",
+        "aarch64-pc-windows-msvc"
       ]
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "lib.js",
+    "README.md"
+  ],
   "scripts": {
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "napi build --platform --release --js-package-name @uniffi-runtime/napi",
+    "build:debug": "napi build --platform --js-package-name @uniffi-runtime/napi",
+    "artifacts": "napi artifacts --js-package-name @uniffi-runtime/napi",
+    "create-npm-dirs": "napi create-npm-dirs",
+    "prepublishOnly": "napi prepublish -t npm",
     "fmt": "prettier --write . && cargo fmt",
     "test": "node --import ./tests/setup.mjs --test tests/*.test.mjs"
   },
