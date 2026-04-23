@@ -1,0 +1,164 @@
+name: Publish @uniffi-runtime/napi
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run without publishing to npm"
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    working-directory: runtimes/napi
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS
+          - target: x86_64-apple-darwin
+            runner: macos-13
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+
+          # Linux GNU
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            build-flags: --use-napi-cross
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            build-flags: --use-napi-cross
+
+          # Linux musl
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            build-flags: -x
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-latest
+            build-flags: -x
+
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - target: aarch64-pc-windows-msvc
+            runner: windows-latest
+
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-zigbuild
+        if: contains(matrix.build-flags, '-x')
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Install ziglang
+        if: contains(matrix.build-flags, '-x')
+        uses: mlugg/setup-zig@v2
+
+      - name: Install @napi-rs/cli
+        run: npm install -g @napi-rs/cli
+
+      - name: Build native module
+        run: >-
+          napi build
+          --platform
+          --release
+          --target ${{ matrix.target }}
+          --js-package-name @uniffi-runtime/napi
+          ${{ matrix.build-flags }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: runtimes/napi/uniffi-runtime-napi.*.node
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install @napi-rs/cli
+        run: npm install -g @napi-rs/cli
+
+      - name: Create npm package dirs
+        run: napi create-npm-dirs
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: runtimes/napi/artifacts
+          pattern: bindings-*
+          merge-multiple: true
+
+      - name: Move artifacts into npm dirs
+        run: napi artifacts --dir artifacts --js-package-name @uniffi-runtime/napi
+
+      - name: List packages
+        run: |
+          echo "=== Root package ==="
+          cat package.json | head -5
+          echo ""
+          echo "=== Platform packages ==="
+          ls -la npm/*/
+          for dir in npm/*/; do
+            echo "--- $dir ---"
+            cat "$dir/package.json"
+            echo ""
+          done
+
+      - name: Publish (dry-run)
+        if: inputs.dry-run
+        run: |
+          echo "::notice::DRY RUN — not publishing to npm"
+          npm publish --dry-run
+          for dir in npm/*/; do
+            echo "--- Publishing $dir (dry-run) ---"
+            (cd "$dir" && npm publish --dry-run --access public)
+          done
+
+      - name: Publish platform packages
+        if: ${{ !inputs.dry-run }}
+        run: |
+          for dir in npm/*/; do
+            echo "--- Publishing $dir ---"
+            (cd "$dir" && npm publish --access public)
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish root package
+        if: ${{ !inputs.dry-run }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
