@@ -1,6 +1,8 @@
 name: Publish @uniffi-runtime/napi
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       dry-run:
@@ -138,7 +140,7 @@ jobs:
           done
 
       - name: Publish (dry-run)
-        if: inputs.dry-run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
         run: |
           echo "::notice::DRY RUN — not publishing to npm"
           npm publish --dry-run
@@ -148,7 +150,7 @@ jobs:
           done
 
       - name: Publish platform packages
-        if: ${{ !inputs.dry-run }}
+        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
         run: |
           for dir in npm/*/; do
             echo "--- Publishing $dir ---"
@@ -158,7 +160,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish root package
-        if: ${{ !inputs.dry-run }}
+        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
