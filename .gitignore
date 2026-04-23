@@ -85,4 +85,7 @@ docs/superpowers/
 
 # napi-rs build artifacts
 *.node
+
+# OS core dump files (negation ensures runtimes/core/ crate is not excluded)
 core
+!runtimes/core/

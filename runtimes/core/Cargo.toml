@@ -1,0 +1,16 @@
+[package]
+name = "uniffi-runtime-core"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+dlopen2 = "0.7"
+libffi = "5.0"
+libffi-sys = "4.0"
+
+[dev-dependencies]
+# Add as needed for unit tests
