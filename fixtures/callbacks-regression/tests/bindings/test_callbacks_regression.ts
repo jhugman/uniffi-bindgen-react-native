@@ -34,7 +34,7 @@ class EventListenerImpl implements EventListener {
 }
 
 class KeywordListenerImpl implements KeywordListener {
-  delete(value: string): string {
+  delete_(value: string): string {
     return `deleted:${value}`;
   }
 }
