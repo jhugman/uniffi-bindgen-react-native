@@ -2178,6 +2178,15 @@ name = "uniffi-napi-test-lib"
 version = "0.1.0"
 
 [[package]]
+name = "uniffi-runtime-core"
+version = "0.1.0"
+dependencies = [
+ "dlopen2",
+ "libffi",
+ "libffi-sys",
+]
+
+[[package]]
 name = "uniffi-runtime-javascript"
 version = "0.31.0-2"
 dependencies = [
@@ -2189,12 +2198,10 @@ dependencies = [
 name = "uniffi-runtime-napi"
 version = "0.1.0"
 dependencies = [
- "dlopen2",
- "libffi",
- "libffi-sys",
  "napi",
  "napi-build",
  "napi-derive",
+ "uniffi-runtime-core",
 ]
 
 [[package]]

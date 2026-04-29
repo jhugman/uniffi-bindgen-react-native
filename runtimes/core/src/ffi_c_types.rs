@@ -12,11 +12,11 @@
 //!
 //! There are three struct types and two function-pointer type aliases:
 //!
-//! - [`RustBufferC`]: The **owned** byte buffer — `{ capacity: u64, len: u64, data: *mut u8 }`.
+//! - [`RustBufferC`]: The **owned** byte buffer—`{ capacity: u64, len: u64, data: *mut u8 }`.
 //!   UniFFI uses this for passing serialized compound types across the boundary.
-//! - [`ForeignBytesC`]: A **borrowed** byte view — `{ len: i32, data: *const u8 }`.
+//! - [`ForeignBytesC`]: A **borrowed** byte view—`{ len: i32, data: *const u8 }`.
 //!   Used only in `rustbuffer_from_bytes` to hand owned-by-JS bytes to Rust without copying.
-//! - [`RustCallStatusC`]: The error-reporting out-parameter — `{ code: i8, error_buf: RustBuffer }`.
+//! - [`RustCallStatusC`]: The error-reporting out-parameter—`{ code: i8, error_buf: RustBuffer }`.
 //!   The `error_buf` fields are **inlined** (not nested) because we need direct field access
 //!   when constructing and inspecting the struct from Rust, and because `#[repr(C)]` layout
 //!   of a struct with inlined fields is identical to one with a nested sub-struct.
@@ -30,8 +30,8 @@
 /// The Rust side is responsible for allocation and deallocation; JS must call
 /// the library's `rustbuffer_free` to release buffers it receives.
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub(crate) struct RustBufferC {
+#[derive(Clone, Copy, Debug)]
+pub struct RustBufferC {
     pub capacity: u64,
     pub len: u64,
     pub data: *mut u8,
@@ -43,7 +43,7 @@ pub(crate) struct RustBufferC {
 /// contents into a new `RustBuffer`. The JS caller must keep the backing `Buffer`
 /// alive until the call returns.
 #[repr(C)]
-pub(crate) struct ForeignBytesC {
+pub struct ForeignBytesC {
     pub len: i32,
     pub data: *const u8,
 }
@@ -56,9 +56,9 @@ pub(crate) struct ForeignBytesC {
 /// so we can read and write them individually without constructing a nested struct.
 /// The `#[repr(C)]` layout is byte-identical either way.
 #[repr(C)]
-pub(crate) struct RustCallStatusC {
+pub struct RustCallStatusC {
     pub code: i8,
-    // RustBuffer fields inlined: capacity, len, data — see module docs.
+    // RustBuffer fields inlined: capacity, len, data—see module docs.
     pub error_buf_capacity: u64,
     pub error_buf_len: u64,
     pub error_buf_data: *mut u8,
@@ -78,19 +78,19 @@ impl Default for RustCallStatusC {
 
 /// Signature of the `*_rustbuffer_from_bytes` symbol: takes borrowed bytes and an
 /// out-parameter for call status, returns an owned `RustBufferC`.
-pub(crate) type RustBufferFromBytesFn =
+pub type RustBufferFromBytesFn =
     unsafe extern "C" fn(ForeignBytesC, *mut RustCallStatusC) -> RustBufferC;
 
 /// Signature of the `*_rustbuffer_free` symbol: takes an owned `RustBufferC` and
 /// an out-parameter for call status, deallocates the buffer.
-pub(crate) type RustBufferFreeFn = unsafe extern "C" fn(RustBufferC, *mut RustCallStatusC);
+pub type RustBufferFreeFn = unsafe extern "C" fn(RustBufferC, *mut RustCallStatusC);
 
 /// Resolved function pointers for RustBuffer lifecycle management.
 ///
-/// These two symbols are resolved once during [`crate::register::register`] and
+/// These two symbols are resolved once during registration and
 /// threaded through to every site that needs to allocate or free RustBuffers.
 #[derive(Clone, Copy)]
-pub(crate) struct RustBufferOps {
+pub struct RustBufferOps {
     pub from_bytes_ptr: *const std::ffi::c_void,
     pub free_ptr: *const std::ffi::c_void,
 }

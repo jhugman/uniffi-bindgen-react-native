@@ -779,13 +779,11 @@ pub(super) fn build_initialization(
     let mut initialization_fns = Vec::new();
     for td in &namespace.type_definitions {
         match td {
-            general::TypeDefinition::Interface(i) => {
-                if i.imp.has_callback_interface() {
-                    initialization_fns.push(format!(
-                        "uniffiCallbackInterface{}.register",
-                        i.name.to_upper_camel_case()
-                    ));
-                }
+            general::TypeDefinition::Interface(i) if i.imp.has_callback_interface() => {
+                initialization_fns.push(format!(
+                    "uniffiCallbackInterface{}.register",
+                    i.name.to_upper_camel_case()
+                ));
             }
             general::TypeDefinition::CallbackInterface(ci) => {
                 initialization_fns.push(format!(
