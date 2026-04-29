@@ -6,7 +6,7 @@
     {%- endmatch %} {# space #}
     {{- func.name() }}(
         {%- for arg in func.arguments() %}
-        {{    arg.type_().borrow()|ffi_type_name_to_rust }} {{ arg.name() }}
+        {{    arg.type_().borrow()|ffi_type_name_to_rust }} {{ arg.name()|cpp_arg_name }}
         {%-   if !loop.last %}, {# space #}
         {%-   endif %}
         {%- endfor %}
@@ -104,7 +104,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
     {%-   endmatch %}
     (*{{  callback.name()|ffi_callback_name }})(
     {%-   for arg in callback.arguments() %}
-    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name() }}{% if !loop.last %}, {% endif %}
+    {{ arg.type_().borrow()|ffi_type_name }} {{ arg.name()|cpp_arg_name }}{% if !loop.last %}, {% endif %}
     {%-   endfor %}
     {%-   if callback.has_rust_call_status_arg() -%}
     {%      if callback.arguments().len() > 0 %}, {% endif %}RustCallStatus* rust_call_status
@@ -178,7 +178,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
     {%- let struct_name = ffi_struct.name()|ffi_struct_name -%}
     typedef struct {{ struct_name }} {
     {%- for field in ffi_struct.fields() %}
-        {{ field.type_().borrow()|ffi_type_name }} {{ field.name() }};
+        {{ field.type_().borrow()|ffi_type_name }} {{ field.name()|cpp_field_name }};
     {%- endfor %}
     } {{ struct_name }};
 {%- endmacro %}
