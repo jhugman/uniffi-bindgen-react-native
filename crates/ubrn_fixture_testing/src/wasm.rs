@@ -61,8 +61,7 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // Step 4: Generate Cargo.toml from template
     std::fs::create_dir_all(&wasm_crate_dir).expect("failed to create wasm-crate dir");
     let canonical_wasm_crate = Utf8PathBuf::try_from(
-        std::path::Path::new(wasm_crate_dir.as_str())
-            .canonicalize()
+        dunce::canonicalize(wasm_crate_dir.as_str())
             .expect("failed to canonicalize wasm-crate dir"),
     )
     .expect("non-UTF-8 path");
