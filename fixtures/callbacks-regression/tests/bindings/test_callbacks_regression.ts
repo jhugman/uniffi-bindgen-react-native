@@ -35,6 +35,7 @@ class EventListenerImpl implements EventListener {
 
 class KeywordListenerImpl implements KeywordListener {
   delete_(value: string): string {
+    console.log("delete_", value);
     return `deleted:${value}`;
   }
 }
