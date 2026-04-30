@@ -14,6 +14,11 @@ pub trait EventListener: Send + Sync {
     fn on_event(&self, message: String, number: i32);
 }
 
+#[uniffi::export(with_foreign)]
+pub trait KeywordListener: Send + Sync {
+    fn delete(&self, value: String) -> String;
+}
+
 #[derive(uniffi::Object)]
 struct EventSource {
     listener: Arc<dyn EventListener>,
@@ -33,4 +38,9 @@ impl EventSource {
             }
         });
     }
+}
+
+#[uniffi::export]
+fn call_delete(listener: Arc<dyn KeywordListener>, value: String) -> String {
+    listener.delete(value)
 }
