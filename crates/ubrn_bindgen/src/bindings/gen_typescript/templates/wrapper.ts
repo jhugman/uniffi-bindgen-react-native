@@ -18,7 +18,7 @@
 // @ts-nocheck
 {%- endif %}
 
-{%- if module.flavor.is_jsi() %}
+{%- if module.flavor.supports_globalthis_native_module() || module.flavor.supports_player() %}
 import nativeModule from "./{{ module.module_name }}-ffi";
 {%- else %}
 import * as wasmBundle from "./wasm-bindgen/index.js";
@@ -35,7 +35,7 @@ import {{ conv.default_name }} from "{{ conv.path }}";
 const { {{ conv.converters|join(", ") }} } = {{ conv.default_name }}.converters;
 {%- endfor %}
 
-{%- if module.flavor.is_jsi() %}
+{%- if module.flavor.supports_plain_call_status() %}
 const uniffiCaller = new UniffiRustCaller(() => ({ code: 0 }));
 {%- else %}
 const nativeModule = () => wasmBundle;

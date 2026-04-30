@@ -27,6 +27,9 @@ import {
   CollidingVariants_Tags,
   identityCollidingVariants,
   AnimalObjectInterface,
+  OptionalFields,
+  OptionalFields_Tags,
+  identityOptionalFields,
 } from "@/generated/enum_types";
 
 test("Enum discriminant", (t) => {
@@ -176,6 +179,42 @@ test("Variant naming cam collide with existing types", (t) => {
 
     t.assertTrue(CollidingVariants.instanceOf(variant1));
     t.assertTrue(CollidingVariants.CollidingVariants.instanceOf(variant1));
+  }
+});
+
+test("Variant with Option fields accepts omitted keys and undefined", (t) => {
+  // Omitting optional keys is a compile-time check (would fail tsc if `?:` was lost).
+  const v1 = OptionalFields.Named.new({ required: "hello" });
+  t.assertEqual(v1.tag, OptionalFields_Tags.Named);
+  if (OptionalFields.Named.instanceOf(v1)) {
+    t.assertEqual(v1.inner.required, "hello");
+    t.assertEqual(v1.inner.maybeString, undefined);
+    t.assertEqual(v1.inner.maybeRecord, undefined);
+  } else {
+    t.fail("expected Named");
+  }
+
+  // Explicit `undefined` is also accepted.
+  const v2 = new OptionalFields.Named({
+    required: "world",
+    maybeString: undefined,
+    maybeRecord: undefined,
+  });
+  t.assertEqual(identityOptionalFields(v2).tag, OptionalFields_Tags.Named);
+
+  // Supplying values roundtrips.
+  const v3 = OptionalFields.Named.new({
+    required: "r",
+    maybeString: "s",
+    maybeRecord: AnimalRecord.create({ value: 7 }),
+  });
+  const roundTripped = identityOptionalFields(v3);
+  if (OptionalFields.Named.instanceOf(roundTripped)) {
+    t.assertEqual(roundTripped.inner.required, "r");
+    t.assertEqual(roundTripped.inner.maybeString, "s");
+    t.assertEqual(roundTripped.inner.maybeRecord?.value, 7);
+  } else {
+    t.fail("expected Named");
   }
 });
 

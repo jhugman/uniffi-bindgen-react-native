@@ -58,7 +58,7 @@ pub fn file_paths(pattern: &str) -> Result<Vec<std::ffi::OsString>, anyhow::Erro
 }
 
 pub fn pwd() -> Result<Utf8PathBuf> {
-    let path = std::env::current_dir()?;
+    let path = dunce::canonicalize(std::env::current_dir()?)?;
     Ok(Utf8PathBuf::try_from(path)?)
 }
 
@@ -228,7 +228,7 @@ pub impl Utf8Path {
         Ok(if is_recording_enabled() {
             self.to_path_buf()
         } else {
-            self.canonicalize_utf8()?
+            Utf8PathBuf::try_from(dunce::canonicalize(self)?)?
         })
     }
 }

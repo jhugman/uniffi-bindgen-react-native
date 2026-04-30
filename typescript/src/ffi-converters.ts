@@ -348,10 +348,40 @@ export const FfiConverterArrayBuffer = (() => {
   return new FFIConverter();
 })();
 
+export const FfiConverterUint8Array = (() => {
+  const lengthConverter = FfiConverterInt32;
+  class FFIConverter extends AbstractFfiConverterByteArray<Uint8Array> {
+    read(from: RustBuffer): Uint8Array {
+      const length = lengthConverter.read(from);
+      return new Uint8Array(from.readArrayBuffer(length));
+    }
+    write(value: Uint8Array, into: RustBuffer): void {
+      const length = value.byteLength;
+      lengthConverter.write(length, into);
+      into.writeByteArray(value);
+    }
+    allocationSize(value: Uint8Array): number {
+      return lengthConverter.allocationSize(0) + value.byteLength;
+    }
+  }
+  return new FFIConverter();
+})();
+
 type StringConverter = {
+  // Single-string encoding. Each template picks an environment-appropriate
+  // implementation: the JSI template uses a C++ helper (avoids the
+  // TextEncoder allocation on the hot `lower()` path for large strings);
+  // the WASM template uses `TextEncoder.encode`.
   stringToBytes: (s: string) => UniffiByteArray;
   bytesToString: (ab: UniffiByteArray) => string;
   stringByteLength: (s: string) => number;
+  // Optional direct-buffer operations. When provided, `write` and `read` use
+  // them to skip the intermediate Uint8Array produced by
+  // `stringToBytes`/`bytesToString`. The `buf` argument is a RustBuffer; the
+  // implementation encodes into / decodes from `buf.arrayBuffer` at the given
+  // offset.
+  writeStringIntoBuffer?: (s: string, buf: any, offset: number) => number;
+  readStringFromBuffer?: (buf: any, offset: number, length: number) => string;
 };
 export function uniffiCreateFfiConverterString(
   converter: StringConverter,
@@ -367,20 +397,38 @@ export function uniffiCreateFfiConverterString(
     }
     read(from: RustBuffer): string {
       const length = lengthConverter.read(from);
-      // TODO Currently, RustBufferHelper.cpp is pretty dumb,
-      // and copies all the bytes in the underlying ArrayBuffer.
-      // Making a better shim for Uint8Array would allow us to use
-      // readByteArray here, and eliminate a copy.
-      const bytes = from.readArrayBuffer(length);
-      return converter.bytesToString(new Uint8Array(bytes));
+      if (converter.readStringFromBuffer) {
+        // Read directly from the RustBuffer's backing ArrayBuffer — zero copy.
+        const offset = from.advanceReadOffset(length);
+        return converter.readStringFromBuffer(from, offset, length);
+      }
+      const bytes = from.readByteArray(length);
+      return converter.bytesToString(bytes);
     }
     write(value: string, into: RustBuffer): void {
-      // TODO: work on RustBufferHelper.cpp is needed to avoid
-      // the extra copy and use writeByteArray.
-      const buffer = converter.stringToBytes(value).buffer;
-      const numBytes = buffer.byteLength;
+      if (converter.writeStringIntoBuffer) {
+        // Encode the string first, then backfill the i32 length prefix with
+        // the actual byte count. Skips one `stringByteLength` measurement
+        // call per string compared to the writeByteArray path below.
+        const lengthOffset = into.advanceWriteOffset(4);
+        const dataOffset = lengthOffset + 4;
+        const bytesWritten = converter.writeStringIntoBuffer(
+          value,
+          into,
+          dataOffset,
+        );
+        new DataView(into.arrayBuffer, lengthOffset, 4).setInt32(
+          0,
+          bytesWritten,
+          false,
+        );
+        into.setWriteOffset(dataOffset + bytesWritten);
+        return;
+      }
+      const bytes = converter.stringToBytes(value);
+      const numBytes = bytes.byteLength;
       lengthConverter.write(numBytes, into);
-      into.writeArrayBuffer(buffer);
+      into.writeByteArray(bytes);
     }
     allocationSize(value: string): number {
       return (

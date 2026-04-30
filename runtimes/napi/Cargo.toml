@@ -1,0 +1,15 @@
+[package]
+name = "uniffi-runtime-napi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2.16", default-features = false, features = ["napi6"] }
+napi-derive = "2.16"
+uniffi-runtime-core = { path = "../core" }
+
+[build-dependencies]
+napi-build = "2.1"

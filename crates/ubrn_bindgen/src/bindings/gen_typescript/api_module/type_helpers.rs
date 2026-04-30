@@ -15,19 +15,26 @@ use heck::ToLowerCamelCase;
 use uniffi_bindgen::pipeline::general;
 
 pub(super) use crate::bindings::gen_typescript::type_mapping::ffi_type_to_ts as ffi_type_to_ts_name;
+use crate::bindings::gen_typescript::Config;
 
 /// Primitives use short names (`FfiConverterBool`); all others use `FfiConverter{canonical_name}`.
-pub(super) fn ffi_converter_name_for(node: &general::TypeNode) -> String {
-    ffi_converter_name_for_type(&node.ty)
+pub(super) fn ffi_converter_name_for(config: &Config, node: &general::TypeNode) -> String {
+    ffi_converter_name_for_type(config, &node.ty)
         .unwrap_or_else(|| format!("FfiConverter{}", node.canonical_name))
 }
 
 /// Returns `None` for non-primitive types.
-pub(super) fn ffi_converter_name_for_type(ty: &general::Type) -> Option<String> {
+pub(super) fn ffi_converter_name_for_type(config: &Config, ty: &general::Type) -> Option<String> {
     let name = match ty {
         general::Type::Boolean => "FfiConverterBool",
         general::Type::String => "FfiConverterString",
-        general::Type::Bytes => "FfiConverterArrayBuffer",
+        general::Type::Bytes => {
+            if config.strict_byte_arrays {
+                "FfiConverterUint8Array"
+            } else {
+                "FfiConverterArrayBuffer"
+            }
+        }
         general::Type::Int8 => "FfiConverterInt8",
         general::Type::Int16 => "FfiConverterInt16",
         general::Type::Int32 => "FfiConverterInt32",
@@ -45,7 +52,7 @@ pub(super) fn ffi_converter_name_for_type(ty: &general::Type) -> Option<String> 
     Some(name.to_string())
 }
 
-pub(super) fn type_label_for(ty: &general::Type) -> String {
+pub(super) fn type_label_for(config: &Config, ty: &general::Type) -> String {
     match ty {
         general::Type::UInt8 => "number".into(),
         general::Type::Int8 => "number".into(),
@@ -59,7 +66,13 @@ pub(super) fn type_label_for(ty: &general::Type) -> String {
         general::Type::Float64 => "number".into(),
         general::Type::Boolean => "boolean".into(),
         general::Type::String => "string".into(),
-        general::Type::Bytes => "ArrayBuffer".into(),
+        general::Type::Bytes => {
+            if config.strict_byte_arrays {
+                "Uint8Array".into()
+            } else {
+                "ArrayBuffer".into()
+            }
+        }
         general::Type::Timestamp => "Date".into(),
         general::Type::Duration => "number".into(),
         general::Type::Interface { name, imp, .. } => {
@@ -75,18 +88,18 @@ pub(super) fn type_label_for(ty: &general::Type) -> String {
         | general::Type::CallbackInterface { name, .. }
         | general::Type::Custom { name, .. } => rewrite_js_builtins(&name.to_upper_camel_case()),
         general::Type::Optional { inner_type } => {
-            format!("{} | undefined", type_label_for(inner_type))
+            format!("{} | undefined", type_label_for(config, inner_type))
         }
         general::Type::Sequence { inner_type } => {
-            format!("Array<{}>", type_label_for(inner_type))
+            format!("Array<{}>", type_label_for(config, inner_type))
         }
         general::Type::Map {
             key_type,
             value_type,
         } => format!(
             "Map<{}, {}>",
-            type_label_for(key_type),
-            type_label_for(value_type)
+            type_label_for(config, key_type),
+            type_label_for(config, value_type)
         ),
     }
 }

@@ -9,7 +9,7 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use cargo_metadata::{Metadata, MetadataCommand, TargetKind};
 
-use crate::{path_or_shim, run_cmd_quietly};
+use crate::{path_or_shim, run_cmd_quietly, Utf8PathExt};
 
 #[derive(Debug, Clone)]
 pub struct CrateMetadata {
@@ -47,7 +47,7 @@ impl CrateMetadata {
 
     pub fn library_file(&self, target: Option<&str>, use_shared_library: Option<bool>) -> String {
         let ext = so_extension(target, use_shared_library);
-        if ext == "wasm" {
+        if ext == "wasm" || ext == "dll" {
             format!("{}.{ext}", &self.library_name)
         } else {
             format!("lib{}.{ext}", &self.library_name)
@@ -102,7 +102,7 @@ impl CrateMetadata {
         if !manifest_path.exists() {
             anyhow::bail!("Manifest not found at {manifest_path}");
         }
-        let manifest_path = manifest_path.canonicalize_utf8()?;
+        let manifest_path = manifest_path.canonicalize_utf8_or_shim()?;
         let crate_dir = manifest_path
             .parent()
             .expect("A valid parent for the crate manifest")
@@ -169,7 +169,7 @@ impl TryFrom<Utf8PathBuf> for CrateMetadata {
         if !manifest_path.exists() {
             anyhow::bail!("Crate manifest doesn't exist");
         }
-        let manifest_path = manifest_path.canonicalize_utf8()?;
+        let manifest_path = manifest_path.canonicalize_utf8_or_shim()?;
         let manifest_path = if !manifest_path.ends_with("Cargo.toml") {
             if !manifest_path.is_dir() {
                 anyhow::bail!("Crate should either be a path to a Cargo.toml or a directory containing a Cargo.toml file");

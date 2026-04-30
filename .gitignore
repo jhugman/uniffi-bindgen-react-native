@@ -82,3 +82,14 @@ docs/superpowers/
 
 # Git worktrees
 .worktrees/
+
+# napi-rs build artifacts
+*.node
+
+# OS core dump files (negation ensures runtimes/core/ crate is not excluded)
+core
+!runtimes/core/
+
+runtimes/napi/artifacts/
+runtimes/napi/npm/
+runtimes/napi/fixtures/*/Cargo.lock
