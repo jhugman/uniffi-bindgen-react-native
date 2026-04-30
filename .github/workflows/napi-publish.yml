@@ -1,0 +1,160 @@
+name: Publish @uniffi-runtime/napi
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run without publishing to npm"
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    working-directory: runtimes/napi
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS
+          - target: x86_64-apple-darwin
+            runner: macos-13
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+
+          # Linux GNU
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            build-flags: --zig
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            build-flags: --zig
+
+          # Linux musl
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            build-flags: --zig
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-latest
+            build-flags: --zig
+
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+          - target: aarch64-pc-windows-msvc
+            runner: windows-latest
+
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-zigbuild
+        if: contains(matrix.build-flags, '--zig')
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Install ziglang
+        if: contains(matrix.build-flags, '--zig')
+        uses: mlugg/setup-zig@v2
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build native module
+        run: npm run build -- --target ${{ matrix.target }} ${{ matrix.build-flags }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bindings-${{ matrix.target }}
+          path: runtimes/napi/uniffi-runtime-napi.*.node
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Create npm package dirs
+        run: npm run create-npm-dirs
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: runtimes/napi/artifacts
+          pattern: bindings-*
+          merge-multiple: true
+
+      - name: Move artifacts into npm dirs
+        run: npm run artifacts
+
+      - name: Assemble root package
+        run: npm run assemble-root
+
+      - name: List packages
+        run: |
+          ls -la npm/*/
+          for dir in npm/*/; do
+            echo "--- $dir ---"
+            cat "$dir/package.json"
+            echo ""
+          done
+
+      - name: Publish (dry-run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+        run: |
+          echo "::notice::DRY RUN — not publishing to npm"
+          for dir in npm/*/; do
+            echo "--- Publishing $dir (dry-run) ---"
+            (cd "$dir" && npm publish --dry-run --access public --tag latest)
+          done
+
+      - name: Publish platform packages
+        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
+        run: |
+          for dir in npm/*/; do
+            [ "$(basename "$dir")" = "root" ] && continue
+            echo "--- Publishing $dir ---"
+            (cd "$dir" && npm publish --access public --tag latest)
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish root package
+        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
+        working-directory: runtimes/napi/npm/root
+        run: npm publish --provenance --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

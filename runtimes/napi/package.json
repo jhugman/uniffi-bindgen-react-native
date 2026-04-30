@@ -1,7 +1,30 @@
 {
-  "name": "uniffi-runtime-napi",
-  "version": "0.1.0",
-  "main": "index.js",
+  "name": "@uniffi-runtime/napi",
+  "version": "0.31.0-2",
+  "description": "Call Rust libraries from Node.js without hand-written glue — the N-API runtime backend for uniffi-bindgen-react-native.",
+  "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/runtimes/napi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/uniffi-bindgen-react-native.git",
+    "directory": "runtimes/napi"
+  },
+  "license": "MPL-2.0",
+  "author": {
+    "name": "James Hugman",
+    "email": "james@hugman.tv"
+  },
+  "bugs": {
+    "url": "https://github.com/jhugman/uniffi-bindgen-react-native/issues"
+  },
+  "keywords": [
+    "uniffi",
+    "napi",
+    "node-api",
+    "rust",
+    "ffi",
+    "libffi"
+  ],
+  "main": "lib.js",
   "types": "index.d.ts",
   "napi": {
     "name": "uniffi-runtime-napi",
@@ -9,13 +32,30 @@
       "defaults": true,
       "additional": [
         "aarch64-apple-darwin",
-        "aarch64-unknown-linux-gnu"
+        "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
+        "x86_64-unknown-linux-musl",
+        "aarch64-pc-windows-msvc"
       ]
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "index.js",
+    "lib.js",
+    "index.d.ts",
+    "*.node",
+    "README.md"
+  ],
   "scripts": {
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "napi build --platform --release --js-package-name @uniffi-runtime/napi",
+    "build:debug": "napi build --platform --js-package-name @uniffi-runtime/napi",
+    "artifacts": "napi artifacts --dir artifacts",
+    "create-npm-dirs": "napi create-npm-dir -t .",
+    "assemble-root": "node ./scripts/assemble-root.mjs",
+    "prepare": "npm run build",
     "fmt": "prettier --write . && cargo fmt",
     "test": "node --import ./tests/setup.mjs --test tests/*.test.mjs"
   },
