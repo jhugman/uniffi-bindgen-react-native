@@ -7,9 +7,8 @@
 use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use pathdiff::diff_utf8_paths;
 
-use crate::{metadata, paths, run_cmd_quietly};
+use crate::{metadata, paths, relative_path, run_cmd_quietly};
 
 /// The Cargo.toml template for generated WASM crates.
 const CARGO_TEMPLATE: &str = include_str!("Cargo.template.toml");
@@ -176,12 +175,9 @@ fn generate_cargo_toml(
     let repo_root = paths::repo_root();
     let uniffi_runtime_javascript = repo_root.join("crates/uniffi-runtime-javascript");
 
-    let crate_path = diff_utf8_paths(package_dir, wasm_crate_dir)
-        .expect("cannot compute relative path to fixture crate");
-    let runtime_path = diff_utf8_paths(uniffi_runtime_javascript, wasm_crate_dir)
-        .expect("cannot compute relative path to uniffi-runtime-javascript");
-    let lib_rs_path = diff_utf8_paths(src_dir.join("lib.rs"), wasm_crate_dir)
-        .expect("cannot compute relative path to lib.rs");
+    let crate_path = relative_path(package_dir, wasm_crate_dir);
+    let runtime_path = relative_path(uniffi_runtime_javascript, wasm_crate_dir);
+    let lib_rs_path = relative_path(src_dir.join("lib.rs"), wasm_crate_dir);
 
     let cargo_toml_content = CARGO_TEMPLATE
         .replace("{{wasm_pkg_name}}", wasm_pkg_name)

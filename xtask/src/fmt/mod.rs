@@ -7,7 +7,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use ubrn_common::{run_cmd, run_cmd_quietly};
+use ubrn_common::{command, run_cmd, run_cmd_quietly};
 
 use crate::{
     bootstrap::{Bootstrap, YarnCmd},
@@ -193,7 +193,7 @@ impl CodeFormatter for LicenceArgs {
         YarnCmd.ensure_ready()?;
         let root = repository_root()?;
         run_cmd_quietly(
-            Command::new("./node_modules/.bin/source-licenser")
+            command("./node_modules/.bin/source-licenser")
                 .arg(".")
                 .arg("--config-file")
                 .arg(".licence-config.yaml")

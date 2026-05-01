@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use camino::{Utf8Path, Utf8PathBuf};
+use std::process::Command;
 use std::sync::LazyLock;
 
 use crate::metadata;
@@ -34,7 +35,12 @@ pub(crate) fn hermes_build_dir() -> Utf8PathBuf {
 }
 
 pub(crate) fn test_runner_binary() -> Utf8PathBuf {
-    build_root().join("test-runner").join("test-runner")
+    let dir = build_root().join("test-runner");
+    if cfg!(target_os = "windows") {
+        dir.join("Debug").join("test-runner.exe")
+    } else {
+        dir.join("test-runner")
+    }
 }
 
 /// Panics with a helpful message if required bootstrap artifacts are missing.
@@ -54,6 +60,17 @@ pub(crate) fn assert_jsi_bootstrap() {
 
 pub(crate) fn assert_wasm_bootstrap() {
     assert_node_modules();
+}
+
+/// On Windows, DLLs must be on PATH at runtime. This is not an issue on Linux/macOS as the
+/// binary's rpath tells the linker where to find the shared libraries.
+/// This adds the Hermes DLL directory to PATH on the given command.
+pub(crate) fn add_hermes_dll_paths(cmd: &mut Command) {
+    if cfg!(target_os = "windows") {
+        let hermes_dll_dir = hermes_build_dir().join("API/hermes/Debug");
+        let path = std::env::var("PATH").unwrap_or_default();
+        cmd.env("PATH", format!("{};{}", hermes_dll_dir, path));
+    }
 }
 
 /// Path to the napi runtime directory within the repo.
@@ -83,6 +100,10 @@ fn napi_platform_triple() -> &'static str {
         "linux-arm64-gnu"
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         "linux-x64-gnu"
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        "win32-x64-msvc"
+    } else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
+        "win32-arm64-msvc"
     } else {
         panic!("Unsupported platform for N-API tests")
     }

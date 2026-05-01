@@ -23,9 +23,17 @@ endif ()
 if (NOT HERMES_BUILD_DIR)
     message(FATAL_ERROR "Please specify HERMES_BUILD_DIR")
 endif ()
+# On multi-config generators (e.g. Visual Studio), build artifacts are placed
+# under a per-config subdirectory (e.g. Debug/).
+if (CMAKE_CONFIGURATION_TYPES)
+    set(HERMES_CONFIG_SUBDIR "/Debug")
+else ()
+    set(HERMES_CONFIG_SUBDIR "")
+endif ()
+
 # Validate HERMES_BUILD_DIR by checking for bin/hermes with the platform-specific extension
-if (NOT EXISTS "${HERMES_BUILD_DIR}/bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
-    message(FATAL_ERROR "HERMES_BUILD_DIR does not contain bin/hermes${CMAKE_EXECUTABLE_SUFFIX}")
+if (NOT EXISTS "${HERMES_BUILD_DIR}/bin${HERMES_CONFIG_SUBDIR}/hermes${CMAKE_EXECUTABLE_SUFFIX}")
+    message(FATAL_ERROR "HERMES_BUILD_DIR does not contain bin${HERMES_CONFIG_SUBDIR}/hermes${CMAKE_EXECUTABLE_SUFFIX}")
 endif ()
 
 # Add Hermes include directories
@@ -36,9 +44,9 @@ include_directories("../includes")
 include_directories("../stubs")
 
 # Add Hermes library directories
-link_directories("${HERMES_BUILD_DIR}/API/hermes")
-link_directories("${HERMES_BUILD_DIR}/jsi")
-link_directories("${HERMES_BUILD_DIR}/lib")
+link_directories("${HERMES_BUILD_DIR}/API/hermes${HERMES_CONFIG_SUBDIR}")
+link_directories("${HERMES_BUILD_DIR}/jsi${HERMES_CONFIG_SUBDIR}")
+link_directories("${HERMES_BUILD_DIR}/lib${HERMES_CONFIG_SUBDIR}")
 
 link_libraries(jsi)
 
@@ -46,13 +54,22 @@ link_libraries(jsi)
 # - stable branches (e.g. rn/0.77-stable): 'hermes' in API/hermes/ (full VM + compiler)
 # - main branch: 'hermesvm' in lib/ (full VM + compiler); 'hermes_lean' in API/hermes/ (no compiler)
 # We must use a full-compiler build so the test-runner can evaluate JS source directly.
-if(EXISTS "${HERMES_BUILD_DIR}/API/hermes/libhermes${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    set(HERMES_LIB_NAME hermes)
-elseif(EXISTS "${HERMES_BUILD_DIR}/lib/libhermesvm${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    set(HERMES_LIB_NAME hermesvm)
-else()
-    message(FATAL_ERROR "Could not find hermes (stable) or hermesvm (main) library in ${HERMES_BUILD_DIR}")
-endif()
+# find_library handles platform naming differences (lib prefix, .so/.dylib/.lib suffixes).
+set(HERMES_LIB_SEARCH_PATHS
+    "${HERMES_BUILD_DIR}/API/hermes${HERMES_CONFIG_SUBDIR}"
+    "${HERMES_BUILD_DIR}/lib${HERMES_CONFIG_SUBDIR}"
+)
+find_library(HERMES_LIB NAMES hermes hermesvm PATHS ${HERMES_LIB_SEARCH_PATHS} NO_DEFAULT_PATH)
+if (NOT HERMES_LIB)
+    message(FATAL_ERROR "Could not find hermes or hermesvm library in ${HERMES_BUILD_DIR}")
+endif ()
+get_filename_component(HERMES_LIB_NAME "${HERMES_LIB}" NAME_WE)
+# Strip the "lib" prefix if present (Unix), so we get the bare linker name.
+string(REGEX REPLACE "^lib" "" HERMES_LIB_NAME "${HERMES_LIB_NAME}")
 
 add_executable(test-runner test-runner.cpp)
+# Prevent windows.h from defining min/max macros that conflict with Hermes headers.
+if (MSVC)
+    target_compile_definitions(test-runner PRIVATE NOMINMAX)
+endif ()
 target_link_libraries(test-runner ${HERMES_LIB_NAME})

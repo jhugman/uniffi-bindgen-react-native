@@ -30,8 +30,11 @@ impl Flavor {
     }
 }
 
+use std::ffi::OsStr;
 use std::process::Command;
 use std::sync::Mutex;
+
+use camino::{Utf8Path, Utf8PathBuf};
 
 /// Serialize test flavors within a fixture.
 ///
@@ -57,6 +60,51 @@ impl CleanupFile {
 impl Drop for CleanupFile {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// Extension trait to convert paths to forward slashes for use in file content.
+///
+/// On Windows, paths use backslashes which break certain tools.
+pub(crate) trait ForwardSlashPath {
+    fn to_forward_slash(&self) -> String;
+}
+
+impl ForwardSlashPath for Utf8Path {
+    fn to_forward_slash(&self) -> String {
+        self.as_str().replace('\\', "/")
+    }
+}
+
+impl ForwardSlashPath for Utf8PathBuf {
+    fn to_forward_slash(&self) -> String {
+        self.as_path().to_forward_slash()
+    }
+}
+
+/// Compute a relative path between two paths, using forward slashes.
+///
+/// On Windows, `diff_utf8_paths` returns backslash paths which break
+/// certain tools
+pub(crate) fn relative_path(path: impl AsRef<Utf8Path>, base: impl AsRef<Utf8Path>) -> Utf8PathBuf {
+    let rel = pathdiff::diff_utf8_paths(path.as_ref(), base.as_ref()).unwrap_or_else(|| {
+        panic!(
+            "cannot compute relative path from {} to {}",
+            base.as_ref(),
+            path.as_ref()
+        )
+    });
+    Utf8PathBuf::from(rel.to_forward_slash())
+}
+
+/// Create a [`Command`] that works on Windows for `.cmd`/`.bat` scripts.
+pub(crate) fn command(program: impl AsRef<OsStr>) -> Command {
+    if cfg!(target_os = "windows") {
+        let mut cmd = Command::new("cmd");
+        cmd.arg("/C").arg(program);
+        cmd
+    } else {
+        Command::new(program)
     }
 }
 
@@ -110,8 +158,7 @@ pub(crate) fn write_fixture_tsconfig(
 ) -> camino::Utf8PathBuf {
     let flavor_str = flavor.as_str();
     let repo_root = paths::repo_root();
-    let rel_root = pathdiff::diff_utf8_paths(repo_root, fixture_dir)
-        .expect("cannot compute relative path to repo root");
+    let rel_root = relative_path(repo_root, fixture_dir);
 
     let napi_runtime_path = if flavor == Flavor::Napi {
         format!(
@@ -143,7 +190,7 @@ pub(crate) fn write_fixture_tsconfig(
 pub(crate) fn run_tsx(test_script: &camino::Utf8Path) {
     let tsx = paths::node_modules_bin().join("tsx");
     run_cmd(
-        Command::new(&tsx)
+        command(&tsx)
             .arg("--experimental-wasm-modules")
             .arg(test_script.as_str()),
     );

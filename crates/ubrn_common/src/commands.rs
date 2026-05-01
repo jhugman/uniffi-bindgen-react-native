@@ -4,11 +4,28 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use anyhow::Result;
+use std::ffi::OsStr;
 use std::process::{Command, Stdio};
 
 // Import needed for our is_recording_enabled and record_command functions
 // The actual implementation is in testing.rs
 use crate::testing::{is_recording_enabled, record_command};
+
+/// Create a [`Command`] that works on Windows for `.cmd`/`.bat` scripts.
+///
+/// On Windows, npm-installed tools (yarn, tsc, prettier, etc.) are `.cmd`
+/// wrapper scripts. Rust's `Command::new` doesn't resolve `PATHEXT`, so
+/// these scripts aren't found. This helper routes through `cmd /C` on
+/// Windows so that both `.exe` and `.cmd` programs are resolved correctly.
+pub fn command(program: impl AsRef<OsStr>) -> Command {
+    if cfg!(target_os = "windows") {
+        let mut cmd = Command::new("cmd");
+        cmd.arg("/C").arg(program);
+        cmd
+    } else {
+        Command::new(program)
+    }
+}
 
 pub fn run_cmd(cmd: &mut Command) -> Result<()> {
     // If we're in recording mode, just record the command and return success

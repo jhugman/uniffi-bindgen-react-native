@@ -45,5 +45,8 @@ pub fn run_test(test_script: &str, flavor: Flavor, target_tmpdir: &str) {
 
 fn run_test_runner_no_lib(bundle: &Utf8Path) {
     let runner = paths::test_runner_binary();
-    run_cmd_quietly(Command::new(runner.as_str()).arg(bundle.as_str()));
+    let mut cmd = Command::new(runner.as_str());
+    cmd.arg(bundle.as_str());
+    paths::add_hermes_dll_paths(&mut cmd);
+    run_cmd_quietly(&mut cmd);
 }
