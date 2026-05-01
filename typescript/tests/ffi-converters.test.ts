@@ -16,7 +16,10 @@ import {
   FfiConverterPrimitive,
   FfiConverterUInt16,
   FfiConverterUInt8,
+  FfiConverterUint8Array,
 } from "../src/ffi-converters";
+
+const testAlloc = (n: number) => new Uint8Array(n);
 import { Asserts, test } from "../testing/asserts";
 
 class TestConverter<R extends any, T> extends AbstractFfiConverterByteArray<T> {
@@ -39,7 +42,7 @@ function testConverter<T>(
   converter: AbstractFfiConverterByteArray<T>,
   input: T,
 ) {
-  const lowered = converter.lower(input);
+  const lowered = converter.lower(input, testAlloc);
   t.assertEqual(
     lowered.byteLength,
     converter.allocationSize(input),
@@ -104,6 +107,21 @@ test("Array of shorts", (t) => {
   testConverter(t, converter, [1, 2, 3]);
   testConverter(t, converter, [0]);
   testConverter(t, converter, new Array(100).fill(128));
+});
+
+test("AbstractFfiConverterByteArray.lower uses the supplied allocator", (t) => {
+  let lastSize = -1;
+  const alloc = (n: number) => {
+    lastSize = n;
+    return new Uint8Array(n);
+  };
+  const value = new Uint8Array([1, 2, 3, 4]);
+  const view = FfiConverterUint8Array.lower(value, alloc);
+  // 4-byte length prefix + 4 bytes of payload = 8.
+  t.assertEqual(lastSize, 8);
+  t.assertEqual(view.byteLength, 8);
+  const lifted = FfiConverterUint8Array.lift(view);
+  t.assertEqual(Array.from(lifted), [1, 2, 3, 4]);
 });
 
 test("Array of optional shorts", (t) => {

@@ -7,9 +7,16 @@ import { UniffiInternalError } from "./errors";
 import { type UniffiByteArray, RustBuffer } from "./ffi-types";
 
 // https://github.com/mozilla/uniffi-rs/blob/main/docs/manual/src/internals/lifting_and_lowering.md
+//
+// `lower(value, alloc)` takes an allocator the caller controls. Only
+// byte-array-backed converters (RustBuffer payloads) actually use it; primitive
+// converters ignore it. Centralising the parameter on the interface keeps
+// codegen call sites uniform.
+export type RustBufferAllocator = (n: number) => Uint8Array;
+
 export interface FfiConverter<FfiType, TsType> {
   lift(value: FfiType): TsType;
-  lower(value: TsType): FfiType;
+  lower(value: TsType, alloc: RustBufferAllocator): FfiType;
   read(from: RustBuffer): TsType;
   write(value: TsType, into: RustBuffer): void;
   allocationSize(value: TsType): number;
@@ -19,7 +26,7 @@ export abstract class FfiConverterPrimitive<T> implements FfiConverter<T, T> {
   lift(value: T): T {
     return value;
   }
-  lower(value: T): T {
+  lower(value: T, _alloc: RustBufferAllocator): T {
     return value;
   }
   abstract read(from: RustBuffer): T;
@@ -31,13 +38,14 @@ export abstract class AbstractFfiConverterByteArray<TsType>
   implements FfiConverter<UniffiByteArray, TsType>
 {
   lift(value: UniffiByteArray): TsType {
-    const buffer = RustBuffer.fromByteArray(value);
+    const buffer = RustBuffer.fromUint8Array(value);
     return this.read(buffer);
   }
-  lower(value: TsType): UniffiByteArray {
-    const buffer = RustBuffer.withCapacity(this.allocationSize(value));
+  lower(value: TsType, alloc: RustBufferAllocator): UniffiByteArray {
+    const view = alloc(this.allocationSize(value));
+    const buffer = RustBuffer.fromUint8Array(view);
     this.write(value, buffer);
-    return buffer.byteArray;
+    return view;
   }
   abstract read(from: RustBuffer): TsType;
   abstract write(value: TsType, into: RustBuffer): void;
@@ -135,14 +143,14 @@ export const FfiConverterBool = (() => {
     lift(value: number): boolean {
       return !!value;
     }
-    lower(value: boolean): number {
+    lower(value: boolean, _alloc: RustBufferAllocator): number {
       return value ? 1 : 0;
     }
     read(from: RustBuffer): boolean {
       return this.lift(byteConverter.read(from));
     }
     write(value: boolean, into: RustBuffer): void {
-      byteConverter.write(this.lower(value), into);
+      byteConverter.write(value ? 1 : 0, into);
     }
     allocationSize(value: boolean): number {
       return byteConverter.allocationSize(0);
@@ -392,7 +400,7 @@ export function uniffiCreateFfiConverterString(
     lift(value: UniffiByteArray): string {
       return converter.bytesToString(value);
     }
-    lower(value: string): UniffiByteArray {
+    lower(value: string, _alloc: RustBufferAllocator): UniffiByteArray {
       return converter.stringToBytes(value);
     }
     read(from: RustBuffer): string {

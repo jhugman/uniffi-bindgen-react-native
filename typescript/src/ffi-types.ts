@@ -18,6 +18,11 @@ export class RustBuffer {
     this.capacity = arrayBuffer.byteLength;
   }
 
+  /**
+   * Allocate a JS-owned buffer of the given capacity. Used by tests; not by
+   * the runtime path, which calls `RustBuffer.fromUint8Array(allocator(n))`
+   * with a runtime-supplied allocator.
+   */
   static withCapacity(capacity: number): RustBuffer {
     const buf = new ArrayBuffer(capacity);
     return new RustBuffer(buf);
@@ -29,10 +34,6 @@ export class RustBuffer {
 
   static fromArrayBuffer(buf: ArrayBuffer): RustBuffer {
     return new RustBuffer(buf);
-  }
-
-  static fromByteArray(buf: UniffiByteArray): RustBuffer {
-    return new RustBuffer(buf.buffer as ArrayBuffer);
   }
 
   /**
