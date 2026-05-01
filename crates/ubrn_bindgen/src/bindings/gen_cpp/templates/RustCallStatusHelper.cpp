@@ -30,9 +30,8 @@ template <> struct Bridging<RustCallStatus> {
       uint8_t *bytes = new uint8_t[len];
       std::memcpy(bytes, status.error_buf.data, len);
       auto payload = std::make_shared<uniffi_jsi::CMutableBuffer>(bytes, len);
-      auto arrayBuffer = jsi::ArrayBuffer(rt, payload);
-      auto u8ctor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
-      auto view = u8ctor.callAsConstructor(rt, jsi::Value(rt, arrayBuffer));
+      auto view = uniffi_jsi::arraybufferToUint8Array(
+          rt, jsi::ArrayBuffer(rt, payload));
       statusObject.setProperty(rt, "errorBuf", view);
       Bridging<RustBuffer>::rustbuffer_free(status.error_buf);
     }

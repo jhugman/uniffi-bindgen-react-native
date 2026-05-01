@@ -68,12 +68,10 @@ template <> struct Bridging<RustBuffer> {
     // alone. Only the codegen-emitted `rustbuffer_free` path frees it.
     auto payload = std::make_shared<uniffi_jsi::CMutableBuffer>(
         buf.data, static_cast<size_t>(buf.len));
-    auto arrayBuffer = jsi::ArrayBuffer(rt, payload);
-    auto u8ctor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
-    auto view = u8ctor.callAsConstructor(rt, jsi::Value(rt, arrayBuffer))
-                    .asObject(rt);
+    auto view = uniffi_jsi::arraybufferToUint8Array(
+        rt, jsi::ArrayBuffer(rt, payload));
     if (buf.capacity != static_cast<uint64_t>(buf.len)) {
-      view.setProperty(rt, "__ubrnRustCapacity",
+      view.setProperty(rt, uniffi_jsi::kUbrnRustCapacity,
                        jsi::Value(static_cast<double>(buf.capacity)));
     }
     return jsi::Value(rt, view);

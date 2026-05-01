@@ -119,10 +119,10 @@ extern "C" {
             // explicitly before dropping the reference.
             auto payload = std::make_shared<uniffi_jsi::CMutableBuffer>(
                 rb.data, static_cast<size_t>(rb.capacity));
-            auto arrayBuffer = jsi::ArrayBuffer(rt, payload);
             // Wrap as Uint8Array so JS can index/assign bytes directly.
-            auto u8ctor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
-            return u8ctor.callAsConstructor(rt, jsi::Value(rt, arrayBuffer));
+            return jsi::Value(
+                rt, uniffi_jsi::arraybufferToUint8Array(
+                        rt, jsi::ArrayBuffer(rt, payload)));
         }
     );
 
@@ -152,9 +152,9 @@ extern "C" {
             //     `capacity != len`.
             // So: prefer the hint, fall back to byteLength.
             size_t capacity = byteLength;
-            if (view.hasProperty(rt, "__ubrnRustCapacity")) {
+            if (view.hasProperty(rt, uniffi_jsi::kUbrnRustCapacity)) {
                 capacity = static_cast<size_t>(
-                    view.getProperty(rt, "__ubrnRustCapacity").asNumber());
+                    view.getProperty(rt, uniffi_jsi::kUbrnRustCapacity).asNumber());
             }
             auto buffer = view.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
             auto byteOffset =
