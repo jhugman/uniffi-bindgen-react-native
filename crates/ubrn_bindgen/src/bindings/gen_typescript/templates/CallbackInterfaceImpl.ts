@@ -38,7 +38,7 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
             {%- when Some(t) %}
             const uniffiResult = UniffiResult.ready<{{ t.ffi_type }}>();
             const uniffiHandleSuccess = (obj: any) => {
-                UniffiResult.writeSuccess(uniffiResult, {{ t.ffi_converter }}.lower(obj));
+                UniffiResult.writeSuccess(uniffiResult, {{ t.ffi_converter }}.lower(obj, nativeModule().rustbuffer_alloc));
             };
             {%- when None %}
             const uniffiResult = UniffiResult.ready<void>();
@@ -54,7 +54,8 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*alloc:*/ nativeModule().rustbuffer_alloc,
             )
             {%- when Some(error_type) %}
             uniffiTraitInterfaceCallWithError(
@@ -63,7 +64,8 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type.decl_type_name }}.instanceOf,
                 /*lowerError:*/ {{ error_type.lower_error_fn }},
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*alloc:*/ nativeModule().rustbuffer_alloc,
             );
             {%- endmatch %}
             return uniffiResult;
@@ -78,7 +80,7 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                     /* {{ ffr.struct_name }} */{
                         {%- match meth.return_type %}
                         {%- when Some(return_type) %}
-                        return_value: {{ return_type.ffi_converter }}.lower(returnValue),
+                        return_value: {{ return_type.ffi_converter }}.lower(returnValue, nativeModule().rustbuffer_alloc),
                         {%- when None %}
                         {%- endmatch %}
                         call_status: uniffiCaller.createCallStatus()
@@ -113,7 +115,8 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*alloc:*/ nativeModule().rustbuffer_alloc,
             );
             {%- when Some(error_type) %}
             const uniffiForeignFuture = uniffiTraitInterfaceCallAsyncWithError(
@@ -122,7 +125,8 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type.decl_type_name }}.instanceOf,
                 /*lowerError:*/ {{ error_type.lower_error_fn }},
-                /*lowerString:*/ FfiConverterString.lower
+                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*alloc:*/ nativeModule().rustbuffer_alloc,
             );
             {%- endmatch %}
             return uniffiForeignFuture;

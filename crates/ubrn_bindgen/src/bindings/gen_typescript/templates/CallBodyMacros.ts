@@ -73,7 +73,7 @@ console.debug(`-- {{ ffi_name }}`);
 {#- Lowered argument list (for FFI calls). -#}
 {%- macro arg_list_lowered(callable) %}
     {%- for arg in callable.arguments %}
-        {{ arg.ffi_converter }}.lower({{ arg.name }}),
+        {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc),
     {%- endfor %}
 {%- endmacro -%}
 
@@ -136,7 +136,7 @@ console.debug(`-- {{ ffi_name }}`);
             {%- if callable.return_type.is_some() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
-                {{ ffi_converter }}.lower(self_),
+                {{ ffi_converter }}.lower(self_, nativeModule().rustbuffer_alloc),
                 {%- call arg_list_lowered(callable) %}
                 callStatus);
             },
@@ -214,7 +214,7 @@ console.debug(`-- {{ ffi_name }}`);
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments.is_empty() %},{% endif %}
                     {%- endif %}
                     {%- for arg in callable.arguments -%}
-                    {{ arg.ffi_converter }}.lower({{ arg.name }}){% if !loop.last %},{% endif %}
+                    {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% if !loop.last %},{% endif %}
                     {%- endfor %}
                 );
             },

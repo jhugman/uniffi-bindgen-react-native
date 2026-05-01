@@ -33,9 +33,9 @@ const {{ custom.ffi_converter_name }} = (() => {
             const intermediate = intermediateConverter.lift(value);
             return {{ config.lift_expr }};
         }
-        lower(value: TsType): FfiType {
+        lower(value: TsType, alloc: RustBufferAllocator): FfiType {
             const intermediate = {{ config.lower_expr }};
-            return intermediateConverter.lower(intermediate);
+            return intermediateConverter.lower(intermediate, alloc);
         }
         read(from: RustBuffer): TsType {
             const intermediate = intermediateConverter.read(from);
