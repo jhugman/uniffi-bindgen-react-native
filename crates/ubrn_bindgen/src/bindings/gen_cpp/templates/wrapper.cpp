@@ -135,28 +135,33 @@ extern "C" {
                 throw jsi::JSError(rt, "rustbuffer_free expected a Uint8Array argument");
             }
             auto view = args[0].asObject(rt);
-            auto buffer = view.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
-            auto byteOffset =
-                static_cast<size_t>(view.getProperty(rt, "byteOffset").asNumber());
             auto byteLength =
                 static_cast<size_t>(view.getProperty(rt, "byteLength").asNumber());
-            // Empty views were never allocated by `rustbuffer_alloc`; nothing to free.
+            // Empty views were never allocated by `rustbuffer_alloc`; nothing
+            // to free. Bail out before reading buffer/byteOffset/capacity to
+            // skip three JSI property traversals on the empty path.
             if (byteLength == 0) {
                 return jsi::Value::undefined();
             }
-            // For a buffer originally produced by `rustbuffer_alloc(n)`, capacity == n
-            // and len == 0. The view's byteLength is `n`, so we mirror it back into
-            // capacity. `len` is irrelevant to free — the library only inspects capacity
-            // and data pointer for deallocation.
-            // TODO(Tasks 11/12): Today this is correct because `rustbuffer_alloc(n)`
-            // returns a view whose `byteLength` equals the original `capacity`. Once
-            // lift-via-handoff lands, a returned `RustBuffer` may produce a view whose
-            // `byteLength` is `len < capacity`. At that point this reconstruction will
-            // need a different mechanism (separate free path, or a side-channel that
-            // remembers the original capacity).
+            // Capacity resolution:
+            //   * For a view from `rustbuffer_alloc(n)`, `byteLength == n == capacity`,
+            //     and no `__ubrnRustCapacity` hint was set.
+            //   * For a view from a lift-handoff, the codegen-emitted
+            //     `Bridging<RustBuffer>::toJs` set `byteLength = len` and stashed
+            //     the original `capacity` on `__ubrnRustCapacity` whenever
+            //     `capacity != len`.
+            // So: prefer the hint, fall back to byteLength.
+            size_t capacity = byteLength;
+            if (view.hasProperty(rt, "__ubrnRustCapacity")) {
+                capacity = static_cast<size_t>(
+                    view.getProperty(rt, "__ubrnRustCapacity").asNumber());
+            }
+            auto buffer = view.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
+            auto byteOffset =
+                static_cast<size_t>(view.getProperty(rt, "byteOffset").asNumber());
             // Honour byteOffset for safety (defensive; currently always 0).
             RustBuffer rb {
-                .capacity = static_cast<uint64_t>(byteLength),
+                .capacity = static_cast<uint64_t>(capacity),
                 .len = 0,
                 .data = buffer.data(rt) + byteOffset,
             };

@@ -26,6 +26,12 @@ interface NativeModuleInterface {
       {%- endfor %}):
       {%- match func.return_type %}{% when Some with (rt) %} {{ rt }}{% when None %} void{% endmatch %};
   {%- endfor %}
+    // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
+    // and `nativeModule().rustbuffer_free(...)`. The JSI host object exposes
+    // them as properties; see `props["rustbuffer_alloc"]` / `props["rustbuffer_free"]`
+    // in the C++ wrapper template.
+    rustbuffer_alloc(n: number): Uint8Array;
+    rustbuffer_free(view: Uint8Array): void;
 }
 
 const getter: () => NativeModuleInterface = () => (globalThis as any).{{ module.module_name }};
