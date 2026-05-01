@@ -100,6 +100,10 @@ fn napi_platform_triple() -> &'static str {
         "linux-arm64-gnu"
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         "linux-x64-gnu"
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        "win32-x64-msvc"
+    } else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
+        "win32-arm64-msvc"
     } else {
         panic!("Unsupported platform for N-API tests")
     }
