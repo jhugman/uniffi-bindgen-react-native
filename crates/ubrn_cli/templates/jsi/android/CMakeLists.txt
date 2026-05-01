@@ -4,9 +4,9 @@ project({{ self.config.project.module_cpp() }})
 
 {%- let root = self.project_root() %}
 {%- let dir = self.config.project.bindings.cpp_path(root) %}
-{%- let bindings_dir = Utf8PathBuf::from(&self.relative_to(root, dir).as_std_path().to_slash_lossy()) %}
+{%- let bindings_dir = self.relative_to(root, dir) %}
 {%- let dir = self.config.project.tm.cpp_path(root) %}
-{%- let tm_dir = Utf8PathBuf::from(&self.relative_to(root, dir).as_std_path().to_slash_lossy()) %}
+{%- let tm_dir = self.relative_to(root, dir) %}
 {%- let is_so_lib = self.config.project.android.use_shared_library %}
 {%- let is_static_lib = !is_so_lib %}
 
@@ -51,7 +51,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
 
 {%- let dir = self.config.project.android.jni_libs(root) %}
-{%- let jni_libs_dir = Utf8PathBuf::from(&self.relative_to(root, dir).as_std_path().to_slash_lossy()) %}
+{%- let jni_libs_dir = self.relative_to(root, dir) %}
 
 cmake_path(
   SET MY_RUST_LIB
