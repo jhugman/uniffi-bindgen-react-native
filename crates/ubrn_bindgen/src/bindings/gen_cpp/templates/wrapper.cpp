@@ -90,6 +90,80 @@ extern "C" {
         }
     );
     {%- endfor %}
+
+    // `rustbuffer_alloc(n)` -> Uint8Array view over Rust-owned memory of capacity `n`.
+    // `rustbuffer_free(view)` -> hands the underlying (ptr, capacity) back to the
+    // crate's `rustbuffer_free`. Together they let JS allocate buffers that the
+    // codegen-emitted lowering path can fill in place and ship to Rust without copying.
+    props["rustbuffer_alloc"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "rustbuffer_alloc"),
+        1,
+        [](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            if (count < 1 || !args[0].isNumber()) {
+                throw jsi::JSError(rt, "rustbuffer_alloc expected a number argument");
+            }
+            double size = args[0].asNumber();
+            if (size < 0) {
+                throw jsi::JSError(rt, "rustbuffer_alloc: size must be non-negative");
+            }
+            if (size > INT32_MAX) {
+                throw jsi::JSError(rt, "rustbuffer_alloc: size exceeds INT32_MAX");
+            }
+            auto rb = {{ ci.cpp_namespace() }}::Bridging<RustBuffer>::rustbuffer_alloc(static_cast<int32_t>(size));
+            if (rb.data == nullptr) {
+                throw jsi::JSError(rt, "rustbuffer_alloc failed: alloc returned null");
+            }
+            // Non-owning view over Rust-allocated memory; CMutableBuffer's destructor
+            // is the default and does not free `rb.data`. JS must call rustbuffer_free
+            // explicitly before dropping the reference.
+            auto payload = std::make_shared<uniffi_jsi::CMutableBuffer>(
+                rb.data, static_cast<size_t>(rb.capacity));
+            auto arrayBuffer = jsi::ArrayBuffer(rt, payload);
+            // Wrap as Uint8Array so JS can index/assign bytes directly.
+            auto u8ctor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
+            return u8ctor.callAsConstructor(rt, jsi::Value(rt, arrayBuffer));
+        }
+    );
+
+    props["rustbuffer_free"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "rustbuffer_free"),
+        1,
+        [](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            if (count < 1 || !args[0].isObject()) {
+                throw jsi::JSError(rt, "rustbuffer_free expected a Uint8Array argument");
+            }
+            auto view = args[0].asObject(rt);
+            auto buffer = view.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
+            auto byteOffset =
+                static_cast<size_t>(view.getProperty(rt, "byteOffset").asNumber());
+            auto byteLength =
+                static_cast<size_t>(view.getProperty(rt, "byteLength").asNumber());
+            // Empty views were never allocated by `rustbuffer_alloc`; nothing to free.
+            if (byteLength == 0) {
+                return jsi::Value::undefined();
+            }
+            // For a buffer originally produced by `rustbuffer_alloc(n)`, capacity == n
+            // and len == 0. The view's byteLength is `n`, so we mirror it back into
+            // capacity. `len` is irrelevant to free — the library only inspects capacity
+            // and data pointer for deallocation.
+            // TODO(Tasks 11/12): Today this is correct because `rustbuffer_alloc(n)`
+            // returns a view whose `byteLength` equals the original `capacity`. Once
+            // lift-via-handoff lands, a returned `RustBuffer` may produce a view whose
+            // `byteLength` is `len < capacity`. At that point this reconstruction will
+            // need a different mechanism (separate free path, or a side-channel that
+            // remembers the original capacity).
+            // Honour byteOffset for safety (defensive; currently always 0).
+            RustBuffer rb {
+                .capacity = static_cast<uint64_t>(byteLength),
+                .len = 0,
+                .data = buffer.data(rt) + byteOffset,
+            };
+            {{ ci.cpp_namespace() }}::Bridging<RustBuffer>::rustbuffer_free(rb);
+            return jsi::Value::undefined();
+        }
+    );
 }
 
 void {{ module_name }}::registerModule(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> callInvoker) {
