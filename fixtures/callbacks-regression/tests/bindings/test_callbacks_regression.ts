@@ -8,10 +8,12 @@
 //   cargo test -p uniffi-example-callbacks-deadlock-regression -- wasm
 
 import generated, {
+  callDelete,
   EventSource,
   EventListener,
+  KeywordListener,
 } from "@/generated/uniffi_callbacks";
-import { asyncTest, AsyncAsserts } from "@/asserts";
+import { asyncTest, AsyncAsserts, test } from "@/asserts";
 import "@/polyfills";
 
 // This is only needed in tests.
@@ -31,11 +33,23 @@ class EventListenerImpl implements EventListener {
   }
 }
 
+class KeywordListenerImpl implements KeywordListener {
+  delete_(value: string): string {
+    console.log("delete_", value);
+    return `deleted:${value}`;
+  }
+}
+
 async function testToMax(max: number, t: AsyncAsserts) {
   const listener = new EventListenerImpl(t, max);
   const source = new EventSource(listener);
   source.start(`Going to ${max}, now at:`, max);
 }
+
+test("Reserved C++ keyword callback methods work end-to-end", (t) => {
+  const listener = new KeywordListenerImpl();
+  t.assertEqual(callDelete(listener, "abc"), "deleted:abc");
+});
 
 (async () => {
   for (let i = 1; i <= 4096; i *= 2) {

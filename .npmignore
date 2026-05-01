@@ -19,7 +19,6 @@ Cargo.lock
 *.pdb
 
 # OSX
-#
 .DS_Store
 
 # XDE
@@ -30,7 +29,6 @@ Cargo.lock
 jsconfig.json
 
 # Xcode
-#
 build/
 *.pbxuser
 !default.pbxuser
@@ -50,7 +48,6 @@ DerivedData
 project.xcworkspace
 
 # Android/IJ
-#
 .classpath
 .cxx
 .gradle
@@ -64,5 +61,11 @@ android.iml
 node_modules/
 *.bundle.js
 
+# GitHub
+.github
+
 # Uniffi
 generated/
+.clang-format-ignore
+.licence-config.yaml
+.prettierignore

@@ -8,12 +8,7 @@ export type {{ rec.ts_name }} = {
     {%- if let Some(ds) = field.docstring %}
 {{ ds }}
     {%- endif %}
-    {%- if field.is_optional %}
-    {{ field.name }}?: {{ field.ts_type }}
-    {%- else %}
-    {{ field.name }}: {{ field.ts_type }}
-    {%- endif %}
-    {%- if !loop.last %},{% endif %}
+    {% call cb::field_decl(field) %}{% if !loop.last %},{% endif %}
     {%- endfor %}
 }
 

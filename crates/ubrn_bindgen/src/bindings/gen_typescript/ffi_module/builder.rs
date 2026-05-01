@@ -11,6 +11,21 @@ use super::nodes::*;
 use super::type_mapping::{ffi_type_to_ts, ffi_type_to_ts_native};
 use crate::switches::AbiFlavor;
 
+/// Check whether a namespace has async functions.
+pub(crate) fn namespace_has_async(namespace: &general::Namespace) -> bool {
+    namespace.ffi_definitions.iter().any(|def| {
+        matches!(
+            def,
+            general::FfiDefinition::RustFunction(f)
+                if matches!(
+                    f.kind,
+                    general::FfiFunctionKind::RustFuturePoll
+                        | general::FfiFunctionKind::RustFutureComplete
+                )
+        )
+    })
+}
+
 impl TsFfiModule {
     pub(crate) fn from_general(
         namespace: &general::Namespace,
@@ -20,17 +35,7 @@ impl TsFfiModule {
         let is_jsi = matches!(flavor, AbiFlavor::Jsi);
         let module_name = format!("Native{}", namespace.name.to_upper_camel_case());
 
-        let has_async = namespace.ffi_definitions.iter().any(|def| {
-            matches!(
-                def,
-                general::FfiDefinition::RustFunction(f)
-                    if matches!(
-                        f.kind,
-                        general::FfiFunctionKind::RustFuturePoll
-                            | general::FfiFunctionKind::RustFutureComplete
-                    )
-            )
-        });
+        let has_async = namespace_has_async(namespace);
 
         let functions = Self::build_functions(namespace, has_async);
         let definitions = Self::build_definitions(namespace);
@@ -77,7 +82,7 @@ impl TsFfiModule {
         functions
     }
 
-    fn should_include_function(func: &general::FfiFunction, has_async: bool) -> bool {
+    pub(crate) fn should_include_function(func: &general::FfiFunction, has_async: bool) -> bool {
         match func.kind {
             general::FfiFunctionKind::RustBufferFromBytes
             | general::FfiFunctionKind::RustBufferFree
@@ -147,7 +152,7 @@ impl TsFfiModule {
                 return_type: Some("number".into()),
             },
             FfiFunctionDecl {
-                name: "ubrn_uniffi_internal_fn_func_ffi__string_to_arraybuffer".into(),
+                name: "ubrn_uniffi_internal_fn_func_ffi__string_to_buffer".into(),
                 arguments: vec![
                     FfiArgDecl {
                         name: "string".into(),
@@ -161,7 +166,7 @@ impl TsFfiModule {
                 return_type: Some("Uint8Array".into()),
             },
             FfiFunctionDecl {
-                name: "ubrn_uniffi_internal_fn_func_ffi__arraybuffer_to_string".into(),
+                name: "ubrn_uniffi_internal_fn_func_ffi__string_from_buffer".into(),
                 arguments: vec![
                     FfiArgDecl {
                         name: "buffer".into(),
@@ -170,6 +175,24 @@ impl TsFfiModule {
                     FfiArgDecl {
                         name: "uniffi_out_err".into(),
                         type_name: "UniffiRustCallStatus".into(),
+                    },
+                ],
+                return_type: Some("string".into()),
+            },
+            FfiFunctionDecl {
+                name: "ubrn_uniffi_internal_fn_func_ffi__read_string_from_buffer".into(),
+                arguments: vec![
+                    FfiArgDecl {
+                        name: "buffer".into(),
+                        type_name: "any".into(),
+                    },
+                    FfiArgDecl {
+                        name: "offset".into(),
+                        type_name: "number".into(),
+                    },
+                    FfiArgDecl {
+                        name: "length".into(),
+                        type_name: "number".into(),
                     },
                 ],
                 return_type: Some("string".into()),
@@ -197,7 +220,7 @@ impl TsFfiModule {
         }
     }
 
-    fn build_definitions(namespace: &general::Namespace) -> Vec<FfiDefinitionDecl> {
+    pub(crate) fn build_definitions(namespace: &general::Namespace) -> Vec<FfiDefinitionDecl> {
         namespace
             .ffi_definitions
             .iter()
@@ -286,7 +309,7 @@ impl TsFfiModule {
             .fields
             .iter()
             .map(|f| FfiFieldDecl {
-                name: f.name.to_lower_camel_case(),
+                name: f.name.clone(),
                 type_name: ffi_type_to_ts(&f.ty.ty),
             })
             .collect();

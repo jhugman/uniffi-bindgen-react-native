@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use heck::{ToLowerCamelCase, ToSnakeCase};
+use heck::ToSnakeCase;
 use proc_macro2::Span;
 use syn::Ident;
 
@@ -44,8 +44,4 @@ pub(super) fn ident(id: &str) -> Ident {
 
 pub(super) fn snake_case_ident(s: &str) -> Ident {
     ident(&s.to_snake_case())
-}
-
-pub(super) fn camel_case_ident(field_name: &str) -> Ident {
-    ident(&field_name.to_lower_camel_case())
 }

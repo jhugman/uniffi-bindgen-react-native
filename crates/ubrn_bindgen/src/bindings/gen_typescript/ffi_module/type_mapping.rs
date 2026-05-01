@@ -6,7 +6,7 @@
 
 use uniffi_bindgen::pipeline::general;
 
-pub(super) use crate::bindings::gen_typescript::type_mapping::ffi_type_to_ts;
+pub(crate) use crate::bindings::gen_typescript::type_mapping::ffi_type_to_ts;
 
 /// Overrides for the native module interface (C++/JSI boundary).
 pub(super) fn ffi_type_to_ts_native(ffi_type: &general::FfiType) -> String {

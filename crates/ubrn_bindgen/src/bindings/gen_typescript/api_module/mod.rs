@@ -21,7 +21,7 @@ use heck::ToUpperCamelCase;
 use uniffi_bindgen::pipeline::general;
 
 use crate::{
-    bindings::gen_typescript::{config::CustomTypeConfig, ffi_module},
+    bindings::gen_typescript::{ffi_module, Config},
     switches::AbiFlavor,
 };
 
@@ -134,11 +134,11 @@ impl ImportAccumulator {
         self.add_infra_value("UniffiRustCaller");
     }
 
-    pub fn collect_primitive(&mut self, ty: &general::Type) {
+    pub fn collect_primitive(&mut self, config: &Config, ty: &general::Type) {
         if matches!(ty, general::Type::String) {
             return;
         }
-        if let Some(name) = type_helpers::ffi_converter_name_for_type(ty) {
+        if let Some(name) = type_helpers::ffi_converter_name_for_type(config, ty) {
             self.add_infra_value(&name);
         }
         match ty {
@@ -196,7 +196,9 @@ impl ImportAccumulator {
         self.add_infra_value("AbstractFfiConverterByteArray");
         self.add_infra_value("FfiConverterInt32");
         self.add_infra_value("UniffiInternalError");
-
+        if !e.is_flat {
+            self.add_infra_value("uniffiTypeNameSymbol");
+        }
         if e.is_error {
             self.add_infra_value("UniffiError");
             self.add_infra_value("uniffiTypeNameSymbol");
@@ -340,10 +342,9 @@ impl ImportAccumulator {
 
 impl TsApiModule {
     fn build_type_definitions(
+        config: &Config,
         namespace: &general::Namespace,
         flavor: &AbiFlavor,
-        custom_type_configs: &HashMap<String, CustomTypeConfig>,
-        strict_object_types: bool,
     ) -> Vec<TsTypeDefinition> {
         let mut defs = Vec::new();
 
@@ -372,17 +373,18 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::Optional(opt) => {
-                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_optional(opt)));
+                    deferred_wrappers
+                        .push(TsTypeDefinition::SimpleWrapper(build_optional(config, opt)));
                 }
                 general::TypeDefinition::Sequence(seq) => {
-                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_sequence(seq)));
+                    deferred_wrappers
+                        .push(TsTypeDefinition::SimpleWrapper(build_sequence(config, seq)));
                 }
                 general::TypeDefinition::Map(map) => {
-                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_map(map)));
+                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_map(config, map)));
                 }
                 general::TypeDefinition::Custom(custom) => {
-                    let config = custom_type_configs.get(custom.name.as_str());
-                    let td = TsTypeDefinition::Custom(build_custom_type(custom, config));
+                    let td = TsTypeDefinition::Custom(build_custom_type(config, custom));
                     if matches!(
                         custom.builtin.ty,
                         general::Type::Map { .. }
@@ -395,10 +397,10 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::External(ext) => {
-                    defs.push(TsTypeDefinition::External(build_external_type(ext)));
+                    defs.push(TsTypeDefinition::External(build_external_type(config, ext)));
                 }
                 general::TypeDefinition::Enum(e) => {
-                    let ts_enum = build_enum(e);
+                    let ts_enum = build_enum(config, e, flavor);
                     if ts_enum.is_flat && ts_enum.is_error {
                         defs.push(TsTypeDefinition::FlatError(ts_enum));
                     } else if ts_enum.is_flat {
@@ -408,19 +410,20 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::Record(r) => {
-                    defs.push(TsTypeDefinition::Record(build_record(r)));
+                    defs.push(TsTypeDefinition::Record(build_record(config, r, flavor)));
                 }
                 general::TypeDefinition::Interface(i) => {
                     defs.push(TsTypeDefinition::Object(Box::new(build_object(
+                        config,
                         i,
                         flavor,
                         &ffi_fn_types,
-                        strict_object_types,
+                        config.strict_object_types,
                     ))));
                 }
                 general::TypeDefinition::CallbackInterface(cbi) => {
                     defs.push(TsTypeDefinition::CallbackInterface(
-                        build_callback_interface(cbi, &ffi_fn_types),
+                        build_callback_interface(config, cbi, &ffi_fn_types, flavor),
                     ));
                 }
             }
@@ -474,27 +477,22 @@ impl TsApiModule {
     }
 
     pub(crate) fn from_general(
+        config: &Config,
         namespace: &general::Namespace,
         flavor: AbiFlavor,
-        config: &super::Config,
         ffi_exported_definitions: Vec<ffi_module::FfiExportedName>,
     ) -> Self {
         let module_name = namespace.name.clone();
         let namespace_docstring = namespace.docstring.as_deref().map(format_docstring);
         let supports_rust_backtrace = flavor.supports_rust_backtrace();
-        let type_definitions = Self::build_type_definitions(
-            namespace,
-            &flavor,
-            &config.custom_types,
-            config.strict_object_types,
-        );
-        let functions = build_functions(namespace, &flavor);
-        let initialization = build_initialization(namespace);
+        let type_definitions = Self::build_type_definitions(config, namespace, &flavor);
+        let functions = build_functions(config, namespace, &flavor);
+        let initialization = build_initialization(namespace, &flavor);
 
         let mut primitive_imports = ImportAccumulator::new();
         for td in &namespace.type_definitions {
             if let general::TypeDefinition::Simple(node) = td {
-                primitive_imports.collect_primitive(&node.ty);
+                primitive_imports.collect_primitive(config, &node.ty);
             }
         }
 

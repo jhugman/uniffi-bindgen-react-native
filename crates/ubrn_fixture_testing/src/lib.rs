@@ -8,14 +8,16 @@ mod paths;
 pub mod typescript;
 
 pub mod jsi;
+pub mod napi;
 pub mod ts;
 pub mod wasm;
 
-/// Test flavor: JSI (Hermes native) or WASM (Node.js).
+/// Test flavor: JSI (Hermes native), WASM (Node.js), or Napi (Node.js N-API).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
     Wasm,
+    Napi,
 }
 
 impl Flavor {
@@ -23,6 +25,7 @@ impl Flavor {
         match self {
             Flavor::Jsi => "jsi",
             Flavor::Wasm => "wasm",
+            Flavor::Napi => "napi",
         }
     }
 }
@@ -153,18 +156,27 @@ pub(crate) fn write_fixture_tsconfig(
     fixture_dir: &camino::Utf8Path,
     flavor: Flavor,
 ) -> camino::Utf8PathBuf {
-    let flavor = flavor.as_str();
+    let flavor_str = flavor.as_str();
     let repo_root = paths::repo_root();
     let rel_root = relative_path(repo_root, fixture_dir);
+
+    let napi_runtime_path = if flavor == Flavor::Napi {
+        format!(
+            ",\n      \"@uniffi-runtime/napi\": [\"{rel_root}/runtimes/napi\"],\n      \"@uniffi-runtime/napi/*\": [\"{rel_root}/runtimes/napi/*\"]"
+        )
+    } else {
+        String::new()
+    };
+
     let tsconfig_path = fixture_dir.join("tsconfig.json");
     let contents = format!(
         r#"{{
   "compilerOptions": {{
     "baseUrl": ".",
     "paths": {{
-      "@/generated/*": ["./generated/{flavor}/ts/*"],
+      "@/generated/*": ["./generated/{flavor_str}/ts/*"],
       "@/*": ["{rel_root}/typescript/testing/*"],
-      "uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]
+      "uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]{napi_runtime_path}
     }}
   }}
 }}

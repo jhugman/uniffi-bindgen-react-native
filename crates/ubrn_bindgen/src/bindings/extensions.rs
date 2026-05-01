@@ -21,10 +21,10 @@ use uniffi_bindgen::{
 
 #[ext]
 pub(crate) impl ComponentInterface {
-    fn ffi_function_string_to_arraybuffer(&self) -> FfiFunction {
+    fn ffi_function_string_to_buffer(&self) -> FfiFunction {
         let meta = uniffi_meta::FnMetadata {
             module_path: "internal".to_string(),
-            name: "ffi__string_to_arraybuffer".to_owned(),
+            name: "ffi__string_to_buffer".to_owned(),
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -41,10 +41,10 @@ pub(crate) impl ComponentInterface {
         ffi.clone()
     }
 
-    fn ffi_function_arraybuffer_to_string(&self) -> FfiFunction {
+    fn ffi_function_string_from_buffer(&self) -> FfiFunction {
         let meta = uniffi_meta::FnMetadata {
             module_path: "internal".to_string(),
-            name: "ffi__arraybuffer_to_string".to_owned(),
+            name: "ffi__string_from_buffer".to_owned(),
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -81,11 +81,36 @@ pub(crate) impl ComponentInterface {
         ffi.clone()
     }
 
+    fn ffi_function_read_string_from_buffer(&self) -> FfiFunction {
+        let meta = uniffi_meta::FnMetadata {
+            module_path: "internal".to_string(),
+            name: "ffi__read_string_from_buffer".to_owned(),
+            is_async: false,
+            inputs: Default::default(),
+            return_type: None,
+            throws: None,
+            checksum: None,
+            docstring: None,
+        };
+        let func: Function = meta.into();
+        let mut ffi = func.ffi_func().clone();
+        ffi.init(
+            Some(FfiType::RustBuffer(None)),
+            vec![
+                FfiArgument::new("buffer", FfiType::ForeignBytes),
+                FfiArgument::new("offset", FfiType::Int32),
+                FfiArgument::new("length", FfiType::Int32),
+            ],
+        );
+        ffi.clone()
+    }
+
     fn iter_ffi_functions_js_to_cpp_and_back(&self) -> impl Iterator<Item = FfiFunction> {
         vec![
             self.ffi_function_string_to_bytelength(),
-            self.ffi_function_string_to_arraybuffer(),
-            self.ffi_function_arraybuffer_to_string(),
+            self.ffi_function_string_to_buffer(),
+            self.ffi_function_string_from_buffer(),
+            self.ffi_function_read_string_from_buffer(),
         ]
         .into_iter()
     }

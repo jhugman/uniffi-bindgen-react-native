@@ -31,6 +31,12 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
         Utf8PathBuf::from(target_tmpdir).join(format!("ubrn-tests/{crate_name}-{test_stem}-wasm"));
     std::fs::create_dir_all(&out_dir).expect("failed to create output dir");
 
+    // Shared target dir across every fixture's wasm-crate: lets cargo reuse
+    // rlibs for common dependencies (uniffi_*, serde, wasm-bindgen, …) instead
+    // of rebuilding them once per fixture, which filled the CI runner's disk.
+    let shared_target_dir = Utf8PathBuf::from(target_tmpdir).join("ubrn-tests-shared/wasm-target");
+    std::fs::create_dir_all(&shared_target_dir).expect("failed to create shared target dir");
+
     // Step 1: Build the fixture crate (native, for metadata extraction)
     crate::cargo_build(crate_name);
 
@@ -54,25 +60,31 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // Step 4: Generate Cargo.toml from template
     std::fs::create_dir_all(&wasm_crate_dir).expect("failed to create wasm-crate dir");
     let canonical_wasm_crate = Utf8PathBuf::try_from(
-        std::path::Path::new(wasm_crate_dir.as_str())
-            .canonicalize()
+        dunce::canonicalize(wasm_crate_dir.as_str())
             .expect("failed to canonicalize wasm-crate dir"),
     )
     .expect("non-UTF-8 path");
+    // The wasm-crate package gets a per-fixture name so multiple fixtures can
+    // share the target dir without overwriting each other's artifacts.
+    let wasm_pkg_name = format!("{crate_name}-wasm-test");
+    let wasm_lib_stem = wasm_pkg_name.replace('-', "_");
     generate_cargo_toml(
         &canonical_wasm_crate,
         crate_name,
         &fixture_dir,
         &wasm_crate_src,
+        &wasm_pkg_name,
     );
 
     // Step 5: Build for wasm32-unknown-unknown
     let cargo_toml = wasm_crate_dir.join("Cargo.toml");
-    compile_wasm32(&cargo_toml);
+    compile_wasm32(&cargo_toml, &shared_target_dir);
 
     // Step 6: Run wasm-bindgen
     // Output goes next to the TypeScript bindings so imports resolve correctly.
-    let wasm_file = wasm_crate_dir.join("target/wasm32-unknown-unknown/debug/my_test_crate.wasm");
+    let wasm_file = shared_target_dir
+        .join("wasm32-unknown-unknown/debug")
+        .join(format!("{wasm_lib_stem}.wasm"));
     let wasm_bindgen_dir = ts_dir.join("wasm-bindgen");
     std::fs::create_dir_all(&wasm_bindgen_dir).expect("failed to create wasm-bindgen dir");
     run_wasm_bindgen(&wasm_file, &wasm_bindgen_dir);
@@ -158,6 +170,7 @@ fn generate_cargo_toml(
     crate_name: &str,
     package_dir: &Utf8Path,
     src_dir: &Utf8Path,
+    wasm_pkg_name: &str,
 ) {
     let repo_root = paths::repo_root();
     let uniffi_runtime_javascript = repo_root.join("crates/uniffi-runtime-javascript");
@@ -167,6 +180,7 @@ fn generate_cargo_toml(
     let lib_rs_path = relative_path(src_dir.join("lib.rs"), wasm_crate_dir);
 
     let cargo_toml_content = CARGO_TEMPLATE
+        .replace("{{wasm_pkg_name}}", wasm_pkg_name)
         .replace("{{crate_name}}", crate_name)
         .replace("{{crate_path}}", crate_path.as_str())
         .replace("{{uniffi_runtime_javascript}}", runtime_path.as_str())
@@ -177,9 +191,10 @@ fn generate_cargo_toml(
 }
 
 /// `cargo build --target wasm32-unknown-unknown --manifest-path <path>`
-fn compile_wasm32(cargo_toml: &Utf8Path) {
+fn compile_wasm32(cargo_toml: &Utf8Path, target_dir: &Utf8Path) {
     run_cmd_quietly(
         Command::new("cargo")
+            .env("CARGO_TARGET_DIR", target_dir.as_str())
             .arg("build")
             .arg("--target")
             .arg("wasm32-unknown-unknown")
