@@ -165,10 +165,11 @@ impl Module {
         let library = LibraryHandle::open(path_str)?;
 
         // Resolve RustBuffer helper symbols.
-        let _alloc = library.lookup_symbol(&spec.rustbuffer_symbols.alloc)?;
+        let alloc_ptr = library.lookup_symbol(&spec.rustbuffer_symbols.alloc)?;
         let free_ptr = library.lookup_symbol(&spec.rustbuffer_symbols.free)?;
         let from_bytes_ptr = library.lookup_symbol(&spec.rustbuffer_symbols.from_bytes)?;
         let rb_ops = RustBufferOps {
+            alloc_ptr,
             from_bytes_ptr,
             free_ptr,
         };

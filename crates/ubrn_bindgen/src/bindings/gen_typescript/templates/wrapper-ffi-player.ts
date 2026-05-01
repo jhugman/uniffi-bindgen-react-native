@@ -21,9 +21,9 @@ import {
 
 const DEFINITIONS = {
   symbols: {
-    rustbufferAlloc: "{{ module.symbols.rustbuffer_alloc }}",
-    rustbufferFree: "{{ module.symbols.rustbuffer_free }}",
-    rustbufferFromBytes: "{{ module.symbols.rustbuffer_from_bytes }}",
+    rustbuffer_alloc: "{{ module.symbols.rustbuffer_alloc }}",
+    rustbuffer_free: "{{ module.symbols.rustbuffer_free }}",
+    rustbuffer_from_bytes: "{{ module.symbols.rustbuffer_from_bytes }}",
   },
   functions: {
     {%- for func in module.functions %}
@@ -66,6 +66,11 @@ interface NativeModuleInterface {
       {%- endfor %}):
       {%- match func.return_type %}{% when Some with (rt) %} {{ rt }}{% when None %} void{% endmatch %};
   {%- endfor %}
+    // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
+    // and `nativeModule().rustbuffer_free(...)`. The runtime's registered
+    // module exposes them as method properties.
+    rustbuffer_alloc(n: number): Uint8Array;
+    rustbuffer_free(view: Uint8Array): void;
 }
 
 let _nativeModule: NativeModuleInterface | undefined;
