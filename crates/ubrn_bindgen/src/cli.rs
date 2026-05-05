@@ -178,6 +178,9 @@ impl BindingsArgs {
 
         generate_ffi_from_pipeline(&general_root, &switches, &ts_dir)?;
         let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
+        if switches.flavor == AbiFlavor::Napi {
+            generate_index_from_modules(&modules, &switches, &ts_dir)?;
+        }
         if !out.no_format {
             gen_typescript::format_directory(&ts_dir)?;
         }
@@ -241,6 +244,17 @@ fn generate_api_from_pipeline(
         modules.push(module);
     }
     Ok(modules)
+}
+
+fn generate_index_from_modules(
+    modules: &[ModuleMetadata],
+    switches: &SwitchArgs,
+    ts_dir: &Utf8Path,
+) -> Result<()> {
+    let code = gen_typescript::generate_index_code(modules.to_vec(), switches.flavor.clone())?;
+    let path = ts_dir.join("index.ts");
+    ubrn_common::write_file(path, code)?;
+    Ok(())
 }
 
 fn extract_ts_config(namespace: &general::Namespace) -> Result<gen_typescript::Config> {
