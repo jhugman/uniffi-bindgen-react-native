@@ -15,6 +15,7 @@ use askama::Template;
 
 use self::api_module::{TsTypeDefinition, TsUniffiTrait};
 use self::ffi_module::FfiDefinitionDecl;
+use self::ffi_module_player::LibResolution;
 pub(crate) use self::{config::TsConfig as Config, util::format_directory};
 
 pub(crate) fn generate_lowlevel_code(ffi_module: ffi_module::TsFfiModule) -> Result<String> {

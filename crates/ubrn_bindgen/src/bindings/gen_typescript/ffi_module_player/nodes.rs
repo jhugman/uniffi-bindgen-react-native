@@ -4,6 +4,21 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+use camino::Utf8PathBuf;
+
+/// How the generated player should locate the cdylib at load time.
+///
+/// Maps 1:1 to the three resolveLibPath modes in `@uniffi-runtime/napi`.
+#[derive(Clone, Debug)]
+pub enum LibResolution {
+    /// Look for the conventional filename next to the binding.
+    Colocated,
+    /// Bake an absolute path into the generated code.
+    Absolute(Utf8PathBuf),
+    /// Resolve via `<base>-<triple>` platform packages.
+    Require(String),
+}
+
 /// IR for the player-style `{namespace}-ffi.ts`.
 ///
 /// Generates a `DEFINITIONS` object for the napi player's `register()` call,
@@ -11,9 +26,10 @@
 pub(crate) struct PlayerFfiModule {
     /// Whether to suppress `@ts-nocheck` for strict type checking.
     pub strict_type_checking: bool,
-    /// Optional library path baked into the generated code.
-    /// If None, the getter accepts a path argument at runtime.
-    pub lib_path: Option<String>,
+    /// The crate name, passed to `resolveLibPath` so error messages name it.
+    pub crate_name: String,
+    /// How the player should locate the library at runtime.
+    pub lib_resolution: LibResolution,
     /// Rustbuffer management symbol names.
     pub symbols: PlayerSymbols,
     /// FFI function registrations for `register({ functions: { ... } })`.

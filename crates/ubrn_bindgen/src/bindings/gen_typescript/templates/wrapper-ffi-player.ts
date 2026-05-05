@@ -7,8 +7,8 @@
 // @ts-nocheck
 {%- endif %}
 
-import lib from "@uniffi-runtime/napi/lib.js";
-const { UniffiNativeModule, FfiType } = lib;
+import lib from "@uniffi-runtime/napi";
+const { UniffiNativeModule, FfiType, resolveLibPath } = lib;
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
@@ -71,18 +71,17 @@ interface NativeModuleInterface {
 let _nativeModule: NativeModuleInterface | undefined;
 const getter: () => NativeModuleInterface = () => {
   if (!_nativeModule) {
-    {%- match module.lib_path %}
-    {%- when Some with (path) %}
-    const libPath = "{{ path }}";
-    {%- when None %}
-    const libPath = process.env.UNIFFI_LIB_PATH;
-    if (!libPath) {
-      throw new Error(
-        "No library path available. " +
-        "Set the UNIFFI_LIB_PATH environment variable to the path of the shared library."
-      );
-    }
-    {%- endmatch %}
+    const libPath = resolveLibPath({
+      crateName: "{{ module.crate_name }}",
+      callerUrl: import.meta.url,
+      {%- match module.lib_resolution %}
+      {%- when LibResolution::Colocated %}
+      {%- when LibResolution::Absolute with (path) %}
+      override: "{{ path }}",
+      {%- when LibResolution::Require with (base) %}
+      npmPackageBase: "{{ base }}",
+      {%- endmatch %}
+    });
     const mod_ = UniffiNativeModule.open(libPath);
     _nativeModule = mod_.register(DEFINITIONS) as unknown as NativeModuleInterface;
   }
