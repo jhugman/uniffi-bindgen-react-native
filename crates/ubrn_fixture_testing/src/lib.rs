@@ -174,6 +174,7 @@ pub(crate) fn write_fixture_tsconfig(
   "compilerOptions": {{
     "baseUrl": ".",
     "paths": {{
+      "@/generated": ["./generated/{flavor_str}/ts"],
       "@/generated/*": ["./generated/{flavor_str}/ts/*"],
       "@/*": ["{rel_root}/typescript/testing/*"],
       "uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]{napi_runtime_path}
