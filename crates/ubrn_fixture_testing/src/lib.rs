@@ -160,13 +160,7 @@ pub(crate) fn write_fixture_tsconfig(
     let repo_root = paths::repo_root();
     let rel_root = relative_path(repo_root, fixture_dir);
 
-    let napi_runtime_path = if flavor == Flavor::Napi {
-        format!(
-            ",\n      \"@uniffi-runtime/napi\": [\"{rel_root}/runtimes/napi\"],\n      \"@uniffi-runtime/napi/*\": [\"{rel_root}/runtimes/napi/*\"]"
-        )
-    } else {
-        String::new()
-    };
+    let runtime_paths = tsconfig_runtimes(flavor, &rel_root);
 
     let tsconfig_path = fixture_dir.join("tsconfig.json");
     let contents = format!(
@@ -176,7 +170,7 @@ pub(crate) fn write_fixture_tsconfig(
     "paths": {{
       "@/generated/*": ["./generated/{flavor_str}/ts/*"],
       "@/*": ["{rel_root}/typescript/testing/*"],
-      "uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]{napi_runtime_path}
+      {runtime_paths}
     }}
   }}
 }}
@@ -184,6 +178,18 @@ pub(crate) fn write_fixture_tsconfig(
     );
     std::fs::write(&tsconfig_path, contents).expect("failed to write fixture tsconfig.json");
     tsconfig_path
+}
+
+fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
+    let mut runtime_paths = vec![format!(
+        r#""uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]"#
+    )];
+    if flavor == Flavor::Napi {
+        runtime_paths.push(format!(
+            r#""@uniffi-runtime/napi": ["{rel_root}/runtimes/napi/lib"]"#
+        ));
+    }
+    runtime_paths.join(",\n      ")
 }
 
 /// Run a test script with tsx and experimental WASM module support.
