@@ -120,6 +120,9 @@ jobs:
       - name: Move artifacts into npm dirs
         run: npm run artifacts
 
+      - name: Build TypeScript helpers
+        run: npm run build:ts
+
       - name: Assemble root package
         run: npm run assemble-root
 

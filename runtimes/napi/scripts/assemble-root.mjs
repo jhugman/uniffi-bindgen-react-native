@@ -5,6 +5,8 @@
  */
 import {
   copyFileSync,
+  cpSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -42,6 +44,16 @@ mkdirSync(rootDir, { recursive: true });
 for (const f of COPY_FILES) {
   copyFileSync(join(pkgDir, f), join(rootDir, f));
 }
+
+// lib.js requires typescript/dist/resolve-lib.js at runtime.
+const tsDist = join(pkgDir, "typescript", "dist");
+if (!existsSync(tsDist)) {
+  console.error(
+    `Missing ${tsDist} — run \`npm run build:ts\` before assemble-root.`,
+  );
+  process.exit(1);
+}
+cpSync(tsDist, join(rootDir, "typescript", "dist"), { recursive: true });
 
 const src = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8"));
 const workspaceRoot = JSON.parse(
