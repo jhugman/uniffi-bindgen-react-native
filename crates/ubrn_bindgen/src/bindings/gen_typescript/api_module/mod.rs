@@ -212,6 +212,12 @@ impl ImportAccumulator {
         if e.has_callables() {
             self.add_infra_value("uniffiTypeNameSymbol");
         }
+        if e.variants
+            .iter()
+            .any(|v| v.has_field_defaults && !v.has_nameless_fields)
+        {
+            self.add_infra_value("uniffiCreateRecord");
+        }
         self.collect_uniffi_traits(&e.uniffi_traits);
         self.collect_callables(&e.constructors);
         self.collect_callables(&e.methods);

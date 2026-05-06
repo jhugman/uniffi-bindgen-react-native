@@ -72,6 +72,7 @@ pub(crate) struct TsVariant {
     pub discriminant: String,
     pub fields: Vec<TsField>,
     pub has_nameless_fields: bool,
+    pub has_field_defaults: bool,
 }
 
 pub(crate) struct TsEnum {

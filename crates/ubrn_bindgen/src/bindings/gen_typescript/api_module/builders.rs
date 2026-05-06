@@ -221,12 +221,14 @@ pub(super) fn build_variant(config: &Config, variant: &general::Variant) -> TsVa
         .map(|field| build_field(config, field))
         .collect();
     let has_nameless_fields = matches!(variant.fields_kind, general::FieldsKind::Unnamed);
+    let has_field_defaults = fields.iter().any(|f| f.default_value.is_some());
     TsVariant {
         name,
         docstring,
         discriminant,
         fields,
         has_nameless_fields,
+        has_field_defaults,
     }
 }
 

@@ -333,8 +333,13 @@ Readonly<{%- if !variant.has_nameless_fields %}{
 {%- if !variant.has_nameless_fields %}
 inner: { {%- for field in variant.fields %}{% call field_decl(field) %}{%- if !loop.last %}; {% endif %}{%- endfor %} }
 {%- else %}
-{%- for field in variant.fields %}v{{ loop.index0 }}: {{ field.ts_type }}{%- if !loop.last %}, {% endif %}{%- endfor %}
+{%- for field in variant.fields %}v{{ loop.index0 }}: {{ field.ts_type }}{%- if let Some(dv) = field.default_value %} = {{ dv }}{%- endif %}{%- if !loop.last %}, {% endif %}{%- endfor %}
 {%- endif %}
+{%- endmacro %}
+
+{#- Bare object type for a named variant's inner shape: { name: Type; ... } (no Readonly wrap). -#}
+{%- macro variant_inner_named_type(variant) -%}
+{ {%- for field in variant.fields %}{% call field_decl(field) %}{%- if !loop.last %}; {% endif %}{%- endfor %} }
 {%- endmacro %}
 
 {#- Variant constructor body: freeze inner. -#}
