@@ -150,7 +150,58 @@ fn render_literal(config: &Config, lit: &general::Literal) -> String {
 fn render_default_value(config: &Config, dv: &general::DefaultValue) -> String {
     match dv {
         general::DefaultValue::Literal(lit_node) => render_literal(config, &lit_node.lit),
-        general::DefaultValue::Default(_) => "undefined".into(),
+        general::DefaultValue::Default(tn) => render_type_default(config, &tn.ty),
+    }
+}
+
+fn render_type_default(_config: &Config, ty: &general::Type) -> String {
+    // Per the uniffi-rs default-values docs, the bare `default` keyword maps
+    // each type to its natural zero-value: 0 for numerics, false, empty
+    // string/bytes/sequence/map, None for Option, all-defaults for Record,
+    // primary-constructor-with-0-args for Object. uniffi-rs validates these
+    // are well-formed at the Rust side (e.g. Record only accepts the bare
+    // default if every field itself has a default).
+    match ty {
+        general::Type::UInt8
+        | general::Type::UInt16
+        | general::Type::UInt32
+        | general::Type::Int8
+        | general::Type::Int16
+        | general::Type::Int32
+        | general::Type::Float32
+        | general::Type::Float64 => "0".into(),
+        general::Type::UInt64 | general::Type::Int64 => "BigInt(0)".into(),
+        general::Type::Boolean => "false".into(),
+        general::Type::String => "\"\"".into(),
+        general::Type::Bytes => "new Uint8Array()".into(),
+        general::Type::Optional { .. } => "undefined".into(),
+        general::Type::Sequence { .. } => "[]".into(),
+        general::Type::Map { .. } => "new Map()".into(),
+        general::Type::Custom { builtin, .. } => render_type_default(_config, builtin),
+        general::Type::Record { name, .. } => {
+            let name = rewrite_js_builtins(&name.to_upper_camel_case());
+            format!("{name}.create({{}})")
+        }
+        general::Type::Interface { name, imp, .. } if imp.has_struct() => {
+            // Struct-impl objects: parameter type is `{name}Like` and the
+            // concrete impl class is `{name}`, so `new {name}()` produces a
+            // value assignable to the parameter type.
+            let name = rewrite_js_builtins(&name.to_upper_camel_case());
+            format!("new {name}()")
+        }
+        // No clear default semantic in the uniffi-rs docs:
+        // - Enum: no canonical "first variant" for tagged or flat enums.
+        // - Trait / CallbackTrait Interface: the impl class wraps a Rust-side
+        //   handle and can't be constructed from JS without one.
+        // - CallbackInterface: not constructible from JS as a runtime default.
+        // - Timestamp / Duration: not enumerated; uniffi-rs Python bindings
+        //   reject these, and we don't expect bare default to be used here.
+        // Fall back to `undefined` so strict-mode TS surfaces the gap.
+        general::Type::Enum { .. }
+        | general::Type::Interface { .. }
+        | general::Type::CallbackInterface { .. }
+        | general::Type::Timestamp
+        | general::Type::Duration => "undefined".into(),
     }
 }
 
@@ -221,12 +272,14 @@ pub(super) fn build_variant(config: &Config, variant: &general::Variant) -> TsVa
         .map(|field| build_field(config, field))
         .collect();
     let has_nameless_fields = matches!(variant.fields_kind, general::FieldsKind::Unnamed);
+    let has_field_defaults = fields.iter().any(|f| f.default_value.is_some());
     TsVariant {
         name,
         docstring,
         discriminant,
         fields,
         has_nameless_fields,
+        has_field_defaults,
     }
 }
 

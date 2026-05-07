@@ -47,9 +47,25 @@ export const {{ type_name }} = (() => {
 {% call cb::variant_ctor_body(variant) %}
         }
 
+        {%- if !is_tuple && variant.has_field_defaults %}
+        static new = (() => {
+            type Inner = {% call cb::variant_inner_named_type(variant) %};
+            const defaults = () => ({
+                {%- for field in variant.fields %}
+                {%- if let Some(dv) = field.default_value %}
+                {{ field.name }}: {{ dv }}{%- if !loop.last %},{% endif %}
+                {%- endif %}
+                {%- endfor %}
+            });
+            const create = uniffiCreateRecord<Inner, ReturnType<typeof defaults>>(defaults);
+            return (partial: Parameters<typeof create>[0]): {{ variant_class }} =>
+                new {{ variant_class }}(create(partial));
+        })();
+        {%- else %}
         static new({% call cb::variant_fields_decl(variant) %}): {{ variant_class }} {
             return new {{ variant_class }}({% call cb::variant_new_args(variant) %});
         }
+        {%- endif %}
         {%- else %}
         constructor() {
             super("{{ type_name }}", "{{ external_name }}");

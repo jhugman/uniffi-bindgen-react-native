@@ -1,0 +1,2 @@
+[bindings.typescript]
+strictTypeChecking = true

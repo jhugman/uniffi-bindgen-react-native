@@ -128,6 +128,17 @@ export class Asserts {
         `${resolveMessage(message, "Not in range")}: ${min} <= ${left} <= ${max}`,
     );
   }
+  assertInstanceOf<T>(
+    obj: any,
+    guard: (o: any) => o is T,
+    message?: Message,
+  ): asserts obj is T {
+    this.assertTrue(
+      guard(obj),
+      () =>
+        `${resolveMessage(message, "Expected instanceOf to be true")}: ${stringify(obj)}`,
+    );
+  }
 
   /// We can't use instanceof here: hermes does not seem to generate the right
   /// prototype chain, so we'll check the error message instead.

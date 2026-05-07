@@ -1,0 +1,21 @@
+[package]
+name = "uniffi-fixture-defaults"
+edition = "2021"
+version = "0.22.0"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+name = "uniffi_defaults"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+uniffi = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen-tests"] }
