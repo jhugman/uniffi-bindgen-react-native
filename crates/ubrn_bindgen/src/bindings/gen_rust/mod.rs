@@ -98,8 +98,16 @@ impl FlavorParams<'_> {
     }
 }
 
-fn callback_fn_ident() -> Ident {
-    ident("JsCallbackFn")
+// wasm-bindgen >=0.2.114 collapses #[wasm_bindgen]-exposed structs that
+// share an identical Rust ident into one JS class breaking foreign-future callbacks.
+// Suffix the ident with the containing module's name so each is a distinct Rust type.
+// See https://github.com/wasm-bindgen/wasm-bindgen/pull/4977
+fn callback_fn_ident(module: &Ident) -> Ident {
+    use heck::ToUpperCamelCase;
+    ident(&format!(
+        "JsCallbackFn{}",
+        module.to_string().to_upper_camel_case()
+    ))
 }
 
 fn wasm_flavor() -> FlavorParams<'static> {
@@ -309,7 +317,7 @@ impl<'a> ComponentTemplate<'a> {
 
         let module_ident = cb.module_ident();
         let js_class = cb.js_module_ident();
-        let callback_fn_ident = callback_fn_ident();
+        let callback_fn_ident = callback_fn_ident(&module_ident);
 
         quote! {
             mod #module_ident {
@@ -352,7 +360,8 @@ impl<'a> ComponentTemplate<'a> {
 
     fn ffi_callback(&mut self, cb: &FfiCallbackFunction2) -> TokenStream {
         let uniffi_ident = self.uniffi_ident();
-        let callback_fn_ident = callback_fn_ident();
+        let cb_module_ident = cb.module_ident();
+        let callback_fn_ident = callback_fn_ident(&cb_module_ident);
 
         let js_method_decl = self.js_callback_method_decl(&callback_fn_ident, cb.callback());
 
@@ -515,8 +524,9 @@ impl<'a> ComponentTemplate<'a> {
                 let field_name = field.name();
                 let field_ident = ident(field_name);
                 if st.is_callback_method(field_name) {
-                    let callback_fn_ident = callback_fn_ident();
                     let alias_ident = st.method_alias_ident(field_name);
+                    let mod_ident = st.method_mod_ident(field_name);
+                    let callback_fn_ident = callback_fn_ident(&mod_ident);
                     quote! {
                         #[wasm_bindgen(method, getter)]
                         fn #field_ident(this: &VTableJs) -> #alias_ident::#callback_fn_ident;
@@ -740,7 +750,7 @@ impl<'a> ComponentTemplate<'a> {
             }
             FfiType::Callback(cb) => {
                 let mod_ident = snake_case_ident(cb);
-                let callback_fn_ident = callback_fn_ident();
+                let callback_fn_ident = callback_fn_ident(&mod_ident);
                 quote! { #mod_ident::#callback_fn_ident }
             }
             FfiType::Reference(_) | FfiType::MutReference(_) => {
