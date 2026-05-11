@@ -5,4 +5,5 @@
  */
 ubrn_macros::build_foreign_language_testcases! {
     "tests/bindings/test_ext_types.ts" => [Jsi, Wasm, Napi],
+    "tests/bindings/test_ext_types_with_index.ts" => [Napi],
 }

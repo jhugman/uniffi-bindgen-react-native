@@ -82,4 +82,13 @@ impl AbiFlavor {
     pub fn supports_finalization_registry(&self) -> bool {
         !matches!(self, Self::Jsi)
     }
+
+    /// Whether this flavor initializes synchronously at module load.
+    ///
+    /// Sync flavors (JSI, Napi) call `initialize()` from the index.ts top
+    /// level and treat `uniffiInitAsync` as a no-op for parity. Async
+    /// flavors (Wasm) defer all initialization into `uniffiInitAsync`.
+    pub fn supports_sync_initialization(&self) -> bool {
+        matches!(self, Self::Jsi | Self::Napi)
+    }
 }

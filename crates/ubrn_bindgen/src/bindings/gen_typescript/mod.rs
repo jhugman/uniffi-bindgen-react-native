@@ -16,6 +16,8 @@ use askama::Template;
 use self::api_module::{TsTypeDefinition, TsUniffiTrait};
 use self::ffi_module::FfiDefinitionDecl;
 pub(crate) use self::{config::TsConfig as Config, util::format_directory};
+use super::metadata::ModuleMetadata;
+use crate::switches::AbiFlavor;
 
 pub(crate) fn generate_lowlevel_code(ffi_module: ffi_module::TsFfiModule) -> Result<String> {
     LowlevelTsWrapper::new(ffi_module)
@@ -29,6 +31,15 @@ pub(crate) fn generate_player_lowlevel_code(
     PlayerLowlevelTsWrapper::new(player_module)
         .render()
         .context("generating player lowlevel typescript from IR failed")
+}
+
+pub(crate) fn generate_index_code(
+    modules: Vec<ModuleMetadata>,
+    flavor: AbiFlavor,
+) -> Result<String> {
+    IndexTsWrapper { modules, flavor }
+        .render()
+        .context("generating index.ts from IR failed")
 }
 
 pub(crate) fn generate_api_code_from_ir(api_module: api_module::TsApiModule) -> Result<String> {
@@ -71,4 +82,11 @@ impl PlayerLowlevelTsWrapper {
     fn new(module: ffi_module_player::PlayerFfiModule) -> Self {
         Self { module }
     }
+}
+
+#[derive(Template)]
+#[template(syntax = "ts", escape = "none", path = "index.ts")]
+struct IndexTsWrapper {
+    modules: Vec<ModuleMetadata>,
+    flavor: AbiFlavor,
 }
