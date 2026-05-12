@@ -19,7 +19,8 @@ impl PlayerFfiModule {
     pub(crate) fn from_general(
         namespace: &general::Namespace,
         config: &TsConfig,
-        lib_path: Option<String>,
+        crate_name: String,
+        lib_resolution: LibResolution,
     ) -> Self {
         let has_async = namespace_has_async(namespace);
 
@@ -34,7 +35,8 @@ impl PlayerFfiModule {
 
         Self {
             strict_type_checking: config.strict_type_checking,
-            lib_path,
+            crate_name,
+            lib_resolution,
             symbols,
             functions,
             callbacks,

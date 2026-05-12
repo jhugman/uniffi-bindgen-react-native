@@ -46,21 +46,26 @@
     "index.js",
     "lib.js",
     "index.d.ts",
+    "typescript/dist/",
     "*.node",
     "README.md"
   ],
   "scripts": {
-    "build": "napi build --platform --release --js-package-name @uniffi-runtime/napi",
-    "build:debug": "napi build --platform --js-package-name @uniffi-runtime/napi",
+    "build:ts": "tsc -p typescript",
+    "build": "npm run build:ts && napi build --platform --release --js-package-name @uniffi-runtime/napi",
+    "build:debug": "npm run build:ts && napi build --platform --js-package-name @uniffi-runtime/napi",
     "artifacts": "napi artifacts --dir artifacts",
     "create-npm-dirs": "napi create-npm-dir -t .",
     "assemble-root": "node ./scripts/assemble-root.mjs",
     "prepare": "npm run build",
     "fmt": "prettier --write . && cargo fmt",
-    "test": "node --import ./tests/setup.mjs --test tests/*.test.mjs"
+    "test": "node --import ./tests/setup.mjs --test tests/*.test.mjs",
+    "test:ts": "node --test tests/resolve-lib.test.mjs"
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.0",
-    "prettier": "^3.8.1"
+    "@types/node": "^20.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.4.0"
   }
 }

@@ -37,12 +37,12 @@ pub fn run_test(crate_name: &str, test_script: &str, _target_tmpdir: &str) {
     let ts_dir = generated_napi.join("ts");
     generate_bindings(&cdylib_path, &ts_dir);
 
-    // Step 3: Write fixture tsconfig, then run tsx with the library path.
+    // Step 3: Write fixture tsconfig, then run tsx.
     let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
         &fixture_dir,
         crate::Flavor::Napi,
     ));
-    run_test_runner(test_script, &cdylib_path);
+    run_test_runner(test_script);
 }
 
 /// Build the N-API runtime (debug mode) if not already built.
@@ -69,6 +69,7 @@ fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path) {
             .arg("generate")
             .arg("napi")
             .arg("bindings")
+            .arg("--lib-absolute")
             .arg("--library")
             .arg("--ts-dir")
             .arg(ts_dir.as_str())
@@ -76,12 +77,8 @@ fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path) {
     );
 }
 
-/// Run tsx with UNIFFI_LIB_PATH set so the generated code can find the library.
-fn run_test_runner(test_script: &Utf8Path, cdylib_path: &Utf8Path) {
+/// Run tsx to execute the test script.
+fn run_test_runner(test_script: &Utf8Path) {
     let tsx = paths::node_modules_bin().join("tsx");
-    run_cmd(
-        crate::command(tsx.as_str())
-            .env("UNIFFI_LIB_PATH", cdylib_path.as_str())
-            .arg(test_script.as_str()),
-    );
+    run_cmd(crate::command(tsx.as_str()).arg(test_script.as_str()));
 }

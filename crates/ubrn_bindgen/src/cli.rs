@@ -31,6 +31,10 @@ pub struct BindingsArgs {
     #[cfg(feature = "wasm")]
     #[command(flatten)]
     switches: SwitchArgs,
+
+    /// Set by the napi CLI; required for the `Napi` flavor (other flavors ignore it).
+    #[clap(skip)]
+    pub(crate) lib_resolution: Option<gen_typescript::ffi_module_player::LibResolution>,
 }
 
 impl BindingsArgs {
@@ -40,7 +44,16 @@ impl BindingsArgs {
             switches: _switches,
             source,
             output,
+            lib_resolution: None,
         }
+    }
+
+    pub fn with_lib_resolution(
+        mut self,
+        resolution: gen_typescript::ffi_module_player::LibResolution,
+    ) -> Self {
+        self.lib_resolution = Some(resolution);
+        self
     }
 
     pub fn ts_dir(&self) -> &Utf8Path {
@@ -119,6 +132,11 @@ impl SourceArgs {
         }
     }
 
+    /// Returns the source path (a UDL file or library file).
+    pub fn source(&self) -> &Utf8PathBuf {
+        &self.source
+    }
+
     pub fn with_config(self, config: Option<Utf8PathBuf>) -> Self {
         Self {
             config,
@@ -176,7 +194,12 @@ impl BindingsArgs {
         let initial_root = pipeline_loader.load_pipeline_initial_root(&source_path, metadata)?;
         let general_root = general::pipeline("react-native").execute(initial_root)?;
 
-        generate_ffi_from_pipeline(&general_root, &switches, &ts_dir)?;
+        generate_ffi_from_pipeline(
+            &general_root,
+            &switches,
+            &ts_dir,
+            self.lib_resolution.clone(),
+        )?;
         let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
         if switches.flavor == AbiFlavor::Napi {
             generate_index_from_modules(&modules, &switches, &ts_dir)?;
@@ -279,6 +302,7 @@ fn generate_ffi_from_pipeline(
     root: &general::Root,
     switches: &SwitchArgs,
     ts_dir: &Utf8Path,
+    lib_resolution: Option<gen_typescript::ffi_module_player::LibResolution>,
 ) -> Result<()> {
     for (name, namespace) in &root.namespaces {
         let module = ModuleMetadata::new(name);
@@ -287,9 +311,18 @@ fn generate_ffi_from_pipeline(
         let config = extract_ts_config(namespace)?;
         let code = match &switches.flavor {
             AbiFlavor::Napi => {
+                let lib_resolution = lib_resolution.clone().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "napi codegen requires a LibResolution; pass --lib-colocated or --lib-absolute"
+                    )
+                })?;
+                let crate_name = namespace.crate_name.clone();
                 let player_module =
                     gen_typescript::ffi_module_player::PlayerFfiModule::from_general(
-                        namespace, &config, None,
+                        namespace,
+                        &config,
+                        crate_name,
+                        lib_resolution,
                     );
                 gen_typescript::generate_player_lowlevel_code(player_module)?
             }

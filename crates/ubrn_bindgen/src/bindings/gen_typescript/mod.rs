@@ -15,6 +15,7 @@ use askama::Template;
 
 use self::api_module::{TsTypeDefinition, TsUniffiTrait};
 use self::ffi_module::FfiDefinitionDecl;
+use self::ffi_module_player::LibResolution;
 pub(crate) use self::{config::TsConfig as Config, util::format_directory};
 use super::metadata::ModuleMetadata;
 use crate::switches::AbiFlavor;

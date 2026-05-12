@@ -4,9 +4,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 const native = require("./index.js");
+const {
+  resolveLibPath,
+  ResolveLibPathError,
+} = require("./typescript/dist/resolve-lib.js");
 
 module.exports = {
   ...native,
+  resolveLibPath,
+  ResolveLibPathError,
   FfiType: {
     UInt8: { tag: "UInt8" },
     Int8: { tag: "Int8" },

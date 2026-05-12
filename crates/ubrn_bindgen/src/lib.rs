@@ -15,3 +15,14 @@ pub use self::{
     cli::{BindingsArgs, OutputArgs, SourceArgs},
     switches::{AbiFlavor, SwitchArgs},
 };
+
+pub mod ffi_module_player_lib_resolution {
+    pub use crate::bindings::gen_typescript::ffi_module_player::LibResolution;
+}
+
+#[doc(hidden)]
+pub mod __player_template_test {
+    pub use crate::bindings::gen_typescript::ffi_module_player::{
+        render_minimal_for_test, LibResolution,
+    };
+}
