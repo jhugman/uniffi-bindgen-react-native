@@ -23,6 +23,7 @@ static const char *s_jslib =
 #include "MyCallInvoker.h"
 #include <ReactCommon/CallInvoker.h>
 #include <hermes/hermes.h>
+#include <jsi/instrumentation.h>
 
 /// Read the contents of a file into a string.
 static std::optional<std::string> readFile(const char *path) {
@@ -129,10 +130,58 @@ static double currentTimeMillis() {
       .count();
 }
 
+static void installPerformanceNow(facebook::jsi::Runtime &runtime) {
+  auto fn = facebook::jsi::Function::createFromHostFunction(
+      runtime,
+      facebook::jsi::PropNameID::forAscii(runtime, "__performanceNow"),
+      0,
+      [](facebook::jsi::Runtime &rt, const facebook::jsi::Value &,
+         const facebook::jsi::Value *, size_t) -> facebook::jsi::Value {
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        double ms = std::chrono::duration<double, std::milli>(now).count();
+        return facebook::jsi::Value(ms);
+      });
+  runtime.global().setProperty(runtime, "__performanceNow", fn);
+}
+
+static void installHeapInfo(facebook::jsi::Runtime &runtime) {
+  auto fn = facebook::jsi::Function::createFromHostFunction(
+      runtime,
+      facebook::jsi::PropNameID::forAscii(runtime, "__hermesHeapInfo"),
+      0,
+      [](facebook::jsi::Runtime &rt, const facebook::jsi::Value &,
+         const facebook::jsi::Value *, size_t) -> facebook::jsi::Value {
+        auto info = rt.instrumentation().getHeapInfo(/*includeExpensive=*/false);
+        facebook::jsi::Object out(rt);
+        for (const auto &kv : info) {
+          out.setProperty(rt, kv.first.c_str(),
+                          facebook::jsi::Value(static_cast<double>(kv.second)));
+        }
+        return facebook::jsi::Value(rt, out);
+      });
+  runtime.global().setProperty(runtime, "__hermesHeapInfo", fn);
+}
+
+static void installGc(facebook::jsi::Runtime &runtime) {
+  auto fn = facebook::jsi::Function::createFromHostFunction(
+      runtime,
+      facebook::jsi::PropNameID::forAscii(runtime, "__hermesGc"),
+      0,
+      [](facebook::jsi::Runtime &rt, const facebook::jsi::Value &,
+         const facebook::jsi::Value *, size_t) -> facebook::jsi::Value {
+        rt.instrumentation().collectGarbage("test-runner");
+        return facebook::jsi::Value::undefined();
+      });
+  runtime.global().setProperty(runtime, "__hermesGc", fn);
+}
+
 static int runEventLoop(facebook::jsi::Runtime &runtime,
                         std::shared_ptr<uniffi::testing::MyCallInvoker> invoker,
                         const std::string &jsCode, const char *jsPath) {
   try {
+    installPerformanceNow(runtime);
+    installHeapInfo(runtime);
+    installGc(runtime);
     facebook::jsi::Object helpers =
         runtime
             .evaluateJavaScript(
