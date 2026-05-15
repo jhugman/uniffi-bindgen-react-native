@@ -175,6 +175,7 @@ fn compile_cpp(
         } else {
             "Ninja"
         })
+        .arg("-DCMAKE_BUILD_TYPE=Release")
         .arg(format!("-DHERMES_SRC_DIR={}", paths::hermes_src_dir()))
         .arg(format!("-DHERMES_BUILD_DIR={}", paths::hermes_build_dir()))
         .arg(format!("-DHERMES_EXTENSION_NAME=rn-{lib_name}"))
