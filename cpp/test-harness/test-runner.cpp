@@ -132,8 +132,7 @@ static double currentTimeMillis() {
 
 static void installPerformanceNow(facebook::jsi::Runtime &runtime) {
   auto fn = facebook::jsi::Function::createFromHostFunction(
-      runtime,
-      facebook::jsi::PropNameID::forAscii(runtime, "__performanceNow"),
+      runtime, facebook::jsi::PropNameID::forAscii(runtime, "__performanceNow"),
       0,
       [](facebook::jsi::Runtime &rt, const facebook::jsi::Value &,
          const facebook::jsi::Value *, size_t) -> facebook::jsi::Value {
@@ -146,12 +145,12 @@ static void installPerformanceNow(facebook::jsi::Runtime &runtime) {
 
 static void installHeapInfo(facebook::jsi::Runtime &runtime) {
   auto fn = facebook::jsi::Function::createFromHostFunction(
-      runtime,
-      facebook::jsi::PropNameID::forAscii(runtime, "__hermesHeapInfo"),
+      runtime, facebook::jsi::PropNameID::forAscii(runtime, "__hermesHeapInfo"),
       0,
       [](facebook::jsi::Runtime &rt, const facebook::jsi::Value &,
          const facebook::jsi::Value *, size_t) -> facebook::jsi::Value {
-        auto info = rt.instrumentation().getHeapInfo(/*includeExpensive=*/false);
+        auto info =
+            rt.instrumentation().getHeapInfo(/*includeExpensive=*/false);
         facebook::jsi::Object out(rt);
         for (const auto &kv : info) {
           out.setProperty(rt, kv.first.c_str(),
@@ -164,9 +163,7 @@ static void installHeapInfo(facebook::jsi::Runtime &runtime) {
 
 static void installGc(facebook::jsi::Runtime &runtime) {
   auto fn = facebook::jsi::Function::createFromHostFunction(
-      runtime,
-      facebook::jsi::PropNameID::forAscii(runtime, "__hermesGc"),
-      0,
+      runtime, facebook::jsi::PropNameID::forAscii(runtime, "__hermesGc"), 0,
       [](facebook::jsi::Runtime &rt, const facebook::jsi::Value &,
          const facebook::jsi::Value *, size_t) -> facebook::jsi::Value {
         rt.instrumentation().collectGarbage("test-runner");

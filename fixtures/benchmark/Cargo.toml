@@ -10,7 +10,7 @@ crate-type = ["lib", "cdylib"]
 name = "uniffi_benchmark"
 
 [dependencies]
-uniffi = { workspace = true }
+uniffi = { workspace = true, features = ["tokio"] }
 
 [dev-dependencies]
 ubrn_macros = { workspace = true }
