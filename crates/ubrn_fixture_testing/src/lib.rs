@@ -186,9 +186,7 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
         r#""uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]"#
     )];
     if flavor == Flavor::Napi {
-        runtime_paths.push(format!(
-            r#""@uniffi-runtime/napi": ["{rel_root}/runtimes/napi/lib"]"#
-        ));
+        runtime_paths.push(format!(r#""@ubjs/node": ["{rel_root}/runtimes/napi/lib"]"#));
     }
     runtime_paths.join(",\n      ")
 }
