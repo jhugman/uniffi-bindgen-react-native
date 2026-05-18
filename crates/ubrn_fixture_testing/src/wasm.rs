@@ -83,7 +83,7 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // Step 6: Run wasm-bindgen
     // Output goes next to the TypeScript bindings so imports resolve correctly.
     let wasm_file = shared_target_dir
-        .join("wasm32-unknown-unknown/debug")
+        .join("wasm32-unknown-unknown/release")
         .join(format!("{wasm_lib_stem}.wasm"));
     let wasm_bindgen_dir = ts_dir.join("wasm-bindgen");
     std::fs::create_dir_all(&wasm_bindgen_dir).expect("failed to create wasm-bindgen dir");
@@ -196,6 +196,7 @@ fn compile_wasm32(cargo_toml: &Utf8Path, target_dir: &Utf8Path) {
         Command::new("cargo")
             .env("CARGO_TARGET_DIR", target_dir.as_str())
             .arg("build")
+            .arg("--release")
             .arg("--target")
             .arg("wasm32-unknown-unknown")
             .arg("--manifest-path")

@@ -174,6 +174,7 @@ impl ImportAccumulator {
 
     fn collect_custom(&mut self, c: &TsCustomType) {
         self.add_infra_type("FfiConverter");
+        self.add_infra_type("RustBufferAllocator");
         self.add_infra_value("uniffiTypeNameSymbol");
         if let Some(cfg) = &c.custom_config {
             for (name, from) in &cfg.imports {

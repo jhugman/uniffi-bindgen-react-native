@@ -96,7 +96,7 @@ impl Bootstrap for HermesCmd {
                 "Ninja"
             })
             .arg("-DHERMES_BUILD_APPLE_FRAMEWORK=OFF")
-            .arg("-DCMAKE_BUILD_TYPE=Debug");
+            .arg("-DCMAKE_BUILD_TYPE=Release");
         if cfg!(target_os = "windows") {
             // The VS generator defaults to static libs, which would require
             // consumers to link the entire Hermes transitive dependency chain.

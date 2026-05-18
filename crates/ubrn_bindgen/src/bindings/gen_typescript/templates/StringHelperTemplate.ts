@@ -7,6 +7,16 @@ const stringConverter = (() => {
         stringToBytes: (s: string) => encoder.encode(s),
         bytesToString: (ab: UniffiByteArray) => decoder.decode(ab),
         stringByteLength: (s: string) => encoder.encode(s).byteLength,
+        writeStringIntoBuffer: (s: string, buf: any, offset: number): number => {
+            const view = new Uint8Array(
+                buf.arrayBuffer,
+                offset,
+                buf.arrayBuffer.byteLength - offset,
+            );
+            return encoder.encodeInto(s, view).written;
+        },
+        readStringFromBuffer: (buf: any, offset: number, length: number): string =>
+            decoder.decode(new Uint8Array(buf.arrayBuffer, offset, length)),
     };
 })();
 {%- else %}

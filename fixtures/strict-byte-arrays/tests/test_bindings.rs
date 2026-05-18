@@ -5,4 +5,5 @@
  */
 ubrn_macros::build_foreign_language_testcases! {
     "tests/bindings/test_strict_byte_arrays.ts" => [Jsi, Wasm, Napi],
+    "tests/bindings/test_rustbuffer_alloc.ts" => [Jsi],
 }

@@ -39,9 +39,9 @@ This calls `dlopen` under the hood.
 ```js
 const nm = mod.register({
   symbols: {
-    rustbufferAlloc: "uniffi_foo_rustbuffer_alloc",
-    rustbufferFree: "uniffi_foo_rustbuffer_free",
-    rustbufferFromBytes: "uniffi_foo_rustbuffer_from_bytes",
+    rustbuffer_alloc: "uniffi_foo_rustbuffer_alloc",
+    rustbuffer_free: "uniffi_foo_rustbuffer_free",
+    rustbuffer_from_bytes: "uniffi_foo_rustbuffer_from_bytes",
   },
   structs: {},
   callbacks: {},

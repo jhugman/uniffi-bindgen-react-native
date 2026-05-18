@@ -12,9 +12,9 @@ import { libPath } from "./helpers/lib-path.mjs";
 const LIB_PATH = libPath("uniffi_napi_test_lib");
 
 const SYMBOLS = {
-  rustbufferAlloc: "uniffi_test_rustbuffer_alloc",
-  rustbufferFree: "uniffi_test_rustbuffer_free",
-  rustbufferFromBytes: "uniffi_test_rustbuffer_from_bytes",
+  rustbuffer_alloc: "uniffi_test_rustbuffer_alloc",
+  rustbuffer_free: "uniffi_test_rustbuffer_free",
+  rustbuffer_from_bytes: "uniffi_test_rustbuffer_from_bytes",
 };
 
 const FUNCTIONS = {

@@ -73,7 +73,7 @@ console.debug(`-- {{ ffi_name }}`);
 {#- Lowered argument list (for FFI calls). -#}
 {%- macro arg_list_lowered(callable) %}
     {%- for arg in callable.arguments %}
-        {{ arg.ffi_converter }}.lower({{ arg.name }}),
+        {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc),
     {%- endfor %}
 {%- endmacro -%}
 
@@ -136,7 +136,7 @@ console.debug(`-- {{ ffi_name }}`);
             {%- if callable.return_type.is_some() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
-                {{ ffi_converter }}.lower(self_),
+                {{ ffi_converter }}.lower(self_, nativeModule().rustbuffer_alloc),
                 {%- call arg_list_lowered(callable) %}
                 callStatus);
             },
@@ -147,11 +147,27 @@ console.debug(`-- {{ ffi_name }}`);
     {%- endmatch %}
 {%- endmacro -%}
 
+{#- The synchronous lift call sites below wrap the converter's `.lift(__rb)`
+   in `try/finally` so `rustbuffer_free` always runs — even if `lift`
+   throws on a malformed payload. The IIFE preserves the surrounding
+   `return ...` shape and avoids restructuring the multi-line `to_ffi_*_call`
+   macros into a `const __rb = ...` statement. -#}
+
 {#- Call body for value-receiver method: sync only (trait methods are never async). -#}
 {%- macro call_body_value(callable) %}
 {%- match callable.return_type -%}
 {%-     when Some with (return_type) %}
+{%- if return_type.is_rust_buffer %}
+    return ((__rb: Uint8Array) => {
+        try {
+            return {{ return_type.ffi_converter }}.lift(__rb);
+        } finally {
+            nativeModule().rustbuffer_free(__rb);
+        }
+    })({% call to_ffi_value_call(callable) %});
+{%- else %}
     return {{ return_type.ffi_converter }}.lift({% call to_ffi_value_call(callable) %});
+{%- endif %}
 {%-     when None %}
 {%-         call to_ffi_value_call(callable) %};
 {%- endmatch %}
@@ -164,7 +180,17 @@ console.debug(`-- {{ ffi_name }}`);
 {%- else %}
 {%-     match callable.return_type -%}
 {%-         when Some with (return_type) %}
+{%- if return_type.is_rust_buffer %}
+    return ((__rb: Uint8Array) => {
+        try {
+            return {{ return_type.ffi_converter }}.lift(__rb);
+        } finally {
+            nativeModule().rustbuffer_free(__rb);
+        }
+    })({% call to_ffi_pointer_call(callable, obj_factory) %});
+{%- else %}
     return {{ return_type.ffi_converter }}.lift({% call to_ffi_pointer_call(callable, obj_factory) %});
+{%- endif %}
 {%-         when None %}
 {%-             call to_ffi_pointer_call(callable, obj_factory) %};
 {%-     endmatch %}
@@ -178,7 +204,17 @@ console.debug(`-- {{ ffi_name }}`);
 {%- else %}
 {%-     match callable.return_type -%}
 {%-         when Some with (return_type) %}
+{%- if return_type.is_rust_buffer %}
+    return ((__rb: Uint8Array) => {
+        try {
+            return {{ return_type.ffi_converter }}.lift(__rb);
+        } finally {
+            nativeModule().rustbuffer_free(__rb);
+        }
+    })({% call to_ffi_call(callable) %});
+{%- else %}
     return {{ return_type.ffi_converter }}.lift({% call to_ffi_call(callable) %});
+{%- endif %}
 {%-         when None %}
 {%-             call to_ffi_call(callable) %};
 {%-     endmatch %}
@@ -214,7 +250,7 @@ console.debug(`-- {{ ffi_name }}`);
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments.is_empty() %},{% endif %}
                     {%- endif %}
                     {%- for arg in callable.arguments -%}
-                    {{ arg.ffi_converter }}.lower({{ arg.name }}){% if !loop.last %},{% endif %}
+                    {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% if !loop.last %},{% endif %}
                     {%- endfor %}
                 );
             },
@@ -224,6 +260,11 @@ console.debug(`-- {{ ffi_name }}`);
             /*freeFunc:*/ {% call native_method_handle_free(ffi_async.free) %},
             {%- match callable.return_type %}
             {%- when Some(return_type) %}
+            // Async returns always go through the JS-side converter: the
+            // FFI symbol returns the future handle (u64), and the user-level
+            // RustBuffer comes back via the shared `rust_future_complete_*`
+            // export. The bytes the runtime hands back must be deserialized
+            // here using the per-callable return-type converter.
             /*liftFunc:*/ {{ return_type.ffi_converter }}.lift.bind({{ return_type.ffi_converter }}),
             {%- when None %}
             /*liftFunc:*/ (_v) => {},

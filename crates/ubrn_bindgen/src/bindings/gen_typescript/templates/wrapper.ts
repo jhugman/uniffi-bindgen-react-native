@@ -38,7 +38,15 @@ const { {{ conv.converters|join(", ") }} } = {{ conv.default_name }}.converters;
 {%- if module.flavor.supports_plain_call_status() %}
 const uniffiCaller = new UniffiRustCaller(() => ({ code: 0 }));
 {%- else %}
-const nativeModule = () => wasmBundle;
+// wasm1: wrap the wasm-bindgen namespace once so the codegen call sites can
+// uniformly reference `nativeModule().rustbuffer_alloc` / `.rustbuffer_free`.
+// For wasm1, RustBuffers are plain JS Uint8Arrays — no Rust-side allocation
+// is involved, so alloc just hands back a fresh view and free is a no-op.
+const _nativeModule = Object.assign({}, wasmBundle, {
+  rustbuffer_alloc: (n: number): Uint8Array => new Uint8Array(n),
+  rustbuffer_free: (_: Uint8Array): void => {},
+});
+const nativeModule = () => _nativeModule;
 const uniffiCaller = new UniffiRustCaller(() => new wasmBundle.RustCallStatus());
 {%- endif %}
 

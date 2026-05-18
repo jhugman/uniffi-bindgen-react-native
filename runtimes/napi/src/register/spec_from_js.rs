@@ -61,9 +61,9 @@ fn ffi_type_desc_from_js(obj: &JsObject) -> Result<FfiTypeDesc> {
 pub fn parse_module_spec(definitions: &JsObject) -> Result<ModuleSpec> {
     let symbols: JsObject = definitions.get_named_property("symbols")?;
     let rustbuffer_symbols = RustBufferSymbols {
-        alloc: symbols.get_named_property::<String>("rustbufferAlloc")?,
-        free: symbols.get_named_property::<String>("rustbufferFree")?,
-        from_bytes: symbols.get_named_property::<String>("rustbufferFromBytes")?,
+        alloc: symbols.get_named_property::<String>("rustbuffer_alloc")?,
+        free: symbols.get_named_property::<String>("rustbuffer_free")?,
+        from_bytes: symbols.get_named_property::<String>("rustbuffer_from_bytes")?,
     };
 
     let functions = parse_functions(definitions)?;

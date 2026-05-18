@@ -3,7 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { type FfiConverter, FfiConverterUInt64 } from "./ffi-converters";
+import {
+  type FfiConverter,
+  FfiConverterUInt64,
+  type RustBufferAllocator,
+} from "./ffi-converters";
 import { type UniffiByteArray, RustBuffer } from "./ffi-types";
 import {
   type UniffiHandle,
@@ -24,14 +28,14 @@ export class FfiConverterCallback<T> implements FfiConverter<UniffiHandle, T> {
   lift(value: UniffiHandle): T {
     return this.handleMap.get(value);
   }
-  lower(value: T): UniffiHandle {
+  lower(value: T, _alloc: RustBufferAllocator): UniffiHandle {
     return this.handleMap.insert(value);
   }
   read(from: RustBuffer): T {
     return this.lift(handleConverter.read(from));
   }
   write(value: T, into: RustBuffer): void {
-    handleConverter.write(this.lower(value), into);
+    handleConverter.write(this.handleMap.insert(value), into);
   }
   allocationSize(value: T): number {
     return handleConverter.allocationSize(defaultUniffiHandle);
@@ -53,12 +57,13 @@ export function uniffiTraitInterfaceCall<T>(
     callStatus: /*i8*/ number,
     errorBuffer: UniffiByteArray,
   ) => void,
-  lowerString: (s: string) => UniffiByteArray,
+  lowerString: (s: string, alloc: RustBufferAllocator) => UniffiByteArray,
+  alloc: RustBufferAllocator,
 ) {
   try {
     handleSuccess(makeCall());
   } catch (e: any) {
-    handleError(CALL_UNEXPECTED_ERROR, lowerString(e.toString()));
+    handleError(CALL_UNEXPECTED_ERROR, lowerString(e.toString(), alloc));
   }
 }
 
@@ -70,8 +75,9 @@ export function uniffiTraitInterfaceCallWithError<T, E extends Error>(
     errorBuffer: UniffiByteArray,
   ) => void,
   isErrorType: (e: any) => e is E,
-  lowerError: (err: E) => UniffiByteArray,
-  lowerString: (s: string) => UniffiByteArray,
+  lowerError: (err: E, alloc: RustBufferAllocator) => UniffiByteArray,
+  lowerString: (s: string, alloc: RustBufferAllocator) => UniffiByteArray,
+  alloc: RustBufferAllocator,
 ): void {
   try {
     handleSuccess(makeCall());
@@ -79,9 +85,9 @@ export function uniffiTraitInterfaceCallWithError<T, E extends Error>(
     // Hermes' prototype chain seems buggy, so we need to make our
     // own arrangements
     if (isErrorType(e)) {
-      handleError(CALL_ERROR, lowerError(e));
+      handleError(CALL_ERROR, lowerError(e, alloc));
     } else {
-      handleError(CALL_UNEXPECTED_ERROR, lowerString(e.toString()));
+      handleError(CALL_UNEXPECTED_ERROR, lowerString(e.toString(), alloc));
     }
   }
 }

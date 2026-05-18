@@ -20,9 +20,9 @@ const LIB_PATH = libPath("uniffi_fixture_simple");
 const CRATE = "uniffi_fixture_simple";
 
 const SYMBOLS = {
-  rustbufferAlloc: `ffi_${CRATE}_rustbuffer_alloc`,
-  rustbufferFree: `ffi_${CRATE}_rustbuffer_free`,
-  rustbufferFromBytes: `ffi_${CRATE}_rustbuffer_from_bytes`,
+  rustbuffer_alloc: `ffi_${CRATE}_rustbuffer_alloc`,
+  rustbuffer_free: `ffi_${CRATE}_rustbuffer_free`,
+  rustbuffer_from_bytes: `ffi_${CRATE}_rustbuffer_from_bytes`,
 };
 
 function openAndRegister(

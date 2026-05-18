@@ -18,6 +18,11 @@ export class RustBuffer {
     this.capacity = arrayBuffer.byteLength;
   }
 
+  /**
+   * Allocate a JS-owned buffer of the given capacity. Used by tests; not by
+   * the runtime path, which calls `RustBuffer.fromUint8Array(allocator(n))`
+   * with a runtime-supplied allocator.
+   */
   static withCapacity(capacity: number): RustBuffer {
     const buf = new ArrayBuffer(capacity);
     return new RustBuffer(buf);
@@ -31,8 +36,17 @@ export class RustBuffer {
     return new RustBuffer(buf);
   }
 
-  static fromByteArray(buf: UniffiByteArray): RustBuffer {
-    return new RustBuffer(buf.buffer as ArrayBuffer);
+  /**
+   * Construct a `RustBuffer` over a `Uint8Array` view. Cursors track absolute
+   * offsets into the backing `ArrayBuffer`, so `byteOffset` and `byteLength`
+   * delimit the readable/writable region.
+   */
+  static fromUint8Array(view: UniffiByteArray): RustBuffer {
+    const buf = new RustBuffer(view.buffer as ArrayBuffer);
+    buf.readOffset = view.byteOffset;
+    buf.writeOffset = view.byteOffset;
+    buf.capacity = view.byteOffset + view.byteLength;
+    return buf;
   }
 
   get length(): number {

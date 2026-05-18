@@ -12,9 +12,9 @@ import { libPath } from "./helpers/lib-path.mjs";
 const LIB_PATH = libPath("uniffi_napi_test_lib");
 
 const SYMBOLS = {
-  rustbufferAlloc: "uniffi_test_rustbuffer_alloc",
-  rustbufferFree: "uniffi_test_rustbuffer_free",
-  rustbufferFromBytes: "uniffi_test_rustbuffer_from_bytes",
+  rustbuffer_alloc: "uniffi_test_rustbuffer_alloc",
+  rustbuffer_free: "uniffi_test_rustbuffer_free",
+  rustbuffer_from_bytes: "uniffi_test_rustbuffer_from_bytes",
 };
 
 test("open() loads a library", () => {
@@ -33,9 +33,9 @@ test("register() throws for missing symbol", () => {
   assert.throws(() => {
     lib.register({
       symbols: {
-        rustbufferAlloc: "nonexistent_symbol",
-        rustbufferFree: "uniffi_test_rustbuffer_free",
-        rustbufferFromBytes: "uniffi_test_rustbuffer_from_bytes",
+        rustbuffer_alloc: "nonexistent_symbol",
+        rustbuffer_free: "uniffi_test_rustbuffer_free",
+        rustbuffer_from_bytes: "uniffi_test_rustbuffer_from_bytes",
       },
       structs: {},
       callbacks: {},

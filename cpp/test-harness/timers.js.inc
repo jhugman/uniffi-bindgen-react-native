@@ -55,6 +55,49 @@ R"((function() {
     globalThis.setImmediate = setImmediate;
     globalThis.clearImmediate = clearImmediate;
 
+    if (typeof globalThis.gc === 'undefined' &&
+        typeof globalThis.__hermesGc === 'function') {
+        globalThis.gc = globalThis.__hermesGc;
+    }
+
+    if (typeof globalThis.process === 'undefined' &&
+        typeof globalThis.__hermesHeapInfo === 'function') {
+        var hostHeapInfo = globalThis.__hermesHeapInfo;
+        globalThis.process = {
+            memoryUsage: function() {
+                var info = hostHeapInfo();
+                var heapUsed = info.hermes_allocatedBytes || 0;
+                var heapTotal = info.hermes_heapSize || 0;
+                // Hermes' mallocSizeEstimate covers off-heap memory it knows
+                // about (e.g. ArrayBuffer backing stores registered with the
+                // GC). It's the closest analog to Node's `external`.
+                var external = info.hermes_mallocSizeEstimate || 0;
+                return {
+                    rss: heapTotal,
+                    heapTotal: heapTotal,
+                    heapUsed: heapUsed,
+                    external: external,
+                    arrayBuffers: 0,
+                };
+            },
+        };
+    }
+
+    if (typeof globalThis.performance === 'undefined') {
+        var hostNow = globalThis.__performanceNow;
+        if (typeof hostNow === 'function') {
+            var perfOrigin = hostNow();
+            globalThis.performance = {
+                now: function() { return hostNow() - perfOrigin; }
+            };
+        } else {
+            var perfStart = Date.now();
+            globalThis.performance = {
+                now: function() { return Date.now() - perfStart; }
+            };
+        }
+    }
+
     return {peek: peekMacroTask, run: runMacroTask};
 })();
 )"

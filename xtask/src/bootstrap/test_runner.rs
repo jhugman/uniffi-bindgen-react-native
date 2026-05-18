@@ -69,6 +69,7 @@ impl Bootstrap for TestRunnerCmd {
             } else {
                 "Ninja"
             })
+            .arg("-DCMAKE_BUILD_TYPE=Release")
             .arg(format!("-DHERMES_SRC_DIR={hermes_src}"))
             .arg(format!("-DHERMES_BUILD_DIR={hermes_build}"))
             .arg(&src_dir);

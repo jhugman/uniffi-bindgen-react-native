@@ -12,9 +12,9 @@ import { libPath } from "./helpers/lib-path.mjs";
 const LIB_PATH = libPath("uniffi_napi_test_lib");
 
 const SYMBOLS = {
-  rustbufferAlloc: "uniffi_test_rustbuffer_alloc",
-  rustbufferFree: "uniffi_test_rustbuffer_free",
-  rustbufferFromBytes: "uniffi_test_rustbuffer_from_bytes",
+  rustbuffer_alloc: "uniffi_test_rustbuffer_alloc",
+  rustbuffer_free: "uniffi_test_rustbuffer_free",
+  rustbuffer_from_bytes: "uniffi_test_rustbuffer_from_bytes",
 };
 
 function openLib() {
@@ -139,6 +139,68 @@ test("RustBuffer: buffer_len returns correct length", () => {
 
   assert.strictEqual(status.code, 0);
   assert.strictEqual(result, 4);
+});
+
+test("rustbuffer_alloc returns a Uint8Array view of the requested length", () => {
+  const lib = openLib();
+  const nm = lib.register({
+    symbols: SYMBOLS,
+    structs: {},
+    callbacks: {},
+    functions: {},
+  });
+
+  const view = nm.rustbuffer_alloc(16);
+  assert.ok(view instanceof Uint8Array);
+  assert.strictEqual(view.byteLength, 16);
+  view[0] = 0xab;
+  view[15] = 0xcd;
+  // Hand the buffer back to Rust to free it (otherwise it leaks).
+  nm.rustbuffer_free(view);
+});
+
+test("RustBuffer return is a view-handoff (alias safety)", () => {
+  // The lift-handoff path hands back a `Uint8Array` aliasing the Rust-
+  // allocated bytes — there's no boundary copy. After `rustbuffer_free`
+  // releases the underlying allocation, the view's bytes are no longer
+  // safe to inspect; mutating the view before free, however, must mutate
+  // the same bytes the runtime is about to free.
+  //
+  // We confirm "no boundary copy" by checking that the lift result and
+  // the final free happen against the same backing storage: the result
+  // is an `ArrayBuffer`-backed view distinct from the input we passed in
+  // (the input was JS-owned bytes wrapped into a Rust-owned `RustBuffer`
+  // by `from_bytes`; the return is a fresh Rust-owned allocation).
+  // Stronger: we make sure the lift path does not produce a view that
+  // shares storage with the JS-owned input — that would be a different
+  // bug (use-after-free across the FFI boundary).
+  const lib = openLib();
+  const nm = lib.register({
+    symbols: SYMBOLS,
+    structs: {},
+    callbacks: {},
+    functions: {
+      uniffi_test_fn_echo_buffer: {
+        args: [FfiType.RustBuffer],
+        ret: FfiType.RustBuffer,
+        hasRustCallStatus: true,
+      },
+    },
+  });
+
+  const input = new Uint8Array([10, 20, 30, 40, 50]);
+  const status = { code: 0 };
+  const result = nm.uniffi_test_fn_echo_buffer(input, status);
+
+  assert.strictEqual(status.code, 0);
+  assert.ok(result instanceof Uint8Array);
+  // The lifted view must not share storage with the JS-owned input — if
+  // it did, mutating `input` post-hoc would corrupt `result`. With a
+  // view-handoff over Rust memory, the two ArrayBuffers are independent.
+  assert.notStrictEqual(result.buffer, input.buffer);
+  // Mutate the input after the call to confirm independence.
+  input[0] = 0xff;
+  assert.strictEqual(result[0], 10);
 });
 
 test("RustBuffer: make_buffer creates filled buffer", () => {

@@ -10,7 +10,7 @@
 //! and alignment that the target library expects, because we pass them by value
 //! (for `RustBufferC`) or by pointer (for `RustCallStatusC`) through libffi.
 //!
-//! There are three struct types and two function-pointer type aliases:
+//! There are three struct types and three function-pointer type aliases:
 //!
 //! - [`RustBufferC`]: The **owned** byte buffer—`{ capacity: u64, len: u64, data: *mut u8 }`.
 //!   UniFFI uses this for passing serialized compound types across the boundary.
@@ -20,9 +20,10 @@
 //!   The `error_buf` fields are **inlined** (not nested) because we need direct field access
 //!   when constructing and inspecting the struct from Rust, and because `#[repr(C)]` layout
 //!   of a struct with inlined fields is identical to one with a nested sub-struct.
-//! - [`RustBufferFromBytesFn`] and [`RustBufferFreeFn`]: Function-pointer types for the
-//!   two `rustbuffer` management symbols (`*_rustbuffer_from_bytes` and `*_rustbuffer_free`)
-//!   that are resolved from the loaded library at registration time.
+//! - [`RustBufferAllocFn`], [`RustBufferFromBytesFn`], and [`RustBufferFreeFn`]: Function-pointer
+//!   types for the three `rustbuffer` management symbols (`*_rustbuffer_alloc`,
+//!   `*_rustbuffer_from_bytes`, and `*_rustbuffer_free`) that are resolved from the loaded
+//!   library at registration time.
 
 /// C layout of UniFFI's `RustBuffer`: an **owned** byte buffer passed by value across the FFI.
 ///
@@ -76,6 +77,11 @@ impl Default for RustCallStatusC {
     }
 }
 
+/// Signature of the `*_rustbuffer_alloc` symbol: takes a requested size in bytes and an
+/// out-parameter for call status, returns an owned `RustBufferC` with `capacity == size`,
+/// `len == 0`, and a freshly heap-allocated `data` pointer.
+pub type RustBufferAllocFn = unsafe extern "C" fn(i32, *mut RustCallStatusC) -> RustBufferC;
+
 /// Signature of the `*_rustbuffer_from_bytes` symbol: takes borrowed bytes and an
 /// out-parameter for call status, returns an owned `RustBufferC`.
 pub type RustBufferFromBytesFn =
@@ -87,10 +93,11 @@ pub type RustBufferFreeFn = unsafe extern "C" fn(RustBufferC, *mut RustCallStatu
 
 /// Resolved function pointers for RustBuffer lifecycle management.
 ///
-/// These two symbols are resolved once during registration and
+/// These three symbols are resolved once during registration and
 /// threaded through to every site that needs to allocate or free RustBuffers.
 #[derive(Clone, Copy)]
 pub struct RustBufferOps {
+    pub alloc_ptr: *const std::ffi::c_void,
     pub from_bytes_ptr: *const std::ffi::c_void,
     pub free_ptr: *const std::ffi::c_void,
 }

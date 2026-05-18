@@ -434,10 +434,15 @@ pub(super) fn build_callable(
         .iter()
         .map(|arg| build_arg(config, arg))
         .collect();
-    let return_type = callable.return_type.ty.as_ref().map(|tn| TsReturnType {
-        ts_type: type_label_for(config, &tn.ty),
-        ffi_converter: ffi_converter_name_for(config, tn),
-        ffi_type: ffi_type_to_ts_name(&tn.ffi_type.ty),
+    let return_type = callable.return_type.ty.as_ref().map(|tn| {
+        let ffi_type = ffi_type_to_ts_name(&tn.ffi_type.ty);
+        let is_rust_buffer = ffi_type == "Uint8Array";
+        TsReturnType {
+            ts_type: type_label_for(config, &tn.ty),
+            ffi_converter: ffi_converter_name_for(config, tn),
+            ffi_type,
+            is_rust_buffer,
+        }
     });
     let throws = callable
         .throws_type

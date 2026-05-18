@@ -6,6 +6,7 @@
 import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call";
 import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
 import { type UniffiByteArray } from "./ffi-types";
+import { type RustBufferAllocator } from "./ffi-converters";
 
 // Some additional data we hold for each in-flight promise.
 type PromiseHelper = {
@@ -24,7 +25,10 @@ const UNIFFI_FOREIGN_FUTURE_HANDLE_MAP = new UniffiHandleMap<PromiseHelper>();
 
 // Some degenerate functions used for default arguments.
 const notExpectedError = (err: any) => false;
-function emptyLowerError<E>(e: E): UniffiByteArray {
+function emptyLowerError<E>(
+  e: E,
+  _alloc: RustBufferAllocator,
+): UniffiByteArray {
   throw new Error("Unreachable");
 }
 
@@ -43,7 +47,8 @@ export function uniffiTraitInterfaceCallAsync<T>(
     callStatus: /*i8*/ number,
     errorBuffer: UniffiByteArray,
   ) => void,
-  lowerString: (str: string) => UniffiByteArray,
+  lowerString: (str: string, alloc: RustBufferAllocator) => UniffiByteArray,
+  alloc: RustBufferAllocator,
 ): UniffiForeignFuture {
   return uniffiTraitInterfaceCallAsyncWithError(
     makeCall,
@@ -52,6 +57,7 @@ export function uniffiTraitInterfaceCallAsync<T>(
     notExpectedError,
     emptyLowerError,
     lowerString,
+    alloc,
   );
 }
 
@@ -63,8 +69,9 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
     errorBuffer: UniffiByteArray,
   ) => void,
   isErrorType: (error: any) => boolean,
-  lowerError: (error: E) => UniffiByteArray,
-  lowerString: (str: string) => UniffiByteArray,
+  lowerError: (error: E, alloc: RustBufferAllocator) => UniffiByteArray,
+  lowerString: (str: string, alloc: RustBufferAllocator) => UniffiByteArray,
+  alloc: RustBufferAllocator,
 ): UniffiForeignFuture {
   const settledHolder: { settled: boolean } = { settled: false };
   const abortController = new AbortController();
@@ -77,7 +84,7 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
       let message = error.message ? error.message : error.toString();
       if (isErrorType(error)) {
         try {
-          handleError(CALL_ERROR, lowerError(error as E));
+          handleError(CALL_ERROR, lowerError(error as E, alloc));
           return;
         } catch (e: any) {
           // Fall through to unexpected error handling below.
@@ -87,7 +94,7 @@ export function uniffiTraitInterfaceCallAsyncWithError<T, E>(
       // This is the catch all:
       // 1. if there was an unexpected error causing a rejection
       // 2. if there was an unexpected error in the handleError function.
-      handleError(CALL_UNEXPECTED_ERROR, lowerString(message));
+      handleError(CALL_UNEXPECTED_ERROR, lowerString(message, alloc));
     });
 
   const promiseHelper = { abortController, settledHolder, promise };

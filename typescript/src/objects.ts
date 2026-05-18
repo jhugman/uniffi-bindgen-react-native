@@ -8,6 +8,7 @@ import {
   AbstractFfiConverterByteArray,
   type FfiConverter,
   FfiConverterUInt64,
+  type RustBufferAllocator,
 } from "./ffi-converters";
 import { RustBuffer } from "./ffi-types";
 import type { UniffiGcObject } from "./rust-call";
@@ -70,18 +71,21 @@ export class FfiConverterObject<T> implements FfiConverter<UniffiHandle, T> {
   lift(value: UniffiHandle): T {
     return this.factory.create(value);
   }
-  lower(value: T): UniffiHandle {
-    if (this.factory.isConcreteType(value)) {
-      return this.factory.clonePointer(value);
-    } else {
-      throw new Error("Cannot lower this object to a pointer");
-    }
+  lower(value: T, _alloc: RustBufferAllocator): UniffiHandle {
+    return this.lowerHandle(value);
   }
   read(from: RustBuffer): T {
     return this.lift(pointerConverter.read(from));
   }
   write(value: T, into: RustBuffer): void {
-    pointerConverter.write(this.lower(value), into);
+    pointerConverter.write(this.lowerHandle(value), into);
+  }
+  protected lowerHandle(value: T): UniffiHandle {
+    if (this.factory.isConcreteType(value)) {
+      return this.factory.clonePointer(value);
+    } else {
+      throw new Error("Cannot lower this object to a pointer");
+    }
   }
   allocationSize(value: T): number {
     return pointerConverter.allocationSize(dummyPointer);
@@ -97,11 +101,11 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
     super(factory);
   }
 
-  lower(value: T): UniffiHandle {
+  lower(value: T, alloc: RustBufferAllocator): UniffiHandle {
     // Rust-backed objects are lowered as raw Arc pointers (even numbers).
     // TS-implemented objects are inserted into the handleMap as foreign handles (odd numbers).
     if (this.factory.isConcreteType(value)) {
-      return super.lower(value);
+      return super.lower(value, alloc);
     }
     return this.handleMap.insert(value);
   }
