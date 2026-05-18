@@ -8,7 +8,7 @@ use camino::Utf8PathBuf;
 
 /// How the generated player should locate the cdylib at load time.
 ///
-/// Maps 1:1 to the three resolveLibPath modes in `@uniffi-runtime/napi`.
+/// Maps 1:1 to the three resolveLibPath modes in `@ubjs/node`.
 #[derive(Clone, Debug)]
 pub enum LibResolution {
     /// Look for the conventional filename next to the binding.

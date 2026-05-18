@@ -1,5 +1,5 @@
 {
-  "name": "@uniffi-runtime/napi",
+  "name": "@ubjs/node",
   "version": "0.31.0-2",
   "description": "Call Rust libraries from Node.js without hand-written glue — the N-API runtime backend for uniffi-bindgen-react-native.",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/runtimes/napi",
@@ -52,8 +52,8 @@
   ],
   "scripts": {
     "build:ts": "tsc -p typescript",
-    "build": "npm run build:ts && napi build --platform --release --js-package-name @uniffi-runtime/napi",
-    "build:debug": "npm run build:ts && napi build --platform --js-package-name @uniffi-runtime/napi",
+    "build": "npm run build:ts && napi build --platform --release --js-package-name @ubjs/node",
+    "build:debug": "npm run build:ts && napi build --platform --js-package-name @ubjs/node",
     "artifacts": "napi artifacts --dir artifacts",
     "create-npm-dirs": "napi create-npm-dir -t .",
     "assemble-root": "node ./scripts/assemble-root.mjs",
