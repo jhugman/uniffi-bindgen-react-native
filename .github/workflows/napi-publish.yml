@@ -27,9 +27,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS
+          # macOS (both targets cross-compile from Apple Silicon runners)
           - target: x86_64-apple-darwin
-            runner: macos-13
+            runner: macos-latest
           - target: aarch64-apple-darwin
             runner: macos-latest
 
