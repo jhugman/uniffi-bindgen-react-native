@@ -49,14 +49,6 @@ jobs:
             runner: ubuntu-latest
             build-flags: --zig
 
-          # Additional architectures with official Node.js binaries
-          - target: armv7-unknown-linux-gnueabihf
-            runner: ubuntu-latest
-            build-flags: --zig
-          - target: s390x-unknown-linux-gnu
-            runner: ubuntu-latest
-            build-flags: --zig
-
           # Windows
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
