@@ -17,12 +17,12 @@ pub use self::{
 };
 
 pub mod ffi_module_player_lib_resolution {
-    pub use crate::bindings::gen_typescript::ffi_module_player::LibResolution;
+    pub use crate::bindings::gen_typescript::ffi_module_player::{LibResolution, TripleStyle};
 }
 
 #[doc(hidden)]
 pub mod __player_template_test {
     pub use crate::bindings::gen_typescript::ffi_module_player::{
-        render_minimal_for_test, LibResolution,
+        render_minimal_for_test, LibResolution, TripleStyle,
     };
 }
