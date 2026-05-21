@@ -45,73 +45,154 @@ function fakeProcess(platform, arch, { glibc = false } = {}) {
   };
 }
 
-test("triple: darwin arm64", () => {
+test("node triple: darwin arm64", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("darwin", "arm64")),
+    detectTripleForTesting(fakeProcess("darwin", "arm64"), "node"),
     "darwin-arm64",
   );
 });
 
-test("triple: darwin x64", () => {
+test("node triple: darwin x64", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("darwin", "x64")),
+    detectTripleForTesting(fakeProcess("darwin", "x64"), "node"),
     "darwin-x64",
   );
 });
 
-test("triple: linux x64 gnu", () => {
+test("node triple: linux x64 gnu", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("linux", "x64", { glibc: true })),
+    detectTripleForTesting(
+      fakeProcess("linux", "x64", { glibc: true }),
+      "node",
+    ),
     "linux-x64-gnu",
   );
 });
 
-test("triple: linux x64 musl", () => {
+test("node triple: linux x64 musl", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("linux", "x64", { glibc: false })),
+    detectTripleForTesting(
+      fakeProcess("linux", "x64", { glibc: false }),
+      "node",
+    ),
     "linux-x64-musl",
   );
 });
 
-test("triple: linux arm64 gnu", () => {
+test("node triple: linux arm64 gnu", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("linux", "arm64", { glibc: true })),
+    detectTripleForTesting(
+      fakeProcess("linux", "arm64", { glibc: true }),
+      "node",
+    ),
     "linux-arm64-gnu",
   );
 });
 
-test("triple: linux arm64 musl", () => {
+test("node triple: linux arm64 musl", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("linux", "arm64", { glibc: false })),
+    detectTripleForTesting(
+      fakeProcess("linux", "arm64", { glibc: false }),
+      "node",
+    ),
     "linux-arm64-musl",
   );
 });
 
-test("triple: win32 x64", () => {
+test("node triple: win32 x64", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("win32", "x64")),
+    detectTripleForTesting(fakeProcess("win32", "x64"), "node"),
     "win32-x64-msvc",
   );
 });
 
-test("triple: win32 arm64", () => {
+test("node triple: win32 arm64", () => {
   assert.equal(
-    detectTripleForTesting(fakeProcess("win32", "arm64")),
+    detectTripleForTesting(fakeProcess("win32", "arm64"), "node"),
     "win32-arm64-msvc",
   );
 });
 
-test("triple: unsupported platform throws", () => {
+test("node triple: unsupported platform throws", () => {
   assert.throws(
-    () => detectTripleForTesting(fakeProcess("freebsd", "x64")),
+    () => detectTripleForTesting(fakeProcess("freebsd", "x64"), "node"),
     /Unsupported platform.*freebsd.*x64/,
   );
 });
 
-test("triple: unsupported arch throws", () => {
+test("node triple: unsupported arch throws", () => {
   assert.throws(
-    () => detectTripleForTesting(fakeProcess("darwin", "ia32")),
+    () => detectTripleForTesting(fakeProcess("darwin", "ia32"), "node"),
     /Unsupported platform.*darwin.*ia32/,
+  );
+});
+
+test("cargo triple: darwin arm64", () => {
+  assert.equal(
+    detectTripleForTesting(fakeProcess("darwin", "arm64"), "cargo"),
+    "aarch64-apple-darwin",
+  );
+});
+
+test("cargo triple: darwin x64", () => {
+  assert.equal(
+    detectTripleForTesting(fakeProcess("darwin", "x64"), "cargo"),
+    "x86_64-apple-darwin",
+  );
+});
+
+test("cargo triple: linux x64 gnu", () => {
+  assert.equal(
+    detectTripleForTesting(
+      fakeProcess("linux", "x64", { glibc: true }),
+      "cargo",
+    ),
+    "x86_64-unknown-linux-gnu",
+  );
+});
+
+test("cargo triple: linux arm64 musl", () => {
+  assert.equal(
+    detectTripleForTesting(
+      fakeProcess("linux", "arm64", { glibc: false }),
+      "cargo",
+    ),
+    "aarch64-unknown-linux-musl",
+  );
+});
+
+test("cargo triple: win32 x64", () => {
+  assert.equal(
+    detectTripleForTesting(fakeProcess("win32", "x64"), "cargo"),
+    "x86_64-pc-windows-msvc",
+  );
+});
+
+test("cargo triple: win32 arm64", () => {
+  assert.equal(
+    detectTripleForTesting(fakeProcess("win32", "arm64"), "cargo"),
+    "aarch64-pc-windows-msvc",
+  );
+});
+
+test("cargo triple: unsupported arch throws", () => {
+  assert.throws(
+    () => detectTripleForTesting(fakeProcess("darwin", "ia32"), "cargo"),
+    /Unsupported.*ia32/,
+  );
+});
+
+test("cargo triple: unsupported platform throws", () => {
+  assert.throws(
+    () => detectTripleForTesting(fakeProcess("freebsd", "x64"), "cargo"),
+    /Unsupported/,
+  );
+});
+
+test("detectTripleForTesting: defaults to cargo style when style omitted", () => {
+  assert.equal(
+    detectTripleForTesting(fakeProcess("darwin", "arm64")),
+    "aarch64-apple-darwin",
   );
 });
 
@@ -226,40 +307,117 @@ test("colocated: missing file throws", () => {
   }
 });
 
-function buildSyntheticPackage(rootDir, base, triple, libFile) {
-  const pkgDir = join(rootDir, "node_modules", `${base}-${triple}`);
+/** Build a synthetic npm package at `<rootDir>/node_modules/<pkgName>`. */
+function buildSyntheticPackageNamed(rootDir, pkgName, libFile) {
+  const pkgDir = join(rootDir, "node_modules", pkgName);
   mkdirSync(pkgDir, { recursive: true });
   writeFileSync(
     join(pkgDir, "package.json"),
-    JSON.stringify({ name: `${base}-${triple}`, version: "0.0.0" }),
+    JSON.stringify({ name: pkgName, version: "0.0.0" }),
   );
   if (libFile !== null) writeFileSync(join(pkgDir, libFile), "");
   return pkgDir;
 }
 
-test("npmPackageBase: package + binary present returns binary path", () => {
+function platformLibFile() {
+  const ext =
+    process.platform === "darwin"
+      ? "dylib"
+      : process.platform === "win32"
+        ? "dll"
+        : "so";
+  return process.platform === "win32" ? `foo.${ext}` : `libfoo.${ext}`;
+}
+
+test("npmPackageBase (cargo): base with trailing '-' joined to cargo triple", () => {
   const { dir, cleanup } = makeTempDir();
-  const restore = setDetectTripleForTesting(() => "darwin-arm64");
+  const restore = setDetectTripleForTesting(() => "aarch64-apple-darwin");
   try {
-    const ext =
-      process.platform === "darwin"
-        ? "dylib"
-        : process.platform === "win32"
-          ? "dll"
-          : "so";
-    const libFile =
-      process.platform === "win32" ? `foo.${ext}` : `libfoo.${ext}`;
-    const pkgDir = buildSyntheticPackage(
+    const libFile = platformLibFile();
+    const pkgDir = buildSyntheticPackageNamed(
       dir,
-      "@scope/foo",
-      "darwin-arm64",
+      "@scope/foo-aarch64-apple-darwin",
       libFile,
     );
     const callerUrl = pathToFileURL(join(dir, "caller.js")).toString();
     const got = resolveLibPath({
       crateName: "foo",
       callerUrl,
-      npmPackageBase: "@scope/foo",
+      npmPackageBase: "@scope/foo-",
+      tripleStyle: "cargo",
+    });
+    assert.equal(got, join(realpathSync(pkgDir), libFile));
+  } finally {
+    setDetectTripleForTesting(restore);
+    cleanup();
+  }
+});
+
+test("npmPackageBase (node): base with trailing '-' joined to node triple", () => {
+  const { dir, cleanup } = makeTempDir();
+  const restore = setDetectTripleForTesting(() => "darwin-arm64");
+  try {
+    const libFile = platformLibFile();
+    const pkgDir = buildSyntheticPackageNamed(
+      dir,
+      "@scope/foo-darwin-arm64",
+      libFile,
+    );
+    const callerUrl = pathToFileURL(join(dir, "caller.js")).toString();
+    const got = resolveLibPath({
+      crateName: "foo",
+      callerUrl,
+      npmPackageBase: "@scope/foo-",
+      tripleStyle: "node",
+    });
+    assert.equal(got, join(realpathSync(pkgDir), libFile));
+  } finally {
+    setDetectTripleForTesting(restore);
+    cleanup();
+  }
+});
+
+test("npmPackageBase: defaults to cargo when tripleStyle omitted", () => {
+  const { dir, cleanup } = makeTempDir();
+  const restore = setDetectTripleForTesting((style) => {
+    assert.equal(style, "cargo", "expected default style 'cargo'");
+    return "aarch64-apple-darwin";
+  });
+  try {
+    const libFile = platformLibFile();
+    buildSyntheticPackageNamed(
+      dir,
+      "@scope/foo-aarch64-apple-darwin",
+      libFile,
+    );
+    const callerUrl = pathToFileURL(join(dir, "caller.js")).toString();
+    resolveLibPath({
+      crateName: "foo",
+      callerUrl,
+      npmPackageBase: "@scope/foo-",
+    });
+  } finally {
+    setDetectTripleForTesting(restore);
+    cleanup();
+  }
+});
+
+test("npmPackageBase: trailing '/' uses subpath layout (no implicit '-')", () => {
+  const { dir, cleanup } = makeTempDir();
+  const restore = setDetectTripleForTesting(() => "aarch64-apple-darwin");
+  try {
+    const libFile = platformLibFile();
+    const pkgDir = buildSyntheticPackageNamed(
+      dir,
+      "@scope/foo/aarch64-apple-darwin",
+      libFile,
+    );
+    const callerUrl = pathToFileURL(join(dir, "caller.js")).toString();
+    const got = resolveLibPath({
+      crateName: "foo",
+      callerUrl,
+      npmPackageBase: "@scope/foo/",
+      tripleStyle: "cargo",
     });
     assert.equal(got, join(realpathSync(pkgDir), libFile));
   } finally {
@@ -270,21 +428,22 @@ test("npmPackageBase: package + binary present returns binary path", () => {
 
 test("npmPackageBase: package missing throws and names triple + base", () => {
   const { dir, cleanup } = makeTempDir();
-  const restore = setDetectTripleForTesting(() => "darwin-arm64");
+  const restore = setDetectTripleForTesting(() => "aarch64-apple-darwin");
   try {
     const callerUrl = pathToFileURL(join(dir, "caller.js")).toString();
     try {
       resolveLibPath({
         crateName: "foo",
         callerUrl,
-        npmPackageBase: "@scope/foo",
+        npmPackageBase: "@scope/foo-",
+        tripleStyle: "cargo",
       });
       assert.fail("expected throw");
     } catch (e) {
       assert.ok(e instanceof ResolveLibPathError);
       assert.equal(e.mode, "npmPackageBase");
-      assert.match(e.message, /@scope\/foo-darwin-arm64/);
-      assert.match(e.message, /darwin-arm64/);
+      assert.match(e.message, /@scope\/foo-aarch64-apple-darwin/);
+      assert.match(e.message, /aarch64-apple-darwin/);
     }
   } finally {
     setDetectTripleForTesting(restore);
@@ -294,15 +453,16 @@ test("npmPackageBase: package missing throws and names triple + base", () => {
 
 test("npmPackageBase: package present but binary missing throws malformed", () => {
   const { dir, cleanup } = makeTempDir();
-  const restore = setDetectTripleForTesting(() => "darwin-arm64");
+  const restore = setDetectTripleForTesting(() => "aarch64-apple-darwin");
   try {
-    buildSyntheticPackage(dir, "@scope/foo", "darwin-arm64", null);
+    buildSyntheticPackageNamed(dir, "@scope/foo-aarch64-apple-darwin", null);
     const callerUrl = pathToFileURL(join(dir, "caller.js")).toString();
     try {
       resolveLibPath({
         crateName: "foo",
         callerUrl,
-        npmPackageBase: "@scope/foo",
+        npmPackageBase: "@scope/foo-",
+        tripleStyle: "cargo",
       });
       assert.fail("expected throw");
     } catch (e) {
