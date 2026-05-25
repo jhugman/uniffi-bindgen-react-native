@@ -1,4 +1,4 @@
-name: Publish uniffi-bindgen-react-native to npmjs
+name: Publish @ubjs/core to npmjs
 on:
   release:
     types: [published]
@@ -8,9 +8,10 @@ on:
         description: "Run without publishing to npm"
         type: boolean
         default: true
+  workflow_call:
 
 jobs:
-  publish-ubrn:
+  publish-core:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -21,17 +22,16 @@ jobs:
         with:
           node-version: "20.x"
           registry-url: "https://registry.npmjs.org"
-      - run: npm install
       - run: cd typescript && npm install && npm run build
 
-      - name: "📦 npm publish: uniffi-bindgen-react-native (dry-run)"
+      - name: "📦 npm publish: @ubjs/core (dry-run)"
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
         run: |
           echo "::notice::DRY RUN — not publishing to npm"
-          npm publish --dry-run --access public
+          cd typescript && npm publish --dry-run --access public
 
-      - name: "📦 npm publish: uniffi-bindgen-react-native"
-        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
-        run: npm publish --provenance --access public
+      - name: "📦 npm publish: @ubjs/core"
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_call' || !inputs.dry-run }}
+        run: cd typescript && npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
