@@ -12,6 +12,15 @@ With this tool, you can write your business logic once in Rust and access it sea
 
 UniFFI provides procedural macros to describe your API, prioritizing expressivity and memory safety. This makes it ideal for portability.
 
+## Packages
+
+- **`uniffi-bindgen-react-native`** (npm) — CLI (`ubrn`), tooling, and the
+  legacy-named runtime that older generated code imports from.
+- **`@ubjs/core`** (npm) — same runtime bytes, new identity. New generated
+  code imports from here. See [`typescript/README.md`](./typescript/README.md).
+- **`@ubjs/node`** (npm) — N-API runtime backend; required for Node and Bun
+  consumers of generated bindings. See [`runtimes/napi/README.md`](./runtimes/napi/README.md).
+
 ## ✨ Features
 
 It provides tooling to generate safe and performant TypeScript to access Rust from:
