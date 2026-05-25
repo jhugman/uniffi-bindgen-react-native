@@ -135,7 +135,7 @@ jobs:
             echo ""
           done
 
-      - name: Publish (dry-run)
+      - name: "📦 npm publish: @ubjs/node (dry-run)"
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
         run: |
           echo "::notice::DRY RUN — not publishing to npm"
@@ -144,7 +144,7 @@ jobs:
             (cd "$dir" && npm publish --dry-run --access public --tag latest)
           done
 
-      - name: Publish platform packages
+      - name: "📦 npm publish: @ubjs/node platform packages"
         if: ${{ github.event_name == 'release' || !inputs.dry-run }}
         run: |
           for dir in npm/*/; do
@@ -155,7 +155,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish root package
+      - name: "📦 npm publish: @ubjs/node"
         if: ${{ github.event_name == 'release' || !inputs.dry-run }}
         working-directory: runtimes/napi/npm/root
         run: npm publish --provenance --access public --tag latest
