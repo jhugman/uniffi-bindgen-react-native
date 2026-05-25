@@ -17,7 +17,7 @@ import {
   type UniffiGcObject,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
   type UniffiResult,
-} from 'uniffi-bindgen-react-native';
+} from '@ubjs/core';
 
 const DEFINITIONS = {
   symbols: {

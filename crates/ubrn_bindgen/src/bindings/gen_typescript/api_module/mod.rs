@@ -74,14 +74,14 @@ impl ImportAccumulator {
 
     pub fn add_infra_value(&mut self, name: &str) {
         self.imports
-            .entry("uniffi-bindgen-react-native".into())
+            .entry("@ubjs/core".into())
             .or_default()
             .insert(ImportedItem::Value(name.into()));
     }
 
     pub fn add_infra_type(&mut self, name: &str) {
         self.imports
-            .entry("uniffi-bindgen-react-native".into())
+            .entry("@ubjs/core".into())
             .or_default()
             .insert(ImportedItem::Type(name.into()));
     }
