@@ -119,6 +119,7 @@ fn compile_ts(tsconfig: &Utf8Path) {
 /// Handles these aliases from the tsconfig:
 ///  - `@/*`                        → `typescript/testing/*`
 ///  - `@/generated/*`              → fixture's `generated/*` (if provided)
+///  - `@ubjs/core`                 → `typescript/src/index`
 ///  - `uniffi-bindgen-react-native` → `typescript/src/index`
 ///
 /// After tsc compilation the directory structure is preserved under `tsc_dir`,
@@ -167,7 +168,8 @@ fn rewrite_paths_recursive(
             let needs_generated = contents.contains("\"@/generated/");
             let needs_at = contents.contains("\"@/");
             let needs_ubrn = contents.contains("\"uniffi-bindgen-react-native\"");
-            if !needs_at && !needs_generated && !needs_ubrn {
+            let needs_core = contents.contains("\"@ubjs/core\"");
+            if !needs_at && !needs_generated && !needs_ubrn && !needs_core {
                 continue;
             }
 
@@ -195,6 +197,12 @@ fn rewrite_paths_recursive(
                 let rel_str = make_relative(&rel);
                 rewritten =
                     rewritten.replace("\"uniffi-bindgen-react-native\"", &format!("\"{rel_str}\""));
+            }
+
+            if needs_core {
+                let rel = relative_path(ubrn_index, file_dir);
+                let rel_str = make_relative(&rel);
+                rewritten = rewritten.replace("\"@ubjs/core\"", &format!("\"{rel_str}\""));
             }
 
             std::fs::write(&utf8, rewritten)

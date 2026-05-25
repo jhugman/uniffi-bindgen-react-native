@@ -182,9 +182,12 @@ pub(crate) fn write_fixture_tsconfig(
 }
 
 fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
-    let mut runtime_paths = vec![format!(
-        r#""uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]"#
-    )];
+    let mut runtime_paths = vec![
+        format!(r#""@ubjs/core": ["{rel_root}/typescript/src/index"]"#),
+        // Defensive: kept so mid-rollout fixtures still resolve. Drop
+        // once all generated fixtures are regenerated to import @ubjs/core.
+        format!(r#""uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]"#),
+    ];
     if flavor == Flavor::Napi {
         runtime_paths.push(format!(r#""@ubjs/node": ["{rel_root}/runtimes/napi/lib"]"#));
     }
