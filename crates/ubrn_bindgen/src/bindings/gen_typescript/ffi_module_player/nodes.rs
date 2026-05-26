@@ -15,8 +15,36 @@ pub enum LibResolution {
     Colocated,
     /// Bake an absolute path into the generated code.
     Absolute(Utf8PathBuf),
-    /// Resolve via `<base>-<triple>` platform packages.
-    Require(String),
+    /// Resolve via `<base><triple>` platform npm packages.
+    ///
+    /// `base` is the literal prefix joined to the triple — callers are
+    /// responsible for any separator (`-`, `/`, `_`); the runtime concatenates
+    /// without inserting one. `triple_style` selects between cargo-style and
+    /// node-style triple naming.
+    Require {
+        base: String,
+        triple_style: TripleStyle,
+    },
+}
+
+/// Which platform-triple naming convention the consuming npm packages use.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TripleStyle {
+    /// `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`, … (cargo `--target`).
+    #[default]
+    Cargo,
+    /// `darwin-arm64`, `linux-x64-gnu`, … (napi-rs convention).
+    Node,
+}
+
+impl TripleStyle {
+    /// String tag passed through to the runtime in generated TS.
+    pub fn as_runtime_tag(self) -> &'static str {
+        match self {
+            TripleStyle::Cargo => "cargo",
+            TripleStyle::Node => "node",
+        }
+    }
 }
 
 /// IR for the player-style `{namespace}-ffi.ts`.

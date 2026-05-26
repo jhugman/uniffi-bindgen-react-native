@@ -8,8 +8,8 @@ mod builder;
 mod nodes;
 mod type_mapping;
 
-pub use nodes::LibResolution;
 pub(crate) use nodes::PlayerFfiModule;
+pub use nodes::{LibResolution, TripleStyle};
 
 /// Render a minimal player template for snapshot testing. Hidden from API docs.
 #[doc(hidden)]

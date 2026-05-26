@@ -15,7 +15,10 @@ interface ProcessLike {
   report?: { getReport(): { header?: { glibcVersionRuntime?: string } } };
 }
 
-function detectTriple(proc: ProcessLike): string {
+/** Which platform-triple naming convention to use. */
+export type TripleStyle = "cargo" | "node";
+
+function detectNodeTriple(proc: ProcessLike): string {
   const { platform, arch } = proc;
   if (platform === "darwin" && arch === "arm64") return "darwin-arm64";
   if (platform === "darwin" && arch === "x64") return "darwin-x64";
@@ -33,9 +36,44 @@ function detectTriple(proc: ProcessLike): string {
   );
 }
 
+function detectCargoTriple(proc: ProcessLike): string {
+  const { platform, arch } = proc;
+  // Cargo uses LLVM target triples: <arch>-<vendor>-<sys>[-<env>].
+  // Map Node's `process.arch` to the LLVM arch name.
+  const archMap: Record<string, string> = {
+    arm64: "aarch64",
+    x64: "x86_64",
+  };
+  const llvmArch = archMap[arch];
+  if (llvmArch === undefined) {
+    throw new Error(
+      `Unsupported platform/arch combination: ${platform}/${arch}. ` +
+        `Supported arches: arm64, x64.`,
+    );
+  }
+  if (platform === "darwin") return `${llvmArch}-apple-darwin`;
+  if (platform === "linux") {
+    const isGnu =
+      proc.report?.getReport()?.header?.glibcVersionRuntime !== undefined;
+    return `${llvmArch}-unknown-linux-${isGnu ? "gnu" : "musl"}`;
+  }
+  if (platform === "win32") return `${llvmArch}-pc-windows-msvc`;
+  throw new Error(
+    `Unsupported platform/arch combination: ${platform}/${arch}. ` +
+      `Supported: darwin, linux, win32.`,
+  );
+}
+
+function detectTriple(proc: ProcessLike, style: TripleStyle): string {
+  return style === "node" ? detectNodeTriple(proc) : detectCargoTriple(proc);
+}
+
 /** Test-only export. Do not use from production code. */
-export function detectTripleForTesting(proc: ProcessLike): string {
-  return detectTriple(proc);
+export function detectTripleForTesting(
+  proc: ProcessLike,
+  style: TripleStyle = "cargo",
+): string {
+  return detectTriple(proc, style);
 }
 
 export type ResolveMode = "override" | "npmPackageBase" | "colocated";
@@ -66,9 +104,13 @@ export type ResolveLibPathOptions = {
   crateName: string;
   callerUrl: string;
 } & (
-  | { override: string; npmPackageBase?: never }
-  | { npmPackageBase: string; override?: never }
-  | { override?: never; npmPackageBase?: never }
+  | { override: string; npmPackageBase?: never; tripleStyle?: never }
+  | { npmPackageBase: string; tripleStyle?: TripleStyle; override?: never }
+  | {
+      override?: never;
+      npmPackageBase?: never;
+      tripleStyle?: never;
+    }
 );
 
 function callerDir(callerUrl: string): string {
@@ -93,6 +135,7 @@ export function resolveLibPath(opts: ResolveLibPathOptions): string {
       opts.crateName,
       opts.callerUrl,
       opts.npmPackageBase,
+      opts.tripleStyle ?? "cargo",
     );
   }
   return resolveColocated(opts.crateName, opts.callerUrl);
@@ -134,11 +177,13 @@ function resolveOverride(crateName: string, path: string): string {
   return path;
 }
 
-let _detectTripleImpl: () => string = () =>
-  detectTriple(process as ProcessLike);
+let _detectTripleImpl: (style: TripleStyle) => string = (style) =>
+  detectTriple(process as ProcessLike, style);
 
 /** Test-only seam to override triple detection. Returns the previous impl. */
-export function setDetectTripleForTesting(fn: () => string): () => string {
+export function setDetectTripleForTesting(
+  fn: (style: TripleStyle) => string,
+): (style: TripleStyle) => string {
   const prev = _detectTripleImpl;
   _detectTripleImpl = fn;
   return prev;
@@ -148,9 +193,12 @@ function resolveNpmPackage(
   crateName: string,
   callerUrl: string,
   npmPackageBase: string,
+  tripleStyle: TripleStyle,
 ): string {
-  const triple = _detectTripleImpl();
-  const pkgName = `${npmPackageBase}-${triple}`;
+  const triple = _detectTripleImpl(tripleStyle);
+  // Caller-supplied base carries its own separator (a trailing `-`, `/`, etc.);
+  // we concatenate literally so subpath layouts (`@scope/foo/<triple>`) work.
+  const pkgName = `${npmPackageBase}${triple}`;
   const require_ = createRequire(callerUrl);
 
   let pkgJsonPath: string;

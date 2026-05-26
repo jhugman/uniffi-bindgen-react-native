@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use expect_test::expect;
-use ubrn_bindgen::__player_template_test::{render_minimal_for_test, LibResolution};
+use ubrn_bindgen::__player_template_test::{render_minimal_for_test, LibResolution, TripleStyle};
 
 fn extract_getter_block(rendered: &str) -> String {
     let start = rendered
@@ -61,9 +61,14 @@ fn template_absolute() {
 }
 
 #[test]
-fn template_require() {
-    let rendered =
-        render_minimal_for_test(LibResolution::Require("@scope/foo".to_string()), "my_crate");
+fn template_require_cargo() {
+    let rendered = render_minimal_for_test(
+        LibResolution::Require {
+            base: "@scope/foo-".to_string(),
+            triple_style: TripleStyle::Cargo,
+        },
+        "my_crate",
+    );
     expect![[r#"
         let _nativeModule: NativeModuleInterface | undefined;
         const getter: () => NativeModuleInterface = () => {
@@ -71,7 +76,8 @@ fn template_require() {
             const libPath = resolveLibPath({
               crateName: "my_crate",
               callerUrl: import.meta.url,
-              npmPackageBase: "@scope/foo",
+              npmPackageBase: "@scope/foo-",
+              tripleStyle: "cargo",
             });
             const mod_ = UniffiNativeModule.open(libPath);
             _nativeModule = mod_.register(DEFINITIONS) as unknown as NativeModuleInterface;
@@ -80,6 +86,51 @@ fn template_require() {
         };
         export default getter;"#]]
     .assert_eq(&extract_getter_block(&rendered));
+}
+
+#[test]
+fn template_require_node() {
+    let rendered = render_minimal_for_test(
+        LibResolution::Require {
+            base: "@scope/foo-".to_string(),
+            triple_style: TripleStyle::Node,
+        },
+        "my_crate",
+    );
+    expect![[r#"
+        let _nativeModule: NativeModuleInterface | undefined;
+        const getter: () => NativeModuleInterface = () => {
+          if (!_nativeModule) {
+            const libPath = resolveLibPath({
+              crateName: "my_crate",
+              callerUrl: import.meta.url,
+              npmPackageBase: "@scope/foo-",
+              tripleStyle: "node",
+            });
+            const mod_ = UniffiNativeModule.open(libPath);
+            _nativeModule = mod_.register(DEFINITIONS) as unknown as NativeModuleInterface;
+          }
+          return _nativeModule;
+        };
+        export default getter;"#]]
+    .assert_eq(&extract_getter_block(&rendered));
+}
+
+#[test]
+fn template_require_preserves_non_hyphen_separator() {
+    // Subpath layout: `@scope/foo/<triple>` — base ends with `/` so no `-` is added.
+    let rendered = render_minimal_for_test(
+        LibResolution::Require {
+            base: "@scope/foo/".to_string(),
+            triple_style: TripleStyle::Cargo,
+        },
+        "my_crate",
+    );
+    let block = extract_getter_block(&rendered);
+    assert!(
+        block.contains(r#"npmPackageBase: "@scope/foo/""#),
+        "expected subpath base verbatim, got:\n{block}"
+    );
 }
 
 #[test]

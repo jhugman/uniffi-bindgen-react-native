@@ -313,7 +313,7 @@ fn generate_ffi_from_pipeline(
             AbiFlavor::Napi => {
                 let lib_resolution = lib_resolution.clone().ok_or_else(|| {
                     anyhow::anyhow!(
-                        "napi codegen requires a LibResolution; pass --lib-colocated or --lib-absolute"
+                        "napi codegen requires a LibResolution; pass --lib-colocated, --lib-absolute, or --lib-package-base"
                     )
                 })?;
                 let crate_name = namespace.crate_name.clone();

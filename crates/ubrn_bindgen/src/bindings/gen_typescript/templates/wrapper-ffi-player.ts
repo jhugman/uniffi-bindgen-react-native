@@ -83,8 +83,9 @@ const getter: () => NativeModuleInterface = () => {
       {%- when LibResolution::Colocated %}
       {%- when LibResolution::Absolute with (path) %}
       override: "{{ path }}",
-      {%- when LibResolution::Require with (base) %}
+      {%- when LibResolution::Require { base, triple_style } %}
       npmPackageBase: "{{ base }}",
+      tripleStyle: "{{ triple_style.as_runtime_tag() }}",
       {%- endmatch %}
     });
     const mod_ = UniffiNativeModule.open(libPath);
