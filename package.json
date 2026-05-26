@@ -1,6 +1,6 @@
 {
   "name": "uniffi-bindgen-react-native",
-  "version": "0.31.0-2",
+  "version": "0.31.0-3",
   "description": "Uniffi bindings generator for calling Rust from React Native",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {
@@ -12,14 +12,22 @@
     "email": "james@hugman.tv"
   },
   "type": "module",
-  "main": "./typescript/dist/index.js",
-  "types": "./typescript/dist/index.d.ts",
+  "main": "./typescript/dist/cjs/index.js",
+  "module": "./typescript/dist/esm/index.js",
+  "types": "./typescript/dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./typescript/dist/esm/index.d.ts",
+      "import": "./typescript/dist/esm/index.js",
+      "require": "./typescript/dist/cjs/index.js"
+    }
+  },
   "bin": {
     "ubrn": "./bin/cli.cjs",
     "uniffi-bindgen-react-native": "./bin/cli.cjs"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "cd typescript && npm install && npm run build",
     "prepare": "yarn build",
     "test": "cargo test"
   },

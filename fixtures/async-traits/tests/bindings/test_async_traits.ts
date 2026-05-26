@@ -12,7 +12,7 @@ import { asyncTest, Asserts, test } from "@/asserts";
 import {
   uniffiRustFutureHandleCount,
   uniffiForeignFutureHandleCount,
-} from "uniffi-bindgen-react-native";
+} from "@ubjs/core";
 import "@/polyfills";
 
 // Initialize the callbacks for the module.

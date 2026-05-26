@@ -3,10 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call";
-import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
-import { type UniffiByteArray } from "./ffi-types";
-import { type RustBufferAllocator } from "./ffi-converters";
+import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call.ts";
+import { type UniffiHandle, UniffiHandleMap } from "./handle-map.ts";
+import { type UniffiByteArray } from "./ffi-types.ts";
+import { type RustBufferAllocator } from "./ffi-converters.ts";
 
 // Some additional data we hold for each in-flight promise.
 type PromiseHelper = {

@@ -9,11 +9,11 @@ import {
   type FfiConverter,
   FfiConverterUInt64,
   type RustBufferAllocator,
-} from "./ffi-converters";
-import { RustBuffer } from "./ffi-types";
-import type { UniffiGcObject } from "./rust-call";
-import { type UniffiHandle, UniffiHandleMap } from "./handle-map";
-import { UniffiInternalError, UniffiThrownObject } from "./errors";
+} from "./ffi-converters.ts";
+import { RustBuffer } from "./ffi-types.ts";
+import type { UniffiGcObject } from "./rust-call.ts";
+import { type UniffiHandle, UniffiHandleMap } from "./handle-map.ts";
+import { UniffiInternalError, UniffiThrownObject } from "./errors.ts";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.

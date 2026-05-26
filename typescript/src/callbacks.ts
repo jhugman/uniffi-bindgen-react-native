@@ -7,18 +7,18 @@ import {
   type FfiConverter,
   FfiConverterUInt64,
   type RustBufferAllocator,
-} from "./ffi-converters";
-import { type UniffiByteArray, RustBuffer } from "./ffi-types";
+} from "./ffi-converters.ts";
+import { type UniffiByteArray, RustBuffer } from "./ffi-types.ts";
 import {
   type UniffiHandle,
   UniffiHandleMap,
   defaultUniffiHandle,
-} from "./handle-map";
+} from "./handle-map.ts";
 import {
   CALL_ERROR,
   CALL_UNEXPECTED_ERROR,
   type UniffiRustCallStatus,
-} from "./rust-call";
+} from "./rust-call.ts";
 
 const handleConverter = FfiConverterUInt64;
 

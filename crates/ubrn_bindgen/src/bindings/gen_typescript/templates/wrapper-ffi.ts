@@ -15,7 +15,7 @@ import {
   type UniffiGcObject,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
   type UniffiResult,
- } from 'uniffi-bindgen-react-native';
+ } from '@ubjs/core';
 
 interface NativeModuleInterface {
     {%- for func in module.functions %}

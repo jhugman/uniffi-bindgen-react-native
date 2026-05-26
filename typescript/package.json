@@ -1,0 +1,42 @@
+{
+  "name": "@ubjs/core",
+  "version": "0.31.0-3",
+  "description": "Runtime support for uniffi-bindgen-javascript generated bindings.",
+  "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/uniffi-bindgen-react-native.git",
+    "directory": "typescript"
+  },
+  "license": "MPL-2.0",
+  "author": {
+    "name": "James Hugman",
+    "email": "james@hugman.tv"
+  },
+  "bugs": {
+    "url": "https://github.com/jhugman/uniffi-bindgen-react-native/issues"
+  },
+  "keywords": ["uniffi", "ffi", "rust", "react-native", "typescript"],
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": ["dist/", "src/", "README.md"],
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs && npm run build:cjs-pkgjson",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:cjs-pkgjson": "node -e \"require('fs').writeFileSync('dist/cjs/package.json', JSON.stringify({type:'commonjs'}))\""
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "publishConfig": { "access": "public" }
+}
