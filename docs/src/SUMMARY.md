@@ -44,6 +44,7 @@
 # Reference
 
 - [`ubrn` Command Line](reference/commandline.md)
+- [Node.js (N-API) support](reference/nodejs.md)
 - [`ubrn.config.yaml`](reference/config-yaml.md)
 - [`uniffi.toml`](reference/uniffi-toml.md)
 - [Generating a Turbo Module](reference/turbo-module-files.md)

@@ -6,7 +6,7 @@
 
 # 🦀 uniffi-bindgen-react-native
 
-`uniffi-bindgen-react-native` is a tool that generates TypeScript bindings for Rust code, making it usable in React Native apps and web pages. It builds on [UniFFI](https://mozilla.github.io/uniffi-rs/latest/), Mozilla's bindings generator ecosystem.
+`uniffi-bindgen-react-native` is a tool that generates TypeScript bindings for Rust code, making it usable in React Native apps, web pages, and Node.js. It builds on [UniFFI](https://mozilla.github.io/uniffi-rs/latest/), Mozilla's bindings generator ecosystem.
 
 With this tool, you can write your business logic once in Rust and access it seamlessly from TypeScript, whether you're developing for mobile platforms or the web.
 
@@ -30,8 +30,10 @@ It provides tooling to generate safe and performant TypeScript to access Rust fr
   - a Turbo-Module that installs the bindings into a running React Native library.
 - 🌐 **Web pages**
   - with a WASM binding crate
+- 🟢 **Node.js** _(new)_
+  - with the [`@ubjs/node`](https://www.npmjs.com/package/@ubjs/node) N-API runtime, loading your compiled Rust `cdylib` at runtime. See the [Node.js reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/nodejs.html).
 
-All using the same proc macros: you annotate your Rust once, and build for Android, iOS and the Web.
+All using the same proc macros: you annotate your Rust once, and build for Android, iOS, the Web, and Node.js.
 
 Javascript hosts the Rust library, and `uniffi-bindgen-react-native` and `uniffi` facilitate the communication between the two:
 
