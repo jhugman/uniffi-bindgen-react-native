@@ -1844,7 +1844,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-react-native"
-version = "0.31.0-2"
+version = "0.31.0-3"
 dependencies = [
  "anyhow",
  "askama 0.13.1",
@@ -2222,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-runtime-javascript"
-version = "0.31.0-2"
+version = "0.31.0-3"
 dependencies = [
  "uniffi_core",
  "wasm-bindgen",

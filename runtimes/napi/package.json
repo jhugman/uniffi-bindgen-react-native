@@ -1,6 +1,6 @@
 {
   "name": "@ubjs/node",
-  "version": "0.31.0-2",
+  "version": "0.31.0-3",
   "description": "Call Rust libraries from Node.js without hand-written glue — the N-API runtime backend for uniffi-bindgen-react-native.",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/runtimes/napi",
   "repository": {
