@@ -3,7 +3,11 @@
 The command line tool `uniffi-bindgen-react-native` can generate Javascript bindings crate for your
 Rust crate, from `[uniffi::export]` proc-macros in your code.
 
-These bindings crates depend on this crate. Currently this is for WASM runtimes only.
+These bindings crates depend on this crate. Currently this is for WASM runtimes only; Node.js
+bindings instead call a prebuilt N-API runtime, [`@ubjs/node`][napi-runtime], which loads your
+compiled `cdylib` at runtime and so needs no generated bindings crate.
+
+[napi-runtime]: https://www.npmjs.com/package/@ubjs/node
 
 This crate is not intended to be used directly by hand-written code.
 

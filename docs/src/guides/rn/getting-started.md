@@ -70,10 +70,14 @@ We should, if all has gone to plan, see `Result: 21` on screen.
 
 ## Step 2: Add `uniffi-bindgen-react-native` to the project
 
-Using `yarn` add the `uniffi-bindgen-react-native` package to your project.
+Using `yarn`, add two packages to your project: `uniffi-bindgen-react-native`, which provides the `ubrn` command line and the C++/JSI runtime the turbo-module compiles against, and `@ubjs/core`, the runtime that the generated TypeScript imports at run-time.
 
 ```sh
-yarn add uniffi-bindgen-react-native
+yarn add uniffi-bindgen-react-native @ubjs/core
+```
+
+```admonish note
+Both are regular dependencies for a React Native library: `uniffi-bindgen-react-native` ships the native runtime that gets compiled into the turbo-module, and `@ubjs/core` is imported by the generated bindings. (A Node.js-only project instead installs `ubrn` as a dev dependency and `@ubjs/node` alongside `@ubjs/core`; see the [Node.js reference](../../reference/nodejs.md).)
 ```
 
 Opening `package.json` add the following:

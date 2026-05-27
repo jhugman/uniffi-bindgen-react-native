@@ -186,7 +186,7 @@ The `defaultFeatures` flag pairs with the `features` array: it is used to build 
 
 The boolean `workspace` controls if the wasm crate is part of [an existing Rust workspace](https://doc.rust-lang.org/cargo/reference/workspaces.html). The default value assumes that the target crate doesn't know anything about the wasm-crate, so the wasm-crate is in its own workspace. If the target crate is in a workspace, and that can be changed, then this setting can be changed to `true`. Tip: [`members` can contain globs](https://doc.rust-lang.org/cargo/reference/workspaces.html#:~:text=the%20members%20list%20also%20supports%20globs) to point to crates that don't yet exist.
 
-`runtimeVersion` is the version of [`uniffi-runtime-javascript` crate](https://crates.io/crates/uniffi-runtime-javascript). By default this is the exact current version of uniffi-bindgen-react-native, so currently `=0.29.0-1`.
+`runtimeVersion` is the version of [`uniffi-runtime-javascript` crate](https://crates.io/crates/uniffi-runtime-javascript). By default this is the exact current version of uniffi-bindgen-react-native, so currently `=0.31.0-3`.
 
 `cargoExtras` is a list of extra arguments passed directly to the `cargo build` command when building for `wasm32-unknown-unknown`.
 

@@ -1,6 +1,7 @@
 # Summary
 
 [Introduction](README.md)
+[Packages](packages.md)
 # Getting started for React Native
 
 - [Before you start](guides/rn/pre-installation.md)

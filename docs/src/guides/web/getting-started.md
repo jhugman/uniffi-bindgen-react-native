@@ -4,6 +4,10 @@ This extends the [Step-by-step tutorial with React Native](../rn/getting-started
 
 ## Preparing the library
 
+```admonish note
+If you came straight here without following the React Native tutorial, make sure your library lists `@ubjs/core` in its dependencies (`yarn add @ubjs/core`) — the generated web bindings import it too.
+```
+
 Add a script to the `package.json`, if you haven't already:
 
 ```diff

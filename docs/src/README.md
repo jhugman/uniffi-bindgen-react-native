@@ -10,7 +10,7 @@ It has since grown to support for other languages not in use at Mozilla.
 ↔️
 ![WASM logo](images/wasm-logo.svg)
 
-[`uniffi-bindgen-react-native`](https://github.com/jhugman/uniffi-bindgen-react-native) is the project that houses the bindings generators for WASM and React Native.
+[`uniffi-bindgen-react-native`](https://github.com/jhugman/uniffi-bindgen-react-native) is the project that houses the bindings generators for React Native, the Web, and Node.js.
 
 It supports all language features that `uniffi-rs` supports, including:
 
@@ -25,6 +25,9 @@ It contains tooling to generate bindings:
 
 - for Hermes via JSI, and to generate the code to create turbo-modules.
 - for WASM, using wasm-bindgen, and the WASM crate.
+- for Node.js, calling a compiled `cdylib` through an N-API runtime.
+
+New projects depend on the `@ubjs` runtime packages; see [Packages](packages.md) for what to install. Code generated before those packages existed keeps working unchanged.
 
 ```admonish warning
 This project is still in early development, and should not yet be used in production.
