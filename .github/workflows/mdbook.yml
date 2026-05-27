@@ -40,6 +40,7 @@ jobs:
           # (latest versions target mdbook 0.5.x)
           opengh-version: "2.4.0"
           admonish-version: "1.18.0"
+          toc-version: "0.14.2"
       - name: Show mdbook version
         run: mdbook --version
       - name: Show linkchecker version
