@@ -11,10 +11,11 @@ Templates are written for [Rinja templating library](https://rinja.readthedocs.i
 
 The WASM crate is generated with `quote`, in the [`gen_rust`][rust-templates] module.
 
-There is a small-ish runtime for both languages:
+There is a small-ish runtime per target:
 
-- [`typescript/src`][ts-runtime], with [tests][ts-tests] and [polyfills][ts-polyfills].
-- ['cpp/includes`][cpp-runtime].
+- [`typescript/src`][ts-runtime], with [tests][ts-tests] and [polyfills][ts-polyfills]. This is the TypeScript runtime, published to npm as [`@ubjs/core`][core-runtime] and shared by all targets.
+- ['cpp/includes`][cpp-runtime], the C++/JSI runtime for React Native, published as the `uniffi-bindgen-react-native.podspec`.
+- [`runtimes/napi`][napi-runtime], the N-API runtime for Node.js, published as [`@ubjs/node`][napi-npm]. Its Rust core is in [`runtimes/core`][napi-core].
 
 This is intended to allow developers from outside the project to contribute more easily.
 
@@ -39,4 +40,8 @@ cargo test -p uniffi-fixture-$fixtureName
 [ts-tests]: https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/typescript/tests
 [ts-polyfills]: https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/typescript/testing
 [cpp-runtime]: https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/cpp/includes
+[core-runtime]: https://www.npmjs.com/package/@ubjs/core
+[napi-runtime]: https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/runtimes/napi
+[napi-npm]: https://www.npmjs.com/package/@ubjs/node
+[napi-core]: https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/runtimes/core
 [fixtures]: https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures

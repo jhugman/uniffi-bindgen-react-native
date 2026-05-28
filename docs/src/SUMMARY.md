@@ -1,6 +1,7 @@
 # Summary
 
 [Introduction](README.md)
+[Packages](packages.md)
 # Getting started for React Native
 
 - [Before you start](guides/rn/pre-installation.md)
@@ -44,6 +45,7 @@
 # Reference
 
 - [`ubrn` Command Line](reference/commandline.md)
+- [Node.js (N-API) support](reference/nodejs.md)
 - [`ubrn.config.yaml`](reference/config-yaml.md)
 - [`uniffi.toml`](reference/uniffi-toml.md)
 - [Generating a Turbo Module](reference/turbo-module-files.md)

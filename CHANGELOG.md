@@ -5,7 +5,42 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-2...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-3...main
+
+---
+
+# 0.31.0-3
+
+## ✨ What's New ✨
+
+### 🟢 Node.js!
+
+`uniffi-bindgen-react-native` can now generate bindings that run directly on Node.js, joining React Native and the Web as a supported target. A new N-API runtime — published to npm as [`@ubjs/node`](https://www.npmjs.com/package/@ubjs/node) — loads your compiled Rust `cdylib` at runtime and calls into it, so a single prebuilt native addon works with any UniFFI library, with no per-library glue code to build. See the [Node.js reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/nodejs.html) for how to get started.
+
+- A new N-API runtime added under `runtimes/` ([#369](https://github.com/jhugman/uniffi-bindgen-react-native/pull/369)), later refactored into layers ([#385](https://github.com/jhugman/uniffi-bindgen-react-native/pull/385)), with single-copy and string/byte optimizations across the FFI boundary ([#378](https://github.com/jhugman/uniffi-bindgen-react-native/pull/378), [#394](https://github.com/jhugman/uniffi-bindgen-react-native/pull/394)).
+- A new `ubrn generate napi bindings` command (aliased `node`) generates the TypeScript bindings, with the location of the `cdylib` resolved at bindgen time via colocated, absolute, or platform-package modes ([#390](https://github.com/jhugman/uniffi-bindgen-react-native/pull/390), [#398](https://github.com/jhugman/uniffi-bindgen-react-native/pull/398)).
+- The full fixture test suite now runs against the N-API flavour ([#377](https://github.com/jhugman/uniffi-bindgen-react-native/pull/377), [#382](https://github.com/jhugman/uniffi-bindgen-react-native/pull/382)), including on Linux via colima.
+- `index.ts` generation added to the player pipeline ([#391](https://github.com/jhugman/uniffi-bindgen-react-native/pull/391)); callback function identifiers are now suffixed with the module name to avoid collisions across crates ([#393](https://github.com/jhugman/uniffi-bindgen-react-native/pull/393)). Thank you [@markharding](https://github.com/markharding)!
+- Published to npm via CI ([#386](https://github.com/jhugman/uniffi-bindgen-react-native/pull/386)); the runtime package is now [`@ubjs/node`](https://www.npmjs.com/package/@ubjs/node) ([#396](https://github.com/jhugman/uniffi-bindgen-react-native/pull/396)) and the TypeScript runtime is now [`@ubjs/core`](https://www.npmjs.com/package/@ubjs/core) ([#399](https://github.com/jhugman/uniffi-bindgen-react-native/pull/399)).
+
+- Byte arrays (`Vec<u8>`) can now be globally emitted as `Uint8Array` instead of `ArrayBuffer` by setting `bindings.typescript.strictByteArrays` in `uniffi.toml` ([#383](https://github.com/jhugman/uniffi-bindgen-react-native/pull/383) by [@coriolinus](https://github.com/coriolinus)).
+
+## 🦊 What's Changed
+
+- Migrate the `wrapper-ffi.ts` ([#359](https://github.com/jhugman/uniffi-bindgen-react-native/pull/359)) and `wrapper.ts` ([#363](https://github.com/jhugman/uniffi-bindgen-react-native/pull/363)) generation to the new `pipeline` API.
+- Audit default-value positions and types, add a fixture, and fix related bugs ([#392](https://github.com/jhugman/uniffi-bindgen-react-native/pull/392)).
+- Fix reserved C++ words being missed during template checking ([#389](https://github.com/jhugman/uniffi-bindgen-react-native/pull/389)). Thank you [@bjtrounson](https://github.com/bjtrounson)!
+- Several Windows fixes — thank you [@pepperoni505](https://github.com/pepperoni505)!
+  - Convert backslash paths to forward slashes ([#364](https://github.com/jhugman/uniffi-bindgen-react-native/pull/364)).
+  - Strip the `\\?\` prefix from canonicalized paths ([#367](https://github.com/jhugman/uniffi-bindgen-react-native/pull/367)).
+  - Don't prepend `lib` to DLLs ([#365](https://github.com/jhugman/uniffi-bindgen-react-native/pull/365)).
+  - Fix `xtask bootstrap` so the tests run ([#373](https://github.com/jhugman/uniffi-bindgen-react-native/pull/373)).
+- Have prettier only format JS and TS files ([#368](https://github.com/jhugman/uniffi-bindgen-react-native/pull/368)). Thank you [@pepperoni505](https://github.com/pepperoni505)!
+- Remove redundant files from the published package bundle ([#381](https://github.com/jhugman/uniffi-bindgen-react-native/pull/381)). Thank you [@Simek](https://github.com/Simek)!
+- Commit an auto-applied change to the lockfile ([#380](https://github.com/jhugman/uniffi-bindgen-react-native/pull/380)). Thank you [@AndrewFerr](https://github.com/AndrewFerr)!
+- CI: cross-compile `x86_64-apple-darwin` on Apple Silicon ([#395](https://github.com/jhugman/uniffi-bindgen-react-native/pull/395)) and remove the zig-based cross compile ([#397](https://github.com/jhugman/uniffi-bindgen-react-native/pull/397)).
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-2...0.31.0-3
 
 ---
 
