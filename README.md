@@ -8,7 +8,7 @@
 
 `uniffi-bindgen-react-native` is a tool that generates TypeScript bindings for Rust code, making it usable in React Native apps, web pages, and Node.js. It builds on [UniFFI](https://mozilla.github.io/uniffi-rs/latest/), Mozilla's bindings generator ecosystem.
 
-With this tool, you can write your business logic once in Rust and access it seamlessly from TypeScript, whether you're developing for mobile platforms or the web.
+With this tool, you can write your business logic once in Rust and access it seamlessly from TypeScript, whether you're developing for mobile platforms, the web or servers.
 
 UniFFI provides procedural macros to describe your API, prioritizing expressivity and memory safety. This makes it ideal for portability.
 
@@ -30,7 +30,7 @@ It provides tooling to generate safe and performant TypeScript to access Rust fr
   - a Turbo-Module that installs the bindings into a running React Native library.
 - 🌐 **Web pages**
   - with a WASM binding crate
-- 🟢 **Node.js** _(new)_
+- 🖥️ **Node.js** _(new)_
   - with the [`@ubjs/node`](https://www.npmjs.com/package/@ubjs/node) N-API runtime, loading your compiled Rust `cdylib` at runtime. See the [Node.js reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/nodejs.html).
 
 All using the same proc macros: you annotate your Rust once, and build for Android, iOS, the Web, and Node.js.
@@ -90,7 +90,10 @@ This project is governed by Mozilla's [Community Participation Guidelines](./COD
 
 ## Funding
 
-`uniffi-bindgen-react-native` is led by James Hugman, with deep collaboration from the [Filament](https://filament.im) engineering team, funded by [Filament](https://filament.im) and [Mozilla](https://future.mozilla.org).
+`uniffi-bindgen-react-native` is led by James Hugman, with deep collaboration from the [Filament](https://filament.im) engineering team, funded by: 
+- [Filament](https://filament.im)
+- [Mozilla](https://future.mozilla.org)
+- [Livekit](https://livekit.com/)
 
 ## License
 
