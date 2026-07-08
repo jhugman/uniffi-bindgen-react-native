@@ -82,7 +82,7 @@ pub(super) fn build_custom_type(config: &Config, custom: &general::CustomType) -
     let ffi_converter_name = ffi_converter_name_for(config, &custom.self_type);
     let builtin_type_name = type_label_for(config, &custom.builtin.ty);
     let builtin_ffi_converter = ffi_converter_name_for(config, &custom.builtin);
-    let ffi_type_name = ffi_type_to_ts_name(&custom.builtin.ffi_type.ty);
+    let ffi_type_name = ffi_type_to_ts_name(&custom.builtin.ffi_type);
 
     let custom_config = config
         .custom_types
@@ -142,6 +142,7 @@ fn render_literal(config: &Config, lit: &general::Literal) -> String {
         }
         general::Literal::EmptySequence => "[]".into(),
         general::Literal::EmptyMap => "new Map()".into(),
+        general::Literal::EmptySet => "new Set()".into(),
         general::Literal::None => "undefined".into(),
         general::Literal::Some { inner } => render_default_value(config, inner),
     }
@@ -149,7 +150,7 @@ fn render_literal(config: &Config, lit: &general::Literal) -> String {
 
 fn render_default_value(config: &Config, dv: &general::DefaultValue) -> String {
     match dv {
-        general::DefaultValue::Literal(lit_node) => render_literal(config, &lit_node.lit),
+        general::DefaultValue::Literal(lit) => render_literal(config, lit),
         general::DefaultValue::Default(tn) => render_type_default(config, &tn.ty),
     }
 }
@@ -202,13 +203,19 @@ fn render_type_default(_config: &Config, ty: &general::Type) -> String {
         | general::Type::CallbackInterface { .. }
         | general::Type::Timestamp
         | general::Type::Duration => "undefined".into(),
+        general::Type::Box { .. } => {
+            unimplemented!("Box types are not yet supported by uniffi-bindgen-react-native")
+        }
+        general::Type::Set { .. } => {
+            unimplemented!("Set types are not yet supported by uniffi-bindgen-react-native")
+        }
     }
 }
 
 /// Discriminants stay in JS (not sent across the FFI), so large integers
 /// can be safely narrowed to JS numbers when they fit.
-fn render_variant_discr(config: &Config, discr: &general::LiteralNode) -> String {
-    match &discr.lit {
+fn render_variant_discr(config: &Config, discr: &general::Literal) -> String {
+    match discr {
         general::Literal::String(s) => format!("\"{}\"", s),
         general::Literal::UInt(n, _, type_node) => match &type_node.ty {
             general::Type::Int64 | general::Type::UInt64 => {
@@ -284,13 +291,16 @@ pub(super) fn build_variant(config: &Config, variant: &general::Variant) -> TsVa
 }
 
 /// `Some` only when Rust declares an explicit discriminant type (e.g. `#[repr(u8)]`).
-fn discr_type_for(config: &Config, en: &general::Enum) -> Option<String> {
-    en.meta_discr_type
-        .as_ref()
-        .map(|t| type_label_for(config, &t.ty))
+fn discr_type_for(config: &Config, en: &general::Enum, has_explicit_discr: bool) -> Option<String> {
+    has_explicit_discr.then(|| type_label_for(config, &en.discr_type.ty))
 }
 
-pub(super) fn build_enum(config: &Config, en: &general::Enum, flavor: &AbiFlavor) -> TsEnum {
+pub(super) fn build_enum(
+    config: &Config,
+    en: &general::Enum,
+    flavor: &AbiFlavor,
+    has_explicit_discr: bool,
+) -> TsEnum {
     let ts_name = rewrite_js_builtins(&en.name.to_upper_camel_case());
     let ffi_converter_name = ffi_converter_name_for(config, &en.self_type);
     let docstring = en.docstring.as_deref().map(format_docstring);
@@ -298,7 +308,7 @@ pub(super) fn build_enum(config: &Config, en: &general::Enum, flavor: &AbiFlavor
     let is_error = matches!(en.shape, general::EnumShape::Error { .. });
     let is_flat = en.is_flat;
 
-    let discr_type = discr_type_for(config, en);
+    let discr_type = discr_type_for(config, en, has_explicit_discr);
 
     let variants: Vec<TsVariant> = en
         .variants
@@ -435,7 +445,7 @@ pub(super) fn build_callable(
         .map(|arg| build_arg(config, arg))
         .collect();
     let return_type = callable.return_type.ty.as_ref().map(|tn| {
-        let ffi_type = ffi_type_to_ts_name(&tn.ffi_type.ty);
+        let ffi_type = ffi_type_to_ts_name(&tn.ffi_type);
         let is_rust_buffer = ffi_type == "Uint8Array";
         TsReturnType {
             ts_type: type_label_for(config, &tn.ty),
@@ -694,7 +704,7 @@ fn build_vtable_field(
     let name = vm.callable.name.clone();
     let method = Some(build_callable(config, &vm.callable, &None, None, flavor));
 
-    let general::FfiType::Function(ref ffi_fn_name) = vm.ffi_type.ty else {
+    let general::FfiType::Function(ref ffi_fn_name) = vm.ffi_type else {
         return TsVtableField {
             name,
             method,
@@ -730,7 +740,7 @@ fn build_foreign_future_result(callable: &general::Callable) -> Option<TsForeign
                 .return_type
                 .ty
                 .as_ref()
-                .map(|tn| ffi_default_value_for(&tn.ffi_type.ty))
+                .map(|tn| ffi_default_value_for(&tn.ffi_type))
                 .unwrap_or_default(),
         })
 }
@@ -749,7 +759,7 @@ fn build_closure_args(
             .filter(|a| a.name != "uniffi_out_return" && a.name != "uniffi_out_dropped_callback")
             .map(|a| TsFfiArg {
                 name: arg_name(&a.name),
-                ffi_type: ffi_type_to_ts_name(&a.ty.ty),
+                ffi_type: ffi_type_to_ts_name(&a.ty),
             })
             .collect();
         (args, ffi_fn.has_rust_call_status_arg)
@@ -760,7 +770,7 @@ fn build_closure_args(
         }];
         args.extend(callable.arguments.iter().map(|a| TsFfiArg {
             name: arg_name(&a.name),
-            ffi_type: ffi_type_to_ts_name(&a.ty.ffi_type.ty),
+            ffi_type: ffi_type_to_ts_name(&a.ty.ffi_type),
         }));
         (args, false)
     }

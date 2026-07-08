@@ -101,6 +101,12 @@ pub(super) fn type_label_for(config: &Config, ty: &general::Type) -> String {
             type_label_for(config, key_type),
             type_label_for(config, value_type)
         ),
+        general::Type::Box { .. } => {
+            unimplemented!("Box types are not yet supported by uniffi-bindgen-react-native")
+        }
+        general::Type::Set { .. } => {
+            unimplemented!("Set types are not yet supported by uniffi-bindgen-react-native")
+        }
     }
 }
 

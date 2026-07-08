@@ -115,7 +115,7 @@ impl TsFfiModule {
             .iter()
             .map(|arg| FfiArgDecl {
                 name: arg.name.to_lower_camel_case(),
-                type_name: type_mapper(&arg.ty.ty),
+                type_name: type_mapper(&arg.ty),
             })
             .collect();
 
@@ -126,7 +126,7 @@ impl TsFfiModule {
             });
         }
 
-        let return_type = func.return_type.ty.as_ref().map(|rt| type_mapper(&rt.ty));
+        let return_type = func.return_type.ty.as_ref().map(type_mapper);
 
         FfiFunctionDecl {
             name: format!("ubrn_{}", func.name.0),
@@ -249,7 +249,7 @@ impl TsFfiModule {
             .filter(|a| a.name != "uniffi_out_return" && a.name != "uniffi_out_dropped_callback")
             .map(|arg| FfiArgDecl {
                 name: arg.name.to_lower_camel_case(),
-                type_name: ffi_type_to_ts(&arg.ty.ty),
+                type_name: ffi_type_to_ts(&arg.ty),
             })
             .collect();
 
@@ -266,10 +266,10 @@ impl TsFfiModule {
                 .iter()
                 .find(|a| a.name == "uniffi_out_return" || a.name == "uniffi_out_dropped_callback")
                 .and_then(|a| {
-                    if matches!(&a.ty.ty, general::FfiType::VoidPointer) {
+                    if matches!(&a.ty, general::FfiType::VoidPointer) {
                         return None;
                     }
-                    let inner = match &a.ty.ty {
+                    let inner = match &a.ty {
                         general::FfiType::Reference(t) | general::FfiType::MutReference(t) => t,
                         t => return Some(ffi_type_to_ts(t)),
                     };
@@ -302,7 +302,7 @@ impl TsFfiModule {
         let is_vtable = s
             .fields
             .iter()
-            .any(|f| matches!(f.ty.ty, general::FfiType::Function(_)));
+            .any(|f| matches!(f.ty, general::FfiType::Function(_)));
         let exported = is_vtable || is_foreign_future;
 
         let fields = s
@@ -310,7 +310,7 @@ impl TsFfiModule {
             .iter()
             .map(|f| FfiFieldDecl {
                 name: f.name.clone(),
-                type_name: ffi_type_to_ts(&f.ty.ty),
+                type_name: ffi_type_to_ts(&f.ty),
             })
             .collect();
 

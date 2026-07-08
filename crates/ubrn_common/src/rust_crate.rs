@@ -214,5 +214,5 @@ fn find_package_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<St
         .packages
         .iter()
         .find(|package| package.manifest_path == *manifest_path)
-        .map(|package| package.name.clone())
+        .map(|package| package.name.to_string())
 }
