@@ -18,28 +18,30 @@ import {
 import { asyncTest } from "@/asserts";
 
 (async () => {
-  await asyncTest("object surface is async and behavior-preserving", async (t) => {
-    // Primary constructor -> `static async create(...)`, which is typed
-    // `Promise<WidgetLike>` (the object *interface*). Trait methods
-    // (equals/hashCode/compareTo/asyncToString) are members of the *class*,
-    // not the interface, so cast to `Widget` to reach them. See Risks:
-    // "Async constructor returns the interface type".
-    const mk = async (s: string): Promise<Widget> => (await Widget.create(s)) as Widget;
-    const w = await mk("yo");
-    t.assertEqual(await w.label(), "yo");
-    t.assertEqual(await w.asyncToString(), "Widget(yo)");
-    t.assertEqual(await w.toDebugString(), 'Widget { val: "yo" }');
-    t.assertTrue(await w.equals(await mk("yo")));
-    t.assertFalse(await w.equals(await mk("no")));
-    // Hash values are not stable across builds, so assert the invariant —
-    // equal instances hash equal — rather than a literal.
-    t.assertEqual(await w.hashCode(), await (await mk("yo")).hashCode());
-    const a = await mk("alpha");
-    const b = await mk("beta");
-    t.assertTrue((await a.compareTo(b)) < 0);
-    t.assertEqual(await a.compareTo(await mk("alpha")), 0);
-    t.end();
-  });
+  await asyncTest(
+    "object surface is async and behavior-preserving",
+    async (t) => {
+      // Forcing async turns the primary constructor into `static async create()`,
+      // typed `Promise<WidgetLike>`. Trait methods live on the class, not on the
+      // `WidgetLike` interface, so cast to `Widget` to reach them.
+      const mk = async (s: string): Promise<Widget> =>
+        (await Widget.create(s)) as Widget;
+      const w = await mk("yo");
+      t.assertEqual(await w.label(), "yo");
+      t.assertEqual(await w.asyncToString(), "Widget(yo)");
+      t.assertEqual(await w.toDebugString(), 'Widget { val: "yo" }');
+      t.assertTrue(await w.equals(await mk("yo")));
+      t.assertFalse(await w.equals(await mk("no")));
+      // Hash values are not stable across builds, so assert the invariant —
+      // equal instances hash equal — rather than a literal.
+      t.assertEqual(await w.hashCode(), await (await mk("yo")).hashCode());
+      const a = await mk("alpha");
+      const b = await mk("beta");
+      t.assertTrue((await a.compareTo(b)) < 0);
+      t.assertEqual(await a.compareTo(await mk("alpha")), 0);
+      t.end();
+    },
+  );
 
   await asyncTest(
     "Debug-only object gets an async asyncToString delegator",

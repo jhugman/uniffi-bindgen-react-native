@@ -27,10 +27,10 @@ pub(crate) struct TsConfig {
     /// When `true`, emit byte arrays (`Vec<u8>`) as `Uint8Array` instead of `ArrayBuffer`.
     #[serde(default)]
     pub(crate) strict_byte_arrays: bool,
-    /// Render the TypeScript surface of the named types/functions (or all,
-    /// when `true`) as `async`/`Promise<T>` without changing the underlying
-    /// synchronous FFI calls. A migration aid toward off-the-main-thread
-    /// delivery. See docs/superpowers/specs/2026-07-10-force-async-config-design.md.
+    /// Give the named types and functions — or everything, when `true` — an
+    /// `async`/`Promise<T>` surface. The FFI calls underneath stay
+    /// synchronous: this is a migration aid toward moving them off the main
+    /// thread.
     #[serde(default)]
     pub(crate) force_async: ForceAsync,
 }

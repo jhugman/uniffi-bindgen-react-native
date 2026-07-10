@@ -38,8 +38,8 @@ test("un-named object and function are synchronous", (t) => {
     // The primary constructor becomes `static async create()`.
     const pending = AsyncObj.create("hi");
     t.assertTrue((pending as unknown) instanceof Promise);
-    // `create` is typed `Promise<AsyncObjLike>`; cast to the class for the
-    // renamed trait method. See Risks: "Async constructor returns the interface type".
+    // `create` resolves to `AsyncObjLike`, the interface. Trait methods live on
+    // the class, so cast to `AsyncObj` to reach them.
     const a = (await pending) as AsyncObj;
     t.assertEqual(await a.label(), "hi");
     // Display renames to asyncToString on a forced type.
