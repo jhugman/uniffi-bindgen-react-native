@@ -1,0 +1,3 @@
+[bindings.typescript]
+forceAsync = ["AsyncObj", "asyncFn"]
+strictTypeChecking = true
