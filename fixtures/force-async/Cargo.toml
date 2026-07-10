@@ -1,0 +1,18 @@
+[package]
+name = "uniffi-fixture-force-async"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "uniffi_force_async"
+
+[dependencies]
+uniffi = { workspace = true }
+
+[dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen-tests"] }
