@@ -34,6 +34,9 @@ impl std::fmt::Display for Widget {
 #[derive(Debug, uniffi::Object)]
 #[uniffi::export(Debug)]
 pub struct DebugOnly {
+    // Read only through the derived `Debug` impl, which the dead-code pass
+    // cannot see through.
+    #[allow(dead_code)]
     n: i32,
 }
 
