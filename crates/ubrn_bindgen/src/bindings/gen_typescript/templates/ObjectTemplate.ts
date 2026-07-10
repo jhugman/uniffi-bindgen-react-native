@@ -50,28 +50,28 @@ export class {{ obj.impl_class_name }} extends UniffiAbstractObject
     {%- for tm in obj.uniffi_traits %}
     {%      match tm %}
     {%-         when TsUniffiTrait::Display { method } %}
-    toString(): string {
+    {% if method.renders_async() %}async {% endif %}{% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call cb::return_type(method) %} {
         {% call cb::call_body_method(method, obj.obj_factory) %}
     }
     {%-         when TsUniffiTrait::Debug { method } %}
-    toDebugString(): string {
+    {% if method.renders_async() %}async {% endif %}toDebugString(): {% call cb::return_type(method) %} {
         {% call cb::call_body_method(method, obj.obj_factory) %}
     }
     {%-            if !obj.has_display_trait() %}
-    toString(): string {
+    {% if method.renders_async() %}async asyncToString(): Promise<string>{% else %}toString(): string{% endif %} {
         return this.toDebugString();
     }
     {%            endif %}
     {%-         when TsUniffiTrait::Eq { eq, ne } %}
-    equals(other: {{ obj.impl_class_name }}): {% call cb::return_type(eq) %} {
+    {% if eq.renders_async() %}async {% endif %}equals(other: {{ obj.impl_class_name }}): {% call cb::return_type(eq) %} {
         {% call cb::call_body_method(eq, obj.obj_factory) %}
     }
     {%-         when TsUniffiTrait::Hash { method } %}
-    hashCode(): {% call cb::return_type(method) %} {
+    {% if method.renders_async() %}async {% endif %}hashCode(): {% call cb::return_type(method) %} {
         {% call cb::call_body_method(method, obj.obj_factory) %}
     }
     {%-         when TsUniffiTrait::Ord { cmp } %}
-    compareTo(other: {{ obj.impl_class_name }}): {% call cb::return_type(cmp) %} {
+    {% if cmp.renders_async() %}async {% endif %}compareTo(other: {{ obj.impl_class_name }}): {% call cb::return_type(cmp) %} {
         {% call cb::call_body_method(cmp, obj.obj_factory) %}
     }
     {%-    endmatch %}
