@@ -239,6 +239,9 @@ pub(crate) struct TsObject {
     pub supports_finalization_registry: bool,
     pub has_callback_interface: bool,
     pub strict_object_types: bool,
+    /// `forceAsync` names this type. Kept so validation can reject a
+    /// `WithForeign` trait interface holding any synchronous method.
+    pub force_async: bool,
 }
 
 impl TsObject {
@@ -297,6 +300,9 @@ pub(crate) struct TsCallbackInterface {
     pub methods: Vec<TsCallable>,
     pub vtable: TsVtable,
     pub has_async_methods: bool,
+    /// `forceAsync` names this callback interface. Read by validation only:
+    /// a callback interface's surface is never transformed.
+    pub force_async: bool,
 }
 
 pub(crate) struct InitializationIR {

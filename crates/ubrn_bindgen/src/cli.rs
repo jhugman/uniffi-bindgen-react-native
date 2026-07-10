@@ -260,7 +260,7 @@ fn generate_api_from_pipeline(
             namespace,
             switches.flavor.clone(),
             ffi_exports,
-        );
+        )?;
         let code = gen_typescript::generate_api_code_from_ir(api_module)?;
         let path = ts_dir.join(module.ts_filename());
         ubrn_common::write_file(path, code)?;

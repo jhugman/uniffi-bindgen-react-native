@@ -458,7 +458,9 @@ impl TsApiModule {
                 || self.type_definitions.iter().any(|td| match td {
                     TsTypeDefinition::Object(o) => {
                         o.methods.iter().any(|m| m.is_ffi_async())
-                            || o.primary_constructor.as_ref().is_some_and(|c| c.is_ffi_async())
+                            || o.primary_constructor
+                                .as_ref()
+                                .is_some_and(|c| c.is_ffi_async())
                             || o.alternate_constructors.iter().any(|c| c.is_ffi_async())
                     }
                     TsTypeDefinition::CallbackInterface(cbi) => cbi.has_async_methods,
@@ -488,7 +490,7 @@ impl TsApiModule {
         namespace: &general::Namespace,
         flavor: AbiFlavor,
         ffi_exported_definitions: Vec<ffi_module::FfiExportedName>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let module_name = namespace.name.clone();
         let namespace_docstring = namespace.docstring.as_deref().map(format_docstring);
         let supports_rust_backtrace = flavor.supports_rust_backtrace();
@@ -568,6 +570,148 @@ impl TsApiModule {
 
         module.exported_converters = acc.exported_converters;
 
-        module
+        validate_force_async(&module.type_definitions)?;
+
+        Ok(module)
+    }
+}
+
+/// Reject `forceAsync` on a callback interface or `WithForeign` trait interface
+/// that has any synchronous method.
+///
+/// Rust calls into these types through a vtable, and each slot's sync/async ABI
+/// is fixed by the Rust method. On an ordinary outbound call, `forceAsync` only
+/// has to widen the return value into an already-resolved promise. Here it would
+/// instead hand a promise to a synchronous vtable slot, which has no way to
+/// await it. So every method must be async in Rust already.
+pub(super) fn validate_force_async(type_definitions: &[TsTypeDefinition]) -> anyhow::Result<()> {
+    let mut blocks = Vec::new();
+    for td in type_definitions {
+        match td {
+            TsTypeDefinition::CallbackInterface(cbi) if cbi.force_async => {
+                if let Some(block) =
+                    force_async_error_block("callback interface", &cbi.ts_name, &cbi.methods)
+                {
+                    blocks.push(block);
+                }
+            }
+            TsTypeDefinition::Object(o) if o.force_async && o.has_callback_interface => {
+                if let Some(block) =
+                    force_async_error_block("trait interface", &o.ts_name, &o.methods)
+                {
+                    blocks.push(block);
+                }
+            }
+            _ => {}
+        }
+    }
+    if blocks.is_empty() {
+        Ok(())
+    } else {
+        anyhow::bail!(blocks.join("\n\n"))
+    }
+}
+
+/// `Some(error)` when `methods` has any non-async member; `None` when all async.
+fn force_async_error_block(kind: &str, name: &str, methods: &[TsCallable]) -> Option<String> {
+    let sync: Vec<&str> = methods
+        .iter()
+        .filter(|m| !m.is_ffi_async())
+        .map(|m| m.name.as_str())
+        .collect();
+    if sync.is_empty() {
+        return None;
+    }
+    let list = sync
+        .iter()
+        .map(|m| format!("  - {m}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Some(format!(
+        "forceAsync targets {kind} `{name}`, but these methods are synchronous:\n\
+         {list}\n\
+         A {kind} can only be forced async if every method is already async in Rust.\n\
+         Mark them `async fn` in the Rust trait, or remove `{name}` from forceAsync."
+    ))
+}
+
+#[cfg(test)]
+mod force_async_validation_tests {
+    use super::*;
+
+    fn callable(name: &str, ffi_async: bool) -> TsCallable {
+        TsCallable {
+            name: name.into(),
+            docstring: None,
+            arguments: vec![],
+            return_type: None,
+            throws: None,
+            ffi_name: format!("ffi_{name}"),
+            ffi_async: ffi_async.then(|| TsAsyncFfi {
+                poll: "poll".into(),
+                complete: "complete".into(),
+                free: "free".into(),
+                cancel: "cancel".into(),
+            }),
+            receiver: None,
+            force_async: false,
+        }
+    }
+
+    fn callback_interface(
+        name: &str,
+        force_async: bool,
+        methods: Vec<TsCallable>,
+    ) -> TsTypeDefinition {
+        TsTypeDefinition::CallbackInterface(TsCallbackInterface {
+            protocol_name: name.into(),
+            ts_name: name.into(),
+            ffi_converter_name: format!("FfiConverterType{name}"),
+            trait_impl: format!("uniffiCallbackInterface{name}"),
+            docstring: None,
+            has_async_methods: methods.iter().any(|m| m.is_ffi_async()),
+            methods,
+            vtable: TsVtable {
+                ffi_init_fn: String::new(),
+                fields: vec![],
+            },
+            force_async,
+        })
+    }
+
+    #[test]
+    fn targeted_sync_callback_interface_is_an_error() {
+        let defs = vec![callback_interface(
+            "Logger",
+            true,
+            vec![callable("log", false), callable("flush", false)],
+        )];
+        let err = validate_force_async(&defs).unwrap_err().to_string();
+        assert!(
+            err.contains("callback interface `Logger`"),
+            "message: {err}"
+        );
+        assert!(err.contains("- log"), "message: {err}");
+        assert!(err.contains("- flush"), "message: {err}");
+    }
+
+    #[test]
+    fn untargeted_sync_callback_interface_is_ok() {
+        let defs = vec![callback_interface(
+            "Logger",
+            false,
+            vec![callable("log", false)],
+        )];
+        assert!(validate_force_async(&defs).is_ok());
+    }
+
+    #[test]
+    fn targeted_all_async_callback_interface_is_ok() {
+        let defs = vec![callback_interface(
+            "Logger",
+            true,
+            vec![callable("log", true), callable("flush", true)],
+        )];
+        assert!(validate_force_async(&defs).is_ok());
     }
 }

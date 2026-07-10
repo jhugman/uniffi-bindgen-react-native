@@ -693,6 +693,7 @@ pub(super) fn build_object(
         supports_finalization_registry,
         has_callback_interface,
         strict_object_types,
+        force_async,
     }
 }
 
@@ -811,6 +812,7 @@ pub(super) fn build_callback_interface(
     let ts_name = rewrite_js_builtins(&cbi.name.to_upper_camel_case());
     // Callback interfaces use `FfiConverterType{Name}` (not `FfiConverter{canonical_name}`).
     let ffi_converter_name = format!("FfiConverterType{ts_name}");
+    let force_async = config.force_async.is_forced(&cbi.name);
 
     let docstring = cbi.docstring.as_deref().map(format_docstring);
 
@@ -836,6 +838,7 @@ pub(super) fn build_callback_interface(
         methods,
         vtable,
         has_async_methods,
+        force_async,
     }
 }
 
