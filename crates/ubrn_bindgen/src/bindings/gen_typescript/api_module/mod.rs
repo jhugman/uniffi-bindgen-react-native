@@ -317,7 +317,7 @@ impl ImportAccumulator {
 
         for field in &vtable.fields {
             if let Some(ref method) = field.method {
-                if method.is_async() {
+                if method.is_ffi_async() {
                     if method.is_throwing() {
                         self.add_infra_value("uniffiTraitInterfaceCallAsyncWithError");
                     } else {
@@ -333,7 +333,7 @@ impl ImportAccumulator {
     }
 
     fn collect_callable(&mut self, callable: &TsCallable) {
-        if callable.is_async() {
+        if callable.is_ffi_async() {
             self.add_infra_value("uniffiRustCallAsync");
         }
     }
@@ -454,12 +454,12 @@ impl TsApiModule {
         }
 
         if self.is_verbose {
-            let has_async = self.functions.iter().any(|f| f.is_async())
+            let has_async = self.functions.iter().any(|f| f.is_ffi_async())
                 || self.type_definitions.iter().any(|td| match td {
                     TsTypeDefinition::Object(o) => {
-                        o.methods.iter().any(|m| m.is_async())
-                            || o.primary_constructor.as_ref().is_some_and(|c| c.is_async())
-                            || o.alternate_constructors.iter().any(|c| c.is_async())
+                        o.methods.iter().any(|m| m.is_ffi_async())
+                            || o.primary_constructor.as_ref().is_some_and(|c| c.is_ffi_async())
+                            || o.alternate_constructors.iter().any(|c| c.is_ffi_async())
                     }
                     TsTypeDefinition::CallbackInterface(cbi) => cbi.has_async_methods,
                     _ => false,

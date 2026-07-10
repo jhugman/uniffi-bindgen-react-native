@@ -26,7 +26,7 @@ export class {{ obj.impl_class_name }} extends UniffiAbstractObject
 
     {%- match obj.primary_constructor %}
     {%- when Some with (cons) %}
-    {%- if !cons.is_async() %}
+    {%- if !cons.renders_async() %}
     {%-   call _object_ctor_decl(obj, cons) %}
     {%- else %}
     {%- call _object_private_ctor(obj) %}
@@ -206,7 +206,7 @@ const {{ obj.ffi_error_converter_name }} = new FfiConverterObjectAsError("{{ obj
 {#- Macro: method or static method declaration -#}
 {%- macro _object_method_decl(obj, func_decl, callable) %}
 {%- call cb::docstring(callable.docstring) %}
-    {% if !func_decl.is_empty() %}{{ func_decl }} {% endif %}{% if callable.is_async() %}async {% endif %}{{ callable.name }}(
+    {% if !func_decl.is_empty() %}{{ func_decl }} {% endif %}{% if callable.renders_async() %}async {% endif %}{{ callable.name }}(
     {%- call cb::arg_list_decl(callable) -%}): {# space #}
     {%- call cb::return_type(callable) %}
     {%- call cb::throws_kw(callable) %} {

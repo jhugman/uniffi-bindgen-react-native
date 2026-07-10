@@ -15,24 +15,24 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
             {%- endfor -%}
         ) => {
             const uniffiMakeCall = {# space #}
-            {%- if meth.is_async() %}
+            {%- if meth.is_ffi_async() %}
             async (signal: AbortSignal)
             {%- else %}
             ()
             {%- endif %}
             : {% call cb::return_type(meth) %} => {
                 const jsCallback = {{ ffi_converter_name }}.lift(uniffiHandle);
-                return {% if meth.is_async() %}await {% endif %}jsCallback.{{ meth.name }}(
+                return {% if meth.is_ffi_async() %}await {% endif %}jsCallback.{{ meth.name }}(
                     {%- for arg in meth.arguments %}
                     {{ arg.ffi_converter }}.lift({{ arg.name }}){% if !loop.last %}, {% endif %}
                     {%- endfor %}
-                    {%- if meth.is_async() -%}
+                    {%- if meth.is_ffi_async() -%}
                     {%-   if !meth.arguments.is_empty() %}, {% endif -%}
                     { signal }
                     {%- endif %}
                 )
             };
-            {%- if !meth.is_async() %}
+            {%- if !meth.is_ffi_async() %}
             {#- // Synchronous callback method #}
             {%- match meth.return_type %}
             {%- when Some(t) %}
@@ -69,7 +69,7 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
             );
             {%- endmatch %}
             return uniffiResult;
-            {%- else %} {#- // is_async = true #}
+            {%- else %} {#- // is_ffi_async = true #}
             {#- // Asynchronous callback method #}
             const uniffiHandleSuccess = (returnValue: {% call cb::raw_return_type(meth) %}) => {
                 uniffiFutureCallback.call(

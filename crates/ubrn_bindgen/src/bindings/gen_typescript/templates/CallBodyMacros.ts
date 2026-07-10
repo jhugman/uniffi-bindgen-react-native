@@ -27,7 +27,7 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- Return type rendering. -#}
 {%- macro return_type(callable) %}
-    {%- if callable.is_async() %}Promise<{% call raw_return_type(callable) %}>
+    {%- if callable.renders_async() %}Promise<{% call raw_return_type(callable) %}>
     {%- else %}
     {%- call raw_return_type(callable) %}
     {%- endif %}
@@ -52,7 +52,7 @@ console.debug(`-- {{ ffi_name }}`);
         {%- if let Some(dv) = arg.default_value %} = {{ dv }}{% endif %}
         {%- if !loop.last %}, {% endif -%}
     {%- endfor %}
-    {%- if callable.is_async() %}
+    {%- if callable.is_ffi_async() %}
     {%-   if !callable.arguments.is_empty() %}, {% endif -%}
     asyncOpts_?: { signal: AbortSignal }
     {%- endif %}
@@ -64,7 +64,7 @@ console.debug(`-- {{ ffi_name }}`);
         {{ arg.name }}: {{ arg.ts_type -}}
         {%- if !loop.last %}, {% endif -%}
     {%- endfor %}
-    {%- if callable.is_async() %}
+    {%- if callable.is_ffi_async() %}
     {%-   if !callable.arguments.is_empty() %}, {% endif -%}
     asyncOpts_?: { signal: AbortSignal }
     {%- endif %}
@@ -175,7 +175,7 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- Call body for method (pointer receiver): sync or async. -#}
 {%- macro call_body_method(callable, obj_factory) %}
-{%- if callable.is_async() %}
+{%- if callable.is_ffi_async() %}
 {%-   call call_body_async(callable, obj_factory) %}
 {%- else %}
 {%-     match callable.return_type -%}
@@ -199,7 +199,7 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- Call body for function (no receiver): sync or async. -#}
 {%- macro call_body_function(callable) %}
-{%- if callable.is_async() %}
+{%- if callable.is_ffi_async() %}
 {%-   call call_body_async(callable, "unreachable") %}
 {%- else %}
 {%-     match callable.return_type -%}
@@ -278,7 +278,7 @@ console.debug(`-- {{ ffi_name }}`);
             {% endmatch %}
         )
 {%- when None %}
-{#- unreachable: caller guards with is_async() -#}
+{#- unreachable: caller guards with is_ffi_async() -#}
 {%- endmatch %}
 {%- endmacro %}
 
