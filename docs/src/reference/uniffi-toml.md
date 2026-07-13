@@ -3,7 +3,7 @@ The `uniffi.toml` file is a toml file used to customize [the generation of C++ a
 To include the file when invoking `ubrn`, specify the path in the
 [corresponding key of the config](../reference/config-yaml.md#bindings).
 
-As of time of writing we support `typescript.customTypes`, `kotlin.cdylib_name` and `kotlin.package_name`.
+As of time of writing, `[bindings.typescript]` supports `logLevel`, `consoleImport`, `customTypes`, `strictObjectTypes`, `strictTypeChecking`, `strictByteArrays` and `forceAsync`; `[bindings.kotlin]` supports `cdylib_name` and `package_name`. Each is described below.
 
 ### Opting out of Interface generation
 
@@ -25,6 +25,77 @@ However, not all projects use or want that functionality. To globally translate 
 [bindings.typescript]
 strictByteArrays = true
 ```
+
+### Typescript strict type checking
+
+By default, generated Typescript files begin with `// @ts-nocheck`, so that `tsc` skips them and downstream projects are not troubled by type errors in code they did not write.
+
+To have `tsc` check the generated files, set `strictTypeChecking` to `true`. This is chiefly useful when working on the generated code itself.
+
+```toml
+[bindings.typescript]
+strictTypeChecking = true
+```
+
+### Forcing an async surface
+
+`forceAsync` gives chosen types and functions an `async`/`Promise` surface in Typescript, without making them async in Rust. The call into Rust still runs synchronously, on the thread that made it.
+
+```toml
+[bindings.typescript]
+forceAsync = true
+```
+
+The point is to let you migrate call sites ahead of time. Rust running off the main thread — whether as real Rust on a background thread, or as WASM on a worker — can only be called asynchronously, so every call site has to grow an `await`. `forceAsync` lets you make that change against a build whose behavior has not changed, and find out what it costs.
+
+```admonish warning
+**`forceAsync` moves no work off the main thread.** An awaited call blocks the Javascript thread for exactly as long as the synchronous one did. All that changes is the shape of the call site.
+```
+
+```admonish warning
+The `await` at each call site is the shape you are migrating towards, and it is what any off-main-thread scheme will need. The rest of the generated surface is less settled: `asyncToString` is named that way only because the call underneath is still synchronous, and forced calls take no `AbortSignal` only because there is no `Future` to cancel. Expect both to be spelled differently once there is.
+```
+
+Set it to `true` to force everything in the crate, or to a list of names to force only those:
+
+```toml
+[bindings.typescript]
+forceAsync = ["Widget", "makeFlatWidget"]
+```
+
+A name may be an object, a record, an enum, or a top-level function. Spelling doesn't matter: `make_flat_widget`, `makeFlatWidget` and `MakeFlatWidget` all name the same function.
+
+#### What changes in the generated Typescript
+
+Methods, constructors, top-level functions and trait methods of a forced type return a `Promise`. Errors arrive as a rejected promise, so `try`/`catch` needs an `await` to catch anything:
+
+```typescript
+// Without forceAsync.
+const w = new Widget("yo");
+const label = w.label();
+
+// With forceAsync. The primary constructor is no longer a `constructor`, so it
+// becomes a static factory — a Rust `new` is already named `create` in Typescript.
+const w = await Widget.create("yo");
+const label = await w.label();
+```
+
+The one method that cannot simply become async is `toString`: Javascript calls it to coerce an object into a string, and an async one hands back a `Promise`. So the `Display` trait is generated as `asyncToString` on a forced type, which no longer has a `toString` of its own. Coercing it — in a template literal, say — gets you the Javascript default of `[object Object]`.
+
+```typescript
+await w.asyncToString(); // "Widget(yo)", from the Display trait
+await w.toDebugString(); // Debug, Eq, Hash and Ord keep their names
+```
+
+Forced calls take no `{ signal: AbortSignal }` option bag. There is no `Future` on the Rust side to cancel — see [task cancellation](../idioms/promises.md#task-cancellation).
+
+#### Callback interfaces and trait interfaces
+
+A callback interface, or a `[Trait, WithForeign]` interface, is implemented in Typescript and called from Rust. `forceAsync` cannot change that direction of travel, so naming one has no effect on its surface. It is only checked: if any of its methods is **synchronous**, generation fails and names the offending methods.
+
+Rust calls into these types through a vtable, and each slot is sync or async according to the Rust method. On the way out, `forceAsync` only has to wrap a return value in a resolved promise; on the way in, it would have to hand a promise to a synchronous slot, which has no way to wait for it. Make the methods `async fn` in Rust, or leave the interface out of the list.
+
+The [`force-async`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async) and [`force-async-list`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async-list) fixtures exercise both forms.
 
 ### Logging the FFI
 
