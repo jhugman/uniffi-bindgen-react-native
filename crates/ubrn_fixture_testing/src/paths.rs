@@ -62,6 +62,29 @@ pub(crate) fn assert_wasm_bootstrap() {
     assert_node_modules();
 }
 
+// NOTE: this filename/dir logic must stay in sync with JsiPlayerShimCmd::shim_lib()
+// in xtask/src/bootstrap/jsi_player_shim.rs (separate crate, can't share the impl).
+pub(crate) fn jsi_player_shim_lib() -> Utf8PathBuf {
+    let dir = build_root().join("jsi-player-shim");
+    if cfg!(target_os = "macos") {
+        dir.join("libubrn_jsi_player.dylib")
+    } else if cfg!(target_os = "windows") {
+        dir.join("ubrn_jsi_player.dll")
+    } else {
+        dir.join("libubrn_jsi_player.so")
+    }
+}
+
+pub(crate) fn assert_jsi2_bootstrap() {
+    // Reuses the Hermes test-runner (it dlopens our shim's registerNatives).
+    assert_jsi_bootstrap();
+    let shim = jsi_player_shim_lib();
+    assert!(
+        shim.exists(),
+        "JSI player shim not found at {shim}. Run `cargo xtask bootstrap jsi-player-shim` first."
+    );
+}
+
 /// On Windows, DLLs must be on PATH at runtime. This is not an issue on Linux/macOS as the
 /// binary's rpath tells the linker where to find the shared libraries.
 /// This adds the Hermes DLL directory to PATH on the given command.

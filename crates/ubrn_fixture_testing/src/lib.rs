@@ -8,15 +8,18 @@ mod paths;
 pub mod typescript;
 
 pub mod jsi;
+pub mod jsi2;
 pub mod napi;
 pub mod ts;
 pub mod wasm;
 pub mod wasm2;
 
-/// Test flavor: JSI (Hermes native), WASM (Node.js), Napi (Node.js N-API), or Wasm2 (Player-based WASM).
+/// Test flavor: JSI (Hermes native), Jsi2 (generic JSI player shim), WASM
+/// (Node.js), Napi (Node.js N-API), or Wasm2 (player-based WASM).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
+    Jsi2,
     Wasm,
     Napi,
     Wasm2,
@@ -26,6 +29,7 @@ impl Flavor {
     pub fn as_str(&self) -> &'static str {
         match self {
             Flavor::Jsi => "jsi",
+            Flavor::Jsi2 => "jsi2",
             Flavor::Wasm => "wasm",
             Flavor::Napi => "napi",
             Flavor::Wasm2 => "wasm2",

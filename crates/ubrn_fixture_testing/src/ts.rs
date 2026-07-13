@@ -21,7 +21,9 @@ pub fn run_test(test_script: &str, flavor: Flavor, target_tmpdir: &str) {
     std::fs::create_dir_all(&out_dir).expect("failed to create output dir");
 
     match flavor {
-        Flavor::Jsi => {
+        Flavor::Jsi | Flavor::Jsi2 => {
+            // Framework TS tests have no fixture crate, hence no native lib.
+            // Both Jsi and Jsi2 share the Hermes test-runner path here.
             paths::assert_jsi_bootstrap();
             // Serialize the entire JSI pipeline (compile + run): the Hermes
             // test-runner's timer implementation doesn't tolerate CPU
