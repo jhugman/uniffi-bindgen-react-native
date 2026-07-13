@@ -4,6 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 ubrn_macros::build_foreign_language_testcases! {
-    "tests/bindings/test_ext_types.ts" => [Jsi, Wasm, Napi, Wasm2],
+    "tests/bindings/test_ext_types.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
+    // Jsi2: Napi-only index-bundle test; bare `@/generated` dir import + top-level
+    // await need the Napi tsc module/resolution config the jsi2 typecheck path lacks.
     "tests/bindings/test_ext_types_with_index.ts" => [Napi, Wasm2],
 }

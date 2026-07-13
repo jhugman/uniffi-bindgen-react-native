@@ -8,5 +8,5 @@ ubrn_macros::build_foreign_language_testcases! {
     // `std::thread::spawn`, which single-threaded wasm32 cannot do. The panic
     // aborts mid-call holding a Rust mutex, and `freeFunc` then aborts again
     // trying to re-lock it. Re-enable once TimerFuture drops host threads.
-    "tests/bindings/test_futures.ts" => [Jsi, Napi],
+    "tests/bindings/test_futures.ts" => [Jsi, Napi, Jsi2],
 }
