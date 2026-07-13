@@ -67,6 +67,9 @@ jobs:
       - name: Run tests of generated JSI bindings
         run: "cargo test -- jsi::"
 
+      - name: Run tests of generated Jsi2 (player shim) bindings
+        run: "cargo test -- jsi2::"
+
   integration-tests-wasm-bindings:
     name: 🧩 Integration tests (WASM bindings)
     runs-on: ubuntu-latest
