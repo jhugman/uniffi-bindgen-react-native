@@ -2130,6 +2130,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "uniffi-fixture-force-async"
+version = "0.1.0"
+dependencies = [
+ "ubrn_fixture_testing",
+ "ubrn_macros",
+ "uniffi",
+]
+
+[[package]]
+name = "uniffi-fixture-force-async-list"
+version = "0.1.0"
+dependencies = [
+ "ubrn_fixture_testing",
+ "ubrn_macros",
+ "uniffi",
+]
+
+[[package]]
 name = "uniffi-fixture-futures"
 version = "0.21.0"
 dependencies = [

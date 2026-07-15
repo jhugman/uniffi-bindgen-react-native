@@ -26,6 +26,10 @@ const message = await sayAfter(1000n, "World");
 
 You can see this in action in the [`futures-example` example](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/examples/futures-example/src), and the more complete [`futures` fixture](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/futures).
 
+## Promises from synchronous Rust
+
+Rust that is not `async` can still be given a `Promise` surface in Typescript, with the [`forceAsync` option](../reference/uniffi-toml.md#forcing-an-async-surface) in `uniffi.toml`. The call itself stays synchronous; only the signature changes. It is a migration aid — a way to get call sites into the shape that calling Rust off the main thread requires, without changing what the code does today.
+
 ## Passing Promises across the FFI
 
 There is no support for passing a `Promise` or `Future` as an argument or error, in either direction.

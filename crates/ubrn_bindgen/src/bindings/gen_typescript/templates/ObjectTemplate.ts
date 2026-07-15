@@ -26,7 +26,7 @@ export class {{ obj.impl_class_name }} extends UniffiAbstractObject
 
     {%- match obj.primary_constructor %}
     {%- when Some with (cons) %}
-    {%- if !cons.is_async() %}
+    {%- if !cons.renders_async() %}
     {%-   call _object_ctor_decl(obj, cons) %}
     {%- else %}
     {%- call _object_private_ctor(obj) %}
@@ -50,28 +50,28 @@ export class {{ obj.impl_class_name }} extends UniffiAbstractObject
     {%- for tm in obj.uniffi_traits %}
     {%      match tm %}
     {%-         when TsUniffiTrait::Display { method } %}
-    toString(): string {
+    {% if method.renders_async() %}async {% endif %}{% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call cb::return_type(method) %} {
         {% call cb::call_body_method(method, obj.obj_factory) %}
     }
     {%-         when TsUniffiTrait::Debug { method } %}
-    toDebugString(): string {
+    {% if method.renders_async() %}async {% endif %}toDebugString(): {% call cb::return_type(method) %} {
         {% call cb::call_body_method(method, obj.obj_factory) %}
     }
     {%-            if !obj.has_display_trait() %}
-    toString(): string {
+    {% if method.renders_async() %}async asyncToString(): Promise<string>{% else %}toString(): string{% endif %} {
         return this.toDebugString();
     }
     {%            endif %}
     {%-         when TsUniffiTrait::Eq { eq, ne } %}
-    equals(other: {{ obj.impl_class_name }}): {% call cb::return_type(eq) %} {
+    {% if eq.renders_async() %}async {% endif %}equals(other: {{ obj.impl_class_name }}): {% call cb::return_type(eq) %} {
         {% call cb::call_body_method(eq, obj.obj_factory) %}
     }
     {%-         when TsUniffiTrait::Hash { method } %}
-    hashCode(): {% call cb::return_type(method) %} {
+    {% if method.renders_async() %}async {% endif %}hashCode(): {% call cb::return_type(method) %} {
         {% call cb::call_body_method(method, obj.obj_factory) %}
     }
     {%-         when TsUniffiTrait::Ord { cmp } %}
-    compareTo(other: {{ obj.impl_class_name }}): {% call cb::return_type(cmp) %} {
+    {% if cmp.renders_async() %}async {% endif %}compareTo(other: {{ obj.impl_class_name }}): {% call cb::return_type(cmp) %} {
         {% call cb::call_body_method(cmp, obj.obj_factory) %}
     }
     {%-    endmatch %}
@@ -206,7 +206,7 @@ const {{ obj.ffi_error_converter_name }} = new FfiConverterObjectAsError("{{ obj
 {#- Macro: method or static method declaration -#}
 {%- macro _object_method_decl(obj, func_decl, callable) %}
 {%- call cb::docstring(callable.docstring) %}
-    {% if !func_decl.is_empty() %}{{ func_decl }} {% endif %}{% if callable.is_async() %}async {% endif %}{{ callable.name }}(
+    {% if !func_decl.is_empty() %}{{ func_decl }} {% endif %}{% if callable.renders_async() %}async {% endif %}{{ callable.name }}(
     {%- call cb::arg_list_decl(callable) -%}): {# space #}
     {%- call cb::return_type(callable) %}
     {%- call cb::throws_kw(callable) %} {

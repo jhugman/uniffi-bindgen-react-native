@@ -137,11 +137,23 @@ pub(crate) struct TsCallable {
     pub ffi_name: String,
     pub ffi_async: Option<TsAsyncFfi>,
     pub receiver: Option<TsReceiver>,
+    /// `forceAsync` names this callable's owning type or function: give it an
+    /// async signature over a synchronous FFI body.
+    pub force_async: bool,
 }
 
 impl TsCallable {
-    pub fn is_async(&self) -> bool {
+    /// True when the Rust side is async, so the call needs the future
+    /// poll/complete/free plumbing, its imports, and the async vtable branch.
+    pub fn is_ffi_async(&self) -> bool {
         self.ffi_async.is_some()
+    }
+
+    /// True when the TypeScript signature is async: the `async` keyword, a
+    /// `Promise<T>` return, a `static async` constructor. Async Rust renders
+    /// async, and so does `forceAsync` — over an unchanged synchronous body.
+    pub fn renders_async(&self) -> bool {
+        self.ffi_async.is_some() || self.force_async
     }
     pub fn is_throwing(&self) -> bool {
         self.throws.is_some()
@@ -227,6 +239,9 @@ pub(crate) struct TsObject {
     pub supports_finalization_registry: bool,
     pub has_callback_interface: bool,
     pub strict_object_types: bool,
+    /// `forceAsync` names this type. Kept so validation can reject a
+    /// `WithForeign` trait interface holding any synchronous method.
+    pub force_async: bool,
 }
 
 impl TsObject {
@@ -285,6 +300,9 @@ pub(crate) struct TsCallbackInterface {
     pub methods: Vec<TsCallable>,
     pub vtable: TsVtable,
     pub has_async_methods: bool,
+    /// `forceAsync` names this callback interface. Read by validation only:
+    /// a callback interface's surface is never transformed.
+    pub force_async: bool,
 }
 
 pub(crate) struct InitializationIR {
