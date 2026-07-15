@@ -15,10 +15,7 @@ import {
   UniffiHandleMap,
   defaultUniffiHandle,
 } from "./handle-map.ts";
-import {
-  CALL_ERROR,
-  CALL_UNEXPECTED_ERROR,
-} from "./rust-call.ts";
+import { CALL_ERROR, CALL_UNEXPECTED_ERROR } from "./rust-call.ts";
 
 const handleConverter = FfiConverterUInt64;
 
