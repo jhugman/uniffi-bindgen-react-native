@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import { RustBuffer } from "../src/ffi-types";
+import { Cursor } from "../src/cursor";
 import {
   FfiConverter,
   FfiConverterArray,
@@ -13,7 +13,6 @@ import {
   FfiConverterInt32,
   FfiConverterInt8,
   FfiConverterOptional,
-  FfiConverterPrimitive,
   FfiConverterUInt16,
   FfiConverterUInt8,
   FfiConverterUint8Array,
@@ -26,11 +25,11 @@ class TestConverter<R extends any, T> extends AbstractFfiConverterByteArray<T> {
   constructor(public inner: FfiConverter<R, T>) {
     super();
   }
-  read(from: RustBuffer): T {
-    return this.inner.read(from);
+  readFromCursor(c: Cursor): T {
+    return this.inner.readFromCursor(c);
   }
-  write(value: T, into: RustBuffer): void {
-    return this.inner.write(value, into);
+  writeIntoCursor(value: T, c: Cursor): void {
+    return this.inner.writeIntoCursor(value, c);
   }
   allocationSize(value: T): number {
     return this.inner.allocationSize(value);

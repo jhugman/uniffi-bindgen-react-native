@@ -3,12 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+import { Cursor } from "./cursor.ts";
 import {
   type FfiConverter,
   FfiConverterUInt64,
   type RustBufferAllocator,
 } from "./ffi-converters.ts";
-import { type UniffiByteArray, RustBuffer } from "./ffi-types.ts";
+import { type UniffiByteArray } from "./ffi-types.ts";
 import {
   type UniffiHandle,
   UniffiHandleMap,
@@ -17,7 +18,6 @@ import {
 import {
   CALL_ERROR,
   CALL_UNEXPECTED_ERROR,
-  type UniffiRustCallStatus,
 } from "./rust-call.ts";
 
 const handleConverter = FfiConverterUInt64;
@@ -31,11 +31,11 @@ export class FfiConverterCallback<T> implements FfiConverter<UniffiHandle, T> {
   lower(value: T, _alloc: RustBufferAllocator): UniffiHandle {
     return this.handleMap.insert(value);
   }
-  read(from: RustBuffer): T {
-    return this.lift(handleConverter.read(from));
+  readFromCursor(c: Cursor): T {
+    return this.lift(handleConverter.readFromCursor(c));
   }
-  write(value: T, into: RustBuffer): void {
-    handleConverter.write(this.handleMap.insert(value), into);
+  writeIntoCursor(value: T, c: Cursor): void {
+    handleConverter.writeIntoCursor(this.handleMap.insert(value), c);
   }
   allocationSize(value: T): number {
     return handleConverter.allocationSize(defaultUniffiHandle);

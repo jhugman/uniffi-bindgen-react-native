@@ -37,9 +37,31 @@ export class RustBuffer {
   }
 
   /**
+   * Construct a RustBuffer that reads/writes directly out of a
+   * `WebAssembly.Memory` backing buffer, with `readOffset`/`writeOffset`
+   * pre-positioned at `dataPtr`. Allows record lift/lower to skip the
+   * intermediate `Uint8Array` copy. The caller is responsible for the
+   * buffer remaining attached for the duration of any read/write.
+   */
+  static fromWasmMemory(
+    memoryBuffer: ArrayBuffer,
+    dataPtr: number,
+    len: number,
+  ): RustBuffer {
+    const buf = new RustBuffer(memoryBuffer);
+    // The reader/writer offset machinery uses absolute offsets into the
+    // backing buffer; treat `dataPtr` as the start of the slice and
+    // `dataPtr + len` as its end.
+    buf.readOffset = dataPtr;
+    buf.writeOffset = dataPtr;
+    buf.capacity = dataPtr + len;
+    return buf;
+  }
+
+  /**
    * Construct a `RustBuffer` over a `Uint8Array` view. Cursors track absolute
    * offsets into the backing `ArrayBuffer`, so `byteOffset` and `byteLength`
-   * delimit the readable/writable region.
+   * delimit the readable/writable region. Generalises `fromWasmMemory`.
    */
   static fromUint8Array(view: UniffiByteArray): RustBuffer {
     const buf = new RustBuffer(view.buffer as ArrayBuffer);
@@ -90,23 +112,6 @@ export class RustBuffer {
     const dest = new Uint8Array(this.arrayBuffer, start);
     dest.set(src);
 
-    this.writeOffset = end;
-  }
-
-  readWithView<T>(numBytes: number, reader: (view: DataView) => T): T {
-    const start = this.readOffset;
-    const end = this.checkOverflow(start, numBytes);
-    const view = new DataView(this.arrayBuffer, start, numBytes);
-    const value = reader(view);
-    this.readOffset = end;
-    return value as T;
-  }
-
-  writeWithView(numBytes: number, writer: (view: DataView) => void) {
-    const start = this.writeOffset;
-    const end = this.checkOverflow(start, numBytes);
-    const view = new DataView(this.arrayBuffer, start, numBytes);
-    writer(view);
     this.writeOffset = end;
   }
 
