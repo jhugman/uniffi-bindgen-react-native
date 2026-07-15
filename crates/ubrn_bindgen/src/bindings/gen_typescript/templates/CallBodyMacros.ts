@@ -70,7 +70,10 @@ console.debug(`-- {{ ffi_name }}`);
     {%- endif %}
 {%- endmacro %}
 
-{#- Lowered argument list (for FFI calls). -#}
+{#- Lowered argument list (for FFI calls). Every arg goes through
+   `converter.lower(value, nativeModule().rustbuffer_alloc)`; for `RustBuffer`-shaped
+   types the converter writes straight into a wasm allocation supplied
+   by `rustbuffer_alloc`, so there is no JS-side intermediate copy. -#}
 {%- macro arg_list_lowered(callable) %}
     {%- for arg in callable.arguments %}
         {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc),
@@ -149,22 +152,23 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- The synchronous lift call sites below wrap the converter's `.lift(__rb)`
    in `try/finally` so `rustbuffer_free` always runs — even if `lift`
-   throws on a malformed payload. The IIFE preserves the surrounding
-   `return ...` shape and avoids restructuring the multi-line `to_ffi_*_call`
-   macros into a `const __rb = ...` statement. -#}
+   throws on a malformed payload. A previous version of these macros
+   wrapped the try/finally in an IIFE (`((__rb) => { ... })(...)`); we
+   inline the `const __rb = ...; try { ... } finally { ... }` form
+   instead to avoid allocating a fresh closure object at every call
+   site invocation (V8-friendlier). -#}
 
 {#- Call body for value-receiver method: sync only (trait methods are never async). -#}
 {%- macro call_body_value(callable) %}
 {%- match callable.return_type -%}
 {%-     when Some with (return_type) %}
 {%- if return_type.is_rust_buffer %}
-    return ((__rb: Uint8Array) => {
-        try {
-            return {{ return_type.ffi_converter }}.lift(__rb);
-        } finally {
-            nativeModule().rustbuffer_free(__rb);
-        }
-    })({% call to_ffi_value_call(callable) %});
+    const __rb: Uint8Array = {% call to_ffi_value_call(callable) %};
+    try {
+        return {{ return_type.ffi_converter }}.lift(__rb);
+    } finally {
+        nativeModule().rustbuffer_free(__rb);
+    }
 {%- else %}
     return {{ return_type.ffi_converter }}.lift({% call to_ffi_value_call(callable) %});
 {%- endif %}
@@ -181,13 +185,12 @@ console.debug(`-- {{ ffi_name }}`);
 {%-     match callable.return_type -%}
 {%-         when Some with (return_type) %}
 {%- if return_type.is_rust_buffer %}
-    return ((__rb: Uint8Array) => {
-        try {
-            return {{ return_type.ffi_converter }}.lift(__rb);
-        } finally {
-            nativeModule().rustbuffer_free(__rb);
-        }
-    })({% call to_ffi_pointer_call(callable, obj_factory) %});
+    const __rb: Uint8Array = {% call to_ffi_pointer_call(callable, obj_factory) %};
+    try {
+        return {{ return_type.ffi_converter }}.lift(__rb);
+    } finally {
+        nativeModule().rustbuffer_free(__rb);
+    }
 {%- else %}
     return {{ return_type.ffi_converter }}.lift({% call to_ffi_pointer_call(callable, obj_factory) %});
 {%- endif %}
@@ -205,13 +208,12 @@ console.debug(`-- {{ ffi_name }}`);
 {%-     match callable.return_type -%}
 {%-         when Some with (return_type) %}
 {%- if return_type.is_rust_buffer %}
-    return ((__rb: Uint8Array) => {
-        try {
-            return {{ return_type.ffi_converter }}.lift(__rb);
-        } finally {
-            nativeModule().rustbuffer_free(__rb);
-        }
-    })({% call to_ffi_call(callable) %});
+    const __rb: Uint8Array = {% call to_ffi_call(callable) %};
+    try {
+        return {{ return_type.ffi_converter }}.lift(__rb);
+    } finally {
+        nativeModule().rustbuffer_free(__rb);
+    }
 {%- else %}
     return {{ return_type.ffi_converter }}.lift({% call to_ffi_call(callable) %});
 {%- endif %}

@@ -166,11 +166,10 @@ export type {{ type_name }} = InstanceType<
 
 // FfiConverter for enum {{ type_name }}
 const {{ e.ffi_converter_name }} = (() => {
-    const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
     class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
-        read(from: RustBuffer): TypeName {
-            switch (ordinalConverter.read(from)) {
+        readFromCursor(c: Cursor): TypeName {
+            switch (c.readI32()) {
             {%- for variant in e.variants %}
             {%-   let has_fields = !variant.fields.is_empty() %}
             {%-   let is_tuple = variant.has_nameless_fields %}
@@ -179,12 +178,12 @@ const {{ e.ffi_converter_name }} = (() => {
             {%-   if has_fields %}
             {%-     if !is_tuple %}{
             {%-     for field in variant.fields %}
-            {{-       field.name }}: {{ field.ffi_converter }}.read(from)
+            {{-       field.name }}: {{ field.ffi_converter }}.readFromCursor(c)
             {%-       if !loop.last -%}, {% endif %}
             {%-     endfor %} }
             {%-     else %}
             {%-       for field in variant.fields %}
-            {{-         field.ffi_converter }}.read(from)
+            {{-         field.ffi_converter }}.readFromCursor(c)
             {%-         if !loop.last -%}, {% endif %}
             {%-       endfor %}
             {%-     endif %}
@@ -193,18 +192,18 @@ const {{ e.ffi_converter_name }} = (() => {
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
         }
-        write(value: TypeName, into: RustBuffer): void {
+        writeIntoCursor(value: TypeName, c: Cursor): void {
             switch (value.tag) {
                 {%- for variant in e.variants %}
                 {%-   let has_fields = !variant.fields.is_empty() %}
                 {%-   let is_tuple = variant.has_nameless_fields %}
                 {%-   let external_name = variant.name %}
                 case {{ type_name__Tags }}.{{ external_name }}: {
-                    ordinalConverter.write({{ loop.index }}, into);
+                    c.writeI32({{ loop.index }});
                     {%- if has_fields %}
                     const inner = value.inner;
                     {%-   for field in variant.fields %}
-                    {{ field.ffi_converter }}.write({%- if is_tuple %}inner[{{ loop.index0 }}]{% else %}inner.{{ field.name }}{% endif %}, into);
+                    {{ field.ffi_converter }}.writeIntoCursor({%- if is_tuple %}inner[{{ loop.index0 }}]{% else %}inner.{{ field.name }}{% endif %}, c);
                     {%-   endfor %}
                     {%- endif %}
                     return;
@@ -224,13 +223,13 @@ const {{ e.ffi_converter_name }} = (() => {
                 case {{ type_name__Tags }}.{{ external_name }}: {
                 {%-   if has_fields %}
                     const inner = value.inner;
-                    let size = ordinalConverter.allocationSize({{ loop.index }});
+                    let size = 4;
                 {%-     for field in variant.fields %}
                     size += {{ field.ffi_converter }}.allocationSize({%- if is_tuple %}inner[{{ loop.index0 }}]{% else %}inner.{{ field.name }}{% endif %});
                 {%-     endfor %}
                     return size;
                 {%-   else %}
-                    return ordinalConverter.allocationSize({{ loop.index }});
+                    return 4;
                 {%-   endif %}
                 }
                 {%- endfor %}

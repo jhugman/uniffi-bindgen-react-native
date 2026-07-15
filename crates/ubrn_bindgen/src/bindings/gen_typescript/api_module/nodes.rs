@@ -175,10 +175,11 @@ pub(crate) struct TsReturnType {
     pub ffi_converter: String,
     pub ffi_type: String,
     /// True when the FFI return type is a `RustBuffer` (i.e. `Uint8Array`).
-    /// The `try/finally` lift wrapper in `CallBodyMacros.ts` keys on this so
-    /// the wrapper only fires when the converter's `lift` actually consumes a
-    /// `Uint8Array` — primitive returns (numbers, bigints, booleans, pointers)
-    /// flow through their converters' `lift` directly without a buffer to free.
+    /// The `try/finally` lift wrapper in `CallBodyMacros.ts` keys on this
+    /// so the wrapper only fires when the converter's `lift` actually
+    /// consumes a `Uint8Array` — primitive returns (numbers, bigints,
+    /// booleans, pointers) flow through their converters' `lift` directly
+    /// without a buffer to free.
     pub is_rust_buffer: bool,
 }
 

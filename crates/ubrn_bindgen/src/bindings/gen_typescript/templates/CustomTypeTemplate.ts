@@ -37,13 +37,13 @@ const {{ custom.ffi_converter_name }} = (() => {
             const intermediate = {{ config.lower_expr }};
             return intermediateConverter.lower(intermediate, alloc);
         }
-        read(from: RustBuffer): TsType {
-            const intermediate = intermediateConverter.read(from);
+        readFromCursor(c: Cursor): TsType {
+            const intermediate = intermediateConverter.readFromCursor(c);
             return {{ config.lift_expr }};
         }
-        write(value: TsType, into: RustBuffer): void {
+        writeIntoCursor(value: TsType, c: Cursor): void {
             const intermediate = {{ config.lower_expr }};
-            intermediateConverter.write(intermediate, into);
+            intermediateConverter.writeIntoCursor(intermediate, c);
         }
         allocationSize(value: TsType): number {
             const intermediate = {{ config.lower_expr }};

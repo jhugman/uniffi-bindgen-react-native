@@ -82,17 +82,17 @@ export const {{ rec.ts_name }} = (() => {
 const {{ rec.ffi_converter_name }} = (() => {
     type TypeName = {{ rec.ts_name }};
     class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
-        read(from: RustBuffer): TypeName {
+        readFromCursor(c: Cursor): TypeName {
             return {
             {%- for field in rec.fields %}
-                {{ field.name }}: {{ field.ffi_converter }}.read(from)
+                {{ field.name }}: {{ field.ffi_converter }}.readFromCursor(c)
                 {%- if !loop.last %}, {% endif %}
             {%- endfor %}
             };
         }
-        write(value: TypeName, into: RustBuffer): void {
+        writeIntoCursor(value: TypeName, c: Cursor): void {
             {%- for field in rec.fields %}
-            {{ field.ffi_converter }}.write(value.{{ field.name }}, into);
+            {{ field.ffi_converter }}.writeIntoCursor(value.{{ field.name }}, c);
             {%- endfor %}
         }
         allocationSize(value: TypeName): number {
