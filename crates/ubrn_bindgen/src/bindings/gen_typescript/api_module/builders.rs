@@ -330,21 +330,24 @@ pub(super) fn build_enum(
         .map(|variant| build_variant(config, variant))
         .collect();
 
+    let force_async = config.force_async.is_forced(&en.name);
+
     let uniffi_traits = build_uniffi_traits_value(
         config,
         &en.uniffi_trait_methods,
         &ffi_converter_name,
         flavor,
+        force_async,
     );
     let constructors = en
         .constructors
         .iter()
-        .map(|c| build_constructor_callable(config, c, flavor))
+        .map(|c| build_constructor_callable(config, c, flavor, force_async))
         .collect();
     let methods = en
         .methods
         .iter()
-        .map(|m| build_value_method_callable(config, m, &ffi_converter_name, flavor))
+        .map(|m| build_value_method_callable(config, m, &ffi_converter_name, flavor, force_async))
         .collect();
 
     TsEnum {
@@ -376,21 +379,24 @@ pub(super) fn build_record(config: &Config, rec: &general::Record, flavor: &AbiF
     let has_create_constructor = rec.constructors.iter().any(|c| c.callable.name == "create");
     let has_new_constructor = rec.constructors.iter().any(|c| c.callable.name == "new");
 
+    let force_async = config.force_async.is_forced(&rec.name);
+
     let uniffi_traits = build_uniffi_traits_value(
         config,
         &rec.uniffi_trait_methods,
         &ffi_converter_name,
         flavor,
+        force_async,
     );
     let constructors = rec
         .constructors
         .iter()
-        .map(|c| build_constructor_callable(config, c, flavor))
+        .map(|c| build_constructor_callable(config, c, flavor, force_async))
         .collect();
     let methods = rec
         .methods
         .iter()
-        .map(|m| build_value_method_callable(config, m, &ffi_converter_name, flavor))
+        .map(|m| build_value_method_callable(config, m, &ffi_converter_name, flavor, force_async))
         .collect();
 
     TsRecord {
@@ -451,6 +457,7 @@ pub(super) fn build_callable(
     docstring: &Option<String>,
     receiver: Option<TsReceiver>,
     flavor: &AbiFlavor,
+    force_async: bool,
 ) -> TsCallable {
     let name = fn_name(&callable.name);
     let arguments: Vec<TsArg> = callable
@@ -490,6 +497,7 @@ pub(super) fn build_callable(
         ffi_name: callable_ffi_name,
         ffi_async,
         receiver,
+        force_async,
     }
 }
 
@@ -498,6 +506,7 @@ pub(super) fn build_method_callable(
     method: &general::Method,
     _ffi_clone_name: &str,
     flavor: &AbiFlavor,
+    force_async: bool,
 ) -> TsCallable {
     let receiver = Some(TsReceiver::Pointer);
     build_callable(
@@ -506,6 +515,7 @@ pub(super) fn build_method_callable(
         &method.docstring,
         receiver,
         flavor,
+        force_async,
     )
 }
 
@@ -513,8 +523,16 @@ pub(super) fn build_constructor_callable(
     config: &Config,
     cons: &general::Constructor,
     flavor: &AbiFlavor,
+    force_async: bool,
 ) -> TsCallable {
-    build_callable(config, &cons.callable, &cons.docstring, None, flavor)
+    build_callable(
+        config,
+        &cons.callable,
+        &cons.docstring,
+        None,
+        flavor,
+        force_async,
+    )
 }
 
 fn collect_uniffi_traits(
@@ -558,9 +576,10 @@ pub(super) fn build_uniffi_traits(
     tm: &general::UniffiTraitMethods,
     ffi_clone_name: &str,
     flavor: &AbiFlavor,
+    force_async: bool,
 ) -> Vec<TsUniffiTrait> {
     collect_uniffi_traits(tm, |m| {
-        build_method_callable(config, m, ffi_clone_name, flavor)
+        build_method_callable(config, m, ffi_clone_name, flavor, force_async)
     })
 }
 
@@ -569,6 +588,7 @@ pub(super) fn build_value_method_callable(
     method: &general::Method,
     ffi_converter: &str,
     flavor: &AbiFlavor,
+    force_async: bool,
 ) -> TsCallable {
     let receiver = Some(TsReceiver::Value {
         ffi_converter: ffi_converter.to_string(),
@@ -579,6 +599,7 @@ pub(super) fn build_value_method_callable(
         &method.docstring,
         receiver,
         flavor,
+        force_async,
     )
 }
 
@@ -587,9 +608,10 @@ pub(super) fn build_uniffi_traits_value(
     tm: &general::UniffiTraitMethods,
     ffi_converter: &str,
     flavor: &AbiFlavor,
+    force_async: bool,
 ) -> Vec<TsUniffiTrait> {
     collect_uniffi_traits(tm, |m| {
-        build_value_method_callable(config, m, ffi_converter, flavor)
+        build_value_method_callable(config, m, ffi_converter, flavor, force_async)
     })
 }
 
@@ -631,11 +653,13 @@ pub(super) fn build_object(
         ),
     );
 
+    let force_async = config.force_async.is_forced(&interface.name);
+
     let (primary_constructor, alternate_constructors) = {
         let mut primary = None;
         let mut alternates = Vec::new();
         for cons in &interface.constructors {
-            let built = build_constructor_callable(config, cons, flavor);
+            let built = build_constructor_callable(config, cons, flavor, force_async);
             if matches!(
                 cons.callable.kind,
                 general::CallableKind::Constructor { primary: true, .. }
@@ -651,11 +675,16 @@ pub(super) fn build_object(
     let methods: Vec<TsMethod> = interface
         .methods
         .iter()
-        .map(|m| build_method_callable(config, m, &ffi_clone, flavor))
+        .map(|m| build_method_callable(config, m, &ffi_clone, flavor, force_async))
         .collect();
 
-    let uniffi_traits =
-        build_uniffi_traits(config, &interface.uniffi_trait_methods, &ffi_clone, flavor);
+    let uniffi_traits = build_uniffi_traits(
+        config,
+        &interface.uniffi_trait_methods,
+        &ffi_clone,
+        flavor,
+        force_async,
+    );
 
     let supports_finalization_registry = flavor.supports_finalization_registry();
 
@@ -688,6 +717,7 @@ pub(super) fn build_object(
         supports_finalization_registry,
         has_callback_interface,
         strict_object_types,
+        force_async,
     }
 }
 
@@ -716,7 +746,14 @@ fn build_vtable_field(
     flavor: &AbiFlavor,
 ) -> TsVtableField {
     let name = vm.callable.name.clone();
-    let method = Some(build_callable(config, &vm.callable, &None, None, flavor));
+    let method = Some(build_callable(
+        config,
+        &vm.callable,
+        &None,
+        None,
+        flavor,
+        false,
+    ));
 
     let general::FfiType::Function(ref ffi_fn_name) = vm.ffi_type else {
         return TsVtableField {
@@ -799,6 +836,7 @@ pub(super) fn build_callback_interface(
     let ts_name = rewrite_js_builtins(&cbi.name.to_upper_camel_case());
     // Callback interfaces use `FfiConverterType{Name}` (not `FfiConverter{canonical_name}`).
     let ffi_converter_name = format!("FfiConverterType{ts_name}");
+    let force_async = config.force_async.is_forced(&cbi.name);
 
     let docstring = cbi.docstring.as_deref().map(format_docstring);
 
@@ -806,7 +844,7 @@ pub(super) fn build_callback_interface(
     let methods: Vec<TsCallable> = cbi
         .methods
         .iter()
-        .map(|m| build_callable(config, &m.callable, &m.docstring, None, flavor))
+        .map(|m| build_callable(config, &m.callable, &m.docstring, None, flavor, false))
         .collect();
 
     let has_async_methods = cbi.methods.iter().any(|m| m.callable.is_async());
@@ -824,6 +862,7 @@ pub(super) fn build_callback_interface(
         methods,
         vtable,
         has_async_methods,
+        force_async,
     }
 }
 
@@ -835,7 +874,10 @@ pub(super) fn build_functions(
     namespace
         .functions
         .iter()
-        .map(|f| build_callable(config, &f.callable, &f.docstring, None, flavor))
+        .map(|f| {
+            let force_async = config.force_async.is_forced(&f.callable.name);
+            build_callable(config, &f.callable, &f.docstring, None, flavor, force_async)
+        })
         .collect()
 }
 

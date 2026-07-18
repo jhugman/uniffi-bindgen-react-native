@@ -20,39 +20,39 @@ export namespace {{ e.ts_name }} {
 {%- for ut in e.uniffi_traits %}
 {%- match ut %}
 {%- when TsUniffiTrait::Display { method } %}
-    export function toString(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+    export {% if method.renders_async() %}async {% endif %}function {% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
         {% call cb::call_body_value(method) %}
     }
 {%- when TsUniffiTrait::Debug { method } %}
-    export function toDebugString(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+    export {% if method.renders_async() %}async {% endif %}function toDebugString(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
         {% call cb::call_body_value(method) %}
     }
 {%- if !e.has_display_trait() %}
-    export function toString(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+    export {% if method.renders_async() %}async {% endif %}function {% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
         {% call cb::call_body_value(method) %}
     }
 {%- endif %}
 {%- when TsUniffiTrait::Eq { eq, ne } %}
-    export function equals(self_: {{ e.ts_name }}, {% call cb::arg_list_decl(eq) %}): {% call cb::return_type(eq) %} {
+    export {% if eq.renders_async() %}async {% endif %}function equals(self_: {{ e.ts_name }}, {% call cb::arg_list_decl(eq) %}): {% call cb::return_type(eq) %} {
         {% call cb::call_body_value(eq) %}
     }
 {%- when TsUniffiTrait::Hash { method } %}
-    export function hashCode(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
+    export {% if method.renders_async() %}async {% endif %}function hashCode(self_: {{ e.ts_name }}): {% call cb::return_type(method) %} {
         {% call cb::call_body_value(method) %}
     }
 {%- when TsUniffiTrait::Ord { cmp } %}
-    export function compareTo(self_: {{ e.ts_name }}, {% call cb::arg_list_decl(cmp) %}): {% call cb::return_type(cmp) %} {
+    export {% if cmp.renders_async() %}async {% endif %}function compareTo(self_: {{ e.ts_name }}, {% call cb::arg_list_decl(cmp) %}): {% call cb::return_type(cmp) %} {
         {% call cb::call_body_value(cmp) %}
     }
 {%- endmatch %}
 {%- endfor %}
 {%- for cons in e.constructors %}
-    export function {{ cons.name }}({% call cb::arg_list_decl(cons) %}): {% call cb::return_type(cons) %} {
+    export {% if cons.renders_async() %}async {% endif %}function {{ cons.name }}({% call cb::arg_list_decl(cons) %}): {% call cb::return_type(cons) %} {
 {%- call cb::call_body_function(cons) %}
     }
 {%- endfor %}
 {%- for method in e.methods %}
-    export function {{ method.name }}(self_: {{ e.ts_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
+    export {% if method.renders_async() %}async {% endif %}function {{ method.name }}(self_: {{ e.ts_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
 {%- call cb::call_body_value(method) %}
     }
 {%- endfor %}

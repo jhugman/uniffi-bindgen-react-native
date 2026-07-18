@@ -313,7 +313,7 @@ fn generate_api_from_pipeline(
             switches.flavor.clone(),
             ffi_exports,
             explicit_discr_enums,
-        );
+        )?;
         let code = gen_typescript::generate_api_code_from_ir(api_module)?;
         let path = ts_dir.join(module.ts_filename());
         ubrn_common::write_file(path, code)?;

@@ -83,28 +83,28 @@ export const {{ type_name }} = (() => {
         {%- for ut in e.uniffi_traits %}
         {%- match ut %}
         {%- when TsUniffiTrait::Display { method } %}
-        toString(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
+        {% if method.renders_async() %}async {% endif %}{% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
             {% call cb::call_body_value(method) %}
         }
         {%- when TsUniffiTrait::Debug { method } %}
-        toDebugString(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
+        {% if method.renders_async() %}async {% endif %}toDebugString(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
             {% call cb::call_body_value(method) %}
         }
         {%- if !e.has_display_trait() %}
-        toString(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
+        {% if method.renders_async() %}async {% endif %}{% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
             {% call cb::call_body_value(method) %}
         }
         {%- endif %}
         {%- when TsUniffiTrait::Eq { eq, ne } %}
-        equals(other: {{ type_name }}): {% call cb::return_type(eq) %} { const self_ = this as unknown as {{ type_name }};
+        {% if eq.renders_async() %}async {% endif %}equals(other: {{ type_name }}): {% call cb::return_type(eq) %} { const self_ = this as unknown as {{ type_name }};
             {% call cb::call_body_value(eq) %}
         }
         {%- when TsUniffiTrait::Hash { method } %}
-        hashCode(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
+        {% if method.renders_async() %}async {% endif %}hashCode(): {% call cb::return_type(method) %} { const self_ = this as unknown as {{ type_name }};
             {% call cb::call_body_value(method) %}
         }
         {%- when TsUniffiTrait::Ord { cmp } %}
-        compareTo(other: {{ type_name }}): {% call cb::return_type(cmp) %} { const self_ = this as unknown as {{ type_name }};
+        {% if cmp.renders_async() %}async {% endif %}compareTo(other: {{ type_name }}): {% call cb::return_type(cmp) %} { const self_ = this as unknown as {{ type_name }};
             {% call cb::call_body_value(cmp) %}
         }
         {%- endmatch %}
@@ -137,13 +137,13 @@ export const {{ type_name }} = (() => {
         instanceOf,
         {%- for cons in e.constructors %}
 {% call cb::docstring(cons.docstring) %}
-        {{ cons.name }}({% call cb::arg_list_decl(cons) %}): {% call cb::return_type(cons) %} {
+        {% if cons.renders_async() %}async {% endif %}{{ cons.name }}({% call cb::arg_list_decl(cons) %}): {% call cb::return_type(cons) %} {
 {%- call cb::call_body_function(cons) %}
         },
         {%- endfor %}
         {%- for method in e.methods %}
 {% call cb::docstring(method.docstring) %}
-        {{ method.name }}(self_: {{ type_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
+        {% if method.renders_async() %}async {% endif %}{{ method.name }}(self_: {{ type_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
 {%- call cb::call_body_value(method) %}
         },
         {%- endfor %}
