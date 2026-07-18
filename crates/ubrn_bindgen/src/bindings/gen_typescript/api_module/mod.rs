@@ -380,11 +380,12 @@ impl TsApiModule {
                         defs.push(TsTypeDefinition::StringHelper(build_string_helper(flavor)));
                     }
                 }
-                general::TypeDefinition::Box(_) => {
-                    unimplemented!("Box types are not yet supported by uniffi-bindgen-react-native")
+                general::TypeDefinition::Box(boxed) => {
+                    deferred_wrappers
+                        .push(TsTypeDefinition::SimpleWrapper(build_box(config, boxed)));
                 }
-                general::TypeDefinition::Set(_) => {
-                    unimplemented!("Set types are not yet supported by uniffi-bindgen-react-native")
+                general::TypeDefinition::Set(set) => {
+                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_set(config, set)));
                 }
                 general::TypeDefinition::Optional(opt) => {
                     deferred_wrappers

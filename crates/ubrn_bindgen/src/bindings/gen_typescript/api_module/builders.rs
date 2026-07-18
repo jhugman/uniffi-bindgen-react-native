@@ -36,6 +36,24 @@ pub(super) fn build_sequence(config: &Config, seq: &general::SequenceType) -> Ts
     }
 }
 
+pub(super) fn build_set(config: &Config, set: &general::SetType) -> TsSimpleWrapper {
+    TsSimpleWrapper {
+        infra_class: "FfiConverterSet".into(),
+        ffi_converter_name: ffi_converter_name_for(config, &set.self_type),
+        type_label: type_label_for(config, &set.self_type.ty),
+        inner_converters: vec![ffi_converter_name_for(config, &set.inner)],
+    }
+}
+
+pub(super) fn build_box(config: &Config, boxed: &general::BoxedType) -> TsSimpleWrapper {
+    TsSimpleWrapper {
+        infra_class: "FfiConverterBox".into(),
+        ffi_converter_name: ffi_converter_name_for(config, &boxed.self_type),
+        type_label: type_label_for(config, &boxed.self_type.ty),
+        inner_converters: vec![ffi_converter_name_for(config, &boxed.inner)],
+    }
+}
+
 pub(super) fn build_map(config: &Config, map: &general::MapType) -> TsSimpleWrapper {
     TsSimpleWrapper {
         infra_class: "FfiConverterMap".into(),
@@ -203,12 +221,8 @@ fn render_type_default(_config: &Config, ty: &general::Type) -> String {
         | general::Type::CallbackInterface { .. }
         | general::Type::Timestamp
         | general::Type::Duration => "undefined".into(),
-        general::Type::Box { .. } => {
-            unimplemented!("Box types are not yet supported by uniffi-bindgen-react-native")
-        }
-        general::Type::Set { .. } => {
-            unimplemented!("Set types are not yet supported by uniffi-bindgen-react-native")
-        }
+        general::Type::Box { inner_type } => render_type_default(_config, inner_type),
+        general::Type::Set { .. } => "new Set()".into(),
     }
 }
 

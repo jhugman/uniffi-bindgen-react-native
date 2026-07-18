@@ -301,6 +301,58 @@ export class FfiConverterArray<Item> extends AbstractFfiConverterByteArray<
   }
 }
 
+export class FfiConverterSet<Item> extends AbstractFfiConverterByteArray<
+  Set<Item>
+> {
+  private static sizeConverter = FfiConverterInt32;
+  constructor(private itemConverter: FfiConverter<any, Item>) {
+    super();
+  }
+  read(from: RustBuffer): Set<Item> {
+    const size = FfiConverterSet.sizeConverter.read(from);
+    const set = new Set<Item>();
+    for (let i = 0; i < size; i++) {
+      set.add(this.itemConverter.read(from));
+    }
+    return set;
+  }
+  write(set: Set<Item>, into: RustBuffer): void {
+    FfiConverterSet.sizeConverter.write(set.size, into);
+    for (const item of set) {
+      this.itemConverter.write(item, into);
+    }
+  }
+  allocationSize(set: Set<Item>): number {
+    let size = FfiConverterSet.sizeConverter.allocationSize(set.size);
+    for (const item of set) {
+      size += this.itemConverter.allocationSize(item);
+    }
+    return size;
+  }
+}
+
+// Rust `Box<T>` lowers/lifts identically to `T`; this converter exists only
+// so boxed types get their own named FfiConverter, matching the other
+// bindings' codegen (e.g. Python's `_UniffiConverterRustBuffer` subclass).
+export class FfiConverterBox<T> implements FfiConverter<any, T> {
+  constructor(private innerConverter: FfiConverter<any, T>) {}
+  lift(value: any): T {
+    return this.innerConverter.lift(value);
+  }
+  lower(value: T, alloc: RustBufferAllocator): any {
+    return this.innerConverter.lower(value, alloc);
+  }
+  read(from: RustBuffer): T {
+    return this.innerConverter.read(from);
+  }
+  write(value: T, into: RustBuffer): void {
+    this.innerConverter.write(value, into);
+  }
+  allocationSize(value: T): number {
+    return this.innerConverter.allocationSize(value);
+  }
+}
+
 export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
   Map<K, V>
 > {
