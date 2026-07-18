@@ -20,7 +20,8 @@
       "types": "./typescript/dist/esm/index.d.ts",
       "import": "./typescript/dist/esm/index.js",
       "require": "./typescript/dist/cjs/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
     "ubrn": "./bin/cli.cjs",
