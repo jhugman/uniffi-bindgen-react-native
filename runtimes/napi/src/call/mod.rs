@@ -172,37 +172,37 @@ pub(crate) fn call_ffi_function(
     }
 
     match &call_ret {
-        CallReturn::RustBuffer(rb) => {
-            rust_buffer_to_js_uint8array_handoff(env, *rb, capacity_symbol)
-        }
+        CallReturn::RustBuffer(rb) => rust_buffer_to_js_uint8array_handoff(
+            env,
+            *rb,
+            module.rb_ops().free_ptr,
+            capacity_symbol,
+        ),
         _ => marshal::read_return_to_js(env, &call_ret),
     }
 }
 
-/// Hand a returned `RustBufferC` to JS as a `Uint8Array` view aliasing the
-/// Rust-owned bytes — no boundary copy. The codegen-emitted lift wrapper is
-/// expected to call `converter.lift(view)` inside a `try/finally` and invoke
-/// the runtime's `rustbuffer_free(view)` afterwards. The single mandatory copy
-/// now happens inside `lift()` itself (via `dest.set(view)` for byte arrays,
-/// `TextDecoder.decode` for strings, field-by-field reads for composites).
+/// Hand a returned `RustBufferC` to JS as a `Uint8Array`.
 ///
-/// The view's `byteLength` is `rb.len` (so string/raw-byte-array converters
-/// that decode the whole view see only the message bytes). Rust may have
-/// allocated `rb.capacity > rb.len` bytes, so we stash `capacity` on the view
-/// via the runtime's per-registration capacity Symbol; the runtime's
-/// `rustbuffer_free` reads it back when releasing the allocation.
+/// Node gets a zero-copy view over the Rust-owned bytes. Runtimes that reject
+/// external ArrayBuffers, including Electron with V8's memory cage, get a
+/// copied V8-owned view instead. The codegen-emitted lift wrapper calls
+/// `rustbuffer_free(view)` in both cases; copied views carry a zero-capacity
+/// marker that makes that call a no-op because Rust was already freed.
 ///
 /// On any error in the handoff, we free the buffer to avoid leaking the
 /// Rust-side allocation.
 fn rust_buffer_to_js_uint8array_handoff(
     env: &napi::Env,
     rb: RustBufferC,
+    rb_free_ptr: *const c_void,
     capacity_symbol: &CapacitySymbol,
 ) -> Result<JsUnknown> {
     let raw_env = env.raw();
     let len = match usize::try_from(rb.len) {
         Ok(n) => n,
         Err(_) => {
+            unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
             return Err(napi::Error::from_reason(
                 "RustBuffer len exceeds addressable memory",
             ));
@@ -218,18 +218,43 @@ fn rust_buffer_to_js_uint8array_handoff(
     }
 
     // SAFETY: `rb.data` points to a Rust-owned allocation of at least `len`
-    // bytes. We expose it to JS without a finalizer; the codegen-emitted
-    // try/finally calls `rustbuffer_free(view)` which will hand the (ptr,
-    // capacity) tuple back to the library's `rustbuffer_free`.
-    let typedarray = unsafe { napi_utils::create_external_uint8array(raw_env, rb.data, len)? };
-
-    // If `capacity > len`, the view's `byteLength` (== len) under-reports the
-    // allocation size. Stash the true capacity so `rustbuffer_free(view)` can
-    // free against the original `Layout`. When `capacity == len`, the runtime
-    // can recover capacity from `byteLength`, so we skip the property write.
-    if rb.capacity != rb.len {
-        unsafe { capacity_symbol.set(raw_env, typedarray, rb.capacity)? };
-    }
+    // bytes. When the runtime supports external buffers, expose it to JS
+    // without a copy and let the generated finally block release it.
+    let typedarray = match unsafe {
+        napi_utils::try_create_external_uint8array(raw_env, rb.data, len)
+    } {
+        Ok(Some(typedarray)) => {
+            // If `capacity > len`, the view's `byteLength` under-reports the
+            // allocation size. Stash the true capacity for `rustbuffer_free`.
+            if rb.capacity != rb.len {
+                if let Err(error) = unsafe { capacity_symbol.set(raw_env, typedarray, rb.capacity) }
+                {
+                    unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+                    return Err(error);
+                }
+            }
+            typedarray
+        }
+        Ok(None) => {
+            // Electron's V8 memory cage forbids external ArrayBuffers. Copy
+            // into V8-owned memory, release the Rust allocation now, and mark
+            // the view so the generated `rustbuffer_free(view)` becomes a no-op.
+            let copied = match unsafe { napi_utils::create_uint8array(raw_env, rb.data, len) } {
+                Ok(copied) => copied,
+                Err(error) => {
+                    unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+                    return Err(error);
+                }
+            };
+            unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+            unsafe { capacity_symbol.set(raw_env, copied, 0)? };
+            copied
+        }
+        Err(error) => {
+            unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+            return Err(error);
+        }
+    };
 
     Ok(unsafe { JsUnknown::from_raw(raw_env, typedarray)? })
 }

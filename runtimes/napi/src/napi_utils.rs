@@ -35,7 +35,8 @@ use uniffi_runtime_core::ffi_c_types::{
 /// underlying RustBuffer capacity on a lift-handoff `Uint8Array`. The view's
 /// `byteLength` is set to `len` so converters that decode the whole view
 /// (strings, raw byte arrays) see only the message bytes — but the global
-/// allocator needs `capacity` to free correctly when `capacity > len`. The
+/// allocator needs `capacity` to free correctly when `capacity > len`. A zero
+/// capacity marks a copied, V8-owned fallback that Rust already released. The
 /// symbol is created once when the module registers and lives as long as the
 /// JS-side module facade.
 pub struct CapacitySymbol {
@@ -366,23 +367,27 @@ pub unsafe fn rustbuffer_alloc(
     Ok(rb)
 }
 
-/// Wrap externally-managed memory as a JS `Uint8Array` (via napi external ArrayBuffer).
+/// Try to wrap externally-managed memory as a JS `Uint8Array`.
 ///
 /// Unlike [`create_uint8array`], this **does not copy**: the returned typed array is a
 /// view directly over `data`. The caller is responsible for keeping the memory alive
 /// for as long as JS holds the view—we pass a no-op finalizer because the codegen-emitted
 /// wrapper drops the JS reference before the corresponding `rustbuffer_free` runs.
 ///
+/// Returns `Ok(None)` when the runtime forbids external buffers, as Electron does when
+/// V8's memory cage is enabled. Callers must fall back to a copied, V8-owned buffer and
+/// release the Rust allocation themselves.
+///
 /// # Safety
 ///
 /// - `raw_env` must be a valid `napi_env` for the current callback scope.
 /// - `data` must point to at least `len` readable+writable bytes that remain alive
 ///   for the lifetime of the returned typed array (ignored when `len == 0`).
-pub unsafe fn create_external_uint8array(
+pub unsafe fn try_create_external_uint8array(
     raw_env: napi::sys::napi_env,
     data: *mut u8,
     len: usize,
-) -> napi::Result<napi::sys::napi_value> {
+) -> napi::Result<Option<napi::sys::napi_value>> {
     // No-op finalizer: ownership stays with the Rust library; codegen will call
     // `rustbuffer_free` explicitly. Using `napi_create_external_arraybuffer` with
     // a null finalizer is technically permitted, but napi engines (Node 18+) emit
@@ -401,8 +406,12 @@ pub unsafe fn create_external_uint8array(
         std::ptr::null_mut(),
         &mut arraybuffer,
     );
+    if status == napi::sys::Status::napi_no_external_buffers_allowed {
+        return Ok(None);
+    }
     if status != napi::sys::Status::napi_ok {
-        return Err(napi::Error::from_reason(
+        return Err(napi::Error::new(
+            napi::Status::from(status),
             "Failed to create external ArrayBuffer".to_string(),
         ));
     }
@@ -424,7 +433,7 @@ pub unsafe fn create_external_uint8array(
             "Failed to create Uint8Array view".to_string(),
         ));
     }
-    Ok(typedarray)
+    Ok(Some(typedarray))
 }
 
 /// Convert a JS `Uint8Array` to a [`RustBufferC`] by reading its data and calling

@@ -90,6 +90,7 @@ pub fn register(
     // library's `rustbuffer_free`. Together they let JS allocate buffers that the
     // codegen-emitted lowering path can fill in place and ship to Rust without copying.
     let alloc_module = Arc::clone(&module);
+    let cap_sym_for_alloc = Arc::clone(&capacity_symbol);
     let alloc_fn = env.create_function_from_closure("rustbuffer_alloc", move |ctx| {
         let size_arg: i32 = ctx.get(0)?;
         if size_arg < 0 {
@@ -107,11 +108,34 @@ pub fn register(
             napi::Error::from_reason("RustBuffer capacity exceeds addressable memory".to_string())
         })?;
         // SAFETY: rb.data points to a valid allocation of `len` bytes that the Rust
-        // library owns; codegen will hand the view back via `rustbuffer_free` before
-        // shipping the (ptr, len, cap) tuple to FFI, so no finalizer is required.
-        let typedarray =
-            unsafe { napi_utils::create_external_uint8array(ctx.env.raw(), rb.data, len)? };
-        unsafe { JsUnknown::from_raw(ctx.env.raw(), typedarray) }
+        // library owns. Node can write directly into that allocation. Electron's V8
+        // memory cage rejects external ArrayBuffers, so fall back to a V8-owned view;
+        // argument marshalling will copy it into Rust when the function is called.
+        let raw_env = ctx.env.raw();
+        let typedarray = match unsafe {
+            napi_utils::try_create_external_uint8array(raw_env, rb.data, len)
+        } {
+            Ok(Some(typedarray)) => typedarray,
+            Ok(None) => {
+                let copied = match unsafe {
+                    napi_utils::create_uint8array(raw_env, std::ptr::null(), len)
+                } {
+                    Ok(copied) => copied,
+                    Err(error) => {
+                        unsafe { napi_utils::free_rustbuffer(rb, alloc_module.rb_ops().free_ptr) };
+                        return Err(error);
+                    }
+                };
+                unsafe { napi_utils::free_rustbuffer(rb, alloc_module.rb_ops().free_ptr) };
+                unsafe { cap_sym_for_alloc.set(raw_env, copied, 0)? };
+                copied
+            }
+            Err(error) => {
+                unsafe { napi_utils::free_rustbuffer(rb, alloc_module.rb_ops().free_ptr) };
+                return Err(error);
+            }
+        };
+        unsafe { JsUnknown::from_raw(raw_env, typedarray) }
     })?;
     result.set_named_property("rustbuffer_alloc", alloc_fn)?;
 
@@ -137,7 +161,7 @@ pub fn register(
         if length == 0 {
             return ctx.env.get_undefined().map(|u| u.into_unknown());
         }
-        // Capacity recovery. Two view origins to handle:
+        // Capacity recovery. Three view origins to handle:
         //   (a) `rustbuffer_alloc(n)` views: capacity == byteLength == n, no
         //       hint set. Use byteLength.
         //   (b) Lift-handoff views: byteLength == rb.len, capacity may be
@@ -146,6 +170,9 @@ pub fn register(
         //       `capacity == len` at handoff time we skip the property write,
         //       so absence of a hint here is also a valid "use byteLength"
         //       signal.
+        //   (c) Copied fallbacks: capacity is explicitly zero because Rust
+        //       already released the source allocation. `free_rustbuffer`
+        //       treats this as a no-op.
         // SAFETY: raw_env / raw_val are valid for the current callback scope.
         let capacity = unsafe { cap_sym_for_free.get(raw_env, raw_val) }.unwrap_or(length as u64);
         let rb = RustBufferC {
@@ -153,10 +180,9 @@ pub fn register(
             len: 0,
             data: data_ptr as *mut u8,
         };
-        // SAFETY: free_ptr was resolved at registration time. rb mirrors the
-        // buffer produced by the matching `rustbuffer_alloc` call OR a
-        // lift-handoff view whose `(data_ptr, capacity)` match the original
-        // RustBuffer that Rust returned across the FFI.
+        // SAFETY: free_ptr was resolved at registration time. For Rust-owned
+        // views, rb mirrors the allocation from `rustbuffer_alloc` or the
+        // lift-handoff. Copied views carry capacity zero and are ignored.
         unsafe { napi_utils::free_rustbuffer(rb, free_module.rb_ops().free_ptr) };
         ctx.env.get_undefined().map(|u| u.into_unknown())
     })?;
