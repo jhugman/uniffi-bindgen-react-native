@@ -27,17 +27,14 @@ use std::ffi::c_void;
 use napi::{JsUnknown, NapiRaw};
 
 use uniffi_runtime_core::ffi_c_types::{
-    ForeignBytesC, RustBufferAllocFn, RustBufferC, RustBufferFreeFn, RustBufferFromBytesFn,
-    RustCallStatusC,
+    ForeignBytesC, RustBufferC, RustBufferFreeFn, RustBufferFromBytesFn, RustCallStatusC,
 };
 
 /// A per-registration JS Symbol used as a hidden property key for stashing the
-/// underlying RustBuffer capacity on a lift-handoff `Uint8Array`. The view's
-/// `byteLength` is set to `len` so converters that decode the whole view
-/// (strings, raw byte arrays) see only the message bytes — but the global
-/// allocator needs `capacity` to free correctly when `capacity > len`. The
-/// symbol is created once when the module registers and lives as long as the
-/// JS-side module facade.
+/// RustBuffer ownership on a `Uint8Array`. Rust-owned views carry their
+/// allocation capacity, which may exceed `byteLength`; JS-owned views carry
+/// zero. The symbol is created once when the module registers and lives as long
+/// as the JS-side module facade.
 pub struct CapacitySymbol {
     /// `napi_ref` keeping the Symbol alive across JS callbacks. Symbols are GC-
     /// managed; we hold a strong reference (initial refcount 1) so the symbol
@@ -141,17 +138,40 @@ impl CapacitySymbol {
                 "Failed to create BigInt for capacity hint".to_string(),
             ));
         }
-        let status = napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val);
+        let mut has = false;
+        let status = napi::sys::napi_has_property(raw_env, obj, sym_val, &mut has);
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
-                "Failed to set capacity-hint property".to_string(),
+                "Failed to inspect RustBuffer ownership metadata",
+            ));
+        }
+
+        let status = if has {
+            napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val)
+        } else {
+            let descriptor = napi::sys::napi_property_descriptor {
+                utf8name: std::ptr::null(),
+                name: sym_val,
+                method: None,
+                getter: None,
+                setter: None,
+                value: cap_val,
+                attributes: napi::sys::PropertyAttributes::writable,
+                data: std::ptr::null_mut(),
+            };
+            napi::sys::napi_define_properties(raw_env, obj, 1, &descriptor)
+        };
+        if status != napi::sys::Status::napi_ok {
+            return Err(napi::Error::from_reason(
+                "Failed to set RustBuffer ownership metadata",
             ));
         }
         Ok(())
     }
 
-    /// Read the capacity hint from `obj`. Returns `None` if no hint is set
-    /// (e.g., views from `rustbuffer_alloc(n)` where `byteLength == capacity`).
+    /// Read the capacity metadata from `obj`. Returns `Ok(None)` only when the
+    /// property is absent; N-API failures remain errors so callers never mistake
+    /// an ownership lookup failure for a Rust-owned buffer.
     ///
     /// # Safety
     ///
@@ -160,26 +180,37 @@ impl CapacitySymbol {
         &self,
         raw_env: napi::sys::napi_env,
         obj: napi::sys::napi_value,
-    ) -> Option<u64> {
-        let sym_val = self.value(raw_env).ok()?;
+    ) -> napi::Result<Option<u64>> {
+        let sym_val = self.value(raw_env)?;
         let mut has = false;
         let status = napi::sys::napi_has_property(raw_env, obj, sym_val, &mut has);
-        if status != napi::sys::Status::napi_ok || !has {
-            return None;
+        if status != napi::sys::Status::napi_ok {
+            return Err(napi::Error::from_reason(
+                "Failed to inspect RustBuffer ownership metadata",
+            ));
         }
+        if !has {
+            return Ok(None);
+        }
+
         let mut cap_val: napi::sys::napi_value = std::ptr::null_mut();
         let status = napi::sys::napi_get_property(raw_env, obj, sym_val, &mut cap_val);
         if status != napi::sys::Status::napi_ok || cap_val.is_null() {
-            return None;
+            return Err(napi::Error::from_reason(
+                "Failed to read RustBuffer ownership metadata",
+            ));
         }
+
         let mut value: u64 = 0;
         let mut lossless = false;
         let status =
             napi::sys::napi_get_value_bigint_uint64(raw_env, cap_val, &mut value, &mut lossless);
-        if status != napi::sys::Status::napi_ok {
-            return None;
+        if status != napi::sys::Status::napi_ok || !lossless {
+            return Err(napi::Error::from_reason(
+                "Invalid RustBuffer ownership metadata",
+            ));
         }
-        Some(value)
+        Ok(Some(value))
     }
 }
 
@@ -201,14 +232,14 @@ impl Drop for CapacitySymbol {
 /// The two-step construction—first an `ArrayBuffer`, then a `TypedArray` view
 /// over it—is the only way to create a `Uint8Array` via the napi C API.
 /// The `ArrayBuffer` owns the backing memory; the `TypedArray` is a lightweight
-/// view with zero additional allocation. We copy `len` bytes from `data` into
-/// the newly allocated `ArrayBuffer` and return the `Uint8Array` view as a raw
-/// `napi_value`.
+/// view with zero additional allocation. When `data` is non-null, we copy `len`
+/// bytes into the newly allocated `ArrayBuffer`; a null pointer leaves the new
+/// buffer for the caller to initialize through the returned view.
 ///
 /// # Safety
 ///
 /// - `raw_env` must be a valid `napi_env` for the current callback scope.
-/// - `data` must point to at least `len` readable bytes (ignored when `len == 0`).
+/// - When non-null, `data` must point to at least `len` readable bytes.
 pub unsafe fn create_uint8array(
     raw_env: napi::sys::napi_env,
     data: *const u8,
@@ -334,55 +365,27 @@ pub unsafe fn rustbuffer_from_raw_bytes(
     Ok(rb)
 }
 
-/// Allocate a [`RustBufferC`] of the requested capacity via `rustbuffer_alloc`.
-///
-/// Returned buffer has `capacity == size`, `len == 0`, and a heap-allocated `data`
-/// pointer owned by the Rust library. Callers must hand the buffer back through the
-/// matching `rustbuffer_free` (or pass it across the FFI to a function that consumes it).
-///
-/// # Safety
-///
-/// - `rb_alloc_ptr` must point to a valid `rustbuffer_alloc` function.
-pub unsafe fn rustbuffer_alloc(
-    size: i32,
-    rb_alloc_ptr: *const c_void,
-) -> napi::Result<RustBufferC> {
-    if rb_alloc_ptr.is_null() {
-        return Err(napi::Error::from_reason(
-            "rustbuffer_alloc symbol is unresolved".to_string(),
-        ));
-    }
-    // SAFETY: `rb_alloc_ptr` was obtained via `dlsym` for the symbol whose name was
-    // provided under `symbols.rustbuffer_alloc` in the JS definitions. We transmute
-    // it to `RustBufferAllocFn`—the correct signature for UniFFI's `rustbuffer_alloc`.
-    let alloc: RustBufferAllocFn = std::mem::transmute(rb_alloc_ptr);
-    let mut call_status = RustCallStatusC::default();
-    let rb = alloc(size, &mut call_status as *mut RustCallStatusC);
-    if call_status.code != 0 {
-        return Err(napi::Error::from_reason(
-            "rustbuffer_alloc failed".to_string(),
-        ));
-    }
-    Ok(rb)
-}
-
-/// Wrap externally-managed memory as a JS `Uint8Array` (via napi external ArrayBuffer).
+/// Try to wrap externally-managed memory as a JS `Uint8Array`.
 ///
 /// Unlike [`create_uint8array`], this **does not copy**: the returned typed array is a
 /// view directly over `data`. The caller is responsible for keeping the memory alive
 /// for as long as JS holds the view—we pass a no-op finalizer because the codegen-emitted
 /// wrapper drops the JS reference before the corresponding `rustbuffer_free` runs.
 ///
+/// Returns `Ok(None)` when the runtime forbids external buffers, as Electron does when
+/// V8's memory cage is enabled. Callers must fall back to a copied, V8-owned buffer and
+/// release the Rust allocation themselves.
+///
 /// # Safety
 ///
 /// - `raw_env` must be a valid `napi_env` for the current callback scope.
 /// - `data` must point to at least `len` readable+writable bytes that remain alive
 ///   for the lifetime of the returned typed array (ignored when `len == 0`).
-pub unsafe fn create_external_uint8array(
+pub unsafe fn try_create_external_uint8array(
     raw_env: napi::sys::napi_env,
     data: *mut u8,
     len: usize,
-) -> napi::Result<napi::sys::napi_value> {
+) -> napi::Result<Option<napi::sys::napi_value>> {
     // No-op finalizer: ownership stays with the Rust library; codegen will call
     // `rustbuffer_free` explicitly. Using `napi_create_external_arraybuffer` with
     // a null finalizer is technically permitted, but napi engines (Node 18+) emit
@@ -401,8 +404,12 @@ pub unsafe fn create_external_uint8array(
         std::ptr::null_mut(),
         &mut arraybuffer,
     );
+    if status == napi::sys::Status::napi_no_external_buffers_allowed {
+        return Ok(None);
+    }
     if status != napi::sys::Status::napi_ok {
-        return Err(napi::Error::from_reason(
+        return Err(napi::Error::new(
+            napi::Status::from(status),
             "Failed to create external ArrayBuffer".to_string(),
         ));
     }
@@ -424,7 +431,7 @@ pub unsafe fn create_external_uint8array(
             "Failed to create Uint8Array view".to_string(),
         ));
     }
-    Ok(typedarray)
+    Ok(Some(typedarray))
 }
 
 /// Convert a JS `Uint8Array` to a [`RustBufferC`] by reading its data and calling
