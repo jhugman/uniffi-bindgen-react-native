@@ -43,6 +43,8 @@ test("RustBuffer echo: pass Uint8Array, get same bytes back", () => {
   assert.strictEqual(status.code, 0);
   assert.ok(result instanceof Uint8Array);
   assert.deepStrictEqual(result, input);
+  nm.rustbuffer_free(result);
+  nm.rustbuffer_free(result);
 });
 
 test("RustBuffer echo: empty buffer", () => {
@@ -67,6 +69,45 @@ test("RustBuffer echo: empty buffer", () => {
   assert.strictEqual(status.code, 0);
   assert.ok(result instanceof Uint8Array);
   assert.strictEqual(result.length, 0);
+});
+
+test("empty RustBuffer handoffs release spare Rust capacity", () => {
+  const lib = openLib();
+  const nm = lib.register({
+    symbols: SYMBOLS,
+    structs: {},
+    callbacks: {},
+    functions: {
+      uniffi_test_rustbuffer_alloc: {
+        args: [FfiType.UInt64],
+        ret: FfiType.RustBuffer,
+        hasRustCallStatus: true,
+      },
+      uniffi_test_fn_buffer_free_count: {
+        args: [],
+        ret: FfiType.UInt64,
+        hasRustCallStatus: true,
+      },
+    },
+  });
+
+  const countStatus = { code: 0 };
+  const before = nm.uniffi_test_fn_buffer_free_count(countStatus);
+  assert.strictEqual(countStatus.code, 0);
+
+  const allocStatus = { code: 0 };
+  const result = nm.uniffi_test_rustbuffer_alloc(8n, allocStatus);
+  assert.strictEqual(allocStatus.code, 0);
+  assert.strictEqual(result.byteLength, 0);
+
+  const after = nm.uniffi_test_fn_buffer_free_count({ code: 0 });
+  assert.strictEqual(after, before + 1n);
+  nm.rustbuffer_free(result);
+  nm.rustbuffer_free(result);
+  assert.strictEqual(
+    nm.uniffi_test_fn_buffer_free_count({ code: 0 }),
+    after,
+  );
 });
 
 test("RustBuffer: large buffer round-trip (1MB)", () => {
@@ -141,7 +182,7 @@ test("RustBuffer: buffer_len returns correct length", () => {
   assert.strictEqual(result, 4);
 });
 
-test("rustbuffer_alloc returns a Uint8Array view of the requested length", () => {
+test("rustbuffer_alloc returns a JS-owned view with scoped cleanup", () => {
   const lib = openLib();
   const nm = lib.register({
     symbols: SYMBOLS,
@@ -155,8 +196,12 @@ test("rustbuffer_alloc returns a Uint8Array view of the requested length", () =>
   assert.strictEqual(view.byteLength, 16);
   view[0] = 0xab;
   view[15] = 0xcd;
-  // Hand the buffer back to Rust to free it (otherwise it leaks).
   nm.rustbuffer_free(view);
+  nm.rustbuffer_free(view);
+  assert.throws(
+    () => nm.rustbuffer_free(new Uint8Array(16)),
+    /unowned Uint8Array/,
+  );
 });
 
 test("RustBuffer return is a view-handoff (alias safety)", () => {
