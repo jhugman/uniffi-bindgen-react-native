@@ -4,16 +4,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+import { Cursor } from "./cursor.ts";
 import {
   AbstractFfiConverterByteArray,
   type FfiConverter,
   FfiConverterUInt64,
   type RustBufferAllocator,
 } from "./ffi-converters.ts";
-import { RustBuffer } from "./ffi-types.ts";
 import type { UniffiGcObject } from "./rust-call.ts";
 import { type UniffiHandle, UniffiHandleMap } from "./handle-map.ts";
-import { UniffiInternalError, UniffiThrownObject } from "./errors.ts";
+import { UniffiThrownObject } from "./errors.ts";
 
 /**
  * Marker interface for all `interface` objects that cross the FFI.
@@ -59,7 +59,7 @@ export interface UniffiObjectFactory<T> {
   isConcreteType(obj: any): obj is T;
 }
 
-const pointerConverter: FfiConverter<any, UniffiHandle> = FfiConverterUInt64;
+const pointerConverter = FfiConverterUInt64;
 const dummyPointer: UniffiHandle = BigInt("0");
 
 /**
@@ -74,11 +74,11 @@ export class FfiConverterObject<T> implements FfiConverter<UniffiHandle, T> {
   lower(value: T, _alloc: RustBufferAllocator): UniffiHandle {
     return this.lowerHandle(value);
   }
-  read(from: RustBuffer): T {
-    return this.lift(pointerConverter.read(from));
+  readFromCursor(c: Cursor): T {
+    return this.lift(pointerConverter.readFromCursor(c));
   }
-  write(value: T, into: RustBuffer): void {
-    pointerConverter.write(this.lowerHandle(value), into);
+  writeIntoCursor(value: T, c: Cursor): void {
+    pointerConverter.writeIntoCursor(this.lowerHandle(value), c);
   }
   protected lowerHandle(value: T): UniffiHandle {
     if (this.factory.isConcreteType(value)) {
@@ -142,13 +142,13 @@ export class FfiConverterObjectAsError<T> extends AbstractFfiConverterByteArray<
   ) {
     super();
   }
-  read(from: RustBuffer): UniffiThrownObject<T> {
-    const obj = this.innerConverter.read(from);
+  readFromCursor(c: Cursor): UniffiThrownObject<T> {
+    const obj = this.innerConverter.readFromCursor(c);
     return new UniffiThrownObject(this.typeName, obj);
   }
-  write(value: UniffiThrownObject<T>, into: RustBuffer): void {
+  writeIntoCursor(value: UniffiThrownObject<T>, c: Cursor): void {
     const obj = value.inner;
-    this.innerConverter.write(obj, into);
+    this.innerConverter.writeIntoCursor(obj, c);
   }
   allocationSize(value: UniffiThrownObject<T>): number {
     return this.innerConverter.allocationSize(value.inner);

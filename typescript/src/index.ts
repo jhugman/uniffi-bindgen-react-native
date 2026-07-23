@@ -9,6 +9,7 @@
 export * from "./async-callbacks.ts";
 export * from "./async-rust-call.ts";
 export * from "./callbacks.ts";
+export * from "./cursor.ts";
 export * from "./enums.ts";
 export * from "./errors.ts";
 export * from "./ffi-converters.ts";

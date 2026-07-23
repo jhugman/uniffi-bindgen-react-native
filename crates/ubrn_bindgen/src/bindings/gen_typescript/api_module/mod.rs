@@ -175,6 +175,7 @@ impl ImportAccumulator {
     fn collect_custom(&mut self, c: &TsCustomType) {
         self.add_infra_type("FfiConverter");
         self.add_infra_type("RustBufferAllocator");
+        self.add_infra_value("Cursor");
         self.add_infra_value("uniffiTypeNameSymbol");
         if let Some(cfg) = &c.custom_config {
             for (name, from) in &cfg.imports {
@@ -195,7 +196,7 @@ impl ImportAccumulator {
 
     fn collect_enum(&mut self, e: &TsEnum) {
         self.add_infra_value("AbstractFfiConverterByteArray");
-        self.add_infra_value("FfiConverterInt32");
+        self.add_infra_value("Cursor");
         self.add_infra_value("UniffiInternalError");
         if !e.is_flat {
             self.add_infra_value("uniffiTypeNameSymbol");
@@ -227,6 +228,7 @@ impl ImportAccumulator {
     fn collect_record(&mut self, r: &TsRecord) {
         self.add_infra_value("uniffiCreateRecord");
         self.add_infra_value("AbstractFfiConverterByteArray");
+        self.add_infra_value("Cursor");
         self.add_exported_converter(&r.ffi_converter_name);
 
         if r.has_callables() {

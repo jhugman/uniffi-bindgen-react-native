@@ -414,9 +414,10 @@ fn build_error_type(config: &Config, type_node: &general::TypeNode) -> TsErrorTy
 }
 
 pub(super) fn build_arg(config: &Config, arg: &general::Argument) -> TsArg {
+    let ts_type = type_label_for(config, &arg.ty.ty);
     TsArg {
         name: arg_name(&arg.name),
-        ts_type: type_label_for(config, &arg.ty.ty),
+        ts_type,
         ffi_converter: ffi_converter_name_for(config, &arg.ty),
         default_value: arg
             .default
@@ -442,10 +443,11 @@ pub(super) fn build_callable(
         .map(|arg| build_arg(config, arg))
         .collect();
     let return_type = callable.return_type.ty.as_ref().map(|tn| {
+        let ts_type = type_label_for(config, &tn.ty);
         let ffi_type = ffi_type_to_ts_name(&tn.ffi_type.ty);
         let is_rust_buffer = ffi_type == "Uint8Array";
         TsReturnType {
-            ts_type: type_label_for(config, &tn.ty),
+            ts_type,
             ffi_converter: ffi_converter_name_for(config, tn),
             ffi_type,
             is_rust_buffer,
