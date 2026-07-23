@@ -1,0 +1,5 @@
+[
+  { "since": "2024-08-01", "ios": "macos-14", "android": "ubuntu-22.04" },
+  { "since": "2025-06-01", "ios": "macos-15", "android": "ubuntu-24.04" },
+  { "since": "2026-06-30", "ios": "macos-26", "android": "ubuntu-24.04" }
+]
