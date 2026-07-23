@@ -267,7 +267,20 @@ console.debug(`-- {{ ffi_name }}`);
             // RustBuffer comes back via the shared `rust_future_complete_*`
             // export. The bytes the runtime hands back must be deserialized
             // here using the per-callable return-type converter.
+            {%- if return_type.is_rust_buffer %}
+            // Borrowed view over foreign memory: the call site owns the free,
+            // as on the sync paths. Unconditional — a no-op where buffers are
+            // already JS-owned.
+            /*liftFunc:*/ (__rb) => {
+                try {
+                    return {{ return_type.ffi_converter }}.lift(__rb);
+                } finally {
+                    nativeModule().rustbuffer_free(__rb);
+                }
+            },
+            {%- else %}
             /*liftFunc:*/ {{ return_type.ffi_converter }}.lift.bind({{ return_type.ffi_converter }}),
+            {%- endif %}
             {%- when None %}
             /*liftFunc:*/ (_v) => {},
             {%- endmatch %}
