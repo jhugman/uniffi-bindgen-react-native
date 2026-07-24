@@ -104,6 +104,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install Electron display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xauth xvfb
+
       - name: Install npm dependencies
         run: cd runtimes/napi && npm ci
 
@@ -120,6 +125,9 @@ jobs:
 
       - name: Run runtime tests
         run: cd runtimes/napi && npm test
+
+      - name: Run Electron RustBuffer test
+        run: cd runtimes/napi && xvfb-run -a npm run test:electron
 
       - name: Run bootstrap for N-API bindings
         run: cargo xtask bootstrap yarn

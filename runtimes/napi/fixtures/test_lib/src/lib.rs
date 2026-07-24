@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use std::ptr;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 #[repr(C)]
@@ -83,10 +83,13 @@ pub extern "C" fn uniffi_test_fn_i64_negate(x: i64, status: &mut RustCallStatus)
 
 // --- RustBuffer helpers ---
 
+static BUFFER_FREE_COUNT: AtomicU64 = AtomicU64::new(0);
+
 fn free_buffer(buf: RustBuffer) {
     if !buf.data.is_null() && buf.capacity > 0 {
         let layout = std::alloc::Layout::from_size_align(buf.capacity as usize, 1).unwrap();
         unsafe { std::alloc::dealloc(buf.data, layout) };
+        BUFFER_FREE_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 }
 
@@ -217,6 +220,12 @@ pub extern "C" fn uniffi_test_fn_buffer_len(buf: RustBuffer, status: &mut RustCa
     let len = buf.len as u32;
     free_buffer(buf);
     len
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_buffer_free_count(status: &mut RustCallStatus) -> u64 {
+    status.code = 0;
+    BUFFER_FREE_COUNT.load(Ordering::SeqCst)
 }
 
 #[no_mangle]
