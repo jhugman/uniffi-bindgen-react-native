@@ -1,0 +1,45 @@
+name: Compat (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: One of ios, android
+        required: true
+        type: string
+      mode:
+        description: pr (today's row only) or full (date-derived window)
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compute-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      triples: ${{ steps.compute.outputs.triples }}
+    steps:
+      - uses: actions/checkout@v4
+      # Node is preinstalled on ubuntu-latest; the script uses only Node built-ins.
+      - id: compute
+        run: |
+          triples=$(node .github/scripts/compat-matrix.mjs '${{ inputs.platform }}' '${{ inputs.mode }}')
+          echo "triples=$triples" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: compute-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.compute-matrix.outputs.triples) }}
+    runs-on: ${{ matrix.runner }}
+    name: "${{ inputs.platform }} · rn ${{ matrix.rn }} · bob ${{ matrix.bob }} · ${{ matrix.runner }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/test-turbo-modules
+        with:
+          platform: ${{ inputs.platform }}
+          bobVersion: ${{ matrix.bob }}
+          rnVersion: ${{ matrix.rn }}

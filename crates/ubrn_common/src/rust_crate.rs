@@ -48,9 +48,9 @@ impl CrateMetadata {
     pub fn library_file(&self, target: Option<&str>, use_shared_library: Option<bool>) -> String {
         let ext = so_extension(target, use_shared_library);
         if ext == "wasm" || ext == "dll" {
-            format!("{}.{ext}", &self.library_name)
+            format!("{}.{ext}", self.library_name)
         } else {
-            format!("lib{}.{ext}", &self.library_name)
+            format!("lib{}.{ext}", self.library_name)
         }
     }
 

@@ -98,7 +98,16 @@ Other versioning we should take care to note:
 - React Native
 - `create-react-native-library`
 
-Compatibility matrices are built during CI:
+Compatibility matrices are built by the [nightly matrix](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-nightly.yml?query=branch%3Amain)
+(iOS + Android, the full date-derived window) and gated per-PR by the
+[PR gate](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-pr.yml)
+(latest RN only).
 
-- [Android](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-android.yml?query=branch%3Amain)
-- [iOS](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-ios.yml?query=branch%3Amain)
+The matrix is **date-derived**: `.github/scripts/compat-matrix.mjs` picks, for
+each React Native release published in the last 365 days, the
+`create-react-native-library` version and CI runner image that were current at
+that RN's publish date. Runner images come from
+`.github/compat-runner-schedule.json` — **the one place to maintain**. When
+GitHub ships a new macOS/ubuntu generation, append a row
+(`{ "since": "<GA date>", "ios": "<label>", "android": "<label>" }`); when an
+old label is retired, bump the oldest row to the oldest still-hosted label.

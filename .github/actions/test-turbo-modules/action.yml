@@ -1,4 +1,5 @@
 name: Test Turbo Modules
+description: Comparison-test the generated turbo-module bindings (and, on iOS, generate & build them) against a given React Native and create-react-native-library version.
 
 inputs:
   platform:

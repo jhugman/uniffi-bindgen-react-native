@@ -1,8 +1,6 @@
 [![CI](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/ci.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/ci.yml)
-[![Compatibility (Android)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-android.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-android.yml)
-[![Compatibility (iOS)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-ios.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-ios.yml)
-[![Compatibility (Android, latest)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-android-latest.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-android-latest.yml)
-[![Compatibility (iOS, latest)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-ios-latest.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-ios-latest.yml)
+[![Compatibility (nightly matrix)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-nightly.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-nightly.yml)
+[![Compatibility (PR gate)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-pr.yml/badge.svg)](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/compat-pr.yml)
 
 # 🦀 uniffi-bindgen-react-native
 
