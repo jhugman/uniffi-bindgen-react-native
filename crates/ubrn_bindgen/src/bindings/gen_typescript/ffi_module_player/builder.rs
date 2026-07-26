@@ -213,11 +213,7 @@ impl PlayerFfiModule {
             });
         }
 
-        let return_type = func
-            .return_type
-            .ty
-            .as_ref()
-            .map(ffi_type_to_ts);
+        let return_type = func.return_type.ty.as_ref().map(ffi_type_to_ts);
 
         FfiFunctionDecl {
             name: func.name.0.clone(),
