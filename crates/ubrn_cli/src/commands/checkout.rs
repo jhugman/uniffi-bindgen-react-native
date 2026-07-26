@@ -93,7 +93,7 @@ impl GitRepoArgs {
         // Find $branch in the output and resolve the SHA or fall back to $branch. We
         // deliberately don't resolve branch names to their SHAs because checking out
         // with the SHA would cause a detached HEAD state.
-        let tag_ref = format!("refs/tags/{}", &self.branch);
+        let tag_ref = format!("refs/tags/{}", self.branch);
         let sha = output
             .lines()
             .find(|line| line.ends_with(&tag_ref))

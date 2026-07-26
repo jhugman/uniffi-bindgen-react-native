@@ -60,26 +60,25 @@ export namespace {{ e.ts_name }} {
 {%- endif %}
 
 const {{ e.ffi_converter_name }} = (() => {
-    const ordinalConverter = FfiConverterInt32;
     type TypeName = {{ e.ts_name }};
     class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
-        read(from: RustBuffer): TypeName {
-            switch (ordinalConverter.read(from)) {
+        readFromCursor(c: Cursor): TypeName {
+            switch (c.readI32()) {
                 {%- for variant in e.variants %}
                 case {{ loop.index }}: return {{ e.ts_name }}.{{ variant.name }};
                 {%- endfor %}
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
         }
-        write(value: TypeName, into: RustBuffer): void {
+        writeIntoCursor(value: TypeName, c: Cursor): void {
             switch (value) {
                 {%- for variant in e.variants %}
-                case {{ e.ts_name }}.{{ variant.name }}: return ordinalConverter.write({{ loop.index }}, into);
+                case {{ e.ts_name }}.{{ variant.name }}: return c.writeI32({{ loop.index }});
                 {%- endfor %}
             }
         }
         allocationSize(value: TypeName): number {
-            return ordinalConverter.allocationSize(0);
+            return 4;
         }
     }
     return new FFIConverter();

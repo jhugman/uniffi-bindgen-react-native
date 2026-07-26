@@ -1,0 +1,17 @@
+name: Compat (PR)
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  ios:
+    uses: ./.github/workflows/compat.yml
+    with:
+      platform: ios
+      mode: pr
+  android:
+    uses: ./.github/workflows/compat.yml
+    with:
+      platform: android
+      mode: pr

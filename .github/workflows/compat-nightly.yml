@@ -1,0 +1,18 @@
+name: Compat (nightly)
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Once a day at midnight
+  workflow_dispatch: {} # allow manual validation
+
+jobs:
+  ios:
+    uses: ./.github/workflows/compat.yml
+    with:
+      platform: ios
+      mode: full
+  android:
+    uses: ./.github/workflows/compat.yml
+    with:
+      platform: android
+      mode: full

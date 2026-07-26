@@ -3,8 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+import { Cursor } from "./cursor.ts";
 import { UniffiInternalError } from "./errors.ts";
-import { type UniffiByteArray, RustBuffer } from "./ffi-types.ts";
+import { type UniffiByteArray } from "./ffi-types.ts";
 
 // https://github.com/mozilla/uniffi-rs/blob/main/docs/manual/src/internals/lifting_and_lowering.md
 //
@@ -17,146 +18,120 @@ export type RustBufferAllocator = (n: number) => Uint8Array;
 export interface FfiConverter<FfiType, TsType> {
   lift(value: FfiType): TsType;
   lower(value: TsType, alloc: RustBufferAllocator): FfiType;
-  read(from: RustBuffer): TsType;
-  write(value: TsType, into: RustBuffer): void;
+  readFromCursor(c: Cursor): TsType;
+  writeIntoCursor(value: TsType, c: Cursor): void;
   allocationSize(value: TsType): number;
-}
-
-export abstract class FfiConverterPrimitive<T> implements FfiConverter<T, T> {
-  lift(value: T): T {
-    return value;
-  }
-  lower(value: T, _alloc: RustBufferAllocator): T {
-    return value;
-  }
-  abstract read(from: RustBuffer): T;
-  abstract write(value: T, into: RustBuffer): void;
-  abstract allocationSize(value: T): number;
 }
 
 export abstract class AbstractFfiConverterByteArray<TsType>
   implements FfiConverter<UniffiByteArray, TsType>
 {
   lift(value: UniffiByteArray): TsType {
-    const buffer = RustBuffer.fromUint8Array(value);
-    return this.read(buffer);
+    const c = Cursor.fromUint8Array(value);
+    return this.readFromCursor(c);
   }
   lower(value: TsType, alloc: RustBufferAllocator): UniffiByteArray {
     const view = alloc(this.allocationSize(value));
-    const buffer = RustBuffer.fromUint8Array(view);
-    this.write(value, buffer);
+    const c = Cursor.fromUint8Array(view);
+    this.writeIntoCursor(value, c);
     return view;
   }
-  abstract read(from: RustBuffer): TsType;
-  abstract write(value: TsType, into: RustBuffer): void;
+
+  abstract readFromCursor(c: Cursor): TsType;
+  abstract writeIntoCursor(value: TsType, c: Cursor): void;
   abstract allocationSize(value: TsType): number;
 }
 
-type NumberType = number | bigint;
-class FfiConverterNumber<
-  T extends NumberType,
-> extends FfiConverterPrimitive<T> {
-  // These fields should be private, but Typescript doesn't allow
-  // that because of the way they are exposed.
-  constructor(
-    public reader: (view: DataView) => T,
-    public writer: (view: DataView, value: T) => void,
-    public byteSize: number,
-  ) {
-    super();
-  }
-  read(from: RustBuffer): T {
-    return from.readWithView(this.byteSize, this.reader);
-  }
-  write(value: T, into: RustBuffer): void {
-    return into.writeWithView(this.byteSize, (view) =>
-      this.writer(view, value),
-    );
-  }
-  allocationSize(value: T): number {
-    return this.byteSize;
-  }
+/**
+ * Build a primitive `FfiConverter` whose hot path delegates straight into
+ * Cursor's monomorphic typed accessors. The returned object is a plain
+ * module-level value (not a class instance) — V8 can inline `lift`/`lower`
+ * trivially, and `readFromCursor`/`writeIntoCursor` are direct references
+ * to the Cursor method wrappers (no per-call function-pointer dispatch via
+ * the old `FfiConverterNumber(reader, writer, byteSize)` closure shape).
+ */
+function makePrimitive<T>(
+  read: (c: Cursor) => T,
+  write: (v: T, c: Cursor) => void,
+  byteSize: number,
+): FfiConverter<T, T> {
+  return {
+    lift: (v: T) => v,
+    lower: (v: T, _alloc: RustBufferAllocator) => v,
+    allocationSize: (_v: T) => byteSize,
+    readFromCursor: read,
+    writeIntoCursor: write,
+  };
 }
 
-const littleEndian = false;
-
 // Ints
-export const FfiConverterInt8 = new FfiConverterNumber(
-  (view: DataView) => view.getInt8(0),
-  (view: DataView, value: number) => view.setInt8(0, value),
-  Int8Array.BYTES_PER_ELEMENT,
+export const FfiConverterInt8 = makePrimitive<number>(
+  (c) => c.readI8(),
+  (v, c) => c.writeI8(v),
+  1,
 );
-export const FfiConverterInt16 = new FfiConverterNumber(
-  (view: DataView) => view.getInt16(0, littleEndian),
-  (view: DataView, value: number) => view.setInt16(0, value, littleEndian),
-  Int16Array.BYTES_PER_ELEMENT,
+export const FfiConverterInt16 = makePrimitive<number>(
+  (c) => c.readI16(),
+  (v, c) => c.writeI16(v),
+  2,
 );
-export const FfiConverterInt32 = new FfiConverterNumber(
-  (view: DataView) => view.getInt32(0, littleEndian),
-  (view: DataView, value: number) => view.setInt32(0, value, littleEndian),
-  Int32Array.BYTES_PER_ELEMENT,
+export const FfiConverterInt32 = makePrimitive<number>(
+  (c) => c.readI32(),
+  (v, c) => c.writeI32(v),
+  4,
 );
-export const FfiConverterInt64 = new FfiConverterNumber(
-  (view: DataView) => view.getBigInt64(0, littleEndian),
-  (view: DataView, value: bigint) => view.setBigInt64(0, value, littleEndian),
-  BigInt64Array.BYTES_PER_ELEMENT,
+export const FfiConverterInt64 = makePrimitive<bigint>(
+  (c) => c.readI64(),
+  (v, c) => c.writeI64(v),
+  8,
 );
 
 // Floats
-export const FfiConverterFloat32 = new FfiConverterNumber(
-  (view: DataView) => view.getFloat32(0, littleEndian),
-  (view: DataView, value: number) => view.setFloat32(0, value, littleEndian),
-  Float32Array.BYTES_PER_ELEMENT,
+export const FfiConverterFloat32 = makePrimitive<number>(
+  (c) => c.readF32(),
+  (v, c) => c.writeF32(v),
+  4,
 );
-export const FfiConverterFloat64 = new FfiConverterNumber(
-  (view: DataView) => view.getFloat64(0, littleEndian),
-  (view: DataView, value: number) => view.setFloat64(0, value, littleEndian),
-  Float64Array.BYTES_PER_ELEMENT,
+export const FfiConverterFloat64 = makePrimitive<number>(
+  (c) => c.readF64(),
+  (v, c) => c.writeF64(v),
+  8,
 );
 
 // UInts
-export const FfiConverterUInt8 = new FfiConverterNumber(
-  (view: DataView) => view.getUint8(0),
-  (view: DataView, value: number) => view.setUint8(0, value),
-  Uint8Array.BYTES_PER_ELEMENT,
+export const FfiConverterUInt8 = makePrimitive<number>(
+  (c) => c.readU8(),
+  (v, c) => c.writeU8(v),
+  1,
 );
-export const FfiConverterUInt16 = new FfiConverterNumber(
-  (view: DataView) => view.getUint16(0, littleEndian),
-  (view: DataView, value: number) => view.setUint16(0, value, littleEndian),
-  Uint16Array.BYTES_PER_ELEMENT,
+export const FfiConverterUInt16 = makePrimitive<number>(
+  (c) => c.readU16(),
+  (v, c) => c.writeU16(v),
+  2,
 );
-export const FfiConverterUInt32 = new FfiConverterNumber(
-  (view: DataView) => view.getUint32(0, littleEndian),
-  (view: DataView, value: number) => view.setUint32(0, value, littleEndian),
-  Uint32Array.BYTES_PER_ELEMENT,
+export const FfiConverterUInt32 = makePrimitive<number>(
+  (c) => c.readU32(),
+  (v, c) => c.writeU32(v),
+  4,
 );
-export const FfiConverterUInt64 = new FfiConverterNumber(
-  (view: DataView) => view.getBigUint64(0, littleEndian),
-  (view: DataView, value: bigint) => view.setBigUint64(0, value, littleEndian),
-  BigUint64Array.BYTES_PER_ELEMENT,
+export const FfiConverterUInt64 = makePrimitive<bigint>(
+  (c) => c.readU64(),
+  (v, c) => c.writeU64(v),
+  8,
 );
 
-// Bool
+// Bool — separate from `makePrimitive` because lift/lower convert between
+// the on-the-wire `number` and JS `boolean` rather than passing through.
 export const FfiConverterBool = (() => {
-  const byteConverter = FfiConverterInt8;
-  class FfiConverterBool implements FfiConverter<number, boolean> {
-    lift(value: number): boolean {
-      return !!value;
-    }
-    lower(value: boolean, _alloc: RustBufferAllocator): number {
-      return value ? 1 : 0;
-    }
-    read(from: RustBuffer): boolean {
-      return this.lift(byteConverter.read(from));
-    }
-    write(value: boolean, into: RustBuffer): void {
-      byteConverter.write(value ? 1 : 0, into);
-    }
-    allocationSize(value: boolean): number {
-      return byteConverter.allocationSize(0);
-    }
-  }
-  return new FfiConverterBool();
+  const read = (c: Cursor) => c.readBool();
+  const write = (v: boolean, c: Cursor) => c.writeBool(v);
+  return {
+    lift: (n: number) => !!n,
+    lower: (b: boolean, _alloc: RustBufferAllocator) => (b ? 1 : 0),
+    allocationSize: (_v: boolean) => 1,
+    readFromCursor: read,
+    writeIntoCursor: write,
+  } satisfies FfiConverter<number, boolean>;
 })();
 
 // Duration
@@ -167,32 +142,27 @@ export const FfiConverterBool = (() => {
 // and switch on from a config file.
 export type UniffiDuration = number;
 export const FfiConverterDuration = (() => {
-  const secondsConverter = FfiConverterUInt64;
-  const nanosConverter = FfiConverterUInt32;
   const msPerSecBigInt = BigInt("1000");
   const nanosPerMs = 1e6;
   class FFIConverter extends AbstractFfiConverterByteArray<UniffiDuration> {
-    read(from: RustBuffer): UniffiDuration {
-      const secsBigInt = secondsConverter.read(from);
-      const nanos = nanosConverter.read(from);
+    readFromCursor(c: Cursor): UniffiDuration {
+      const secsBigInt = c.readU64();
+      const nanos = c.readU32();
       const ms = Number(secsBigInt * msPerSecBigInt);
       if (ms === Number.POSITIVE_INFINITY || ms === Number.NEGATIVE_INFINITY) {
         throw new UniffiInternalError.NumberOverflow();
       }
       return ms + nanos / nanosPerMs;
     }
-    write(value: UniffiDuration, into: RustBuffer): void {
+    writeIntoCursor(value: UniffiDuration, c: Cursor): void {
       const ms = value.valueOf();
       const secsBigInt = BigInt(Math.trunc(ms)) / msPerSecBigInt;
       const remainingNanos = (ms % 1000) * nanosPerMs;
-      secondsConverter.write(secsBigInt, into);
-      nanosConverter.write(remainingNanos, into);
+      c.writeU64(secsBigInt);
+      c.writeU32(remainingNanos);
     }
     allocationSize(_value: UniffiDuration): number {
-      return (
-        secondsConverter.allocationSize(msPerSecBigInt) +
-        nanosConverter.allocationSize(0)
-      );
+      return 12;
     }
   }
   return new FFIConverter();
@@ -202,12 +172,9 @@ export const FfiConverterDuration = (() => {
 // and switch on from a config file.
 export type UniffiTimestamp = Date;
 export const FfiConverterTimestamp = (() => {
-  const secondsConverter = FfiConverterInt64;
-  const nanosConverter = FfiConverterUInt32;
   const msPerSecBigInt = BigInt("1000");
   const nanosPerMs = 1e6;
   const msPerSec = 1e3;
-  const maxMsFromEpoch = 8.64e15;
   function safeDate(ms: number) {
     if (Math.abs(ms) > 8.64e15) {
       throw new UniffiInternalError.DateTimeOverflow();
@@ -216,9 +183,9 @@ export const FfiConverterTimestamp = (() => {
   }
 
   class FFIConverter extends AbstractFfiConverterByteArray<UniffiTimestamp> {
-    read(from: RustBuffer): UniffiTimestamp {
-      const secsBigInt = secondsConverter.read(from);
-      const nanos = nanosConverter.read(from);
+    readFromCursor(c: Cursor): UniffiTimestamp {
+      const secsBigInt = c.readI64();
+      const nanos = c.readU32();
       const ms = Number(secsBigInt * msPerSecBigInt);
       if (ms >= 0) {
         return safeDate(ms + nanos / nanosPerMs);
@@ -226,18 +193,15 @@ export const FfiConverterTimestamp = (() => {
         return safeDate(ms - nanos / nanosPerMs);
       }
     }
-    write(value: UniffiTimestamp, into: RustBuffer): void {
+    writeIntoCursor(value: UniffiTimestamp, c: Cursor): void {
       const ms = value.valueOf();
       const secsBigInt = BigInt(Math.trunc(ms / msPerSec));
       const remainingNanos = Math.abs((ms % msPerSec) * nanosPerMs);
-      secondsConverter.write(secsBigInt, into);
-      nanosConverter.write(remainingNanos, into);
+      c.writeI64(secsBigInt);
+      c.writeU32(remainingNanos);
     }
     allocationSize(_value: UniffiTimestamp): number {
-      return (
-        secondsConverter.allocationSize(msPerSecBigInt) +
-        nanosConverter.allocationSize(0)
-      );
+      return 12;
     }
   }
   return new FFIConverter();
@@ -246,54 +210,50 @@ export const FfiConverterTimestamp = (() => {
 export class FfiConverterOptional<Item> extends AbstractFfiConverterByteArray<
   Item | undefined
 > {
-  private static flagConverter = FfiConverterBool;
   constructor(private itemConverter: FfiConverter<any, Item>) {
     super();
   }
-  read(from: RustBuffer): Item | undefined {
-    const flag = FfiConverterOptional.flagConverter.read(from);
-    return flag ? this.itemConverter.read(from) : undefined;
+  readFromCursor(c: Cursor): Item | undefined {
+    const tag = c.readU8();
+    return tag === 0 ? undefined : this.itemConverter.readFromCursor(c);
   }
-  write(value: Item | undefined, into: RustBuffer): void {
-    if (value !== undefined) {
-      FfiConverterOptional.flagConverter.write(true, into);
-      this.itemConverter.write(value!, into);
-    } else {
-      FfiConverterOptional.flagConverter.write(false, into);
+  writeIntoCursor(value: Item | undefined, c: Cursor): void {
+    if (value === undefined) {
+      c.writeU8(0);
+      return;
     }
+    c.writeU8(1);
+    this.itemConverter.writeIntoCursor(value, c);
   }
   allocationSize(value: Item | undefined): number {
-    let size = FfiConverterOptional.flagConverter.allocationSize(true);
-    if (value !== undefined) {
-      size += this.itemConverter.allocationSize(value);
-    }
-    return size;
+    return (
+      1 + (value === undefined ? 0 : this.itemConverter.allocationSize(value))
+    );
   }
 }
 
 export class FfiConverterArray<Item> extends AbstractFfiConverterByteArray<
   Array<Item>
 > {
-  private static sizeConverter = FfiConverterInt32;
   constructor(private itemConverter: FfiConverter<any, Item>) {
     super();
   }
-  read(from: RustBuffer): Array<Item> {
-    const size = FfiConverterArray.sizeConverter.read(from);
+  readFromCursor(c: Cursor): Array<Item> {
+    const size = c.readI32();
     const array = new Array<Item>(size);
     for (let i = 0; i < size; i++) {
-      array[i] = this.itemConverter.read(from);
+      array[i] = this.itemConverter.readFromCursor(c);
     }
     return array;
   }
-  write(array: Array<Item>, into: RustBuffer): void {
-    FfiConverterArray.sizeConverter.write(array.length, into);
+  writeIntoCursor(array: Array<Item>, c: Cursor): void {
+    c.writeI32(array.length);
     for (const item of array) {
-      this.itemConverter.write(item, into);
+      this.itemConverter.writeIntoCursor(item, c);
     }
   }
   allocationSize(array: Array<Item>): number {
-    let size = FfiConverterArray.sizeConverter.allocationSize(array.length);
+    let size = 4;
     for (const item of array) {
       size += this.itemConverter.allocationSize(item);
     }
@@ -304,26 +264,25 @@ export class FfiConverterArray<Item> extends AbstractFfiConverterByteArray<
 export class FfiConverterSet<Item> extends AbstractFfiConverterByteArray<
   Set<Item>
 > {
-  private static sizeConverter = FfiConverterInt32;
   constructor(private itemConverter: FfiConverter<any, Item>) {
     super();
   }
-  read(from: RustBuffer): Set<Item> {
-    const size = FfiConverterSet.sizeConverter.read(from);
+  readFromCursor(c: Cursor): Set<Item> {
+    const size = c.readI32();
     const set = new Set<Item>();
     for (let i = 0; i < size; i++) {
-      set.add(this.itemConverter.read(from));
+      set.add(this.itemConverter.readFromCursor(c));
     }
     return set;
   }
-  write(set: Set<Item>, into: RustBuffer): void {
-    FfiConverterSet.sizeConverter.write(set.size, into);
+  writeIntoCursor(set: Set<Item>, c: Cursor): void {
+    c.writeI32(set.size);
     for (const item of set) {
-      this.itemConverter.write(item, into);
+      this.itemConverter.writeIntoCursor(item, c);
     }
   }
   allocationSize(set: Set<Item>): number {
-    let size = FfiConverterSet.sizeConverter.allocationSize(set.size);
+    let size = 4;
     for (const item of set) {
       size += this.itemConverter.allocationSize(item);
     }
@@ -342,11 +301,11 @@ export class FfiConverterBox<T> implements FfiConverter<any, T> {
   lower(value: T, alloc: RustBufferAllocator): any {
     return this.innerConverter.lower(value, alloc);
   }
-  read(from: RustBuffer): T {
-    return this.innerConverter.read(from);
+  readFromCursor(c: Cursor): T {
+    return this.innerConverter.readFromCursor(c);
   }
-  write(value: T, into: RustBuffer): void {
-    this.innerConverter.write(value, into);
+  writeIntoCursor(value: T, c: Cursor): void {
+    this.innerConverter.writeIntoCursor(value, c);
   }
   allocationSize(value: T): number {
     return this.innerConverter.allocationSize(value);
@@ -356,30 +315,32 @@ export class FfiConverterBox<T> implements FfiConverter<any, T> {
 export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
   Map<K, V>
 > {
-  private static sizeConverter = FfiConverterInt32;
   constructor(
     private keyConverter: FfiConverter<any, K>,
     private valueConverter: FfiConverter<any, V>,
   ) {
     super();
   }
-  read(from: RustBuffer): Map<K, V> {
-    const size = FfiConverterMap.sizeConverter.read(from);
-    const map = new Map();
+  readFromCursor(c: Cursor): Map<K, V> {
+    const size = c.readI32();
+    const map = new Map<K, V>();
     for (let i = 0; i < size; i++) {
-      map.set(this.keyConverter.read(from), this.valueConverter.read(from));
+      map.set(
+        this.keyConverter.readFromCursor(c),
+        this.valueConverter.readFromCursor(c),
+      );
     }
     return map;
   }
-  write(map: Map<K, V>, into: RustBuffer): void {
-    FfiConverterMap.sizeConverter.write(map.size, into);
+  writeIntoCursor(map: Map<K, V>, c: Cursor): void {
+    c.writeI32(map.size);
     for (const [k, v] of map.entries()) {
-      this.keyConverter.write(k, into);
-      this.valueConverter.write(v, into);
+      this.keyConverter.writeIntoCursor(k, c);
+      this.valueConverter.writeIntoCursor(v, c);
     }
   }
   allocationSize(map: Map<K, V>): number {
-    let size = FfiConverterMap.sizeConverter.allocationSize(map.size);
+    let size = 4;
     for (const [k, v] of map.entries()) {
       size +=
         this.keyConverter.allocationSize(k) +
@@ -390,38 +351,34 @@ export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
 }
 
 export const FfiConverterArrayBuffer = (() => {
-  const lengthConverter = FfiConverterInt32;
   class FFIConverter extends AbstractFfiConverterByteArray<ArrayBuffer> {
-    read(from: RustBuffer): ArrayBuffer {
-      const length = lengthConverter.read(from);
-      return from.readArrayBuffer(length);
+    readFromCursor(c: Cursor): ArrayBuffer {
+      const length = c.readI32();
+      return c.readArrayBuffer(length);
     }
-    write(value: ArrayBuffer, into: RustBuffer): void {
-      const length = value.byteLength;
-      lengthConverter.write(length, into);
-      into.writeByteArray(new Uint8Array(value));
+    writeIntoCursor(value: ArrayBuffer, c: Cursor): void {
+      c.writeI32(value.byteLength);
+      c.writeBytes(new Uint8Array(value));
     }
     allocationSize(value: ArrayBuffer): number {
-      return lengthConverter.allocationSize(0) + value.byteLength;
+      return 4 + value.byteLength;
     }
   }
   return new FFIConverter();
 })();
 
 export const FfiConverterUint8Array = (() => {
-  const lengthConverter = FfiConverterInt32;
   class FFIConverter extends AbstractFfiConverterByteArray<Uint8Array> {
-    read(from: RustBuffer): Uint8Array {
-      const length = lengthConverter.read(from);
-      return new Uint8Array(from.readArrayBuffer(length));
+    readFromCursor(c: Cursor): Uint8Array {
+      const length = c.readI32();
+      return c.readBytes(length);
     }
-    write(value: Uint8Array, into: RustBuffer): void {
-      const length = value.byteLength;
-      lengthConverter.write(length, into);
-      into.writeByteArray(value);
+    writeIntoCursor(value: Uint8Array, c: Cursor): void {
+      c.writeI32(value.byteLength);
+      c.writeBytes(value);
     }
     allocationSize(value: Uint8Array): number {
-      return lengthConverter.allocationSize(0) + value.byteLength;
+      return 4 + value.byteLength;
     }
   }
   return new FFIConverter();
@@ -446,8 +403,6 @@ type StringConverter = {
 export function uniffiCreateFfiConverterString(
   converter: StringConverter,
 ): FfiConverter<UniffiByteArray, string> {
-  const lengthConverter = FfiConverterInt32;
-
   class FFIConverter implements FfiConverter<UniffiByteArray, string> {
     lift(value: UniffiByteArray): string {
       return converter.bytesToString(value);
@@ -455,45 +410,50 @@ export function uniffiCreateFfiConverterString(
     lower(value: string, _alloc: RustBufferAllocator): UniffiByteArray {
       return converter.stringToBytes(value);
     }
-    read(from: RustBuffer): string {
-      const length = lengthConverter.read(from);
+    readFromCursor(c: Cursor): string {
+      const length = c.readI32();
       if (converter.readStringFromBuffer) {
-        // Read directly from the RustBuffer's backing ArrayBuffer — zero copy.
-        const offset = from.advanceReadOffset(length);
-        return converter.readStringFromBuffer(from, offset, length);
+        // Read directly from the cursor's backing ArrayBuffer — zero copy.
+        // The helper takes an object with an `arrayBuffer` property plus an
+        // absolute offset and length; for Cursor that's `u8.buffer` and
+        // `start + pos`.
+        const buf: any = { arrayBuffer: (c as any).u8.buffer };
+        const offset = (c as any).start + (c as any).pos;
+        (c as any).pos += length;
+        return converter.readStringFromBuffer(buf, offset, length);
       }
-      const bytes = from.readByteArray(length);
+      const bytes = c.readBytes(length);
       return converter.bytesToString(bytes);
     }
-    write(value: string, into: RustBuffer): void {
+    writeIntoCursor(value: string, c: Cursor): void {
       if (converter.writeStringIntoBuffer) {
-        // Encode the string first, then backfill the i32 length prefix with
-        // the actual byte count. Skips one `stringByteLength` measurement
-        // call per string compared to the writeByteArray path below.
-        const lengthOffset = into.advanceWriteOffset(4);
-        const dataOffset = lengthOffset + 4;
+        // Encode the string into the buffer at the data offset (after the
+        // i32 length prefix), then backfill the length prefix with the
+        // actual bytes written. Skips one `stringByteLength` measurement
+        // call per string compared to the writeBytes path below.
+        const lengthPos = (c as any).pos;
+        // Reserve 4 bytes for the length prefix.
+        (c as any).pos += 4;
+        const dataOffset = (c as any).start + (c as any).pos;
+        // Synthetic buf with the cursor's underlying ArrayBuffer; helpers
+        // use `buf.arrayBuffer` to construct a Uint8Array view.
+        const buf: any = { arrayBuffer: (c as any).u8.buffer };
         const bytesWritten = converter.writeStringIntoBuffer(
           value,
-          into,
+          buf,
           dataOffset,
         );
-        new DataView(into.arrayBuffer, lengthOffset, 4).setInt32(
-          0,
-          bytesWritten,
-          false,
-        );
-        into.setWriteOffset(dataOffset + bytesWritten);
+        // Backfill the length prefix (big-endian i32, matches Cursor.writeI32).
+        (c as any).dv.setInt32(lengthPos, bytesWritten);
+        (c as any).pos += bytesWritten;
         return;
       }
       const bytes = converter.stringToBytes(value);
-      const numBytes = bytes.byteLength;
-      lengthConverter.write(numBytes, into);
-      into.writeByteArray(bytes);
+      c.writeI32(bytes.byteLength);
+      c.writeBytes(bytes);
     }
     allocationSize(value: string): number {
-      return (
-        lengthConverter.allocationSize(0) + converter.stringByteLength(value)
-      );
+      return 4 + converter.stringByteLength(value);
     }
   }
   return new FFIConverter();

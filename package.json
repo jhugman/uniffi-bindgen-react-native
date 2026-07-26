@@ -12,9 +12,6 @@
     "email": "james@hugman.tv"
   },
   "type": "module",
-  "main": "./typescript/dist/cjs/index.js",
-  "module": "./typescript/dist/esm/index.js",
-  "types": "./typescript/dist/esm/index.d.ts",
   "exports": {
     ".": {
       "types": "./typescript/dist/esm/index.d.ts",
@@ -23,6 +20,9 @@
     },
     "./package.json": "./package.json"
   },
+  "main": "./typescript/dist/cjs/index.js",
+  "module": "./typescript/dist/esm/index.js",
+  "types": "./typescript/dist/esm/index.d.ts",
   "bin": {
     "ubrn": "./bin/cli.cjs",
     "uniffi-bindgen-react-native": "./bin/cli.cjs"

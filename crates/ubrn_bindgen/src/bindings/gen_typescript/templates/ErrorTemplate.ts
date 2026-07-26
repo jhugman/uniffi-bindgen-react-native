@@ -65,26 +65,25 @@ export type {{ type_name }} = InstanceType<
 >;
 
 const {{ e.ffi_converter_name }} = (() => {
-    const intConverter = FfiConverterInt32;
     type TypeName = {{ type_name }};
     class FfiConverter extends AbstractFfiConverterByteArray<TypeName> {
-        read(from: RustBuffer): TypeName {
-            switch (intConverter.read(from)) {
+        readFromCursor(c: Cursor): TypeName {
+            switch (c.readI32()) {
             {%-   for variant in e.variants %}
                 case {{ loop.index }}: return new {{ type_name }}.{{ variant.name }}(
-                    FfiConverterString.read(from)
+                    FfiConverterString.readFromCursor(c)
                 );
             {%    endfor %}
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
         }
-        write(value: TypeName, into: RustBuffer): void {
+        writeIntoCursor(value: TypeName, c: Cursor): void {
             const obj = value as any;
             const index = obj[variantOrdinalSymbol] as number;
-            intConverter.write(index, into);
+            c.writeI32(index);
         }
         allocationSize(value: TypeName): number {
-            return intConverter.allocationSize(0);
+            return 4;
         }
     }
     return new FfiConverter();
