@@ -5,8 +5,10 @@ members = [
     "fixtures/*",
     "runtimes/*",
     "runtimes/napi/fixtures/*",
+    "runtimes/wasm/helper-crate",
     "xtask",
 ]
+exclude = ["runtimes/wasm"]
 
 resolver = "2"
 
@@ -28,3 +30,6 @@ uniffi_core = { version = "=0.31.0", default-features = false }
 uniffi_meta = "=0.31.0"
 ubrn_fixture_testing = { path = "crates/ubrn_fixture_testing" }
 ubrn_macros = { path = "crates/ubrn_macros" }
+uniffi-runtime-wasm = { path = "runtimes/wasm/helper-crate" }
+walrus = "0.23"
+wasm-bindgen-cli-support = "=0.2.100"
