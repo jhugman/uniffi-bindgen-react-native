@@ -12,7 +12,12 @@ path = "{{lib_rs_path}}"
 default = ["console_error_panic_hook"]
 
 [dependencies]
-# Pin wasm-bindgen to avoid js-sys compile time regression introduced in 0.2.101+.
+# Must match the workspace's `wasm-bindgen-cli-support`: the rewriter demands
+# schema-version equality with the crate the wasm was built against. Two more
+# reasons to stay on 0.2.100 — 0.2.101+ revives a js-sys compile-time
+# regression, and it changes async-callback vtable codegen in a way the legacy
+# `Wasm` runtime rejects ("Callback interface method returned unexpected
+# error").
 wasm-bindgen = "=0.2.100"
 {{crate_name}} = { path = "{{crate_path}}" }
 uniffi-runtime-javascript = { path = "{{uniffi_runtime_javascript}}", features = ["wasm32"] }

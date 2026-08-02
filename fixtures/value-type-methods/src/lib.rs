@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
+
 // Point: a record with methods.
 // NOTE: Record constructors via #[uniffi::constructor] are not yet supported in uniffi 0.31.0
 // because the metadata reader (uniffi_meta::reader::read_constructor) only accepts
