@@ -12,6 +12,8 @@ pub(crate) mod jsi;
 pub(crate) mod napi;
 #[cfg(feature = "wasm")]
 pub(crate) mod wasm;
+#[cfg(feature = "wasm")]
+pub(crate) mod wasm2;
 pub(crate) mod workspace;
 
 pub mod test_utils;
@@ -55,6 +57,8 @@ pub enum Platform {
     Ios,
     #[cfg(feature = "wasm")]
     Wasm,
+    #[cfg(feature = "wasm")]
+    Wasm2,
 }
 
 impl From<&Platform> for AbiFlavor {
@@ -62,6 +66,8 @@ impl From<&Platform> for AbiFlavor {
         match value {
             #[cfg(feature = "wasm")]
             Platform::Wasm => AbiFlavor::Wasm,
+            #[cfg(feature = "wasm")]
+            Platform::Wasm2 => AbiFlavor::Wasm2,
             _ => AbiFlavor::Jsi,
         }
     }
