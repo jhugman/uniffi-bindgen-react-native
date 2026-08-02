@@ -3,11 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-use std::{path::PathBuf, process::Command};
+use std::{collections::BTreeMap, path::PathBuf, process::Command};
 
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
-use cargo_metadata::{Metadata, MetadataCommand, TargetKind};
+use cargo_metadata::{Metadata, MetadataCommand, Package, TargetKind};
 
 use crate::{path_or_shim, run_cmd_quietly, Utf8PathExt};
 
@@ -18,6 +18,10 @@ pub struct CrateMetadata {
     pub(crate) target_dir: Utf8PathBuf,
     pub(crate) package_name: String,
     pub(crate) library_name: String,
+    pub(crate) builds_cdylib: bool,
+    /// Declared dependency name -> the features this crate asks for on it,
+    /// unioned across normal, dev and target-specific edges.
+    pub(crate) direct_dependencies: BTreeMap<String, Vec<String>>,
 }
 
 impl CrateMetadata {
@@ -70,6 +74,30 @@ impl CrateMetadata {
         &self.library_name
     }
 
+    /// Whether `[lib] crate-type` includes `cdylib`.
+    pub fn builds_cdylib(&self) -> bool {
+        self.builds_cdylib
+    }
+
+    /// Whether the crate declares `name` as a direct dependency. Includes
+    /// target-specific dependencies, so a `[target.'cfg(target_arch =
+    /// "wasm32")'.dependencies]` entry counts.
+    pub fn has_dependency(&self, name: &str) -> bool {
+        self.direct_dependencies.contains_key(name)
+    }
+
+    /// Whether *this crate's own manifest* asks for `feature` on `package`.
+    ///
+    /// Deliberately the declared edge rather than the resolved graph: `cargo
+    /// metadata` on a workspace member reports features unioned across every
+    /// member, so a sibling enabling something would make it look enabled
+    /// here.
+    pub fn declares_dependency_feature(&self, package: &str, feature: &str) -> bool {
+        self.direct_dependencies
+            .get(package)
+            .is_some_and(|fs| fs.iter().any(|f| f == feature))
+    }
+
     pub fn project_root(&self) -> &Utf8Path {
         self.target_dir
             .parent()
@@ -111,6 +139,13 @@ impl CrateMetadata {
         let package_name = find_package_name(metadata, &manifest_path)
             .expect("A [package] `name` was not found in the manifest");
         let target_dir = metadata.target_directory.clone();
+        let package = find_package(metadata, &manifest_path);
+        let builds_cdylib = package.is_some_and(|p| {
+            p.targets
+                .iter()
+                .any(|t| t.kind.contains(&TargetKind::CDyLib))
+        });
+        let direct_dependencies = package.map(declared_dependencies).unwrap_or_default();
 
         Ok(Self {
             manifest_path,
@@ -118,6 +153,8 @@ impl CrateMetadata {
             library_name,
             target_dir,
             crate_dir,
+            builds_cdylib,
+            direct_dependencies,
         })
     }
 }
@@ -193,13 +230,32 @@ fn guess_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> String {
         .replace('-', "_")
 }
 
-fn find_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<String> {
-    // Get the library name
-    let lib = TargetKind::Lib;
+/// Collect this package's declared dependencies, unioning the requested
+/// features across every edge with the same name — a crate commonly names the
+/// same dependency in `[dependencies]` and in a `[target.'cfg(...)']` block.
+fn declared_dependencies(p: &Package) -> BTreeMap<String, Vec<String>> {
+    let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for d in &p.dependencies {
+        let entry = out.entry(d.name.clone()).or_default();
+        for f in &d.features {
+            if !entry.contains(f) {
+                entry.push(f.clone());
+            }
+        }
+    }
+    out
+}
+
+fn find_package<'a>(metadata: &'a Metadata, manifest_path: &Utf8Path) -> Option<&'a Package> {
     metadata
         .packages
         .iter()
         .find(|package| package.manifest_path == *manifest_path)
+}
+
+fn find_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<String> {
+    let lib = TargetKind::Lib;
+    find_package(metadata, manifest_path)
         .and_then(|package| {
             package
                 .targets
@@ -210,9 +266,5 @@ fn find_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<St
 }
 
 fn find_package_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<String> {
-    metadata
-        .packages
-        .iter()
-        .find(|package| package.manifest_path == *manifest_path)
-        .map(|package| package.name.clone())
+    find_package(metadata, manifest_path).map(|package| package.name.clone())
 }
