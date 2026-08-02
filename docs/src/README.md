@@ -25,6 +25,7 @@ It contains tooling to generate bindings:
 
 - for Hermes via JSI, and to generate the code to create turbo-modules.
 - for WASM, using wasm-bindgen, and the WASM crate.
+- for WASM, calling a `cdylib` built for `wasm32-unknown-unknown` directly, with no generated shim crate. See [`wasm2` support](reference/wasm2/overview.md).
 - for Node.js, calling a compiled `cdylib` through an N-API runtime.
 
 New projects depend on the `@ubjs` runtime packages; see [Packages](packages.md) for what to install. Code generated before those packages existed keeps working unchanged.
