@@ -1,0 +1,41 @@
+name: Publish @ubjs/wasm to npmjs
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run without publishing to npm"
+        type: boolean
+        default: true
+  workflow_call:
+
+jobs:
+  publish-wasm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
+
+      # `@ubjs/core` is a peer dependency, satisfied here by the in-tree copy
+      # so `tsc -b` can resolve it. Building it first keeps that copy current.
+      - run: cd typescript && npm install && npm run build
+      - run: cd runtimes/wasm && npm install && npm test
+
+      - name: "📦 npm publish: @ubjs/wasm (dry-run)"
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+        run: |
+          echo "::notice::DRY RUN — not publishing to npm"
+          cd runtimes/wasm && npm publish --dry-run --access public
+
+      - name: "📦 npm publish: @ubjs/wasm"
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_call' || !inputs.dry-run }}
+        run: cd runtimes/wasm && npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
