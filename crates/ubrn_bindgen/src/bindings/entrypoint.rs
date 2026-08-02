@@ -22,5 +22,7 @@ pub fn generate_entrypoint(
         AbiFlavor::Napi => Ok(String::new()),
         #[cfg(feature = "wasm")]
         AbiFlavor::Wasm => gen_rust::generate_entrypoint(crate_, modules),
+        #[cfg(feature = "wasm")]
+        AbiFlavor::Wasm2 => Ok(String::new()),
     }
 }

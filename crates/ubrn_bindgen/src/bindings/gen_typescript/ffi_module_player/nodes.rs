@@ -54,10 +54,15 @@ impl TripleStyle {
 pub(crate) struct PlayerFfiModule {
     /// Whether to suppress `@ts-nocheck` for strict type checking.
     pub strict_type_checking: bool,
-    /// The crate name, passed to `resolveLibPath` so error messages name it.
+    /// The ABI flavor this module targets (Napi, Wasm2, etc.).
+    pub flavor: crate::AbiFlavor,
+    /// The crate name. For napi, passed to `resolveLibPath` so error messages
+    /// name it. For wasm2, used to build the URL for the side-by-side `.wasm`
+    /// file.
     pub crate_name: String,
-    /// How the player should locate the library at runtime.
-    pub lib_resolution: LibResolution,
+    /// How the napi player should locate the library at runtime.
+    /// `None` for non-napi flavors (e.g. wasm2).
+    pub lib_resolution: Option<LibResolution>,
     /// Rustbuffer management symbol names.
     pub symbols: PlayerSymbols,
     /// FFI function registrations for `register({ functions: { ... } })`.
@@ -114,4 +119,29 @@ pub(crate) struct PlayerFieldDef {
     pub name: String,
     /// Player FfiType expression (e.g. "FfiType.Callback(\"calc_add\")").
     pub type_expr: String,
+}
+
+impl PlayerFfiModule {
+    /// Construct a minimal `PlayerFfiModule` with empty collections and the
+    /// given flavor. Used by codegen snapshot tests to exercise the template
+    /// branches without needing to materialize a full `general::Namespace`.
+    #[doc(hidden)]
+    pub fn empty_for_test(flavor: crate::AbiFlavor) -> Self {
+        Self {
+            strict_type_checking: true,
+            flavor,
+            crate_name: "ubrn_test_crate".into(),
+            lib_resolution: None,
+            symbols: PlayerSymbols {
+                rustbuffer_alloc: "ubrn_test_rb_alloc".into(),
+                rustbuffer_free: "ubrn_test_rb_free".into(),
+                rustbuffer_from_bytes: "ubrn_test_rb_from_bytes".into(),
+            },
+            functions: Vec::new(),
+            callbacks: Vec::new(),
+            structs: Vec::new(),
+            typed_functions: Vec::new(),
+            typed_definitions: Vec::new(),
+        }
+    }
 }

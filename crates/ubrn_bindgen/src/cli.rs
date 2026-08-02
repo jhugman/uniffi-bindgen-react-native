@@ -15,7 +15,7 @@ use uniffi_bindgen::{
 };
 
 #[cfg(feature = "wasm")]
-use super::{bindings::gen_rust, wasm::generate_rs};
+use super::{bindings::gen_rust, wasm::generate_rs, wasm_metadata};
 use super::{
     bindings::{gen_cpp, gen_typescript, metadata::ModuleMetadata},
     react_native::generate_cpp,
@@ -164,7 +164,7 @@ impl BindingsArgs {
         // C++/Rust generation via ComponentInterface
         match &switches.flavor {
             AbiFlavor::Jsi => {
-                let metadata = loader.load_metadata(&source_path)?;
+                let metadata = load_metadata(&loader, &source_path)?;
                 let cis = loader.load_cis(metadata)?;
                 let mut components = loader.load_components(cis, parse_cpp_config)?;
                 for c in components.iter_mut() {
@@ -175,7 +175,7 @@ impl BindingsArgs {
             AbiFlavor::Napi => { /* No C++ generation for Napi */ }
             #[cfg(feature = "wasm")]
             AbiFlavor::Wasm => {
-                let metadata = loader.load_metadata(&source_path)?;
+                let metadata = load_metadata(&loader, &source_path)?;
                 let cis = loader.load_cis(metadata)?;
                 let mut components = loader.load_components(cis, parse_rust_config)?;
                 for c in components.iter_mut() {
@@ -183,6 +183,8 @@ impl BindingsArgs {
                 }
                 generate_rs(&components, &switches, &abi_dir, !out.no_format)?;
             }
+            #[cfg(feature = "wasm")]
+            AbiFlavor::Wasm2 => { /* No native shim for Wasm2 */ }
         }
 
         // TypeScript generation via pipeline
@@ -190,7 +192,7 @@ impl BindingsArgs {
         // each namespace gets its own crate's uniffi.toml (e.g. custom type mappings).
         // TODO check this is the desired behavior in uniffi-rs 0.31.x.
         let pipeline_loader = self.create_pipeline_loader(manifest_path)?;
-        let metadata = pipeline_loader.load_metadata(&source_path)?;
+        let metadata = load_metadata(&pipeline_loader, &source_path)?;
         let initial_root = pipeline_loader.load_pipeline_initial_root(&source_path, metadata)?;
         let general_root = general::pipeline("react-native").execute(initial_root)?;
 
@@ -201,8 +203,8 @@ impl BindingsArgs {
             self.lib_resolution.clone(),
         )?;
         let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
-        if switches.flavor == AbiFlavor::Napi {
-            generate_index_from_modules(&modules, &switches, &ts_dir)?;
+        if switches.flavor.supports_index_ts_at_generation() {
+            generate_index_from_modules(&modules, &switches, &ts_dir, &source_path)?;
         }
         if !out.no_format {
             gen_typescript::format_directory(&ts_dir)?;
@@ -273,8 +275,22 @@ fn generate_index_from_modules(
     modules: &[ModuleMetadata],
     switches: &SwitchArgs,
     ts_dir: &Utf8Path,
+    source_path: &Utf8Path,
 ) -> Result<()> {
-    let code = gen_typescript::generate_index_code(modules.to_vec(), switches.flavor.clone())?;
+    // For wasm2 the source *is* the module, and staging copies it beside the
+    // generated TypeScript under the same name.
+    let wasm_stem = source_path.file_stem().unwrap_or_default().to_string();
+    // Staging will run wasm-bindgen over a module that imports its placeholder
+    // namespace, leaving a `<stem>_bg.js` beside the wasm. Ask the same
+    // question here so the index imports exactly what staging produces.
+    let has_wasm_bindgen_glue = switches.flavor.is_wasm2()
+        && ubrn_common::has_wasm_bindgen_imports(source_path).unwrap_or(false);
+    let code = gen_typescript::generate_index_code(
+        modules.to_vec(),
+        switches.flavor.clone(),
+        wasm_stem,
+        has_wasm_bindgen_glue,
+    )?;
     let path = ts_dir.join("index.ts");
     ubrn_common::write_file(path, code)?;
     Ok(())
@@ -321,8 +337,22 @@ fn generate_ffi_from_pipeline(
                     gen_typescript::ffi_module_player::PlayerFfiModule::from_general(
                         namespace,
                         &config,
+                        &switches.flavor,
                         crate_name,
-                        lib_resolution,
+                        Some(lib_resolution),
+                    );
+                gen_typescript::generate_player_lowlevel_code(player_module)?
+            }
+            #[cfg(feature = "wasm")]
+            AbiFlavor::Wasm2 => {
+                let crate_name = namespace.crate_name.clone();
+                let player_module =
+                    gen_typescript::ffi_module_player::PlayerFfiModule::from_general(
+                        namespace,
+                        &config,
+                        &switches.flavor,
+                        crate_name,
+                        None,
                     );
                 gen_typescript::generate_player_lowlevel_code(player_module)?
             }
@@ -339,6 +369,33 @@ fn generate_ffi_from_pipeline(
         ubrn_common::write_file(path, code)?;
     }
     Ok(())
+}
+
+/// Load metadata, transparently handling `wasm32-unknown-unknown` cdylibs.
+///
+/// When the `wasm` feature is enabled, this peeks at the source file and, if
+/// it looks like a WebAssembly module, extracts UNIFFI_META_* blobs directly
+/// from its globals + data segments instead of falling through to the native
+/// dylib symbol-table reader. Non-wasm sources (UDL, native libraries) take
+/// the unchanged default path.
+fn load_metadata(
+    loader: &uniffi_bindgen::BindgenLoader,
+    source_path: &Utf8Path,
+) -> Result<uniffi_meta::MetadataGroupMap> {
+    #[cfg(feature = "wasm")]
+    {
+        loader.load_metadata_specialized(source_path, |_path, bytes| {
+            if wasm_metadata::looks_like_wasm(bytes) {
+                Ok(Some(wasm_metadata::extract_from_wasm_bytes(bytes)?))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+    #[cfg(not(feature = "wasm"))]
+    {
+        loader.load_metadata(source_path)
+    }
 }
 
 fn parse_cpp_config(_ci: &ComponentInterface, toml: toml::Value) -> Result<gen_cpp::Config> {

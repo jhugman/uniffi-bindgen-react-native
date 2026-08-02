@@ -7,8 +7,15 @@
 // @ts-nocheck
 {%- endif %}
 
+{%- if module.flavor.is_wasm2() %}
+// Only `/core`, which is environment-neutral. Opening the `.wasm` is the
+// generated `index.ts`'s job, so this module
+// bundles for node, browsers and React Native alike.
+import { FfiType } from "@ubjs/wasm/core";
+{%- else %}
 import lib from "@ubjs/node";
 const { UniffiNativeModule, FfiType, resolveLibPath } = lib;
+{%- endif %}
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
@@ -73,6 +80,25 @@ interface NativeModuleInterface {
     rustbuffer_free(view: Uint8Array): void;
 }
 
+{%- if module.flavor.is_wasm2() %}
+let _nativeModule: NativeModuleInterface | undefined;
+const getter: () => NativeModuleInterface = () => {
+  if (!_nativeModule) {
+    throw new Error(
+      "{{ module.crate_name }}: wasm module not initialised. Await " +
+      "`uniffiInitAsync(...)` from the generated entrypoint before calling " +
+      "into this module.",
+    );
+  }
+  return _nativeModule;
+};
+export const PLAYER_DEFINITIONS = DEFINITIONS;
+// Takes the runtime's loose record — `registerSync` cannot know this
+// module's exports — and narrows it once, here, rather than at each call.
+export function setNativeModule(m: Record<string, (...args: any[]) => any>) {
+  _nativeModule = m as unknown as NativeModuleInterface;
+}
+{%- else %}
 let _nativeModule: NativeModuleInterface | undefined;
 const getter: () => NativeModuleInterface = () => {
   if (!_nativeModule) {
@@ -80,12 +106,16 @@ const getter: () => NativeModuleInterface = () => {
       crateName: "{{ module.crate_name }}",
       callerUrl: import.meta.url,
       {%- match module.lib_resolution %}
-      {%- when LibResolution::Colocated %}
-      {%- when LibResolution::Absolute with (path) %}
+      {%- when Some with (resolution) %}
+        {%- match resolution %}
+        {%- when LibResolution::Colocated %}
+        {%- when LibResolution::Absolute with (path) %}
       override: "{{ path }}",
       {%- when LibResolution::Require { base, triple_style } %}
       npmPackageBase: "{{ base }}",
       tripleStyle: "{{ triple_style.as_runtime_tag() }}",
+        {%- endmatch %}
+      {%- when None %}
       {%- endmatch %}
     });
     const mod_ = UniffiNativeModule.open(libPath);
@@ -93,6 +123,7 @@ const getter: () => NativeModuleInterface = () => {
   }
   return _nativeModule;
 };
+{%- endif %}
 export default getter;
 
 // Structs and function types for calling back into Typescript from Rust.
