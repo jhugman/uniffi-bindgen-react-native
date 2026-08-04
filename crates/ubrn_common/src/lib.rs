@@ -9,9 +9,13 @@ pub mod fmt;
 mod rust_crate;
 mod serde;
 mod testing;
+#[cfg(feature = "wasm")]
+mod wasm;
 
 pub use commands::*;
 pub use files::*;
 pub use rust_crate::*;
 pub use serde::*;
 pub use testing::*;
+#[cfg(feature = "wasm")]
+pub use wasm::*;
