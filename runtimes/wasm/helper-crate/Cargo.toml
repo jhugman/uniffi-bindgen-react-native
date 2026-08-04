@@ -1,0 +1,19 @@
+[package]
+name = "uniffi-runtime-wasm"
+version = "0.31.0-3"
+edition = "2021"
+description = "Runtime helpers (alloc/free/panic hook) for the wasm2 UniFFI player"
+license = "MPL-2.0"
+repository = "https://github.com/jhugman/uniffi-bindgen-react-native"
+readme = "README.md"
+keywords = ["ffi", "uniffi", "wasm", "webassembly", "code-generation"]
+categories = ["api-bindings", "development-tools::ffi", "wasm"]
+publish = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+
+[features]
+default = []

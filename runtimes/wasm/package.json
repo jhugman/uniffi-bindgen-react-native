@@ -1,0 +1,47 @@
+{
+  "name": "@ubjs/wasm",
+  "version": "0.31.0-3",
+  "description": "WebAssembly player runtime for uniffi-bindgen-react-native generated bindings.",
+  "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/uniffi-bindgen-react-native.git",
+    "directory": "runtimes/wasm"
+  },
+  "license": "MPL-2.0",
+  "author": {
+    "name": "James Hugman",
+    "email": "james@hugman.tv"
+  },
+  "bugs": {
+    "url": "https://github.com/jhugman/uniffi-bindgen-react-native/issues"
+  },
+  "keywords": ["uniffi", "ffi", "rust", "wasm", "webassembly", "typescript"],
+  "type": "module",
+  "exports": {
+    ".": {
+      "browser": "./dist/browser/src/index.js",
+      "node": "./dist/node/src/index.js",
+      "default": "./dist/browser/src/index.js"
+    },
+    "./core": "./dist/core/src/index.js",
+    "./browser": "./dist/browser/src/index.js",
+    "./node": "./dist/node/src/index.js"
+  },
+  "files": ["dist/", "!dist/tsconfig.tsbuildinfo", "README.md"],
+  "scripts": {
+    "build": "tsc -b",
+    "prepare": "npm run build",
+    "test": "node --test --import tsx './core/tests/*.test.ts'"
+  },
+  "peerDependencies": {
+    "@ubjs/core": "^0.31.0-3"
+  },
+  "devDependencies": {
+    "@ubjs/core": "file:../../typescript",
+    "@types/node": "^20",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "publishConfig": { "access": "public" }
+}

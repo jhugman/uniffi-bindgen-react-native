@@ -38,6 +38,8 @@ use uniffi_runtime_core::ffi_c_types::{
 /// allocator needs `capacity` to free correctly when `capacity > len`. The
 /// symbol is created once when the module registers and lives as long as the
 /// JS-side module facade.
+///
+/// Mirrors wasm2's `CAPACITY_HINT` symbol in `runtimes/wasm/core/src/call.ts`.
 pub struct CapacitySymbol {
     /// `napi_ref` keeping the Symbol alive across JS callbacks. Symbols are GC-
     /// managed; we hold a strong reference (initial refcount 1) so the symbol
