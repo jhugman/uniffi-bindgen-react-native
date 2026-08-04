@@ -4,14 +4,17 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+use std::collections::{HashMap, HashSet};
+
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
 use serde::Deserialize;
 use ubrn_common::{mk_dir, path_or_shim, CrateMetadata, Utf8PathBufExt as _};
 use uniffi_bindgen::{
-    cargo_metadata::CrateConfigSupplier, pipeline::general, BindgenLoader, BindgenPaths,
-    ComponentInterface,
+    cargo_metadata::CrateConfigSupplier,
+    pipeline::{general, initial},
+    BindgenLoader, BindgenPaths, BindgenPathsLayer, ComponentInterface, GlobalConfig,
 };
 
 #[cfg(feature = "wasm")]
@@ -166,7 +169,8 @@ impl BindingsArgs {
             AbiFlavor::Jsi => {
                 let metadata = loader.load_metadata(&source_path)?;
                 let cis = loader.load_cis(metadata)?;
-                let mut components = loader.load_components(cis, parse_cpp_config)?;
+                let mut components =
+                    loader.load_components(cis, |ci, toml| parse_cpp_config(ci, toml))?;
                 for c in components.iter_mut() {
                     c.ci.derive_ffi_funcs()?;
                 }
@@ -177,7 +181,8 @@ impl BindingsArgs {
             AbiFlavor::Wasm => {
                 let metadata = loader.load_metadata(&source_path)?;
                 let cis = loader.load_cis(metadata)?;
-                let mut components = loader.load_components(cis, parse_rust_config)?;
+                let mut components =
+                    loader.load_components(cis, |ci, toml| parse_rust_config(ci, toml))?;
                 for c in components.iter_mut() {
                     c.ci.derive_ffi_funcs()?;
                 }
@@ -192,6 +197,7 @@ impl BindingsArgs {
         let pipeline_loader = self.create_pipeline_loader(manifest_path)?;
         let metadata = pipeline_loader.load_metadata(&source_path)?;
         let initial_root = pipeline_loader.load_pipeline_initial_root(&source_path, metadata)?;
+        let explicit_discr_enums = collect_explicit_discr_enums(&initial_root);
         let general_root = general::pipeline("react-native").execute(initial_root)?;
 
         generate_ffi_from_pipeline(
@@ -200,7 +206,8 @@ impl BindingsArgs {
             &ts_dir,
             self.lib_resolution.clone(),
         )?;
-        let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
+        let modules =
+            generate_api_from_pipeline(&general_root, &switches, &ts_dir, &explicit_discr_enums)?;
         if switches.flavor == AbiFlavor::Napi {
             generate_index_from_modules(&modules, &switches, &ts_dir)?;
         }
@@ -213,14 +220,16 @@ impl BindingsArgs {
     fn create_loader(&self, manifest_path: Option<&Utf8PathBuf>) -> Result<BindgenLoader> {
         let mut bindgen_paths = BindgenPaths::default();
         if let Some(config_path) = &self.source.config {
-            bindgen_paths.add_config_override_layer(config_path.clone());
+            bindgen_paths.add_layer(ConfigOverrideLayer {
+                path: config_path.clone(),
+            });
         }
         let cwd = Utf8PathBuf::from("Cargo.toml");
         let manifest_path = manifest_path.unwrap_or(&cwd);
         let cargo_metadata = CrateMetadata::cargo_metadata(manifest_path)?;
         let config_supplier = CrateConfigSupplier::from(cargo_metadata);
         bindgen_paths.add_layer(config_supplier);
-        Ok(BindgenLoader::new(bindgen_paths))
+        Ok(BindgenLoader::new(bindgen_paths, GlobalConfig::default()))
     }
 
     /// Create a loader for the pipeline that uses only per-crate configs.
@@ -236,15 +245,57 @@ impl BindingsArgs {
         let cargo_metadata = CrateMetadata::cargo_metadata(manifest_path)?;
         let config_supplier = CrateConfigSupplier::from(cargo_metadata);
         bindgen_paths.add_layer(config_supplier);
-        Ok(BindgenLoader::new(bindgen_paths))
+        Ok(BindgenLoader::new(bindgen_paths, GlobalConfig::default()))
     }
+}
+
+/// A [BindgenPathsLayer] that always resolves to the same config file, regardless
+/// of crate name. Used to implement the `--config` CLI flag, which points at a
+/// single `uniffi.toml`-style file to use for every crate.
+struct ConfigOverrideLayer {
+    path: Utf8PathBuf,
+}
+
+impl BindgenPathsLayer for ConfigOverrideLayer {
+    fn get_config_path(&self, _crate_name: &str) -> Option<Utf8PathBuf> {
+        Some(self.path.clone())
+    }
+}
+
+/// Namespace name -> orig_names of enums that declared an explicit `#[repr(...)]`
+/// discriminant type in the Rust source.
+///
+/// This is only available from the `initial` pipeline IR: the `general` pipeline
+/// collapses "explicit repr" and "inferred repr" enums down to the same
+/// `Enum::discr_type: TypeNode`, so we capture the distinction up front.
+type ExplicitDiscrEnums = HashMap<String, HashSet<String>>;
+
+fn collect_explicit_discr_enums(root: &initial::Root) -> ExplicitDiscrEnums {
+    root.namespaces
+        .iter()
+        .map(|(name, namespace)| {
+            let enums = namespace
+                .type_definitions
+                .iter()
+                .filter_map(|td| match td {
+                    initial::TypeDefinition::Enum(e) if e.discr_type.is_some() => {
+                        Some(e.orig_name.clone())
+                    }
+                    _ => None,
+                })
+                .collect();
+            (name.clone(), enums)
+        })
+        .collect()
 }
 
 fn generate_api_from_pipeline(
     general_root: &general::Root,
     switches: &SwitchArgs,
     ts_dir: &Utf8Path,
+    explicit_discr_enums: &ExplicitDiscrEnums,
 ) -> Result<Vec<ModuleMetadata>> {
+    let empty = HashSet::new();
     let mut modules = Vec::new();
     for (name, namespace) in &general_root.namespaces {
         let config = extract_ts_config(namespace)?;
@@ -255,11 +306,13 @@ fn generate_api_from_pipeline(
             &config,
         );
         let ffi_exports = ffi_module.exported_names();
+        let explicit_discr_enums = explicit_discr_enums.get(name).unwrap_or(&empty);
         let api_module = gen_typescript::api_module::TsApiModule::from_general(
             &config,
             namespace,
             switches.flavor.clone(),
             ffi_exports,
+            explicit_discr_enums,
         )?;
         let code = gen_typescript::generate_api_code_from_ir(api_module)?;
         let path = ts_dir.join(module.ts_filename());

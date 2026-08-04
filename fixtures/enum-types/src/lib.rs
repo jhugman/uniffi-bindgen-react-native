@@ -127,6 +127,38 @@ fn identity_optional_fields(value: OptionalFields) -> OptionalFields {
     value
 }
 
+// A recursive enum: `Cons` holds a `Box<IntList>` pointing back to the same
+// type. Without the `Box` this would be an infinite-size type and fail to
+// compile; uniffi 0.32 added automatic FFI support for `Box<T>` so recursive
+// enums like this can cross the FFI at all.
+#[derive(uniffi::Enum, Debug, Clone, PartialEq, Eq)]
+pub enum IntList {
+    Cons(i32, Box<IntList>),
+    Nil,
+}
+
+#[uniffi::export]
+fn identity_int_list(value: IntList) -> IntList {
+    value
+}
+
+#[uniffi::export]
+fn make_int_list(values: Vec<i32>) -> IntList {
+    let mut list = IntList::Nil;
+    for v in values.into_iter().rev() {
+        list = IntList::Cons(v, Box::new(list));
+    }
+    list
+}
+
+#[uniffi::export]
+fn int_list_sum(value: IntList) -> i32 {
+    match value {
+        IntList::Cons(v, rest) => v + int_list_sum(*rest),
+        IntList::Nil => 0,
+    }
+}
+
 uniffi::include_scaffolding!("enum_types");
 
 #[cfg(test)]

@@ -15,7 +15,7 @@ mod docstring;
 mod nodes;
 mod type_helpers;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use heck::ToUpperCamelCase;
 use uniffi_bindgen::pipeline::general;
@@ -354,6 +354,7 @@ impl TsApiModule {
         config: &Config,
         namespace: &general::Namespace,
         flavor: &AbiFlavor,
+        explicit_discr_enums: &HashSet<String>,
     ) -> Vec<TsTypeDefinition> {
         let mut defs = Vec::new();
 
@@ -380,6 +381,13 @@ impl TsApiModule {
                         string_helper_emitted = true;
                         defs.push(TsTypeDefinition::StringHelper(build_string_helper(flavor)));
                     }
+                }
+                general::TypeDefinition::Box(boxed) => {
+                    deferred_wrappers
+                        .push(TsTypeDefinition::SimpleWrapper(build_box(config, boxed)));
+                }
+                general::TypeDefinition::Set(set) => {
+                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_set(config, set)));
                 }
                 general::TypeDefinition::Optional(opt) => {
                     deferred_wrappers
@@ -409,7 +417,8 @@ impl TsApiModule {
                     defs.push(TsTypeDefinition::External(build_external_type(config, ext)));
                 }
                 general::TypeDefinition::Enum(e) => {
-                    let ts_enum = build_enum(config, e, flavor);
+                    let has_explicit_discr = explicit_discr_enums.contains(&e.orig_name);
+                    let ts_enum = build_enum(config, e, flavor, has_explicit_discr);
                     if ts_enum.is_flat && ts_enum.is_error {
                         defs.push(TsTypeDefinition::FlatError(ts_enum));
                     } else if ts_enum.is_flat {
@@ -492,11 +501,13 @@ impl TsApiModule {
         namespace: &general::Namespace,
         flavor: AbiFlavor,
         ffi_exported_definitions: Vec<ffi_module::FfiExportedName>,
+        explicit_discr_enums: &HashSet<String>,
     ) -> anyhow::Result<Self> {
         let module_name = namespace.name.clone();
         let namespace_docstring = namespace.docstring.as_deref().map(format_docstring);
         let supports_rust_backtrace = flavor.supports_rust_backtrace();
-        let type_definitions = Self::build_type_definitions(config, namespace, &flavor);
+        let type_definitions =
+            Self::build_type_definitions(config, namespace, &flavor, explicit_discr_enums);
         let functions = build_functions(config, namespace, &flavor);
         let initialization = build_initialization(namespace, &flavor);
 

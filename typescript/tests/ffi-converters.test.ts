@@ -9,10 +9,12 @@ import {
   FfiConverterArray,
   AbstractFfiConverterByteArray,
   FfiConverterBool,
+  FfiConverterBox,
   FfiConverterInt16,
   FfiConverterInt32,
   FfiConverterInt8,
   FfiConverterOptional,
+  FfiConverterSet,
   FfiConverterUInt16,
   FfiConverterUInt8,
   FfiConverterUint8Array,
@@ -121,6 +123,22 @@ test("AbstractFfiConverterByteArray.lower uses the supplied allocator", (t) => {
   t.assertEqual(view.byteLength, 8);
   const lifted = FfiConverterUint8Array.lift(view);
   t.assertEqual(Array.from(lifted), [1, 2, 3, 4]);
+});
+
+test("Set of shorts", (t) => {
+  const converter = new FfiConverterSet(FfiConverterUInt16);
+  testConverter(t, converter, new Set([1, 2, 3]));
+  testConverter(t, converter, new Set());
+});
+
+test("Box of a short is transparent", (t) => {
+  // Box<T> lowers/lifts identically to T, so unlike the byte-array-backed
+  // converters above, its `lower()` output isn't a RustBuffer view -
+  // it's whatever the inner converter (a raw number here) produces.
+  const converter = new FfiConverterBox(FfiConverterUInt16);
+  const lowered = converter.lower(0x7fff, testAlloc);
+  t.assertEqual(lowered, 0x7fff);
+  t.assertEqual(converter.lift(lowered), 0x7fff);
 });
 
 test("Array of optional shorts", (t) => {
