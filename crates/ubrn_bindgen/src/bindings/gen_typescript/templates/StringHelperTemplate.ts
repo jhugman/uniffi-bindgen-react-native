@@ -7,13 +7,24 @@ const stringConverter = (() => {
         stringToBytes: (s: string) => encoder.encode(s),
         bytesToString: (ab: UniffiByteArray) => decoder.decode(ab),
         stringByteLength: (s: string) => encoder.encode(s).byteLength,
-        writeStringIntoBuffer: (s: string, buf: any, offset: number): number => {
-            const view = new Uint8Array(
-                buf.arrayBuffer,
-                offset,
-                buf.arrayBuffer.byteLength - offset,
-            );
-            return encoder.encodeInto(s, view).written;
+        // Returns the whole `encodeInto` result. `written` sizes the length
+        // prefix; `read` is the only reliable way to tell that the string did
+        // not fit, because `encodeInto` stops before a code point it cannot
+        // complete rather than filling the buffer — so a short `written` does
+        // not imply truncation.
+        writeStringIntoBuffer: (
+            s: string,
+            buf: any,
+            offset: number,
+            capacity: number,
+        ): { read: number; written: number } => {
+            // Bound the view by the caller's allocation, not by the backing
+            // buffer. They coincide when the buffer wraps exactly one
+            // allocation, but under wasm the backing buffer is the whole
+            // linear memory, and sizing from it would let `encodeInto` run
+            // past the allocation into neighbouring memory.
+            const view = new Uint8Array(buf.arrayBuffer, offset, capacity);
+            return encoder.encodeInto(s, view);
         },
         readStringFromBuffer: (buf: any, offset: number, length: number): string =>
             decoder.decode(new Uint8Array(buf.arrayBuffer, offset, length)),
@@ -56,13 +67,24 @@ const stringConverter = (() => {
         // Encode directly into the RustBuffer backing store via
         // TextEncoder.encodeInto — zero intermediate allocation. Replaces
         // the old C++ write_string_into_buffer helper.
-        writeStringIntoBuffer: (s: string, buf: any, offset: number): number => {
-            const view = new Uint8Array(
-                buf.arrayBuffer,
-                offset,
-                buf.arrayBuffer.byteLength - offset,
-            );
-            return encoder.encodeInto(s, view).written;
+        // Returns the whole `encodeInto` result. `written` sizes the length
+        // prefix; `read` is the only reliable way to tell that the string did
+        // not fit, because `encodeInto` stops before a code point it cannot
+        // complete rather than filling the buffer — so a short `written` does
+        // not imply truncation.
+        writeStringIntoBuffer: (
+            s: string,
+            buf: any,
+            offset: number,
+            capacity: number,
+        ): { read: number; written: number } => {
+            // Bound the view by the caller's allocation, not by the backing
+            // buffer. They coincide when the buffer wraps exactly one
+            // allocation, but under wasm the backing buffer is the whole
+            // linear memory, and sizing from it would let `encodeInto` run
+            // past the allocation into neighbouring memory.
+            const view = new Uint8Array(buf.arrayBuffer, offset, capacity);
+            return encoder.encodeInto(s, view);
         },
         // Dedicated C++ helper — avoids per-read Uint8Array allocation and
         // the double property-lookup in string_from_buffer.
