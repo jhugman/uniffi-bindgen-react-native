@@ -27,8 +27,25 @@ impl JsiPlayerShimCmd {
     fn build_dir() -> Result<Utf8PathBuf> {
         Ok(build_root()?.join("jsi-player-shim"))
     }
+    /// The cargo profile the player's Rust core is built with.
+    ///
+    /// Defaults to `debug` to keep bootstrap fast. `UBRN_PROFILE=release`
+    /// builds it optimized, which matters when benchmarking: the player's FFI
+    /// engine is on every call's hot path.
+    fn cargo_profile() -> &'static str {
+        let is_release = std::env::var("UBRN_PROFILE")
+            .map(|v| v == "release")
+            .unwrap_or(false);
+        if is_release {
+            "release"
+        } else {
+            "debug"
+        }
+    }
     fn rust_target_dir() -> Result<Utf8PathBuf> {
-        Ok(repository_root()?.join("target").join("debug"))
+        Ok(repository_root()?
+            .join("target")
+            .join(Self::cargo_profile()))
     }
     fn include_dir() -> Result<Utf8PathBuf> {
         Ok(repository_root()?
@@ -65,6 +82,9 @@ impl Bootstrap for JsiPlayerShimCmd {
         cargo
             .current_dir(repository_root()?)
             .args(["build", "-p", "uniffi-runtime-jsi"]);
+        if Self::cargo_profile() == "release" {
+            cargo.arg("--release");
+        }
         run_cmd(&mut cargo)?;
 
         // 2. CMake-configure + build the shim against it.
