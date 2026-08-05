@@ -146,13 +146,12 @@ pub(crate) fn run_cmd_quietly(cmd: &mut Command) {
 
 /// `cargo build -p <crate_name>`
 pub(crate) fn cargo_build(crate_name: &str) {
-    run_cmd_quietly(
-        Command::new("cargo")
-            .arg("build")
-            .arg("-p")
-            .arg(crate_name)
-            .arg("--lib"),
-    );
+    let mut cmd = Command::new("cargo");
+    cmd.arg("build").arg("-p").arg(crate_name).arg("--lib");
+    if crate::metadata::cargo_profile() == "release" {
+        cmd.arg("--release");
+    }
+    run_cmd_quietly(&mut cmd);
 }
 
 /// Write a minimal tsconfig.json into the fixture directory so that tsx
