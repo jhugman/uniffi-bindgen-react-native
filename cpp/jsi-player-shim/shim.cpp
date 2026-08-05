@@ -58,6 +58,21 @@ private:
   UbrnRustBuffer rb_;
 };
 
+// A jsi buffer that owns the std::string holding its bytes.
+//
+// Used by string_to_buffer: `jsi::String::utf8()` already returns a string
+// owning exactly the UTF-8 bytes, so handing that to JS directly avoids
+// allocating a second buffer and copying into it.
+class OwnedStringBuffer : public jsi::MutableBuffer {
+public:
+  explicit OwnedStringBuffer(std::string &&s) : s_(std::move(s)) {}
+  size_t size() const override { return s_.size(); }
+  uint8_t *data() override { return reinterpret_cast<uint8_t *>(s_.data()); }
+
+private:
+  std::string s_;
+};
+
 // Build a JS Uint8Array aliasing a returned RustBuffer (freed when GC'd).
 //
 // ArrayBuffer::size() reports `rb.len` (what string/byte-array lift() decoders
@@ -308,18 +323,15 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
               throw jsi::JSError(
                   rt, "uniffi jsi player: string_to_buffer needs a string");
             }
-            std::string s = args[0].asString(rt).utf8(rt);
-            size_t len = s.size();
-            // Allocate a JS-owned Uint8Array(len) and copy the UTF-8 bytes into
-            // its backing ArrayBuffer. (Mirrors the error-buf copy path above;
-            // avoids a native-owned MutableBuffer and any Bridging.h dependency.)
+            // Transcode once into a buffer that owns the bytes. The
+            // `std::string` from `utf8()` already holds exactly what JS needs,
+            // so allocating a second Uint8Array and copying into it is pure
+            // overhead on large strings.
+            auto payload = std::make_shared<OwnedStringBuffer>(
+                args[0].asString(rt).utf8(rt));
+            auto ab = jsi::ArrayBuffer(rt, payload);
             auto ctor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
-            auto arr = ctor.callAsConstructor(rt, (double)len).asObject(rt);
-            if (len) {
-              auto ab = arr.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
-              memcpy(ab.data(rt), s.data(), len);
-            }
-            return jsi::Value(rt, arr);
+            return ctor.callAsConstructor(rt, ab);
           }));
 
   // ffi__string_to_byte_length(s, undefined) -> number
