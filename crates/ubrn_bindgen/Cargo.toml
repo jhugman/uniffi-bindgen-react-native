@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 default = []
-wasm = ["quote", "prettyplease", "syn", "proc-macro2"]
+wasm = ["quote", "prettyplease", "syn", "proc-macro2", "wasmparser", "ubrn_common/wasm"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -38,6 +38,10 @@ optional = true
 
 [dependencies.proc-macro2]
 version = "1.0"
+optional = true
+
+[dependencies.wasmparser]
+version = "0.244"
 optional = true
 
 [dev-dependencies]

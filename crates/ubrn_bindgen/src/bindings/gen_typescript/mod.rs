@@ -37,10 +37,17 @@ pub(crate) fn generate_player_lowlevel_code(
 pub(crate) fn generate_index_code(
     modules: Vec<ModuleMetadata>,
     flavor: AbiFlavor,
+    wasm_stem: String,
+    has_wasm_bindgen_glue: bool,
 ) -> Result<String> {
-    IndexTsWrapper { modules, flavor }
-        .render()
-        .context("generating index.ts from IR failed")
+    IndexTsWrapper {
+        modules,
+        flavor,
+        wasm_stem,
+        has_wasm_bindgen_glue,
+    }
+    .render()
+    .context("generating index.ts from IR failed")
 }
 
 pub(crate) fn generate_api_code_from_ir(api_module: api_module::TsApiModule) -> Result<String> {
@@ -90,4 +97,20 @@ impl PlayerLowlevelTsWrapper {
 struct IndexTsWrapper {
     modules: Vec<ModuleMetadata>,
     flavor: AbiFlavor,
+    /// File stem of the module this index loads, which staging places
+    /// alongside it. Empty for flavors that load no wasm.
+    wasm_stem: String,
+    /// Whether the module imports wasm-bindgen's placeholder namespace, in
+    /// which case staging writes a `<stem>_bg.js` for us to import.
+    has_wasm_bindgen_glue: bool,
+}
+
+/// Test-only entry point: render the player lowlevel TS wrapper for a
+/// minimal `PlayerFfiModule` configured with the given flavor. Used by
+/// integration tests to assert template branching without standing up a
+/// full `general::Namespace`.
+#[doc(hidden)]
+pub fn render_player_lowlevel_for_test(flavor: &crate::AbiFlavor) -> Result<String> {
+    let module = ffi_module_player::PlayerFfiModule::empty_for_test(flavor.clone());
+    generate_player_lowlevel_code(module)
 }

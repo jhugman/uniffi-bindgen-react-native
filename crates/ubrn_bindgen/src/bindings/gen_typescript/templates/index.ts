@@ -18,12 +18,49 @@ if (!initialized) {
 
 export async function uniffiInitAsync() { /* sync flavor: no-op */ }
 {% else %}
+// The module is opened here rather than in an environment-specific entrypoint:
+// `@ubjs/wasm` resolves to its browser or node build through the
+// package's `exports` conditions, leaving this the one place that loads.
+import { openWasm, type WasmSource } from '@ubjs/wasm';
+{%- for m in modules %}
+import {
+  PLAYER_DEFINITIONS as PLAYER_DEFINITIONS_{{ m.ts() }},
+  setNativeModule as setNativeModule_{{ m.ts() }},
+} from './{{ m.ts_ffi() }}';
+{%- endfor %}
+{%- if has_wasm_bindgen_glue %}
+// This crate reaches wasm-bindgen through its dependencies, so the module
+// imports glue that only wasm-bindgen can write. Importing it here keeps it in
+// the bundler's graph; the alternative is fetching it at runtime, which no
+// bundler can see and which needs the file served beside the wasm.
+import * as wasmBindgenGlue from './{{ wasm_stem }}_bg.js';
+{%- endif %}
+
+/**
+ * Open the module and register every namespace. Idempotent.
+ *
+ * `{{ wasm_stem }}.wasm` is staged beside this file. There is no default,
+ * because naming an asset is the one thing only the host knows: a bundler
+ * rewrites the URL when it copies the file, so name it the way your
+ * environment does.
+ *
+ *     import wasm from './{{ wasm_stem }}.wasm';                   // bundler
+ *     const wasm = new URL('./{{ wasm_stem }}.wasm', import.meta.url); // node
+ *     await uniffiInitAsync(wasm);
+ */
 let initPromise: Promise<void> | undefined;
-export function uniffiInitAsync(): Promise<void> {
+export function uniffiInitAsync(source: WasmSource): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
+      const wasmModule = await openWasm(source as any{% if has_wasm_bindgen_glue %}, {
+        resolveModule: async (name: string) =>
+          name.endsWith('{{ wasm_stem }}_bg.js')
+            ? (wasmBindgenGlue as unknown as Record<string, unknown>)
+            : undefined,
+      }{% endif %});
       {%- for m in modules %}
-      await {{ m.ts() }}.default.initialize();
+      setNativeModule_{{ m.ts() }}(wasmModule.registerSync(PLAYER_DEFINITIONS_{{ m.ts() }}));
+      {{ m.ts() }}.default.initialize();
       {%- endfor %}
     })();
   }

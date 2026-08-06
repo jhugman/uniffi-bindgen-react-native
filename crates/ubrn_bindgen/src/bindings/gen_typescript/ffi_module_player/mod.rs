@@ -17,8 +17,9 @@ pub fn render_minimal_for_test(lib_resolution: LibResolution, crate_name: &str) 
     use nodes::{PlayerFfiModule, PlayerSymbols};
     let module = PlayerFfiModule {
         strict_type_checking: false,
+        flavor: crate::AbiFlavor::Napi,
         crate_name: crate_name.to_string(),
-        lib_resolution,
+        lib_resolution: Some(lib_resolution),
         symbols: PlayerSymbols {
             rustbuffer_alloc: "ubrn_test_alloc".into(),
             rustbuffer_free: "ubrn_test_free".into(),

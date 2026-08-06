@@ -13,3 +13,6 @@ pub(crate) mod gen_typescript;
 pub(crate) mod metadata;
 
 pub use self::entrypoint::generate_entrypoint;
+
+#[doc(hidden)]
+pub use self::gen_typescript::render_player_lowlevel_for_test;

@@ -883,6 +883,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
  "foldhash",
+ "serde",
 ]
 
 [[package]]
@@ -1851,6 +1852,7 @@ dependencies = [
  "ubrn_common",
  "uniffi_bindgen",
  "uniffi_meta",
+ "wasmparser 0.244.0",
 ]
 
 [[package]]
@@ -2803,6 +2805,7 @@ dependencies = [
  "hashbrown 0.15.5",
  "indexmap 2.13.0",
  "semver",
+ "serde",
 ]
 
 [[package]]
