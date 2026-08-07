@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use std::ptr;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
 use std::sync::Mutex;
 
 #[repr(C)]
@@ -83,8 +83,23 @@ pub extern "C" fn uniffi_test_fn_i64_negate(x: i64, status: &mut RustCallStatus)
 
 // --- RustBuffer helpers ---
 
+/// Census of the `RustBuffer` allocations this fixture currently owns.
+///
+/// Every allocation goes through `alloc_rustbuffer` or `uniffi_test_rustbuffer_alloc`, and
+/// every release goes through `free_buffer`, so these counters are exact rather than
+/// approximate. Tests read them through `uniffi_test_live_buffer_count` /
+/// `uniffi_test_live_buffer_bytes` to assert buffer ownership directly.
+///
+/// This exists because RSS sampling cannot do the job: V8 moves its own heap reservation by
+/// megabytes, which swamps a few hundred leaked bytes per call and makes such a test both
+/// slow and flaky. A counter turns the same question into an exact equality.
+static LIVE_BUFFERS: AtomicI64 = AtomicI64::new(0);
+static LIVE_BUFFER_BYTES: AtomicI64 = AtomicI64::new(0);
+
 fn free_buffer(buf: RustBuffer) {
     if !buf.data.is_null() && buf.capacity > 0 {
+        LIVE_BUFFERS.fetch_sub(1, Ordering::Relaxed);
+        LIVE_BUFFER_BYTES.fetch_sub(buf.capacity as i64, Ordering::Relaxed);
         let layout = std::alloc::Layout::from_size_align(buf.capacity as usize, 1).unwrap();
         unsafe { std::alloc::dealloc(buf.data, layout) };
     }
@@ -105,6 +120,8 @@ fn alloc_rustbuffer(data: &[u8]) -> RustBuffer {
         ptr::copy_nonoverlapping(data.as_ptr(), ptr, len);
         ptr
     };
+    LIVE_BUFFERS.fetch_add(1, Ordering::Relaxed);
+    LIVE_BUFFER_BYTES.fetch_add(len as i64, Ordering::Relaxed);
     RustBuffer {
         capacity: len as u64,
         len: len as u64,
@@ -131,13 +148,36 @@ pub extern "C" fn uniffi_test_rustbuffer_alloc(
     status: &mut RustCallStatus,
 ) -> RustBuffer {
     status.code = 0;
+    if size == 0 {
+        return RustBuffer {
+            capacity: 0,
+            len: 0,
+            data: ptr::null_mut(),
+        };
+    }
     let layout = std::alloc::Layout::from_size_align(size as usize, 1).unwrap();
     let data = unsafe { std::alloc::alloc_zeroed(layout) };
+    LIVE_BUFFERS.fetch_add(1, Ordering::Relaxed);
+    LIVE_BUFFER_BYTES.fetch_add(size as i64, Ordering::Relaxed);
     RustBuffer {
         capacity: size,
         len: 0,
         data,
     }
+}
+
+/// Number of `RustBuffer` allocations the fixture currently owns. See [`LIVE_BUFFERS`].
+#[no_mangle]
+pub extern "C" fn uniffi_test_live_buffer_count(status: &mut RustCallStatus) -> i32 {
+    status.code = 0;
+    LIVE_BUFFERS.load(Ordering::Relaxed) as i32
+}
+
+/// Total bytes across the allocations the fixture currently owns. See [`LIVE_BUFFERS`].
+#[no_mangle]
+pub extern "C" fn uniffi_test_live_buffer_bytes(status: &mut RustCallStatus) -> i64 {
+    status.code = 0;
+    LIVE_BUFFER_BYTES.load(Ordering::Relaxed)
 }
 
 #[no_mangle]
