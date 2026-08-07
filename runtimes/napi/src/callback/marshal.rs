@@ -142,8 +142,17 @@ fn marshal_field_to_bytes(
             slot::write_f64(slot, n.get_double()?);
         }
         FfiTypeDesc::RustBuffer => {
+            // No capacity symbol in scope on the callback path, so this keeps the copy
+            // behavior. Always memory-safe, but it means a `rustbuffer_alloc` view lowered
+            // as a callback argument is still orphaned. See the note in
+            // `js_uint8array_to_rust_buffer`.
             let rb = unsafe {
-                napi_utils::js_uint8array_to_rust_buffer(env.raw(), js_val, rb_from_bytes_ptr)?
+                napi_utils::js_uint8array_to_rust_buffer(
+                    env.raw(),
+                    js_val,
+                    rb_from_bytes_ptr,
+                    None,
+                )?
             };
             slot::write_rust_buffer(slot, rb);
         }
@@ -173,7 +182,12 @@ fn marshal_field_to_bytes(
             if has_error_buf && code != 0 {
                 let err_val: JsUnknown = status_obj.get_named_property("errorBuf")?;
                 let rb = unsafe {
-                    napi_utils::js_uint8array_to_rust_buffer(env.raw(), err_val, rb_from_bytes_ptr)?
+                    napi_utils::js_uint8array_to_rust_buffer(
+                        env.raw(),
+                        err_val,
+                        rb_from_bytes_ptr,
+                        None,
+                    )?
                 };
                 let u64_size = std::mem::size_of::<u64>();
                 let ptr_size = std::mem::size_of::<*mut u8>();
@@ -287,7 +301,12 @@ fn marshal_arg_to_bytes(
         FfiTypeDesc::RustBuffer => {
             let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
             let rb = unsafe {
-                napi_utils::js_uint8array_to_rust_buffer(env.raw(), js_val, rb_from_bytes_ptr)?
+                napi_utils::js_uint8array_to_rust_buffer(
+                    env.raw(),
+                    js_val,
+                    rb_from_bytes_ptr,
+                    None,
+                )?
             };
             // Transmute RustBufferC to its raw bytes.
             let rb_bytes: [u8; std::mem::size_of::<RustBufferC>()] =

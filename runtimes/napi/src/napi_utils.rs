@@ -32,12 +32,24 @@ use uniffi_runtime_core::ffi_c_types::{
 };
 
 /// A per-registration JS Symbol used as a hidden property key for stashing the
-/// underlying RustBuffer capacity on a lift-handoff `Uint8Array`. The view's
-/// `byteLength` is set to `len` so converters that decode the whole view
-/// (strings, raw byte arrays) see only the message bytes — but the global
-/// allocator needs `capacity` to free correctly when `capacity > len`. The
-/// symbol is created once when the module registers and lives as long as the
-/// JS-side module facade.
+/// underlying RustBuffer capacity on a `Uint8Array` that views library-owned memory.
+///
+/// Set on both kinds of library-owned view:
+///
+/// - **lift-handoff views** (a buffer Rust returned). The view's `byteLength` is `len` so
+///   converters that decode the whole view see only the message bytes, but the allocator
+///   needs `capacity` to free correctly when `capacity > len`.
+/// - **`rustbuffer_alloc` views**. Here `capacity == byteLength`, so the hint is redundant for
+///   freeing — but its *presence* is what marks the view as library-owned, which lets the
+///   argument-lowering path adopt the allocation instead of copying it.
+///
+/// Therefore the invariant is: **a hint is present if and only if the library owns the
+/// backing memory.** An ordinary V8-backed `Uint8Array` never carries one. A hint of `0`
+/// means the view was library-owned but has since been adopted by a callee, so the memory is
+/// gone and the view must not be used again.
+///
+/// The symbol is created once when the module registers and lives as long as the JS-side
+/// module facade.
 ///
 /// Mirrors wasm2's `CAPACITY_HINT` symbol in `runtimes/wasm/core/src/call.ts`.
 pub struct CapacitySymbol {
@@ -152,8 +164,9 @@ impl CapacitySymbol {
         Ok(())
     }
 
-    /// Read the capacity hint from `obj`. Returns `None` if no hint is set
-    /// (e.g., views from `rustbuffer_alloc(n)` where `byteLength == capacity`).
+    /// Read the capacity hint from `obj`. Returns `None` when no hint is set, which means
+    /// the memory is not the library's — an ordinary V8-backed `Uint8Array`. `Some(0)` means
+    /// a library-owned view whose allocation has already been adopted by a callee.
     ///
     /// # Safety
     ///
@@ -429,8 +442,26 @@ pub unsafe fn create_external_uint8array(
     Ok(typedarray)
 }
 
-/// Convert a JS `Uint8Array` to a [`RustBufferC`] by reading its data and calling
-/// [`rustbuffer_from_raw_bytes`].
+/// Convert a JS `Uint8Array` argument to a [`RustBufferC`] the callee can consume.
+///
+/// Two kinds of view arrive here, and they must be handled differently:
+///
+/// - **Library-owned views**, produced by `rustbuffer_alloc`. Codegen allocates one of these,
+///   fills it in place, and passes it straight through as the argument. It carries a capacity
+///   hint (see [`CapacitySymbol`]), and nothing else will ever free it: codegen frees returned
+///   buffers but never lowered arguments, and the view has a no-op finalizer. These are
+///   **adopted** — we hand the existing allocation to the callee, which frees it. Copying such
+///   a view instead would orphan the original and leak one whole payload per call.
+/// - **V8-owned arrays**, i.e. any ordinary `Uint8Array` from JS. These are not ours to give
+///   away, so they are **copied** into a fresh library allocation via `rustbuffer_from_bytes`.
+///
+/// The capacity hint is the discriminator: the runtime knows a buffer's capacity precisely
+/// when the library allocated it. On adoption the hint is reset to `0`, which makes any later
+/// `rustbuffer_free(view)` a no-op rather than a double free, since `free_rustbuffer` skips
+/// zero-capacity buffers.
+///
+/// Passing `None` for `capacity_symbol` forces the copy path. Call sites that have no symbol
+/// in scope use that, which is always memory-safe — it is the pre-adoption behavior.
 ///
 /// # Safety
 ///
@@ -441,10 +472,38 @@ pub unsafe fn js_uint8array_to_rust_buffer(
     raw_env: napi::sys::napi_env,
     js_val: JsUnknown,
     rb_from_bytes_ptr: *const c_void,
+    capacity_symbol: Option<&CapacitySymbol>,
 ) -> napi::Result<RustBufferC> {
-    let (data_ptr, length) = read_typedarray_data(raw_env, js_val.raw()).ok_or_else(|| {
+    let raw_val = js_val.raw();
+    let (data_ptr, length) = read_typedarray_data(raw_env, raw_val).ok_or_else(|| {
         napi::Error::from_reason("Expected a Uint8Array argument for RustBuffer".to_string())
     })?;
+
+    // An empty view owns no allocation, so there is nothing to adopt. `rustbuffer_alloc(0)`
+    // never sets a hint, and the copy path yields the correct empty `RustBufferC`.
+    if length == 0 {
+        return rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr);
+    }
+
+    if let Some(symbol) = capacity_symbol {
+        if let Some(capacity) = symbol.get(raw_env, raw_val) {
+            if capacity == 0 {
+                // The hint exists but has been zeroed, so this view was already adopted and
+                // its memory has since been freed by the callee. Reading it would be a
+                // use-after-free, so refuse rather than hand the callee a dangling pointer.
+                return Err(napi::Error::from_reason(
+                    "RustBuffer argument was already consumed by a previous FFI call".to_string(),
+                ));
+            }
+            symbol.set(raw_env, raw_val, 0)?;
+            return Ok(RustBufferC {
+                capacity,
+                len: length as u64,
+                data: data_ptr as *mut u8,
+            });
+        }
+    }
+
     rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr)
 }
 

@@ -67,6 +67,7 @@ pub(crate) fn call_ffi_function(
                         env.raw(),
                         js_val,
                         module.rb_ops().from_bytes_ptr,
+                        Some(capacity_symbol),
                     )?
                 };
                 slot::write_rust_buffer(slot, rust_buffer);
