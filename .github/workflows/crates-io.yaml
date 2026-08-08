@@ -9,29 +9,37 @@ on:
         type: boolean
         default: true
 
-env:
-  CARGO_MANIFEST_PATH: crates/uniffi-runtime-javascript/Cargo.toml
-
 jobs:
   publish-crates-io:
+    name: 🦀 ${{ matrix.crate }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    strategy:
+      # Neither crate depends on the other, so one failure should not
+      # cancel the other's publish.
+      fail-fast: false
+      matrix:
+        include:
+          - crate: uniffi-runtime-javascript
+            manifest: crates/uniffi-runtime-javascript/Cargo.toml
+          - crate: uniffi-runtime-wasm
+            manifest: runtimes/wasm/helper-crate/Cargo.toml
     steps:
       - uses: actions/checkout@v4
 
       - name: Verify package
-        run: cargo package --manifest-path ${{ env.CARGO_MANIFEST_PATH }} --allow-dirty
+        run: cargo package --manifest-path ${{ matrix.manifest }} --allow-dirty
 
       - name: Publish (dry run)
         if: ${{ github.event.inputs.dry_run == 'true' }}
-        run: cargo publish --manifest-path ${{ env.CARGO_MANIFEST_PATH }} --dry-run
+        run: cargo publish --manifest-path ${{ matrix.manifest }} --dry-run
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
       - name: Publish to crates.io
         if: ${{ github.event.inputs.dry_run != 'true' }}
-        run: cargo publish --manifest-path ${{ env.CARGO_MANIFEST_PATH }}
+        run: cargo publish --manifest-path ${{ matrix.manifest }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

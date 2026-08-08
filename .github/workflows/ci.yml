@@ -94,6 +94,45 @@ jobs:
       - name: Run tests of generated WASM bindings
         run: "cargo test -- wasm::"
 
+  integration-tests-wasm2-bindings:
+    name: 🧩 Integration tests (WASM2 player bindings)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          swap-storage: false
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installing
+        run: cargo xtask bootstrap yarn
+
+      - name: Installing WASM
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Run unit tests of the WASM2 player runtime
+        run: cd runtimes/wasm && npm ci && npm test
+
+      - name: Run tests of generated WASM2 bindings
+        run: "cargo test -- wasm2::"
+
+      # Named separately: this test covers the CLI path a consuming project
+      # runs rather than the fixture harness, so its name does not match the
+      # `wasm2::` filter above. It is `#[ignore]`d so the workspace-wide
+      # unit-test job, which installs no wasm32 target, does not run it.
+      - name: Run the end-to-end `ubrn build wasm2` test
+        run: "cargo test -p uniffi-bindgen-react-native --test wasm2_build -- --ignored"
+
   integration-tests-napi-runtime:
     name: 🧩 Integration tests (N-API runtime and bindings)
     runs-on: ubuntu-latest
