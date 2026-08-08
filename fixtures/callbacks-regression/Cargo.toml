@@ -16,6 +16,8 @@ thiserror = "1.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }

@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
+
 mod platform_specific;
 use platform_specific::acquire_with_timeout;
 use ubrn_testing::timer::{TimerFuture, TimerService};

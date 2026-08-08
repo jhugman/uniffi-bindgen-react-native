@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
+
 #[uniffi::export]
 /// This makes the byte array in rust, and the test in JS will compare it there.
 ///

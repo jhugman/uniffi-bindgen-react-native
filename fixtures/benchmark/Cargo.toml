@@ -12,6 +12,10 @@ name = "uniffi_benchmark"
 [dependencies]
 uniffi = { workspace = true, features = ["tokio"] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
+
 [dev-dependencies]
 ubrn_macros = { workspace = true }
 ubrn_fixture_testing = { workspace = true }

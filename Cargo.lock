@@ -1893,6 +1893,7 @@ dependencies = [
  "dunce",
  "heck",
  "pathdiff",
+ "ubrn_common",
 ]
 
 [[package]]
@@ -2069,6 +2070,8 @@ dependencies = [
  "ubrn_macros",
  "ubrn_testing",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2084,6 +2087,8 @@ dependencies = [
  "ubrn_macros",
  "ubrn_testing",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2099,6 +2104,8 @@ dependencies = [
  "ubrn_macros",
  "ubrn_testing",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2114,6 +2121,8 @@ dependencies = [
  "ubrn_macros",
  "ubrn_testing",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2123,6 +2132,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2133,6 +2144,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2144,6 +2157,8 @@ dependencies = [
  "ubrn_macros",
  "ubrn_testing",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
  "wasm-bindgen-futures",
 ]
 
@@ -2156,6 +2171,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
  "uniffi_meta",
 ]
 
@@ -2168,6 +2185,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2187,6 +2206,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2198,6 +2219,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2214,6 +2237,8 @@ dependencies = [
  "uniffi-fixture-ext-types-external-crate",
  "uniffi-fixture-ext-types-lib-one",
  "uniffi-fixture-ext-types-sub-lib",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
  "url",
 ]
 
@@ -2279,6 +2304,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2291,6 +2318,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2312,6 +2341,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2323,6 +2354,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2334,6 +2367,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2343,6 +2378,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
