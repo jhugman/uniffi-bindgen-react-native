@@ -26,30 +26,29 @@
 //! 4. At call time, Rust marshals JS values into C-compatible argument buffers, invokes
 //!    the foreign function via core, and unmarshals the result back to JS.
 //!
-//! ## Main-thread detection and the two-path callback design
+//! ## Owning-thread detection and the two-path callback design
 //!
-//! Node.js's N-API values can only be created and accessed on the **main thread** (the
-//! thread running the event loop). However, Rust libraries may invoke callbacks from
-//! arbitrary worker threads. This fundamental tension drives the two-path design that
-//! pervades the callback system:
+//! Node.js's N-API values can only be created and accessed on the JS thread that owns
+//! them. However, Rust libraries may invoke callbacks from arbitrary worker threads.
+//! This fundamental tension drives the two-path design that pervades the callback
+//! system:
 //!
-//! - **Same-thread path**: When a callback fires on the main thread, we can directly
-//!   construct napi values and call into JS synchronously.
-//! - **Cross-thread path**: When a callback fires on a worker thread, we must use a
-//!   threadsafe function to schedule the call back onto the main thread's event
-//!   loop, then block the worker until the result is available.
+//! - **Same-thread path**: When a callback fires on the JS thread that registered it, we
+//!   can directly construct napi values and call into JS synchronously.
+//! - **Cross-thread path**: When a callback fires on any other thread, we must use a
+//!   threadsafe function to schedule the call back onto the owning thread's event
+//!   loop, then block the calling thread until the result is available.
 //!
-//! The [`MAIN_THREAD_ID`] static captures the main thread's identity at module
-//! initialization time, and [`is_main_thread`] is the single predicate that every
-//! callback path consults to choose between these two strategies.
+//! [`callback::is_js_thread`] is the single predicate every callback path consults to choose
+//! between these two strategies, and it answers per callback: each callback records the thread
+//! that registered it, alongside the `napi_env` and `ThreadsafeFunction` it already held for that
+//! same thread.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
-use std::thread::ThreadId;
 
 use napi::bindgen_prelude::*;
-use napi::module_init;
 use napi::JsObject;
 use napi_derive::napi;
 
@@ -65,11 +64,6 @@ use uniffi_runtime_core::Module;
 pub(crate) fn core_err(e: uniffi_runtime_core::Error) -> napi::Error {
     napi::Error::from_reason(e.to_string())
 }
-
-/// The identity of the main Node.js thread, captured once at module initialization.
-/// Used by [`is_main_thread`] to determine whether callback code can access napi
-/// values directly or must dispatch through a threadsafe function.
-static MAIN_THREAD_ID: OnceLock<ThreadId> = OnceLock::new();
 
 /// Per-environment state for coordinating shutdown and tracking VTable TSFNs.
 ///
@@ -244,24 +238,6 @@ fn install_env_cleanup_hook(env: &Env) {
     unsafe {
         napi::sys::napi_add_env_cleanup_hook(raw, Some(env_cleanup_hook), raw.cast());
     }
-}
-
-#[module_init]
-fn init() {
-    MAIN_THREAD_ID
-        .set(std::thread::current().id())
-        .expect("module_init called twice");
-}
-
-/// Returns `true` if the calling thread is the main Node.js event-loop thread.
-///
-/// This is the single decision point for the callback system's two-path design:
-/// when `true`, napi values can be manipulated directly; when `false`, work must
-/// be dispatched to the main thread via a threadsafe function.
-pub fn is_main_thread() -> bool {
-    MAIN_THREAD_ID
-        .get()
-        .is_some_and(|id| *id == std::thread::current().id())
 }
 
 /// The top-level napi class exposed to JavaScript.
