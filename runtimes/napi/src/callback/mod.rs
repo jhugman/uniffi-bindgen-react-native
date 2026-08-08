@@ -74,6 +74,9 @@ struct RustCallStatusForVTable {
 /// invocation and passes it through to `on_js_thread`, `dispatch_to_js_thread`,
 /// and `is_js_thread`.
 struct CallbackUserData {
+    /// State of the environment this callback belongs to, held here so an invocation can check for
+    /// shutdown without taking a lock.
+    env_state: Arc<crate::EnvState>,
     /// Raw napi environment handle. Only valid on the main thread.
     raw_env: napi::sys::napi_env,
     /// GC-preventing reference to the JS callback function. Only valid on the main thread.
@@ -148,7 +151,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
     // SAFETY: `user_data` was created via `Box::into_raw` and leaked.
     let ud = unsafe { &*(user_data as *const CallbackUserData) };
 
-    if crate::is_shutting_down() {
+    if ud.env_state.is_shutting_down() {
         // Zero out the return buffer so the caller gets a deterministic value.
         if !ret.is_null() {
             let ret_size = ud.ret_size;
@@ -347,7 +350,7 @@ pub extern "C" fn dispatch_to_js_thread(
     // SAFETY: `user_data` was created via `Box::into_raw` and leaked.
     let ud = unsafe { &*(user_data as *const CallbackUserData) };
 
-    if crate::is_shutting_down() {
+    if ud.env_state.is_shutting_down() {
         return;
     }
 
@@ -472,6 +475,7 @@ pub fn create_callback_user_data(
 
     // Allocate the userdata and leak it to a stable address.
     let userdata = Box::new(CallbackUserData {
+        env_state: crate::env_state(env.raw()),
         raw_env: env.raw(),
         fn_ref,
         arg_layout,
@@ -512,7 +516,8 @@ pub fn create_callback_user_data(
     let mut tsfn = tsfn;
 
     // Register the raw TSFN handle so the env cleanup hook can abort it at shutdown.
-    crate::register_tsfn(tsfn.raw());
+    // SAFETY: `userdata_ptr` is valid and uniquely owned here.
+    unsafe { (*userdata_ptr).env_state.register_tsfn(tsfn.raw()) };
 
     // Unref the TSFN so it does not prevent the Node.js event loop from exiting.
     tsfn.unref(env)?;

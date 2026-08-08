@@ -43,8 +43,9 @@
 //! initialization time, and [`is_main_thread`] is the single predicate that every
 //! callback path consults to choose between these two strategies.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 use std::thread::ThreadId;
 
 use napi::bindgen_prelude::*;
@@ -70,91 +71,178 @@ pub(crate) fn core_err(e: uniffi_runtime_core::Error) -> napi::Error {
 /// values directly or must dispatch through a threadsafe function.
 static MAIN_THREAD_ID: OnceLock<ThreadId> = OnceLock::new();
 
-/// Global module state for coordinating shutdown and tracking VTable TSFNs.
+/// Per-environment state for coordinating shutdown and tracking VTable TSFNs.
 ///
-/// During env cleanup (triggered when Node.js is shutting down), the cleanup hook
-/// sets `shutdown` to `true` and aborts all tracked TSFNs. Aborting drops pending
-/// calls and their `SyncSender`s, which unblocks any Rust worker threads that are
-/// waiting on `rx.recv()`. This prevents SIGSEGV crashes on Linux where the shared
-/// library would otherwise be `dlclose()`'d while Rust threads still hold function
-/// pointers into it.
-struct ModuleState {
-    /// Set to `true` when the env cleanup hook fires.
+/// During env cleanup (triggered when that environment is torn down, which for a worker happens
+/// long before the process exits), the hook sets `shutdown` to `true` and aborts that
+/// environment's TSFNs. Aborting drops pending calls and their `SyncSender`s, which unblocks any
+/// Rust worker threads that are waiting on `rx.recv()`. This prevents SIGSEGV crashes on Linux
+/// where the shared library would otherwise be `dlclose()`'d while Rust threads still hold
+/// function pointers into it.
+///
+/// Per environment rather than per process: a TSFN is bound to the event loop of the environment
+/// that created it, so one environment's teardown must neither abort another's handles nor mark
+/// another's callbacks as shutting down.
+pub struct EnvState {
+    /// A hint, read on every callback invocation so the hot path takes no lock. The list below is
+    /// the authority: a registration racing teardown is refused by `register_tsfn`, not by this.
     shutdown: AtomicBool,
-    /// Raw handles of VTable TSFNs, so the cleanup hook can abort them all.
-    tsfn_handles: Mutex<Vec<napi::sys::napi_threadsafe_function>>,
+    /// This environment's VTable TSFN handles while it lives, and `None` once it is torn down.
+    ///
+    /// One `Option` rather than a separate flag and list, because registering and sweeping have to
+    /// be the same decision under the same lock. As two pieces of state, a handle could be pushed
+    /// after the sweep had already passed it, leaving it bound to an event loop that no longer
+    /// exists with nothing left to abort it.
+    tsfns: Mutex<Option<Vec<TsfnHandle>>>,
 }
 
-// SAFETY: `napi_threadsafe_function` (a raw pointer) is designed to be used
-// across threads—napi's threadsafe function APIs are explicitly thread-safe.
-// The `Mutex` synchronizes access to the `Vec`.
-unsafe impl Send for ModuleState {}
-unsafe impl Sync for ModuleState {}
-
-static MODULE_STATE: OnceLock<ModuleState> = OnceLock::new();
-
-/// Returns `true` if the Node.js environment is shutting down.
+/// A `napi_threadsafe_function`, as a value that may cross threads.
 ///
-/// Callback trampolines check this before attempting any work, so they can
-/// bail out early rather than touching a half-torn-down JS environment.
-pub fn is_shutting_down() -> bool {
-    MODULE_STATE
-        .get()
-        .is_some_and(|s| s.shutdown.load(Ordering::Acquire))
-}
+/// The newtype exists for the two impls below. They are the only `unsafe` this needs, and putting
+/// them here rather than on [`EnvState`] keeps them off the fields that never wanted them.
+#[derive(Clone, Copy)]
+struct TsfnHandle(napi::sys::napi_threadsafe_function);
 
-/// Register a VTable TSFN raw handle so the env cleanup hook can abort it.
-pub fn register_tsfn(raw: napi::sys::napi_threadsafe_function) {
-    if let Some(state) = MODULE_STATE.get() {
-        state
-            .tsfn_handles
-            .lock()
-            .expect("tsfn_handles lock poisoned")
-            .push(raw);
+// SAFETY: napi's threadsafe function APIs are explicitly callable from any thread, which is the
+// whole purpose of the type. This is an opaque handle that is never dereferenced here, only handed
+// back to `napi_release_threadsafe_function`.
+unsafe impl Send for TsfnHandle {}
+unsafe impl Sync for TsfnHandle {}
+
+impl EnvState {
+    fn new() -> Self {
+        Self {
+            shutdown: AtomicBool::new(false),
+            tsfns: Mutex::new(Some(Vec::new())),
+        }
     }
-}
 
-/// Env cleanup hook called by Node.js during shutdown.
-///
-/// # Safety
-/// Called by the napi runtime with the `data` pointer we registered (null in our case).
-unsafe extern "C" fn env_cleanup_hook(_data: *mut std::ffi::c_void) {
-    if let Some(state) = MODULE_STATE.get() {
-        // Signal all trampoline code to stop processing.
-        state.shutdown.store(true, Ordering::Release);
+    /// Returns `true` if the owning Node.js environment is shutting down.
+    ///
+    /// Callback trampolines check this before attempting any work, so they can
+    /// bail out early rather than touching a half-torn-down JS environment.
+    pub fn is_shutting_down(&self) -> bool {
+        self.shutdown.load(Ordering::Acquire)
+    }
 
-        // Abort every tracked VTable TSFN. This drops any pending calls
-        // (and their SyncSenders), which unblocks Rust worker threads
-        // waiting on `rx.recv()`.
-        let handles = state
-            .tsfn_handles
-            .lock()
-            .expect("tsfn_handles lock poisoned");
-        for &handle in handles.iter() {
+    /// Register a VTable TSFN raw handle so this environment's cleanup hook can abort it.
+    ///
+    /// A handle arriving after the environment has been torn down is aborted here instead: its
+    /// sweep has already passed, so nothing else ever would. Callers get one rule rather than a
+    /// result to remember, and the decision stays with the state that knows the answer.
+    ///
+    /// # Safety
+    ///
+    /// `raw` must be a live threadsafe function this environment owns, and ownership of it passes
+    /// here: the caller must not release it, because this either stores it for the teardown sweep
+    /// or aborts it on the spot.
+    pub unsafe fn register_tsfn(&self, raw: napi::sys::napi_threadsafe_function) {
+        let orphaned = match &mut *self.tsfns() {
+            Some(live) => {
+                live.push(TsfnHandle(raw));
+                false
+            }
+            None => true,
+        };
+        // Outside the guard, for the reason `close` gives: aborting is a call into napi that
+        // unblocks other threads, and it has no business happening under this lock.
+        if orphaned {
+            // SAFETY: an opaque handle the caller just created and never dereferences. `abort`
+            // drops pending calls, which is what releases anything already waiting on it.
             unsafe {
                 napi::sys::napi_release_threadsafe_function(
-                    handle,
+                    raw,
                     napi::sys::ThreadsafeFunctionReleaseMode::abort,
                 );
             }
         }
     }
+
+    /// Close this environment to new handles and take the ones it holds.
+    ///
+    /// The guard is released with the returned value, so the caller aborts without holding the
+    /// lock. That matters: aborting unblocks Rust worker threads, and one of those may re-enter
+    /// through a callback before the sweep has finished.
+    fn close(&self) -> Vec<TsfnHandle> {
+        self.shutdown.store(true, Ordering::Release);
+        self.tsfns().take().unwrap_or_default()
+    }
+
+    /// A poisoned lock means a panic while the list was held. It guards a list of opaque handles
+    /// with no cross-field invariant a panic could break, and a panic raised from here would cross
+    /// the napi boundary as an abort, so recovering beats taking the host process down.
+    fn tsfns(&self) -> MutexGuard<'_, Option<Vec<TsfnHandle>>> {
+        self.tsfns.lock().unwrap_or_else(PoisonError::into_inner)
+    }
 }
 
-/// Install the env cleanup hook (idempotent—only the first call has effect).
-fn install_env_cleanup_hook(env: &Env) {
-    static INSTALLED: AtomicBool = AtomicBool::new(false);
-    if INSTALLED
-        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        .is_ok()
-    {
+/// Every environment that has registered a module, keyed by its raw `napi_env`.
+///
+/// Touched when a callback is created and when an environment is torn down, both cold paths. A
+/// callback invocation reads its own `Arc<EnvState>` out of its user data, so the hot path takes
+/// no lock.
+static ENV_STATES: OnceLock<Mutex<HashMap<usize, Arc<EnvState>>>> = OnceLock::new();
+
+/// Recovered rather than propagated, for the reason [`EnvState::tsfns`] gives: a panic raised from
+/// here would cross the napi boundary as an abort.
+fn env_states() -> MutexGuard<'static, HashMap<usize, Arc<EnvState>>> {
+    ENV_STATES
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The state for `raw_env`, created on first use.
+pub fn env_state(raw_env: napi::sys::napi_env) -> Arc<EnvState> {
+    Arc::clone(
+        env_states()
+            .entry(raw_env as usize)
+            .or_insert_with(|| Arc::new(EnvState::new())),
+    )
+}
+
+/// Env cleanup hook, called by Node.js when an environment is torn down.
+///
+/// # Safety
+/// Called by the napi runtime with the `data` pointer we registered, which is the raw `napi_env`
+/// this hook was installed for.
+unsafe extern "C" fn env_cleanup_hook(data: *mut std::ffi::c_void) {
+    // Removed in a statement of its own, so the table's lock is released before anything below.
+    let removed = env_states().remove(&(data as usize));
+    let Some(state) = removed else {
+        return;
+    };
+
+    // `close` marks the environment shut, takes its handles, and releases its own lock before
+    // handing them back. Aborting drops pending calls (and their SyncSenders), which unblocks Rust
+    // worker threads waiting on `rx.recv()` — and one of those may come straight back through a
+    // callback, so it must not find this sweep still holding the lock it needs.
+    for handle in state.close() {
         unsafe {
-            napi::sys::napi_add_env_cleanup_hook(
-                env.raw(),
-                Some(env_cleanup_hook),
-                std::ptr::null_mut(),
+            napi::sys::napi_release_threadsafe_function(
+                handle.0,
+                napi::sys::ThreadsafeFunctionReleaseMode::abort,
             );
         }
+    }
+}
+
+/// Install the cleanup hook for `env`, once per environment.
+///
+/// Every environment needs its own: a worker's TSFNs are bound to the worker's event loop, and are
+/// only safe for that environment's teardown to abort.
+fn install_env_cleanup_hook(env: &Env) {
+    let raw = env.raw();
+    let key = raw as usize;
+    {
+        let mut states = env_states();
+        if states.contains_key(&key) {
+            return;
+        }
+        states.insert(key, Arc::new(EnvState::new()));
+    }
+    unsafe {
+        napi::sys::napi_add_env_cleanup_hook(raw, Some(env_cleanup_hook), raw.cast());
     }
 }
 
@@ -163,10 +251,6 @@ fn init() {
     MAIN_THREAD_ID
         .set(std::thread::current().id())
         .expect("module_init called twice");
-    let _ = MODULE_STATE.set(ModuleState {
-        shutdown: AtomicBool::new(false),
-        tsfn_handles: Mutex::new(Vec::new()),
-    });
 }
 
 /// Returns `true` if the calling thread is the main Node.js event-loop thread.
