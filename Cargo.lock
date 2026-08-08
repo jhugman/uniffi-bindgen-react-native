@@ -1985,6 +1985,7 @@ dependencies = [
  "ubrn_common",
  "uniffi_bindgen",
  "uniffi_meta",
+ "wasm-bindgen-cli-support",
 ]
 
 [[package]]

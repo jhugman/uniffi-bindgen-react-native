@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [features]
 default = ["wasm"]
-wasm = []
+wasm = ["ubrn_common/wasm"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -37,6 +37,7 @@ ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }
 uniffi_meta = { workspace = true }
 path-slash = "0.2.1"
+wasm-bindgen-cli-support = { workspace = true }
 
 [dev-dependencies]
 ubrn_cli_testing = { path = "../ubrn_cli_testing" }
