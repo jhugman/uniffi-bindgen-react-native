@@ -5,8 +5,13 @@
  */
 
 /// Wrap a docstring in a JSDoc `/** ... */` block at the given indentation.
+///
+/// Any `*/` in the docstring is escaped, since it would otherwise close the
+/// block early. TypeScript does not permit nested
+/// block comments.
 pub(super) fn format_docstring_at(docstring: &str, indent_spaces: usize) -> String {
-    let middle = textwrap::indent(&textwrap::dedent(docstring), " * ");
+    let escaped = docstring.replace("*/", "*\\/");
+    let middle = textwrap::indent(&textwrap::dedent(&escaped), " * ");
     let wrapped = format!("/**\n{middle}\n */");
     textwrap::indent(&wrapped, &" ".repeat(indent_spaces))
 }
