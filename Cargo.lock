@@ -2177,15 +2177,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "uniffi-fixture-docstrings"
-version = "0.22.0"
-dependencies = [
- "ubrn_fixture_testing",
- "ubrn_macros",
- "uniffi",
-]
-
-[[package]]
 name = "uniffi-fixture-enum-types"
 version = "0.22.0"
 dependencies = [
