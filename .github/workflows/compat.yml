@@ -21,7 +21,7 @@ jobs:
     outputs:
       triples: ${{ steps.compute.outputs.triples }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # Node is preinstalled on ubuntu-latest; the script uses only Node built-ins.
       - id: compute
         run: |
@@ -37,7 +37,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     name: "${{ inputs.platform }} · rn ${{ matrix.rn }} · bob ${{ matrix.bob }} · ${{ matrix.runner }}"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/test-turbo-modules
         with:
           platform: ${{ inputs.platform }}

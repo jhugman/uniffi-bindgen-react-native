@@ -27,7 +27,7 @@ jobs:
           - crate: uniffi-runtime-wasm
             manifest: runtimes/wasm/helper-crate/Cargo.toml
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Verify package
         run: cargo package --manifest-path ${{ matrix.manifest }} --allow-dirty
