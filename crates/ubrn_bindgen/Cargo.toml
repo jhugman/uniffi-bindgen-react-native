@@ -41,7 +41,7 @@ version = "1.0"
 optional = true
 
 [dependencies.wasmparser]
-version = "0.244"
+version = "0.255"
 optional = true
 
 [dev-dependencies]
