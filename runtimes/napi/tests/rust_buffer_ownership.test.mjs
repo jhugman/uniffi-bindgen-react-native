@@ -105,8 +105,9 @@ test("lowered argument buffer is released (rustbuffer_alloc view as argument)", 
   );
 });
 
-test("lowered argument buffer is released for a void-returning call", () => {
-  // Isolates the argument direction: nothing comes back, so any growth must be the argument.
+test("lowered argument buffer is released for a scalar-returning call", () => {
+  // Isolates the argument direction: the return is a scalar, not a buffer, so any growth in
+  // live allocations must come from the argument.
   const { nm, live } = openModule();
   const before = live();
 

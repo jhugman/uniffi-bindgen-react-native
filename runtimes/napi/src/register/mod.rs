@@ -110,6 +110,12 @@ pub fn register(
         // SAFETY: rb.data points to a valid allocation of `len` bytes that the Rust
         // library owns; the view is released either by `rustbuffer_free(view)` or by being
         // adopted when passed as an FFI argument, so no finalizer is required.
+        //
+        // CONTRACT: adoption frees the backing allocation but cannot detach this view, so the
+        // `Uint8Array` is left dangling over freed memory. A view must be treated as consumed
+        // once it has been passed as an FFI argument: reading it afterwards is a use-after-free,
+        // and passing it a second time fails with an "already consumed" error. Generated lowering
+        // code drops the view immediately, so this only bites hand-written callers.
         let typedarray =
             unsafe { napi_utils::create_external_uint8array(ctx.env.raw(), rb.data, len)? };
         // Stamp the capacity so the runtime can recognise this view as library-owned. Two
