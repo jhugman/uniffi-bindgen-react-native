@@ -695,7 +695,8 @@ unsafe fn write_js_return_to_bytes(
             // Read Uint8Array -> rustbuffer_from_bytes -> write RustBufferC bytes.
             // Truncating copy: caller may pass a `ret_bytes` smaller than RustBufferC
             // when the return slot is a different shape; preserve historical behavior.
-            let rb = napi_utils::js_uint8array_to_rust_buffer(raw_env, js_val, rb_from_bytes_ptr)?;
+            let rb =
+                napi_utils::js_uint8array_to_rust_buffer(raw_env, js_val, rb_from_bytes_ptr, None)?;
             let rb_bytes = slot::rust_buffer_to_bytes(&rb);
             let copy_len = rb_bytes.len().min(ret_bytes.len());
             ret_bytes[..copy_len].copy_from_slice(&rb_bytes[..copy_len]);

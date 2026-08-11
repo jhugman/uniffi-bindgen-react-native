@@ -57,6 +57,11 @@ pub(crate) fn call_ffi_function(
 
     let mut call = module.prepare_call(fn_name).map_err(core_err)?;
 
+    // NOTE: arguments are lowered in order, and lowering a library-owned `RustBuffer` adopts its
+    // allocation (the callee frees it). If a *later* argument fails to lower we return early
+    // without invoking the callee, so any already-adopted buffer in this call is orphaned. This
+    // only happens on a misuse/error path — e.g. passing the same alloc'd view twice, which trips
+    // the "already consumed" guard — never on the happy path, which always reaches the call.
     for (i, desc) in arg_types.iter().enumerate() {
         let js_val: JsUnknown = ctx.get(i)?;
         let slot = call.arg_slot(i).map_err(core_err)?;
@@ -67,6 +72,7 @@ pub(crate) fn call_ffi_function(
                         env.raw(),
                         js_val,
                         module.rb_ops().from_bytes_ptr,
+                        Some(capacity_symbol),
                     )?
                 };
                 slot::write_rust_buffer(slot, rust_buffer);

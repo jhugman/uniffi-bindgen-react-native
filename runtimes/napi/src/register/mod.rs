@@ -90,6 +90,7 @@ pub fn register(
     // library's `rustbuffer_free`. Together they let JS allocate buffers that the
     // codegen-emitted lowering path can fill in place and ship to Rust without copying.
     let alloc_module = Arc::clone(&module);
+    let cap_sym_for_alloc = Arc::clone(&capacity_symbol);
     let alloc_fn = env.create_function_from_closure("rustbuffer_alloc", move |ctx| {
         let size_arg: i32 = ctx.get(0)?;
         if size_arg < 0 {
@@ -107,10 +108,23 @@ pub fn register(
             napi::Error::from_reason("RustBuffer capacity exceeds addressable memory".to_string())
         })?;
         // SAFETY: rb.data points to a valid allocation of `len` bytes that the Rust
-        // library owns; codegen will hand the view back via `rustbuffer_free` before
-        // shipping the (ptr, len, cap) tuple to FFI, so no finalizer is required.
+        // library owns; the view is released either by `rustbuffer_free(view)` or by being
+        // adopted when passed as an FFI argument, so no finalizer is required.
+        //
+        // CONTRACT: adoption frees the backing allocation but cannot detach this view, so the
+        // `Uint8Array` is left dangling over freed memory. A view must be treated as consumed
+        // once it has been passed as an FFI argument: reading it afterwards is a use-after-free,
+        // and passing it a second time fails with an "already consumed" error. Generated lowering
+        // code drops the view immediately, so this only bites hand-written callers.
         let typedarray =
             unsafe { napi_utils::create_external_uint8array(ctx.env.raw(), rb.data, len)? };
+        // Stamp the capacity so the runtime can recognise this view as library-owned. Two
+        // consumers rely on it: `rustbuffer_free` frees against the true capacity, and the
+        // argument-lowering path adopts the allocation instead of copying it. Without the
+        // stamp, a lowered argument gets copied and this allocation is orphaned.
+        if rb.capacity > 0 {
+            unsafe { cap_sym_for_alloc.set(ctx.env.raw(), typedarray, rb.capacity)? };
+        }
         unsafe { JsUnknown::from_raw(ctx.env.raw(), typedarray) }
     })?;
     result.set_named_property("rustbuffer_alloc", alloc_fn)?;
@@ -137,15 +151,15 @@ pub fn register(
         if length == 0 {
             return ctx.env.get_undefined().map(|u| u.into_unknown());
         }
-        // Capacity recovery. Two view origins to handle:
-        //   (a) `rustbuffer_alloc(n)` views: capacity == byteLength == n, no
-        //       hint set. Use byteLength.
-        //   (b) Lift-handoff views: byteLength == rb.len, capacity may be
-        //       larger and was stashed on the view at handoff time. Read
-        //       the stashed value via `CapacitySymbol::get`. When
-        //       `capacity == len` at handoff time we skip the property write,
-        //       so absence of a hint here is also a valid "use byteLength"
-        //       signal.
+        // Capacity recovery. Three cases, all keyed off the hint:
+        //   (a) `rustbuffer_alloc(n)` views: hint == byteLength == n.
+        //   (b) Lift-handoff views: byteLength == rb.len, and the hint carries the true
+        //       capacity, which may be larger. Set at handoff time when capacity != len.
+        //   (c) Hint == 0: the view was already adopted as an FFI argument, so the callee
+        //       has freed the memory. `free_rustbuffer` skips zero-capacity buffers, which
+        //       turns this into the no-op it must be rather than a double free.
+        // No hint at all means the memory is not the library's to free; fall back to
+        // byteLength to preserve the historical behaviour for such views.
         // SAFETY: raw_env / raw_val are valid for the current callback scope.
         let capacity = unsafe { cap_sym_for_free.get(raw_env, raw_val) }.unwrap_or(length as u64);
         let rb = RustBufferC {

@@ -115,14 +115,24 @@ extern "C" {
                 throw jsi::JSError(rt, "rustbuffer_alloc failed: alloc returned null");
             }
             // Non-owning view over Rust-allocated memory; CMutableBuffer's destructor
-            // is the default and does not free `rb.data`. JS must call rustbuffer_free
-            // explicitly before dropping the reference.
+            // is the default and does not free `rb.data`. The allocation is released
+            // either by an explicit `rustbuffer_free(view)` or by being adopted when
+            // the view is lowered as an FFI argument.
             auto payload = std::make_shared<uniffi_jsi::CMutableBuffer>(
                 rb.data, static_cast<size_t>(rb.capacity));
             // Wrap as Uint8Array so JS can index/assign bytes directly.
-            return jsi::Value(
-                rt, uniffi_jsi::arraybufferToUint8Array(
-                        rt, jsi::ArrayBuffer(rt, payload)));
+            auto view = uniffi_jsi::arraybufferToUint8Array(
+                rt, jsi::ArrayBuffer(rt, payload));
+            // Stamp the capacity so the argument-lowering path
+            // (`Bridging<RustBuffer>::fromJs`) recognises this view as
+            // library-owned and adopts the allocation instead of copying it.
+            // Without the stamp, a lowered argument is copied and this
+            // allocation is orphaned — one leaked payload per call.
+            if (rb.capacity > 0) {
+              view.setProperty(rt, uniffi_jsi::kUbrnRustCapacity,
+                               jsi::Value(static_cast<double>(rb.capacity)));
+            }
+            return jsi::Value(rt, view);
         }
     );
 
@@ -155,6 +165,12 @@ extern "C" {
             if (view.hasProperty(rt, uniffi_jsi::kUbrnRustCapacity)) {
                 capacity = static_cast<size_t>(
                     view.getProperty(rt, uniffi_jsi::kUbrnRustCapacity).asNumber());
+            }
+            // A zero capacity marks a view already adopted as an FFI argument
+            // (its hint was reset to 0) and freed by the callee. Freeing again
+            // would be a double free, so this is a no-op.
+            if (capacity == 0) {
+                return jsi::Value::undefined();
             }
             auto buffer = view.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
             auto byteOffset =
