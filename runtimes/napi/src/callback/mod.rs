@@ -43,6 +43,7 @@ use std::thread::ThreadId;
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::{Env, NapiRaw, NapiValue};
 
+pub(crate) mod cache;
 mod marshal;
 pub(crate) mod vtable;
 
