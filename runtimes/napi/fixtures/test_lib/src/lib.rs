@@ -949,3 +949,27 @@ pub extern "C" fn uniffi_test_fn_get_scalar_echo_thread_result(status: &mut Rust
     status.code = 0;
     SCALAR_ECHO_THREAD_RESULT.load(Ordering::SeqCst)
 }
+
+// --- Callback that RETURNS a RustBuffer ---
+//
+// Mirrors uniffi's contract for a callback interface method returning a non-string
+// type: the foreign side lowers its return value into a `RustBuffer` and Rust, as
+// the caller, takes ownership and frees it. This is the path where a lowered value
+// used to be orphaned — the runtime copied the foreign buffer instead of adopting
+// it, and nothing ever freed the original.
+pub type BufferReturningCallback = extern "C" fn(u64, &mut RustCallStatus) -> RustBuffer;
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_call_buffer_returning_callback(
+    cb: BufferReturningCallback,
+    handle: u64,
+    status: &mut RustCallStatus,
+) -> u32 {
+    status.code = 0;
+    let mut cb_status = new_cb_status();
+    let rb = cb(handle, &mut cb_status);
+    let len = rb.len as u32;
+    // Rust owns what the callback returned.
+    free_buffer(rb);
+    len
+}

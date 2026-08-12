@@ -497,13 +497,16 @@ pub unsafe fn create_external_uint8array(
 /// - **V8-owned arrays**, i.e. any ordinary `Uint8Array` from JS. These are not ours to give
 ///   away, so they are **copied** into a fresh library allocation via `rustbuffer_from_bytes`.
 ///
-/// The capacity hint is the discriminator: the runtime knows a buffer's capacity precisely
-/// when the library allocated it. On adoption the hint is reset to `0`, which makes any later
+/// The capacity marker is the discriminator: the runtime knows a buffer's capacity precisely
+/// when the library allocated it. On adoption the marker is reset to `0`, which makes any later
 /// `rustbuffer_free(view)` a no-op rather than a double free, since `free_rustbuffer` skips
 /// zero-capacity buffers.
 ///
-/// Passing `None` for `capacity_symbol` forces the copy path. Call sites that have no symbol
-/// in scope use that, which is always memory-safe — it is the pre-adoption behavior.
+/// The symbol is a required parameter, deliberately. It used to be an `Option`, and a caller
+/// with no symbol in scope could pass `None` to force the copy path — memory-safe in itself,
+/// but it silently orphaned every library-owned view that reached it, because nothing else
+/// frees a lowered argument. Requiring the symbol makes that a compile error instead of a
+/// leak, so a marshalling path added later cannot opt out by accident.
 ///
 /// # Safety
 ///
@@ -514,7 +517,7 @@ pub unsafe fn js_uint8array_to_rust_buffer(
     raw_env: napi::sys::napi_env,
     js_val: JsUnknown,
     rb_from_bytes_ptr: *const c_void,
-    capacity_symbol: Option<&CapacitySymbol>,
+    capacity_symbol: &CapacitySymbol,
 ) -> napi::Result<RustBufferC> {
     let raw_val = js_val.raw();
     let (data_ptr, length) = read_typedarray_data(raw_env, raw_val).ok_or_else(|| {
@@ -527,25 +530,24 @@ pub unsafe fn js_uint8array_to_rust_buffer(
         return rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr);
     }
 
-    if let Some(symbol) = capacity_symbol {
-        if let Some(capacity) = symbol.get(raw_env, raw_val)? {
-            if capacity == 0 {
-                // The hint exists but has been zeroed, so this view was already adopted and
-                // its memory has since been freed by the callee. Reading it would be a
-                // use-after-free, so refuse rather than hand the callee a dangling pointer.
-                return Err(napi::Error::from_reason(
-                    "RustBuffer argument was already consumed by a previous FFI call".to_string(),
-                ));
-            }
-            symbol.set(raw_env, raw_val, 0)?;
-            return Ok(RustBufferC {
-                capacity,
-                len: length as u64,
-                data: data_ptr as *mut u8,
-            });
+    if let Some(capacity) = capacity_symbol.get(raw_env, raw_val)? {
+        if capacity == 0 {
+            // The marker exists but has been zeroed, so this view was already adopted and
+            // its memory has since been freed by the callee. Reading it would be a
+            // use-after-free, so refuse rather than hand the callee a dangling pointer.
+            return Err(napi::Error::from_reason(
+                "RustBuffer argument was already consumed by a previous FFI call".to_string(),
+            ));
         }
+        capacity_symbol.set(raw_env, raw_val, 0)?;
+        return Ok(RustBufferC {
+            capacity,
+            len: length as u64,
+            data: data_ptr as *mut u8,
+        });
     }
 
+    // No marker: an ordinary V8-backed array from JS, which is not ours to give away.
     rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr)
 }
 

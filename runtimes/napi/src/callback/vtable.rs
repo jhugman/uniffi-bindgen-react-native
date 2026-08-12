@@ -35,6 +35,7 @@ pub fn build_vtable_struct(
     module: &Arc<Module>,
     struct_name: &str,
     js_obj: &JsObject,
+    registration: &Arc<crate::register::Registration>,
 ) -> Result<*const c_void> {
     let struct_def = module
         .spec_structs()
@@ -55,7 +56,7 @@ pub fn build_vtable_struct(
         };
 
         let js_fn: napi::JsFunction = js_obj.get_named_property(&field.name)?;
-        let user_data = create_callback_user_data(env, js_fn, cb_name, module)?;
+        let user_data = create_callback_user_data(env, js_fn, cb_name, module, registration)?;
 
         let fn_ptr = module
             .make_callback_trampoline(

@@ -51,7 +51,7 @@ pub(crate) fn call_ffi_function(
     module: &Arc<Module>,
     arg_types: &[FfiTypeDesc],
     has_rust_call_status: bool,
-    registration: &crate::register::Registration,
+    registration: &Arc<crate::register::Registration>,
 ) -> Result<JsUnknown> {
     let declared_arg_count = arg_types.len();
 
@@ -72,7 +72,7 @@ pub(crate) fn call_ffi_function(
                         env.raw(),
                         js_val,
                         module.rb_ops().from_bytes_ptr,
-                        Some(&registration.capacity_symbol),
+                        &registration.capacity_symbol,
                     )?
                 };
                 slot::write_rust_buffer(slot, rust_buffer);
@@ -82,7 +82,8 @@ pub(crate) fn call_ffi_function(
                     unreachable!("guard ensures inner is Struct");
                 };
                 let js_obj = unsafe { JsObject::from_raw(env.raw(), js_val.raw())? };
-                let struct_ptr = vtable::build_vtable_struct(env, module, struct_name, &js_obj)?;
+                let struct_ptr =
+                    vtable::build_vtable_struct(env, module, struct_name, &js_obj, registration)?;
                 slot::write_pointer(slot, struct_ptr);
             }
             FfiTypeDesc::Callback(cb_name) => {
@@ -117,8 +118,13 @@ pub(crate) fn call_ffi_function(
                         // the declared arg type is `Callback`, so a non-function here is a
                         // caller error surfaced as a JS exception.
                         let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), raw_fn_val)? };
-                        let user_data =
-                            callback::create_callback_user_data(env, js_fn, cb_name, module)?;
+                        let user_data = callback::create_callback_user_data(
+                            env,
+                            js_fn,
+                            cb_name,
+                            module,
+                            registration,
+                        )?;
                         let fn_ptr = module
                             .make_callback_trampoline(
                                 cb_name,
