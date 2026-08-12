@@ -138,13 +138,18 @@ pub fn register(
         // consumers rely on it: `rustbuffer_free` frees against the true capacity, and the
         // argument-lowering path adopts the allocation instead of copying it. Without the
         // stamp, a lowered argument gets copied and this allocation is orphaned.
-        if rb.capacity > 0 {
-            unsafe {
-                reg_for_alloc
-                    .capacity_symbol
-                    .set(ctx.env.raw(), typedarray, rb.capacity)?
-            };
-        }
+        //
+        // Unconditional, including `rustbuffer_alloc(0)` where the capacity is 0: an
+        // absent marker means "not the library's, refuse to free", so a zero-capacity
+        // view is marked 0 — "ours, nothing to free" — rather than left bare.
+        //
+        // SAFETY: `ctx.env` is the active env for this callback, and `typedarray` is the
+        // view created just above.
+        unsafe {
+            reg_for_alloc
+                .capacity_symbol
+                .set(ctx.env.raw(), typedarray, rb.capacity)?
+        };
         unsafe { JsUnknown::from_raw(ctx.env.raw(), typedarray) }
     })?;
     result.set_named_property("rustbuffer_alloc", alloc_fn)?;
@@ -165,33 +170,41 @@ pub fn register(
                     "rustbuffer_free expected a Uint8Array argument".to_string(),
                 )
             })?;
-        // Empty views never carry a capacity hint (view-handoff short-
-        // circuits empty buffers, and `rustbuffer_alloc(0)` is itself a
-        // no-op). Bail out before the napi_ref + napi_has_property dance.
-        if length == 0 {
+        let _ = length;
+        // The marker is authoritative. Three cases:
+        //   (a) marker > 0 — library-owned. `rustbuffer_alloc(n)` views carry `n`;
+        //       lift-handoff views carry the true capacity, which may exceed
+        //       `byteLength` (that is `rb.len`). Free against the marker.
+        //   (b) marker == 0 — the view was already adopted as an FFI argument, so the
+        //       callee has freed the memory. Must be a no-op, not a double free.
+        //   (c) no marker — the bytes are not the library's. Reject.
+        //
+        // Rejecting (c) rather than ignoring it keeps a caller's mistake visible. Guessing
+        // the capacity from `byteLength` instead would pass V8-owned memory to Rust's
+        // allocator.
+        //
+        // SAFETY: raw_env / raw_val are valid for the current callback scope, and
+        // `raw_val` is the typed array the caller passed.
+        let capacity =
+            unsafe { reg_for_free.capacity_symbol.get(raw_env, raw_val)? }.ok_or_else(|| {
+                napi::Error::from_reason("rustbuffer_free received an unowned Uint8Array")
+            })?;
+        if capacity == 0 {
             return ctx.env.get_undefined().map(|u| u.into_unknown());
         }
-        // Capacity recovery. Three cases, all keyed off the hint:
-        //   (a) `rustbuffer_alloc(n)` views: hint == byteLength == n.
-        //   (b) Lift-handoff views: byteLength == rb.len, and the hint carries the true
-        //       capacity, which may be larger. Set at handoff time when capacity != len.
-        //   (c) Hint == 0: the view was already adopted as an FFI argument, so the callee
-        //       has freed the memory. `free_rustbuffer` skips zero-capacity buffers, which
-        //       turns this into the no-op it must be rather than a double free.
-        // No hint at all means the memory is not the library's to free; fall back to
-        // byteLength to preserve the historical behaviour for such views.
-        // SAFETY: raw_env / raw_val are valid for the current callback scope.
-        let capacity =
-            unsafe { reg_for_free.capacity_symbol.get(raw_env, raw_val) }.unwrap_or(length as u64);
+
+        // Mark the view released before handing its allocation back, so repeated
+        // cleanup is a no-op rather than a double free.
+        //
+        // SAFETY: as above — `raw_env` and `raw_val` are valid for this callback scope.
+        unsafe { reg_for_free.capacity_symbol.set(raw_env, raw_val, 0)? };
         let rb = RustBufferC {
             capacity,
             len: 0,
             data: data_ptr as *mut u8,
         };
-        // SAFETY: free_ptr was resolved at registration time. rb mirrors the
-        // buffer produced by the matching `rustbuffer_alloc` call OR a
-        // lift-handoff view whose `(data_ptr, capacity)` match the original
-        // RustBuffer that Rust returned across the FFI.
+        // SAFETY: free_ptr was resolved at registration time, and the marker ties this
+        // exact pointer and capacity to a buffer the library allocated.
         unsafe { napi_utils::free_rustbuffer(rb, free_module.rb_ops().free_ptr) };
         ctx.env.get_undefined().map(|u| u.into_unknown())
     })?;

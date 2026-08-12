@@ -155,10 +155,41 @@ impl CapacitySymbol {
                 "Failed to create BigInt for capacity hint".to_string(),
             ));
         }
-        let status = napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val);
+        // Own property, not inherited: the marker only ever lives on instances, and a
+        // prototype-chain hit would send us down the `napi_set_property` branch, silently
+        // creating an enumerable own property that shadows it.
+        let mut has = false;
+        let status = napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has);
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
-                "Failed to set capacity-hint property".to_string(),
+                "Failed to inspect RustBuffer ownership metadata",
+            ));
+        }
+
+        let status = if has {
+            // Already defined non-enumerable below; a plain set keeps that descriptor.
+            napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val)
+        } else {
+            // `writable` only, so the marker is non-enumerable. That is load-bearing:
+            // lift now marks every handed-off view, and
+            // `assert.deepStrictEqual(view, new Uint8Array([...]))` compares enumerable
+            // own symbol properties — an enumerable marker would break every caller that
+            // compares a returned buffer against a plain Uint8Array.
+            let descriptor = napi::sys::napi_property_descriptor {
+                utf8name: std::ptr::null(),
+                name: sym_val,
+                method: None,
+                getter: None,
+                setter: None,
+                value: cap_val,
+                attributes: napi::sys::PropertyAttributes::writable,
+                data: std::ptr::null_mut(),
+            };
+            napi::sys::napi_define_properties(raw_env, obj, 1, &descriptor)
+        };
+        if status != napi::sys::Status::napi_ok {
+            return Err(napi::Error::from_reason(
+                "Failed to set RustBuffer ownership metadata",
             ));
         }
         Ok(())
@@ -175,26 +206,37 @@ impl CapacitySymbol {
         &self,
         raw_env: napi::sys::napi_env,
         obj: napi::sys::napi_value,
-    ) -> Option<u64> {
-        let sym_val = self.value(raw_env).ok()?;
+    ) -> napi::Result<Option<u64>> {
+        let sym_val = self.value(raw_env)?;
         let mut has = false;
-        let status = napi::sys::napi_has_property(raw_env, obj, sym_val, &mut has);
-        if status != napi::sys::Status::napi_ok || !has {
-            return None;
+        let status = napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has);
+        if status != napi::sys::Status::napi_ok {
+            return Err(napi::Error::from_reason(
+                "Failed to inspect RustBuffer ownership metadata",
+            ));
         }
+        if !has {
+            return Ok(None);
+        }
+
         let mut cap_val: napi::sys::napi_value = std::ptr::null_mut();
         let status = napi::sys::napi_get_property(raw_env, obj, sym_val, &mut cap_val);
         if status != napi::sys::Status::napi_ok || cap_val.is_null() {
-            return None;
+            return Err(napi::Error::from_reason(
+                "Failed to read RustBuffer ownership metadata",
+            ));
         }
+
         let mut value: u64 = 0;
         let mut lossless = false;
         let status =
             napi::sys::napi_get_value_bigint_uint64(raw_env, cap_val, &mut value, &mut lossless);
-        if status != napi::sys::Status::napi_ok {
-            return None;
+        if status != napi::sys::Status::napi_ok || !lossless {
+            return Err(napi::Error::from_reason(
+                "Invalid RustBuffer ownership metadata",
+            ));
         }
-        Some(value)
+        Ok(Some(value))
     }
 }
 
@@ -486,7 +528,7 @@ pub unsafe fn js_uint8array_to_rust_buffer(
     }
 
     if let Some(symbol) = capacity_symbol {
-        if let Some(capacity) = symbol.get(raw_env, raw_val) {
+        if let Some(capacity) = symbol.get(raw_env, raw_val)? {
             if capacity == 0 {
                 // The hint exists but has been zeroed, so this view was already adopted and
                 // its memory has since been freed by the callee. Reading it would be a
