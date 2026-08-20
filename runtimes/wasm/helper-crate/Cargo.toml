@@ -1,6 +1,6 @@
 [package]
 name = "uniffi-runtime-wasm"
-version = "0.31.0-4"
+version = "0.31.0-5"
 edition = "2021"
 description = "Runtime helpers (alloc/free/panic hook) for the wasm2 UniFFI player"
 license = "MPL-2.0"

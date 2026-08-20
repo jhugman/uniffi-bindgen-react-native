@@ -61,8 +61,15 @@ helper crate a consuming cdylib links. `@ubjs/wasm` declares `@ubjs/core` as a
 1. (Optional but recommended) Run a dry-run of the publish workflows — see
    [Testing a release before tagging](#testing-a-release-before-tagging).
 1. Once the PR has landed, [draft a new release](https://github.com/jhugman/uniffi-bindgen-react-native/releases/new).
-1. Create a new tag (in the choose-a-tag dialog) with the version number (without a `v`).
-1. Use the version number again, but with a `v` prepended, for the release title: `v${VERSION_NUMBER}`.
+1. Create a new tag (in the choose-a-tag dialog). The tag is the version
+   **exactly as it appears in `package.json`**, with no `v` and no
+   abbreviation — `0.31.0-5`, never `v0.31.0-5` and never `0.31-5`. Copy it,
+   do not retype it:
+   ```sh
+   node -p "require('./package.json').version"
+   ```
+1. Use that same version with a `v` prepended for the release *title*:
+   `v${VERSION_NUMBER}`. The `v` belongs to the title only, never the tag.
 1. Publish the release.
 1. Wait for the six publish workflows to go green:
    - [CocoaPods](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/cocoapods.yml)
@@ -115,11 +122,72 @@ will skip the platform packages that already landed and publish the rest.
 
 ## Version numbers
 
-`uniffi-rs` uses a `semver` versioning scheme (e.g. `0.31.0`).
+A release version is always exactly this shape:
 
-`uniffi-bindgen-react-native` tracks the `uniffi-rs` version and appends a `-N` variant number. The variant number increases monotonically across releases and is **not** reset when the `uniffi-rs` version changes.
+```
+MAJOR . MINOR . 0 - N
+└────┬────┘    │   └── variant number, monotonic
+     │         └────── always literally 0
+     └──────────────── tracks the uniffi-rs release
+```
 
-For example, if the last release was `0.30.0-1` and `uniffi-rs` is bumped to `0.31.0`, the next release is `0.31.0-2` (not `0.31.0-0`).
+- **`MAJOR.MINOR`** tracks the `uniffi-rs` release the bindings are built
+  against. `uniffi-rs` `0.31.x` gives `0.31`.
+- **The patch is always `0`.** We do *not* mirror the `uniffi-rs` patch level.
+  If `uniffi-rs` goes `0.31.0` → `0.31.4`, our `MAJOR.MINOR` is unchanged and
+  only `N` moves. The `0` is a placeholder: semver requires three numeric
+  components, so we cannot write `0.31-5` (see below).
+- **`N`** increases monotonically across releases and is **not** reset when the
+  `uniffi-rs` version changes. If the last release was `0.30.0-1` and
+  `uniffi-rs` is bumped to `0.31`, the next release is `0.31.0-2`, not
+  `0.31.0-0`.
+
+Older releases (`0.28.3-5`, `0.29.3-1`) do carry a non-zero patch, from when the
+scheme mirrored the `uniffi-rs` patch level. They are history; do not copy them.
+
+### One string drives everything
+
+The same string is the npm version, the crate version, the CocoaPod version and
+the **git tag**, because the podspec derives its source tag from `package.json`:
+
+```ruby
+s.version = package['version']
+s.source  = { :git => ..., :tag => s.version.to_s }
+```
+
+So a tag that does not match `package.json` exactly fails CocoaPods lint with
+`Remote branch <version> not found in upstream origin`, and every other publish
+workflow goes red alongside it.
+
+### These are semver prereleases
+
+Anything after the `-` is a semver *prerelease* identifier, so `0.31.0-5` reads
+as "a prerelease of `0.31.0`" and sorts *below* `0.31.0`. Every release we have
+ever cut is, to npm and cargo, a prerelease. Two consequences:
+
+- **`npm publish` must pass `--tag latest`.** npm 11 (bundled with node 24)
+  refuses to publish a prerelease without an explicit dist-tag, rather than
+  silently moving `latest` onto it. All four npm publish workflows pass it on
+  every `npm publish` invocation, dry-run included; a new one must too.
+- **Consumers need an explicit version.** `npm install uniffi-bindgen-react-native`
+  resolves via the `latest` dist-tag, which we set — but a bare semver range
+  like `^0.31.0` will *not* match `0.31.0-5`.
+
+### The patch cannot be dropped from the string
+
+Tempting, but neither toolchain accepts it — semver mandates all three
+components before a `-` suffix:
+
+```console
+$ npm publish --dry-run          # version = "0.31-5"
+npm error Invalid version: "0.31-5"
+
+$ cargo metadata                 # version = "0.31-5"
+error: unexpected character '-' after minor version number
+```
+
+"Dropping the patch" is therefore a *policy* — we stop tracking the `uniffi-rs`
+patch level — not a change to the string. The `.0` stays.
 
 ### Compatibility with other packages
 

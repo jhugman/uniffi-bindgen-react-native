@@ -1,6 +1,6 @@
 {
   "name": "@ubjs/core",
-  "version": "0.31.0-4",
+  "version": "0.31.0-5",
   "description": "Runtime support for uniffi-bindgen-javascript generated bindings.",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {

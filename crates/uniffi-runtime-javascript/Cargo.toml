@@ -1,6 +1,6 @@
 [package]
 name = "uniffi-runtime-javascript"
-version = "0.31.0-4"
+version = "0.31.0-5"
 edition = "2021"
 authors = ["James Hugman <james@hugman.tv>"]
 description = "wasm-bindgen runtime for UniFFI-generated Javascript bindings crates"

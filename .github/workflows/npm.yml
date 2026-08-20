@@ -28,10 +28,10 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
         run: |
           echo "::notice::DRY RUN — not publishing to npm"
-          npm publish --dry-run --access public
+          npm publish --dry-run --access public --tag latest
 
       - name: "📦 npm publish: uniffi-bindgen-react-native"
         if: ${{ github.event_name == 'release' || !inputs.dry-run }}
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
