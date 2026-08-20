@@ -1,9 +1,9 @@
 [package]
 name = "uniffi-runtime-javascript"
-version = "0.31.0-3"
+version = "0.31.0-4"
 edition = "2021"
 authors = ["James Hugman <james@hugman.tv>"]
-description = "Javascript runtime for UniFFI-generated bindings"
+description = "wasm-bindgen runtime for UniFFI-generated Javascript bindings crates"
 license = "MPL-2.0"
 repository = "https://github.com/jhugman/uniffi-bindgen-react-native"
 readme = "README.md"

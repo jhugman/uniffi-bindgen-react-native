@@ -5,7 +5,64 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-3...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-4...main
+
+---
+
+# 0.31.0-4
+
+## ✨ What's New ✨
+
+### 🕸️ A new WASM flavour: `wasm2`
+
+`uniffi-bindgen-react-native` gains a second WASM target, built on the same player architecture as the Node.js runtime shipped in 0.31.0-3. There is no shim crate to generate and no per-library glue to compile: `ubrn build wasm2` compiles your crate once for `wasm32-unknown-unknown`, and the bindgen reads the UniFFI metadata straight out of that same `.wasm`, so the second native-only cargo build disappears. The generated wrapper opens no module itself, which leaves it environment-neutral — the same bindings bundle for Node, browsers and React Native alike.
+
+Getting started: your crate needs to be a `cdylib`, link the new [`uniffi-runtime-wasm`](https://crates.io/crates/uniffi-runtime-wasm) helper crate, and enable the `uniffi_core` feature that drops `Send + Sync` on exported objects. `ubrn build wasm2` checks all three up front rather than letting cargo fail later. The player runtime is published to npm as [`@ubjs/wasm`](https://www.npmjs.com/package/@ubjs/wasm).
+
+- The player runtime, plus the `uniffi-runtime-wasm` helper crate consuming cdylibs link ([#418](https://github.com/jhugman/uniffi-bindgen-react-native/pull/418)).
+- Post-link processing of the wasm module — staging, a growable function table for callback trampolines, and dead-export stripping — and the crate-manifest queries the build validates ([#424](https://github.com/jhugman/uniffi-bindgen-react-native/pull/424)).
+- The `Wasm2` ABI flavour in the bindgen, exporting `PLAYER_DEFINITIONS` and `setNativeModule` from the per-module wrapper, with a generated `index.ts` doing the opening ([#425](https://github.com/jhugman/uniffi-bindgen-react-native/pull/425)).
+- The `ubrn build wasm2` and `ubrn generate wasm2` subcommands, aliased `web2` ([#426](https://github.com/jhugman/uniffi-bindgen-react-native/pull/426)).
+- The full fixture suite now runs against the flavour ([#427](https://github.com/jhugman/uniffi-bindgen-react-native/pull/427)) in CI ([#428](https://github.com/jhugman/uniffi-bindgen-react-native/pull/428)). As with the existing `wasm` flavour, the `futures` fixture is excluded: its `TimerFuture` wakes itself with `std::thread::spawn`, which single-threaded wasm32 cannot do.
+
+### Other new features
+
+- `bindings.typescript.forceAsync` in `uniffi.toml` gives chosen types and functions an `async`/`Promise` surface in TypeScript without making them async in Rust, so call sites can be migrated to `await` ahead of any real off-main-thread work. Set it to `true` for the whole crate, or to a list of names. See [the reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/uniffi-toml.html#forcing-an-async-surface) — in particular, it moves no work off the main thread ([#408](https://github.com/jhugman/uniffi-bindgen-react-native/pull/408)).
+- `bindings.typescript.strictTypeChecking` drops the `// @ts-nocheck` header from generated files so `tsc` checks them ([#408](https://github.com/jhugman/uniffi-bindgen-react-native/pull/408)).
+- Lifting and lowering now share a cursor instead of creating a `DataView` per value, which speeds up types made of many small reads and writes — large or deeply nested records, recursive enums — on every backend ([#413](https://github.com/jhugman/uniffi-bindgen-react-native/pull/413)).
+- The supported `uniffi-rs` version is relaxed from `=0.31.0` to `=0.31`, so 0.31.x point releases no longer need a matching release here ([#431](https://github.com/jhugman/uniffi-bindgen-react-native/pull/431)).
+
+## 🦊 What's Changed
+
+### Memory leaks fixed
+
+Four leaks affecting the N-API backend, present in 0.31.0-3. Upgrading is recommended for anyone making calls in a loop.
+
+- The `RustBuffer` returned by an **async** call was never freed, leaking one buffer per async call returning a string, byte array, record or list. The `wasm` flavour was unaffected ([#420](https://github.com/jhugman/uniffi-bindgen-react-native/pull/420)).
+- The N-API runtime allocated every `RustBuffer` **argument** twice and freed only one of the two, leaking a copy of each buffer passed into Rust — roughly 2.4 KB per frame. Lowered arguments are now library-owned rather than copied ([#432](https://github.com/jhugman/uniffi-bindgen-react-native/pull/432)). Thank you [@1egoman](https://github.com/1egoman)!
+- Callback trampolines were rebuilt on every call that marshalled a callback argument, instead of once per callback type as intended. `rust_future_poll` marshals its continuation on every poll, so **every `await` of a uniffi async function** paid this — each construction leaking a pinned `napi_ref`, a `CallbackUserData`, and a fresh `ThreadsafeFunction` libuv handle. Trampolines are now cached per callback type ([#440](https://github.com/jhugman/uniffi-bindgen-react-native/pull/440)).
+- Callback interfaces implemented in TypeScript leaked their whole serialized return value on each invocation, for any method returning a record, enum, `Vec`, `Option` or byte array. #432 taught the **argument** path to adopt library-owned buffers; the **callback-return** path still copied, orphaning the original. `String` returns were never affected — their converter produces `TextEncoder` memory rather than a library allocation ([#442](https://github.com/jhugman/uniffi-bindgen-react-native/pull/442)).
+
+Alongside those, the runtime now refuses to free a buffer it cannot prove the library owns, rather than falling back to guessing the capacity from `byteLength`. Generated code always marks the buffers it frees, so this is hardening rather than a user-visible fix ([#441](https://github.com/jhugman/uniffi-bindgen-react-native/pull/441)).
+
+### Fixes
+
+- N-API: `is_js_thread` is now answered per callback rather than per process. Calling a library from a Node `worker_threads` worker — which is what Vitest and Jest do by default — hung on the first call, taking down `worker.terminate()` and `process.exit()` with it. Every async call was affected, not just calls with a callback of your own ([#433](https://github.com/jhugman/uniffi-bindgen-react-native/pull/433), fixing [#436](https://github.com/jhugman/uniffi-bindgen-react-native/issues/436)). Thank you [@stupside](https://github.com/stupside)!
+- Escape `*/` in generated TypeScript docstrings. TypeScript doesn't allow nested block comments, so a `*/` in a doc comment closed the docstring early and the rest was parsed as code, failing the build ([#438](https://github.com/jhugman/uniffi-bindgen-react-native/pull/438)). Thank you [@liamiepops](https://github.com/liamiepops)!
+- Export the `./package.json` subpath from the root package. The generated Android CMake resolves the package root with `require.resolve('uniffi-bindgen-react-native/package.json')`, which failed with `ERR_PACKAGE_PATH_NOT_EXPORTED` where Node enforces the `exports` map ([#407](https://github.com/jhugman/uniffi-bindgen-react-native/pull/407), fixing [#404](https://github.com/jhugman/uniffi-bindgen-react-native/issues/404)). Thank you [@DeyLak](https://github.com/DeyLak)!
+- Android: replace the deprecated `TurboReactPackage` with `BaseReactPackage` in the generated Kotlin and Java packages ([#411](https://github.com/jhugman/uniffi-bindgen-react-native/pull/411), fixing [#410](https://github.com/jhugman/uniffi-bindgen-react-native/issues/410)). Thank you [@ANAMASGARD](https://github.com/ANAMASGARD)!
+- Emit `opt-level = 3` rather than `opt-level = "3"` in the generated WASM template's release profile ([#401](https://github.com/jhugman/uniffi-bindgen-react-native/pull/401)). Thank you [@MrCreativ3001](https://github.com/MrCreativ3001)!
+
+### CI
+
+- The React Native compatibility matrix is now date-derived: React Native versions, `create-react-native-library` versions and runner images are tied together by date, covering the last 12 months of React Native. Per-PR checks run the latest versions only; the historical sweep runs nightly. This fixes the frequent build breakages caused by old React Native versions no longer building on `macos-latest` ([#419](https://github.com/jhugman/uniffi-bindgen-react-native/pull/419)).
+- Node 24 in CI ([#439](https://github.com/jhugman/uniffi-bindgen-react-native/pull/439)).
+
+## ⚠️ Breaking Changes
+
+- The N-API `RustBuffer` fixes change the contract between the generated bindings and the runtime: regenerate your bindings and upgrade [`@ubjs/node`](https://www.npmjs.com/package/@ubjs/node) together. A new runtime with old bindings, or the reverse, will not behave correctly ([#420](https://github.com/jhugman/uniffi-bindgen-react-native/pull/420), [#432](https://github.com/jhugman/uniffi-bindgen-react-native/pull/432)).
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-3...0.31.0-4
 
 ---
 
