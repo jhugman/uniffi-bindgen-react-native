@@ -18,7 +18,7 @@ panic hook that forwards Rust panics to a JS function the player installs in
 crate-type = ["lib", "cdylib"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-uniffi-runtime-wasm = "0.31.0-3"
+uniffi-runtime-wasm = "0.31.0-4"
 
 [dependencies]
 uniffi_core = { version = "0.31", features = ["wasm-unstable-single-threaded"] }

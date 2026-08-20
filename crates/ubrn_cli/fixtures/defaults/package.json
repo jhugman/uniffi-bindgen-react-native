@@ -156,6 +156,6 @@
     "version": "0.50.2"
   },
   "dependencies": {
-    "@ubjs/core": "^0.31.0-3"
+    "@ubjs/core": "^0.31.0-4"
   }
 }
