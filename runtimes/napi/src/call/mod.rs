@@ -51,7 +51,7 @@ pub(crate) fn call_ffi_function(
     module: &Arc<Module>,
     arg_types: &[FfiTypeDesc],
     has_rust_call_status: bool,
-    capacity_symbol: &CapacitySymbol,
+    registration: &crate::register::Registration,
 ) -> Result<JsUnknown> {
     let declared_arg_count = arg_types.len();
 
@@ -72,7 +72,7 @@ pub(crate) fn call_ffi_function(
                         env.raw(),
                         js_val,
                         module.rb_ops().from_bytes_ptr,
-                        Some(capacity_symbol),
+                        Some(&registration.capacity_symbol),
                     )?
                 };
                 slot::write_rust_buffer(slot, rust_buffer);
@@ -86,17 +86,58 @@ pub(crate) fn call_ffi_function(
                 slot::write_pointer(slot, struct_ptr);
             }
             FfiTypeDesc::Callback(cb_name) => {
-                let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), js_val.raw())? };
-                let user_data = callback::create_callback_user_data(env, js_fn, cb_name, module)?;
-                let fn_ptr = module
-                    .make_callback_trampoline(
-                        cb_name,
-                        callback::on_js_thread,
-                        callback::dispatch_to_js_thread,
-                        callback::is_js_thread,
-                        user_data,
-                    )
-                    .map_err(core_err)?;
+                // Reuse this function's trampoline if it already has one. Building one is
+                // permanently leaked by design — the library may invoke the pointer from any
+                // thread later — so the intended bound is one per callback type, and building
+                // one per call turns that into unbounded growth.
+                //
+                // Keying on the function object is what makes reuse correct: the Symbols
+                // belong to this `register()` call and so to this env, and a trampoline holds
+                // no per-call state, since callbacks receive their handle as an ordinary
+                // argument.
+                //
+                // A hit costs only the lookup — nothing below runs until a miss.
+                //
+                // SAFETY: `js_val` is a value from the current callback scope, so `raw()`
+                // yields a `napi_value` valid for that scope without transferring ownership.
+                let raw_fn_val = unsafe { js_val.raw() };
+                // SAFETY: `env` is the active env for this call and `raw_fn_val` is the value
+                // read above; a lookup miss is reported as `Ok(None)`, so a JS function
+                // carrying no marker is simply built below rather than misread.
+                let cached = unsafe {
+                    registration
+                        .trampolines
+                        .get(env.raw(), raw_fn_val, cb_name)?
+                };
+                let fn_ptr = match cached {
+                    Some(fn_ptr) => fn_ptr,
+                    None => {
+                        // SAFETY: `raw_fn_val` is a `napi_value` from this callback scope.
+                        // `from_raw` errors rather than aborting if it is not a function, and
+                        // the declared arg type is `Callback`, so a non-function here is a
+                        // caller error surfaced as a JS exception.
+                        let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), raw_fn_val)? };
+                        let user_data =
+                            callback::create_callback_user_data(env, js_fn, cb_name, module)?;
+                        let fn_ptr = module
+                            .make_callback_trampoline(
+                                cb_name,
+                                callback::on_js_thread,
+                                callback::dispatch_to_js_thread,
+                                callback::is_js_thread,
+                                user_data,
+                            )
+                            .map_err(core_err)?;
+                        // SAFETY: as for the lookup above — same env, same value. The
+                        // pointer stored is the trampoline just built for `cb_name`.
+                        unsafe {
+                            registration
+                                .trampolines
+                                .set(env.raw(), raw_fn_val, cb_name, fn_ptr)?
+                        };
+                        fn_ptr
+                    }
+                };
                 slot::write_pointer(slot, fn_ptr);
             }
             _ => {
@@ -179,7 +220,7 @@ pub(crate) fn call_ffi_function(
 
     match &call_ret {
         CallReturn::RustBuffer(rb) => {
-            rust_buffer_to_js_uint8array_handoff(env, *rb, capacity_symbol)
+            rust_buffer_to_js_uint8array_handoff(env, *rb, &registration.capacity_symbol)
         }
         _ => marshal::read_return_to_js(env, &call_ret),
     }

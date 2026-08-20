@@ -23,6 +23,24 @@ use crate::napi_utils::CapacitySymbol;
 use uniffi_runtime_core::ffi_c_types::RustBufferC;
 use uniffi_runtime_core::{FfiTypeDesc, Module};
 
+/// State created once per `register()` call and shared by every function closure the
+/// resulting facade exposes.
+///
+/// Both members are per-registration JS Symbols, and both are keyed to the `napi_env`
+/// that `register()` ran on — which is what makes their contents safe to reuse across
+/// calls. Bundling them keeps the dispatch signature manageable as more per-registration
+/// state accrues.
+pub(crate) struct Registration {
+    /// Hidden capacity-hint key on lift-handoff `Uint8Array` views. A handed-off view's
+    /// `byteLength` is `rb.len`, but Rust may have allocated `rb.capacity > rb.len`, so
+    /// the capacity is stashed here for `rustbuffer_free(view)` to read back.
+    pub(crate) capacity_symbol: CapacitySymbol,
+    /// Hidden keys caching a built callback trampoline on the JS function it was built
+    /// for. Without this, dispatch rebuilds one per call — a permanent ~3 KB leak, and
+    /// the async poll loop passes its continuation on every poll. See `callback::cache`.
+    pub(crate) trampolines: crate::callback::cache::TrampolineCache,
+}
+
 /// Build a JS object whose methods call into the native library described by `definitions`.
 pub fn register(
     env: Env,
@@ -38,17 +56,15 @@ pub fn register(
     let functions: JsObject = definitions.get_named_property("functions")?;
     let mut result = env.create_object()?;
 
-    // Per-registration Symbol used as a hidden capacity-hint key on lift-
-    // handoff `Uint8Array` views. The view-handoff path returns a view whose
-    // `byteLength` is `rb.len`, but Rust may have allocated
-    // `rb.capacity > rb.len`. We stash `capacity` on the view via this
-    // symbol; `rustbuffer_free(view)` reads it back when releasing the
-    // allocation.
-    //
-    // SAFETY: env is the active napi env supplied by node for this register
-    // call. The `Arc<CapacitySymbol>` keeps the Symbol alive across the
-    // module facade's lifetime (closures captured below outlive the call).
-    let capacity_symbol = Arc::new(unsafe { CapacitySymbol::new(env.raw())? });
+    // SAFETY: env is the active napi env supplied by node for this register call. The
+    // `Arc<Registration>` keeps both Symbols alive across the module facade's lifetime
+    // (the closures captured below outlive this call).
+    let registration = Arc::new(Registration {
+        capacity_symbol: unsafe { CapacitySymbol::new(env.raw())? },
+        trampolines: unsafe {
+            crate::callback::cache::TrampolineCache::new(env.raw(), module.spec_callbacks().keys())?
+        },
+    });
 
     let names = functions.get_property_names()?;
     let len = names.get_array_length()?;
@@ -68,7 +84,7 @@ pub fn register(
         })?;
         let arg_types: Rc<Vec<FfiTypeDesc>> = Rc::new(func_def.args.clone());
         let has_rust_call_status = func_def.has_rust_call_status;
-        let cap_sym_for_call = Arc::clone(&capacity_symbol);
+        let reg_for_call = Arc::clone(&registration);
 
         let js_func = env.create_function_from_closure(&name, move |ctx| {
             call_ffi_function(
@@ -78,7 +94,7 @@ pub fn register(
                 &module_ref,
                 &arg_types,
                 has_rust_call_status,
-                &cap_sym_for_call,
+                &reg_for_call,
             )
         })?;
 
@@ -90,7 +106,7 @@ pub fn register(
     // library's `rustbuffer_free`. Together they let JS allocate buffers that the
     // codegen-emitted lowering path can fill in place and ship to Rust without copying.
     let alloc_module = Arc::clone(&module);
-    let cap_sym_for_alloc = Arc::clone(&capacity_symbol);
+    let reg_for_alloc = Arc::clone(&registration);
     let alloc_fn = env.create_function_from_closure("rustbuffer_alloc", move |ctx| {
         let size_arg: i32 = ctx.get(0)?;
         if size_arg < 0 {
@@ -123,14 +139,18 @@ pub fn register(
         // argument-lowering path adopts the allocation instead of copying it. Without the
         // stamp, a lowered argument gets copied and this allocation is orphaned.
         if rb.capacity > 0 {
-            unsafe { cap_sym_for_alloc.set(ctx.env.raw(), typedarray, rb.capacity)? };
+            unsafe {
+                reg_for_alloc
+                    .capacity_symbol
+                    .set(ctx.env.raw(), typedarray, rb.capacity)?
+            };
         }
         unsafe { JsUnknown::from_raw(ctx.env.raw(), typedarray) }
     })?;
     result.set_named_property("rustbuffer_alloc", alloc_fn)?;
 
     let free_module = Arc::clone(&module);
-    let cap_sym_for_free = Arc::clone(&capacity_symbol);
+    let reg_for_free = Arc::clone(&registration);
     let free_fn = env.create_function_from_closure("rustbuffer_free", move |ctx| {
         let js_val: JsUnknown = ctx.get(0)?;
         let raw_env = ctx.env.raw();
@@ -161,7 +181,8 @@ pub fn register(
         // No hint at all means the memory is not the library's to free; fall back to
         // byteLength to preserve the historical behaviour for such views.
         // SAFETY: raw_env / raw_val are valid for the current callback scope.
-        let capacity = unsafe { cap_sym_for_free.get(raw_env, raw_val) }.unwrap_or(length as u64);
+        let capacity =
+            unsafe { reg_for_free.capacity_symbol.get(raw_env, raw_val) }.unwrap_or(length as u64);
         let rb = RustBufferC {
             capacity,
             len: 0,
