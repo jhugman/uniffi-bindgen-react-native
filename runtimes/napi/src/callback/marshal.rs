@@ -64,6 +64,7 @@ pub fn marshal_js_struct_to_bytes(
     struct_name: &str,
     module: &Arc<Module>,
     rb_from_bytes_ptr: *const c_void,
+    registration: &Arc<crate::register::Registration>,
 ) -> Result<Vec<u8>> {
     let struct_def = module
         .spec_structs()
@@ -84,6 +85,7 @@ pub fn marshal_js_struct_to_bytes(
             slot,
             module,
             rb_from_bytes_ptr,
+            registration,
         )?;
     }
     Ok(buf)
@@ -97,6 +99,7 @@ fn marshal_field_to_bytes(
     slot: &mut [u8],
     module: &Arc<Module>,
     rb_from_bytes_ptr: *const c_void,
+    registration: &Arc<crate::register::Registration>,
 ) -> Result<()> {
     match field_type {
         FfiTypeDesc::UInt8 => {
@@ -142,16 +145,12 @@ fn marshal_field_to_bytes(
             slot::write_f64(slot, n.get_double()?);
         }
         FfiTypeDesc::RustBuffer => {
-            // No capacity symbol in scope on the callback path, so this keeps the copy
-            // behavior. Always memory-safe, but it means a `rustbuffer_alloc` view lowered
-            // as a callback argument is still orphaned. See the note in
-            // `js_uint8array_to_rust_buffer`.
             let rb = unsafe {
                 napi_utils::js_uint8array_to_rust_buffer(
                     env.raw(),
                     js_val,
                     rb_from_bytes_ptr,
-                    None,
+                    &registration.capacity_symbol,
                 )?
             };
             slot::write_rust_buffer(slot, rb);
@@ -159,8 +158,14 @@ fn marshal_field_to_bytes(
         FfiTypeDesc::Struct(name) => {
             // Recursively marshal nested struct
             let nested_obj: JsObject = js_val.try_into()?;
-            let nested_bytes =
-                marshal_js_struct_to_bytes(env, &nested_obj, name, module, rb_from_bytes_ptr)?;
+            let nested_bytes = marshal_js_struct_to_bytes(
+                env,
+                &nested_obj,
+                name,
+                module,
+                rb_from_bytes_ptr,
+                registration,
+            )?;
             slot[..nested_bytes.len()].copy_from_slice(&nested_bytes);
         }
         FfiTypeDesc::RustCallStatus => {
@@ -186,7 +191,7 @@ fn marshal_field_to_bytes(
                         env.raw(),
                         err_val,
                         rb_from_bytes_ptr,
-                        None,
+                        &registration.capacity_symbol,
                     )?
                 };
                 let u64_size = std::mem::size_of::<u64>();
@@ -206,8 +211,13 @@ fn marshal_field_to_bytes(
         FfiTypeDesc::Callback(cb_name) => {
             // Callback-typed struct field: create a trampoline and write the fn pointer.
             let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), js_val.raw())? };
-            let user_data =
-                crate::callback::create_callback_user_data(env, js_fn, cb_name, module)?;
+            let user_data = crate::callback::create_callback_user_data(
+                env,
+                js_fn,
+                cb_name,
+                module,
+                registration,
+            )?;
             let fn_ptr = module
                 .make_callback_trampoline(
                     cb_name,
@@ -254,6 +264,7 @@ fn marshal_arg_to_bytes(
     desc: &FfiTypeDesc,
     js_val: JsUnknown,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> Result<Vec<u8>> {
     match desc {
         FfiTypeDesc::UInt8 => {
@@ -305,7 +316,7 @@ fn marshal_arg_to_bytes(
                     env.raw(),
                     js_val,
                     rb_from_bytes_ptr,
-                    None,
+                    &registration.capacity_symbol,
                 )?
             };
             // Transmute RustBufferC to its raw bytes.
@@ -316,7 +327,7 @@ fn marshal_arg_to_bytes(
         FfiTypeDesc::Struct(name) => {
             let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
             let js_obj: JsObject = js_val.try_into()?;
-            marshal_js_struct_to_bytes(env, &js_obj, name, module, rb_from_bytes_ptr)
+            marshal_js_struct_to_bytes(env, &js_obj, name, module, rb_from_bytes_ptr, registration)
         }
         FfiTypeDesc::VoidPointer
         | FfiTypeDesc::Callback(_)
@@ -351,6 +362,7 @@ pub fn create_fn_pointer_wrapper(
     fn_ptr: *const c_void,
     callback_name: &str,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> Result<JsFunction> {
     // Validate that the callback exists in the spec.
     let cb_def = module
@@ -362,6 +374,7 @@ pub fn create_fn_pointer_wrapper(
     // Store fn_ptr as usize so the closure is Send (required by create_function_from_closure).
     let fn_ptr_val = fn_ptr as usize;
     let module_ref = Arc::clone(module);
+    let reg_ref = Arc::clone(registration);
     let cb_name = callback_name.to_string();
 
     let js_func = env.create_function_from_closure("fn_pointer_wrapper", move |ctx| {
@@ -370,7 +383,7 @@ pub fn create_fn_pointer_wrapper(
         let mut arg_buffers: Vec<Vec<u8>> = Vec::with_capacity(arg_types.len());
         for (i, desc) in arg_types.iter().enumerate() {
             let js_val = ctx.get::<JsUnknown>(i)?;
-            let buf = marshal_arg_to_bytes(ctx.env, desc, js_val, &module_ref)?;
+            let buf = marshal_arg_to_bytes(ctx.env, desc, js_val, &module_ref, &reg_ref)?;
             arg_buffers.push(buf);
         }
 

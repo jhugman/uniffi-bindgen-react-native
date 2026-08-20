@@ -104,6 +104,12 @@ struct CallbackUserData {
     tsfn: Mutex<Option<ThreadsafeFunction<DispatchPayload, ErrorStrategy::Fatal>>>,
     /// Reference to the Module, needed for fn_pointer wrapping (Callback-typed args).
     module: Arc<Module>,
+    /// Per-registration state, so marshalling a `RustBuffer` on the callback path can
+    /// reach the ownership marker and therefore *adopt* a library-owned buffer rather
+    /// than copy it. Copying orphaned the original: generated callback code lowers its
+    /// return value through `rustbuffer_alloc`, and nothing frees a lowered value, so
+    /// each invocation leaked one whole serialized payload.
+    registration: Arc<crate::register::Registration>,
 }
 
 // SAFETY: `CallbackUserData` is shared across threads. This is sound because:
@@ -112,6 +118,9 @@ struct CallbackUserData {
 // - `tsfn` is designed for cross-thread use and protected by a Mutex.
 // - `arg_types`, `ret_type`, `arg_layout`, `ret_size` are immutable after construction.
 // - `module` is an `Arc<Module>` which is Send+Sync.
+// - `registration` holds napi Symbols that, like `raw_env`/`fn_ref`, are only touched on
+//   `owner_thread` — marshalling always runs there, on the same-thread path or after the
+//   `tsfn` dispatch.
 unsafe impl Send for CallbackUserData {}
 unsafe impl Sync for CallbackUserData {}
 
@@ -201,7 +210,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
         // SAFETY: `args` points to a buffer of `arg_layout.total_size` bytes.
         // `slot.offset` and `slot.size` are within bounds.
         let arg_bytes = unsafe { std::slice::from_raw_parts(args.add(slot.offset), slot.size) };
-        let js_val = match read_arg_bytes_to_js(&env, desc, arg_bytes, &ud.module) {
+        let js_val = match read_arg_bytes_to_js(&env, desc, arg_bytes, &ud.module, &ud.registration)
+        {
             Ok(v) => v,
             Err(_e) => {
                 #[cfg(debug_assertions)]
@@ -275,6 +285,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
                             out_return_ptr,
                             &ud.ret_type,
                             &ud.module,
+                            &ud.registration,
                         );
                     }
                 }
@@ -288,6 +299,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
                         js_ret,
                         out_return_ptr as *mut u8,
                         &ud.module,
+                        &ud.registration,
                     );
                 }
             }
@@ -331,6 +343,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
                             js_ret,
                             ret_bytes,
                             &ud.module,
+                            &ud.registration,
                         );
                     }
                 }
@@ -448,6 +461,7 @@ pub fn create_callback_user_data(
     js_fn: napi::JsFunction,
     callback_name: &str,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> napi::Result<*const c_void> {
     let def = module
         .spec_callbacks()
@@ -500,6 +514,7 @@ pub fn create_callback_user_data(
         ret_size,
         tsfn: Mutex::new(None),
         module: Arc::clone(module),
+        registration: Arc::clone(registration),
     });
     let userdata_ptr = Box::into_raw(userdata);
 
@@ -563,6 +578,7 @@ fn read_arg_bytes_to_js(
     desc: &FfiTypeDesc,
     arg_bytes: &[u8],
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> napi::Result<napi::JsUnknown> {
     let rb_free_ptr = module.rb_ops().free_ptr;
     match desc {
@@ -610,7 +626,13 @@ fn read_arg_bytes_to_js(
         FfiTypeDesc::Callback(cb_name) => {
             // Read the function pointer from bytes and wrap it as a callable JS function.
             let fn_ptr = slot::read_pointer(arg_bytes) as *const c_void;
-            let js_fn = self::marshal::create_fn_pointer_wrapper(env, fn_ptr, cb_name, module)?;
+            let js_fn = self::marshal::create_fn_pointer_wrapper(
+                env,
+                fn_ptr,
+                cb_name,
+                module,
+                registration,
+            )?;
             Ok(js_fn.into_unknown())
         }
         FfiTypeDesc::VoidPointer | FfiTypeDesc::Reference(_) | FfiTypeDesc::MutReference(_) => {
@@ -635,6 +657,7 @@ unsafe fn write_js_return_to_bytes(
     js_val: napi::JsUnknown,
     ret_bytes: &mut [u8],
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> napi::Result<()> {
     let raw_env = env.raw();
     let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
@@ -696,8 +719,12 @@ unsafe fn write_js_return_to_bytes(
             // Read Uint8Array -> rustbuffer_from_bytes -> write RustBufferC bytes.
             // Truncating copy: caller may pass a `ret_bytes` smaller than RustBufferC
             // when the return slot is a different shape; preserve historical behavior.
-            let rb =
-                napi_utils::js_uint8array_to_rust_buffer(raw_env, js_val, rb_from_bytes_ptr, None)?;
+            let rb = napi_utils::js_uint8array_to_rust_buffer(
+                raw_env,
+                js_val,
+                rb_from_bytes_ptr,
+                &registration.capacity_symbol,
+            )?;
             let rb_bytes = slot::rust_buffer_to_bytes(&rb);
             let copy_len = rb_bytes.len().min(ret_bytes.len());
             ret_bytes[..copy_len].copy_from_slice(&rb_bytes[..copy_len]);
@@ -725,6 +752,7 @@ unsafe fn write_js_value_to_pointer(
     js_val: napi::JsUnknown,
     dest: *mut u8,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) {
     // For Struct types, use fn_pointer::marshal_js_struct_to_bytes which handles
     // the full C struct layout (slot_size_align doesn't support Struct types).
@@ -737,6 +765,7 @@ unsafe fn write_js_value_to_pointer(
                 struct_name,
                 module,
                 rb_from_bytes_ptr,
+                registration,
             ) {
                 std::ptr::copy_nonoverlapping(bytes.as_ptr(), dest, bytes.len());
             }
@@ -754,7 +783,7 @@ unsafe fn write_js_value_to_pointer(
     // Max non-struct size is RustBufferC (24 bytes: {u64, u64, *mut u8}).
     let mut buf = [0u8; std::mem::size_of::<RustBufferC>()];
     debug_assert!(size <= buf.len());
-    if write_js_return_to_bytes(env, desc, js_val, &mut buf[..size], module).is_ok() {
+    if write_js_return_to_bytes(env, desc, js_val, &mut buf[..size], module, registration).is_ok() {
         std::ptr::copy_nonoverlapping(buf.as_ptr(), dest, size);
     }
 }
@@ -775,6 +804,7 @@ unsafe fn write_uniffi_result(
     out_return_ptr: *mut c_void,
     ret_type: &FfiTypeDesc,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) {
     let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
 
@@ -820,6 +850,7 @@ unsafe fn write_uniffi_result(
                     pointee,
                     out_return_ptr as *mut u8,
                     module,
+                    registration,
                 );
             }
         }

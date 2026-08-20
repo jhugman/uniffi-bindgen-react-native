@@ -97,4 +97,31 @@ pub fn live_big_alloc_bytes() -> u64 {
     LIVE_BIG_BYTES.load(Ordering::Relaxed).max(0) as u64
 }
 
+// --- RustBuffer-return leak probe (callback direction) -----------------------
+//
+// The probe above only exercises the *argument* direction: JS lowers a buffer and
+// Rust consumes it. The mirror case is a foreign callback that *returns* a buffer,
+// where the foreign side lowers and Rust consumes what comes back.
+//
+// That direction had no coverage in any flavour, because this fixture had no
+// callback interface — which is how a runtime could copy instead of adopt on the
+// callback path and still pass a green suite. The counter makes it exact: if the
+// foreign-lowered buffer is orphaned, the live count climbs by one per call.
+#[uniffi::export(with_foreign)]
+pub trait BytesProducer: Send + Sync {
+    /// Returns a byte array the foreign side lowers into a `RustBuffer`. Rust owns
+    /// what comes back and drops it, so a balanced implementation leaves the live
+    /// count unchanged.
+    fn produce(&self, size: u32) -> Vec<u8>;
+}
+
+#[uniffi::export]
+/// Calls `produce` once and reports the length, dropping the returned buffer. Any
+/// growth in `live_big_alloc_count` across a loop of these is a buffer the foreign
+/// lowering allocated and nobody freed.
+pub fn consume_produced_bytes(producer: std::sync::Arc<dyn BytesProducer>, size: u32) -> u32 {
+    let bytes = producer.produce(size);
+    bytes.len() as u32
+}
+
 uniffi::setup_scaffolding!();
