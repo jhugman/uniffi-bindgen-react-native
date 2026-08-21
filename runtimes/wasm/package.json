@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@ubjs/core": "file:../../typescript",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "tsx": "^4",
     "typescript": "^5"
   },
