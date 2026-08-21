@@ -346,7 +346,19 @@ const void *trampolineForJsFn(jsi::Runtime &rt, UbrnJsiModule *module,
     throw jsi::JSError(rt,
                        "uniffi jsi player: " + errLabel + " is not a function");
   }
-  auto jsFn = std::make_shared<jsi::Function>(v.asObject(rt).getFunction(rt));
+  auto jsFnObj = v.asObject(rt).getFunction(rt);
+
+  // Reuse this function's trampoline if it already has one. Nothing below runs
+  // on a hit; see ModuleCallbackInfo::trampolines for why reuse is safe and why
+  // a scan beats building a closure.
+  for (const auto &entry : info.trampolines) {
+    if (entry.cbName == cbName &&
+        jsi::Object::strictEquals(rt, *entry.fn, jsFnObj)) {
+      return entry.fnPtr;
+    }
+  }
+
+  auto jsFn = std::make_shared<jsi::Function>(std::move(jsFnObj));
   auto *ud = new CbUserData{&rt, jsFn, cbIt->second, module, &info};
   const void *fnPtr =
       ubrn_jsi_make_trampoline(module, cbName.c_str(), cb_on_js_thread,
@@ -355,6 +367,7 @@ const void *trampolineForJsFn(jsi::Runtime &rt, UbrnJsiModule *module,
     throw jsi::JSError(rt, "uniffi jsi player: make_trampoline failed for '" +
                                cbName + "'");
   }
+  info.trampolines.push_back({cbName, jsFn, fnPtr});
   return fnPtr;
 }
 

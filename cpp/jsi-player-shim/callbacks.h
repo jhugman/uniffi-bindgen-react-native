@@ -130,6 +130,14 @@ struct StructDesc {
   std::vector<StructFieldDesc> fields;
 };
 
+// One memoised trampoline, keyed by the callback name and the JS function it
+// was built for.
+struct TrampolineEntry {
+  std::string cbName;
+  std::shared_ptr<jsi::Function> fn;
+  const void *fnPtr;
+};
+
 // Cached per-module callback + struct layouts, parsed once at register time and
 // kept alive for the process lifetime (captured by the module object closures).
 struct ModuleCallbackInfo {
@@ -138,6 +146,32 @@ struct ModuleCallbackInfo {
       structs; // struct name -> Callback field list
   std::map<std::string, StructDesc>
       structDescs; // struct name -> all-field descs
+
+  // Trampolines already built for this module.
+  //
+  // A trampoline is permanently leaked by design: the library may invoke the
+  // pointer from any thread long after the call that produced it, so nothing
+  // can safely reclaim it. The intended bound is therefore one per callback
+  // type — building one per call turns that design into unbounded growth. The
+  // async poll loop is the case that matters: it passes its continuation on
+  // every `rust_future_poll`, so an await leaked one CbUserData + libffi
+  // closure per poll.
+  //
+  // Keying on the function object is what makes reuse correct. A trampoline
+  // carries no per-call state — callbacks receive their handle as an ordinary
+  // argument — so sharing one across calls cannot mix up call state. Holding
+  // the `jsi::Function` here pins it, which the leaked CbUserData did anyway.
+  //
+  // A linear scan is deliberate. The generated continuation is a module-level
+  // const, so this holds a handful of entries at most, and a few strictEquals
+  // comparisons are far cheaper than building a libffi closure. A caller that
+  // passes a freshly created function on every call gets no benefit and
+  // behaves exactly as it did before.
+  //
+  // Mutable because this is memoisation: it does not change what the module
+  // means, only how often a trampoline is built. Written only on the JS
+  // thread, which is the only thread that marshals a Callback-typed value.
+  mutable std::vector<TrampolineEntry> trampolines;
 };
 
 // Build a trampoline for a Callback-typed value (a JS function), returning the

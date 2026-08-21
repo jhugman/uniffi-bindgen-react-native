@@ -166,12 +166,11 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
               // continuation fires CROSS-THREAD (Rust executor -> cb_dispatch
               // -> invokeAsync), so the userdata is LEAKED for the process
               // lifetime.
-              // TODO: rust_future_poll_* is called once per poll, so this leaks
-              // a fresh CbUserData + trampoline PER POLL (unbounded for
-              // long-running futures). Acceptable for host-parity scope and
-              // matches the NAPI oracle's known behavior; a future
-              // free-after-invoke mechanism (distribution plan) would address
-              // it.
+              //
+              // trampolineForJsFn memoises per (callback name, JS function), so
+              // that leak is one per callback type rather than one per call.
+              // It has to be: rust_future_poll_* runs once per poll, and the
+              // continuation it is handed is a module-level const.
               const std::string &cbName = info.args[i].name;
               const void *fnPtr = ubrn_cb::trampolineForJsFn(
                   rt, handle, *cbInfo, cbName, args[i],
@@ -261,6 +260,26 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
             view.len = rb.capacity; // expose capacity bytes; lower() fills the
                                     // whole view
             return rustBufferToUint8Array(rt, handle, view);
+          }));
+
+  // $uniffiTrampolineCount() -> number of trampolines built for this module.
+  //
+  // Diagnostic only; codegen never calls it. It exists because the per-call
+  // trampoline leak it guards against is invisible from JS: the leaked
+  // CbUserData pins the same continuation function object every time, so
+  // neither the Hermes heap nor any allocator count moves, and the only
+  // symptom is native RSS. Exposing the count lets a fixture assert the
+  // invariant directly — one trampoline per callback type, not one per call.
+  //
+  // The `$` prefix cannot collide with a real entry: every other property here
+  // is an FFI symbol name from the module spec.
+  mod.setProperty(
+      rt, "$uniffiTrampolineCount",
+      jsi::Function::createFromHostFunction(
+          rt, jsi::PropNameID::forUtf8(rt, "$uniffiTrampolineCount"), 0,
+          [cbInfo](jsi::Runtime &, const jsi::Value &, const jsi::Value *,
+                   size_t) -> jsi::Value {
+            return jsi::Value((double)cbInfo->trampolines.size());
           }));
 
   // rustbuffer_free(view) — the RustOwnedBuffer destructor frees the underlying
