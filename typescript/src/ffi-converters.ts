@@ -31,10 +31,21 @@ export abstract class AbstractFfiConverterByteArray<TsType>
     return this.readFromCursor(c);
   }
   lower(value: TsType, alloc: RustBufferAllocator): UniffiByteArray {
-    const view = alloc(this.allocationSize(value));
+    const capacity = this.allocationSize(value);
+    const view = alloc(capacity);
     const c = Cursor.fromUint8Array(view);
     this.writeIntoCursor(value, c);
-    return view;
+    const written = (c as any).pos;
+    if (written === capacity) {
+      // Exact sizing — every converter except strings knows its size up front.
+      return view;
+    }
+    // A string was sized by upper bound, so the tail of the allocation is
+    // slack. Shrink the view to the message bytes and record the real
+    // allocation size, which `rustbuffer_free` needs to free correctly.
+    const exact = view.subarray(0, written);
+    (exact as any).__ubrnRustCapacity = capacity;
+    return exact;
   }
 
   abstract readFromCursor(c: Cursor): TsType;
@@ -346,7 +357,17 @@ type StringConverter = {
   // `stringToBytes`/`bytesToString`. The `buf` argument is a RustBuffer; the
   // implementation encodes into / decodes from `buf.arrayBuffer` at the given
   // offset.
-  writeStringIntoBuffer?: (s: string, buf: any, offset: number) => number;
+  // Mirrors `TextEncoder.encodeInto`: `written` is the byte count, `read` the
+  // number of UTF-16 code units consumed. `read < s.length` means the string
+  // did not fit — `written` cannot show that, because `encodeInto` stops
+  // before a code point it lacks room to finish rather than filling the
+  // buffer.
+  writeStringIntoBuffer?: (
+    s: string,
+    buf: any,
+    offset: number,
+    capacity: number,
+  ) => { read: number; written: number };
   readStringFromBuffer?: (buf: any, offset: number, length: number) => string;
 };
 export function uniffiCreateFfiConverterString(
@@ -356,7 +377,54 @@ export function uniffiCreateFfiConverterString(
     lift(value: UniffiByteArray): string {
       return converter.bytesToString(value);
     }
-    lower(value: string, _alloc: RustBufferAllocator): UniffiByteArray {
+    lower(value: string, alloc: RustBufferAllocator): UniffiByteArray {
+      // A top-level string is the whole buffer — no length prefix, unlike the
+      // cursor path.
+      //
+      // `stringToBytes` transcodes into a native string and hands JS a buffer
+      // that the boundary then copies again. Encoding straight into the
+      // allocation removes both, the same way `writeIntoCursor` does for
+      // strings inside a container. Empty strings keep the old path: a
+      // zero-length allocation is not worth special-casing downstream.
+      if (converter.writeStringIntoBuffer && value.length > 0) {
+        // Size for ASCII first, where UTF-8 length equals UTF-16 length.
+        // Reserving the 3-bytes-per-code-unit worst case up front would ask
+        // the allocator for 3x the memory on every call, which costs more
+        // than the occasional second pass — and the buffers are Rust-owned,
+        // so on the JSI player they are only released when the view is
+        // collected.
+        //
+        // The extra byte makes truncation detectable: a string that fits
+        // leaves at least one byte unwritten, so `written === capacity` can
+        // only mean `encodeInto` ran out of room.
+        let capacity = value.length;
+        let view = alloc(capacity);
+        let result = converter.writeStringIntoBuffer(
+          value,
+          { arrayBuffer: view.buffer } as any,
+          view.byteOffset,
+          capacity,
+        );
+        if (result.read < value.length) {
+          // Some of the string didn't fit, so it holds at least one non-ASCII
+          // code point. Redo at the worst case, which always suffices.
+          capacity = 3 * value.length;
+          view = alloc(capacity);
+          result = converter.writeStringIntoBuffer(
+            value,
+            { arrayBuffer: view.buffer } as any,
+            view.byteOffset,
+            capacity,
+          );
+        }
+        const written = result.written;
+        if (written === capacity) {
+          return view;
+        }
+        const exact = view.subarray(0, written);
+        (exact as any).__ubrnRustCapacity = capacity;
+        return exact;
+      }
       return converter.stringToBytes(value);
     }
     readFromCursor(c: Cursor): string {
@@ -387,10 +455,13 @@ export function uniffiCreateFfiConverterString(
         // Synthetic buf with the cursor's underlying ArrayBuffer; helpers
         // use `buf.arrayBuffer` to construct a Uint8Array view.
         const buf: any = { arrayBuffer: (c as any).u8.buffer };
-        const bytesWritten = converter.writeStringIntoBuffer(
+        // `allocationSize` reserved the worst case for this string, so the
+        // encode always fits and `read` needs no checking here.
+        const { written: bytesWritten } = converter.writeStringIntoBuffer(
           value,
           buf,
           dataOffset,
+          3 * value.length,
         );
         // Backfill the length prefix (big-endian i32, matches Cursor.writeI32).
         (c as any).dv.setInt32(lengthPos, bytesWritten);
@@ -402,6 +473,18 @@ export function uniffiCreateFfiConverterString(
       c.writeBytes(bytes);
     }
     allocationSize(value: string): number {
+      if (converter.writeStringIntoBuffer) {
+        // Upper bound rather than an exact measurement. `stringByteLength`
+        // transcodes the whole string and keeps only its length, so sizing
+        // exactly costs a second full UTF-8 encode of every string — the
+        // dominant cost when lowering arrays of them.
+        //
+        // UTF-8 needs at most 3 bytes per UTF-16 code unit: a BMP character
+        // is one unit and at most 3 bytes, and a surrogate pair is two units
+        // and 4 bytes. `writeIntoCursor` backfills the true length and
+        // `lower()` shrinks the view to it.
+        return 4 + 3 * value.length;
+      }
       return 4 + converter.stringByteLength(value);
     }
   }
