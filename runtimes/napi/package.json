@@ -64,7 +64,7 @@
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.0",
-    "@types/node": "^20.0.0",
+    "@types/node": "^24",
     "prettier": "^3.8.1",
     "typescript": "^5.4.0"
   }
