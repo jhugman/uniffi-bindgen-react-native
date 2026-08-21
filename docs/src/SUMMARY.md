@@ -12,6 +12,7 @@
 
 - [Before you start](guides/web/pre-installation.md)
 - [Step by step: Make your first library project](guides/web/getting-started.md)
+- [Moving from `web` to `wasm2`](guides/web/wasm2-migration.md)
 - [Troubleshooting](guides/web/troubleshooting.md)
 
 # Guides
@@ -46,6 +47,9 @@
 
 - [`ubrn` Command Line](reference/commandline.md)
 - [Node.js (N-API) support](reference/nodejs.md)
+- [WebAssembly (`wasm2`) support](reference/wasm2/overview.md)
+  - [`wasm2` reference](reference/wasm2/reference.md)
+  - [`wasm2` cookbook](reference/wasm2/cookbook.md)
 - [`ubrn.config.yaml`](reference/config-yaml.md)
 - [`uniffi.toml`](reference/uniffi-toml.md)
 - [Generating a Turbo Module](reference/turbo-module-files.md)
@@ -56,3 +60,4 @@
 
 - [Lifting and lowering](./internals/lifting-and-lowering.md)
 - [NativeModule.ts and Codegen](./internals/rn-codegen.md)
+- [The `wasm2` player](./internals/wasm2-player.md)
