@@ -5,11 +5,11 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-4...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-5...main
 
 ---
 
-# 0.31.0-4
+# 0.31.0-5
 
 ## ✨ What's New ✨
 
@@ -62,7 +62,7 @@ Alongside those, the runtime now refuses to free a buffer it cannot prove the li
 
 - The N-API `RustBuffer` fixes change the contract between the generated bindings and the runtime: regenerate your bindings and upgrade [`@ubjs/node`](https://www.npmjs.com/package/@ubjs/node) together. A new runtime with old bindings, or the reverse, will not behave correctly ([#420](https://github.com/jhugman/uniffi-bindgen-react-native/pull/420), [#432](https://github.com/jhugman/uniffi-bindgen-react-native/pull/432)).
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-3...0.31.0-4
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-3...0.31.0-5
 
 ---
 

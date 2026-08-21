@@ -32,10 +32,10 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
         run: |
           echo "::notice::DRY RUN — not publishing to npm"
-          cd runtimes/wasm && npm publish --dry-run --access public
+          cd runtimes/wasm && npm publish --dry-run --access public --tag latest
 
       - name: "📦 npm publish: @ubjs/wasm"
         if: ${{ github.event_name == 'release' || github.event_name == 'workflow_call' || !inputs.dry-run }}
-        run: cd runtimes/wasm && npm publish --provenance --access public
+        run: cd runtimes/wasm && npm publish --provenance --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
