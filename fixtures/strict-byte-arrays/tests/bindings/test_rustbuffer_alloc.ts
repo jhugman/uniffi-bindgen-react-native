@@ -4,18 +4,23 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 // To run:
-//   cargo test -p uniffi-fixture-strict-byte-arrays -- jsi
+//   cargo test -p uniffi-fixture-strict-byte-arrays -- test_rustbuffer_alloc
 //
-// Exercises the JSI codegen-emitted host functions
-// `<ModuleName>.rustbuffer_alloc(n)` and `<ModuleName>.rustbuffer_free(view)`.
+// Exercises the `rustbuffer_alloc(n)` / `rustbuffer_free(view)` host functions
+// on both JSI flavors: gen_cpp emits them onto its host object, and the player
+// installs them on the module it registers.
 
-// Side-effect import to ensure registerNatives has installed the host object
-// onto globalThis before we look it up.
 import "@/generated/uniffi_strict_byte_arrays";
+import getNativeModule from "@/generated/uniffi_strict_byte_arrays-ffi";
 import { test } from "@/asserts";
 import "@/polyfills";
 
-const nm = (globalThis as any).NativeUniffiStrictByteArrays;
+// Portable native-module handle: every flavor default-exports its
+// `nativeModule()` getter from the `-ffi` module, so this reaches the gen_cpp
+// host object and the player's registered module alike. Reading
+// `globalThis.NativeUniffiStrictByteArrays` directly would only ever find the
+// former.
+const nm: any = getNativeModule();
 
 test("rustbuffer_alloc returns a Uint8Array of the requested length", (t) => {
   const view = nm.rustbuffer_alloc(16);
