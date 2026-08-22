@@ -126,8 +126,7 @@ jsi::Value readArgToJs(jsi::Runtime &rt, UbrnJsiModule *module,
 void writeJsToBytes(jsi::Runtime &rt, UbrnJsiModule *module, uint8_t tag,
                     const jsi::Value &v, uint8_t *dst, size_t size) {
   if (tag == UBRN_TY_RUSTBUFFER) {
-    auto [ptr, len] = arrayBytes(rt, v);
-    UbrnRustBuffer rb = ubrn_jsi_rustbuffer_from_bytes(module, ptr, len);
+    UbrnRustBuffer rb = rustBufferForArg(rt, module, v);
     size_t copy = sizeof(rb) < size ? sizeof(rb) : size;
     memcpy(dst, &rb, copy);
     return;
@@ -139,8 +138,7 @@ void writeJsToBytes(jsi::Runtime &rt, UbrnJsiModule *module, uint8_t tag,
 // buffer, for the RustCallStatus error path.
 UbrnRustBuffer errBufToRustBuffer(jsi::Runtime &rt, UbrnJsiModule *module,
                                   const jsi::Value &v) {
-  auto [ptr, len] = arrayBytes(rt, v);
-  return ubrn_jsi_rustbuffer_from_bytes(module, ptr, len);
+  return rustBufferForArg(rt, module, v);
 }
 
 // Forward decl (mutual recursion: struct fields can be nested structs).
@@ -197,8 +195,7 @@ void marshalFieldToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
                          const jsi::Value &v, uint8_t *slot, size_t slotSize) {
   switch (type.tag) {
   case UBRN_TY_RUSTBUFFER: {
-    auto [ptr, len] = arrayBytes(rt, v);
-    UbrnRustBuffer rb = ubrn_jsi_rustbuffer_from_bytes(module, ptr, len);
+    UbrnRustBuffer rb = rustBufferForArg(rt, module, v);
     size_t copy = sizeof(rb) < slotSize ? sizeof(rb) : slotSize;
     memcpy(slot, &rb, copy);
     return;
@@ -264,8 +261,7 @@ std::vector<uint8_t> marshalArgToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
     return marshalJsStructToBytes(rt, module, info, desc.name, v.asObject(rt));
   }
   if (desc.tag == UBRN_TY_RUSTBUFFER) {
-    auto [ptr, len] = arrayBytes(rt, v);
-    UbrnRustBuffer rb = ubrn_jsi_rustbuffer_from_bytes(module, ptr, len);
+    UbrnRustBuffer rb = rustBufferForArg(rt, module, v);
     std::vector<uint8_t> out(sizeof(rb));
     memcpy(out.data(), &rb, sizeof(rb));
     return out;

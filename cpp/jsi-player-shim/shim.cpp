@@ -36,28 +36,6 @@ struct FnInfo {
   bool hasRcs;
 };
 
-// A jsi buffer that owns a returned Rust RustBuffer and frees it on GC.
-//
-// Lifetime DECISION: the RustBuffer's lifetime is tied to the Uint8Array's GC
-// via this MutableBuffer, which makes the codegen-emitted `rustbuffer_free`
-// call a no-op (see buildModuleObject). This is simpler than NAPI's eager-free
-// + capacity-symbol scheme and avoids a double-free on the aliased view: the
-// view aliases the Rust allocation directly, so freeing it eagerly while JS
-// still holds the view would be use-after-free. If a later fixture
-// (gc-callbacks-crasher / coverall leak checks, Task 3.5) proves a leak, switch
-// to NAPI's model (eager free + capacity symbol).
-class RustOwnedBuffer : public jsi::MutableBuffer {
-public:
-  RustOwnedBuffer(UbrnJsiModule *m, UbrnRustBuffer rb) : m_(m), rb_(rb) {}
-  ~RustOwnedBuffer() override { ubrn_jsi_rustbuffer_free(m_, rb_); }
-  size_t size() const override { return (size_t)rb_.len; }
-  uint8_t *data() override { return rb_.data; }
-
-private:
-  UbrnJsiModule *m_;
-  UbrnRustBuffer rb_;
-};
-
 // A jsi buffer that owns the std::string holding its bytes.
 //
 // Used by string_to_buffer: `jsi::String::utf8()` already returns a string
@@ -91,6 +69,9 @@ jsi::Value rustBufferToUint8Array(jsi::Runtime &rt, UbrnJsiModule *m,
   }
   auto buf = std::make_shared<RustOwnedBuffer>(m, rb);
   auto ab = jsi::ArrayBuffer(rt, buf);
+  // Tag the ArrayBuffer so that if this view comes back as an FFI argument the
+  // allocation is adopted rather than copied — see rustBufferForArg.
+  ab.setNativeState(rt, std::make_shared<RustBufferOwner>(buf));
   auto ctor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
   return ctor.callAsConstructor(rt, ab);
 }
@@ -145,9 +126,7 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
             size_t sz = tagSize(tag);
             backing[i].resize(sz);
             if (tag == UBRN_TY_RUSTBUFFER) {
-              auto [ptr, len] = arrayBytes(rt, args[i]);
-              UbrnRustBuffer rb =
-                  ubrn_jsi_rustbuffer_from_bytes(handle, ptr, len);
+              UbrnRustBuffer rb = rustBufferForArg(rt, handle, args[i]);
               memcpy(backing[i].data(), &rb, sizeof(rb));
             } else if (tag == UBRN_TY_REFERENCE) {
               // A vtable-pointer arg: the JS value is a plain object whose

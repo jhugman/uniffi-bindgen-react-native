@@ -346,3 +346,101 @@ inline std::pair<const uint8_t *, size_t> arrayBytes(jsi::Runtime &rt,
   }
   return {ab.data(rt) + byteOffset, byteLength};
 }
+
+// ---------------------------------------------------------------------------
+// RustBuffer ownership across the JS boundary
+// ---------------------------------------------------------------------------
+
+// A jsi buffer that owns a library allocation and frees it when the JS view is
+// collected — unless the allocation has been handed to a callee first.
+//
+// Two kinds of Uint8Array reach an FFI argument, and they must be treated
+// differently (this mirrors NAPI's js_uint8array_to_rust_buffer):
+//
+//   * Library-owned views, produced by `rustbuffer_alloc`. Codegen allocates
+//     one, fills it in place and passes it straight through. These are
+//     ADOPTED: the existing allocation goes to the callee, which frees it.
+//     Copying instead would allocate and memcpy a second buffer per call and
+//     leave the original alive until the view happened to be collected.
+//   * Ordinary JS arrays, which are not ours to give away. These are COPIED
+//     into a fresh library allocation.
+//
+// `release()` is what makes adoption safe: it disarms the destructor, so the
+// callee's free is the only one. It is the analogue of NAPI zeroing its
+// capacity marker.
+class RustOwnedBuffer : public jsi::MutableBuffer {
+public:
+  RustOwnedBuffer(UbrnJsiModule *m, UbrnRustBuffer rb) : m_(m), rb_(rb) {}
+  ~RustOwnedBuffer() override {
+    if (owns_) {
+      ubrn_jsi_rustbuffer_free(m_, rb_);
+    }
+  }
+  size_t size() const override { return (size_t)rb_.len; }
+  uint8_t *data() override { return rb_.data; }
+
+  bool owns() const { return owns_; }
+  // Hand the allocation to a callee; the destructor becomes a no-op.
+  UbrnRustBuffer release() {
+    owns_ = false;
+    return rb_;
+  }
+
+private:
+  UbrnJsiModule *m_;
+  UbrnRustBuffer rb_;
+  bool owns_ = true;
+};
+
+// Recovers the owner from a view's ArrayBuffer.
+//
+// Attached to the ArrayBuffer rather than the Uint8Array deliberately: a
+// `subarray` shares the ArrayBuffer but is a fresh Uint8Array, so a marker on
+// the view would be lost exactly where it matters — the string lowering path
+// shrinks its view to the bytes actually written before passing it.
+class RustBufferOwner : public jsi::NativeState {
+public:
+  explicit RustBufferOwner(std::shared_ptr<RustOwnedBuffer> b)
+      : buffer(std::move(b)) {}
+  std::shared_ptr<RustOwnedBuffer> buffer;
+};
+
+// Produce the RustBuffer for a JS value being lowered into an FFI argument,
+// adopting the allocation when the view already owns one.
+inline UbrnRustBuffer rustBufferForArg(jsi::Runtime &rt, UbrnJsiModule *module,
+                                       const jsi::Value &v) {
+  auto obj = v.asObject(rt);
+  jsi::ArrayBuffer ab =
+      obj.isArrayBuffer(rt)
+          ? obj.getArrayBuffer(rt)
+          : obj.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
+  size_t byteOffset = 0, byteLength = ab.size(rt);
+  if (!obj.isArrayBuffer(rt)) {
+    byteOffset = (size_t)obj.getProperty(rt, "byteOffset").asNumber();
+    byteLength = (size_t)obj.getProperty(rt, "byteLength").asNumber();
+  }
+
+  // Only a view starting at the allocation can be adopted: the callee frees
+  // from the pointer it is given, so that pointer has to be the one the
+  // allocator handed out. An offset view is copied instead.
+  if (byteOffset == 0 && ab.hasNativeState(rt)) {
+    auto owner =
+        std::dynamic_pointer_cast<RustBufferOwner>(ab.getNativeState(rt));
+    if (owner && owner->buffer) {
+      if (!owner->buffer->owns()) {
+        // Already adopted, so the callee has since freed it. Reading it now
+        // would hand out a dangling pointer.
+        throw jsi::JSError(rt, "uniffi jsi player: RustBuffer argument was "
+                               "already consumed by a previous FFI call");
+      }
+      UbrnRustBuffer adopted = owner->buffer->release();
+      // Capacity stays as allocated so the callee frees the whole region; len
+      // narrows to the bytes the caller actually filled.
+      adopted.len = (uint64_t)byteLength;
+      return adopted;
+    }
+  }
+
+  return ubrn_jsi_rustbuffer_from_bytes(module, ab.data(rt) + byteOffset,
+                                        byteLength);
+}
