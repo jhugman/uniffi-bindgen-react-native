@@ -290,8 +290,12 @@ fn generate_index_from_modules(
     // Staging will run wasm-bindgen over a module that imports its placeholder
     // namespace, leaving a `<stem>_bg.js` beside the wasm. Ask the same
     // question here so the index imports exactly what staging produces.
+    #[cfg(feature = "wasm")]
     let has_wasm_bindgen_glue = switches.flavor.is_wasm2()
         && ubrn_common::has_wasm_bindgen_imports(source_path).unwrap_or(false);
+    // Without the feature only Napi reaches here, and it stages no wasm.
+    #[cfg(not(feature = "wasm"))]
+    let has_wasm_bindgen_glue = false;
     // Only when every namespace opts in; the index re-exports all of them.
     let mut strict_type_checking = !general_root.namespaces.is_empty();
     for namespace in general_root.namespaces.values() {

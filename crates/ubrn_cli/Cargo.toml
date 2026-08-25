@@ -15,7 +15,8 @@ path = "src/main.rs"
 
 [features]
 default = ["wasm"]
-wasm = ["ubrn_common/wasm"]
+# Gates the wasm/wasm2 code paths, and the walrus + wasm-bindgen tree with them.
+wasm = ["ubrn_bindgen/wasm", "ubrn_common/wasm", "dep:wasm-bindgen-cli-support"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -32,12 +33,12 @@ serde-toml-merge = "=0.3.9"
 textwrap = "0.16.1"
 toml = { workspace = true, features = ["display"] }
 topological-sort = "0.2.2"
-ubrn_bindgen = { path = "../ubrn_bindgen", features = ["wasm"] }
+ubrn_bindgen = { path = "../ubrn_bindgen" }
 ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }
 uniffi_meta = { workspace = true }
 path-slash = "0.2.1"
-wasm-bindgen-cli-support = { workspace = true }
+wasm-bindgen-cli-support = { workspace = true, optional = true }
 
 [dev-dependencies]
 ubrn_cli_testing = { path = "../ubrn_cli_testing" }
