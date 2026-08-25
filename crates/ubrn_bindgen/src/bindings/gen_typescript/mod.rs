@@ -39,12 +39,14 @@ pub(crate) fn generate_index_code(
     flavor: AbiFlavor,
     wasm_stem: String,
     has_wasm_bindgen_glue: bool,
+    strict_type_checking: bool,
 ) -> Result<String> {
     IndexTsWrapper {
         modules,
         flavor,
         wasm_stem,
         has_wasm_bindgen_glue,
+        strict_type_checking,
     }
     .render()
     .context("generating index.ts from IR failed")
@@ -103,6 +105,8 @@ struct IndexTsWrapper {
     /// Whether the module imports wasm-bindgen's placeholder namespace, in
     /// which case staging writes a `<stem>_bg.js` for us to import.
     has_wasm_bindgen_glue: bool,
+    /// Drops the `@ts-nocheck` header; set only when every namespace opts in.
+    strict_type_checking: bool,
 }
 
 /// Test-only entry point: render the player lowlevel TS wrapper for a
