@@ -11,7 +11,7 @@
 // Only `/core`, which is environment-neutral. Opening the `.wasm` is the
 // generated `index.ts`'s job, so this module
 // bundles for node, browsers and React Native alike.
-import { FfiType } from "@ubjs/wasm/core";
+import { FfiType, type ModuleDefinitions } from "@ubjs/wasm/core";
 {%- else %}
 import lib from "@ubjs/node";
 const { UniffiNativeModule, FfiType, resolveLibPath } = lib;
@@ -26,6 +26,7 @@ import {
   type UniffiResult,
 } from '@ubjs/core';
 
+// Arrays stay mutable; readonly does not assign to `FfiTypeDesc[]`.
 const DEFINITIONS = {
   symbols: {
     rustbuffer_alloc: "{{ module.symbols.rustbuffer_alloc }}",
@@ -62,7 +63,7 @@ const DEFINITIONS = {
     ],
     {%- endfor %}
   },
-} as const;
+}{% if module.flavor.is_wasm2() %} satisfies ModuleDefinitions{% endif %};
 
 interface NativeModuleInterface {
     {%- for func in module.typed_functions %}
