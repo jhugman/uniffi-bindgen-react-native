@@ -134,7 +134,7 @@ impl CodeFormatter for RustArgs {
             if check_only {
                 cmd.env(
                     "RUSTFLAGS",
-                    "-Dwarnings -Aclippy::empty_line_after_doc_comments",
+                    "-Dwarnings -Aclippy::empty_line_after_doc_comments -Aclippy::large_const_arrays",
                 );
                 run_cmd_quietly(&mut cmd)?;
             } else {

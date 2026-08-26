@@ -18,10 +18,20 @@ fn wasm2_player_ffi_renders_expected_markers() {
     let rendered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2)
         .expect("rendering wasm2 player wrapper-ffi.ts should succeed");
 
-    // Wasm2 imports FfiType from the wasm runtime, not the napi runtime.
+    // Wasm2 imports from the wasm runtime, not napi.
     assert!(
-        rendered.contains(r#"import { FfiType } from "@ubjs/wasm/core""#),
+        rendered.contains(r#"import { FfiType, type ModuleDefinitions } from "@ubjs/wasm/core""#),
         "expected wasm2 runtime import in rendered output:\n{rendered}"
+    );
+
+    // `as const` would freeze the arrays, which then will not assign.
+    assert!(
+        rendered.contains("} satisfies ModuleDefinitions;"),
+        "expected DEFINITIONS to be checked with `satisfies`:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains("} as const;"),
+        "wasm2 DEFINITIONS must not be frozen; it has to assign to ModuleDefinitions:\n{rendered}"
     );
 
     // Wasm2 exposes the player definitions for late binding by the runtime.
@@ -52,7 +62,7 @@ fn wasm2_player_ffi_renders_expected_markers() {
         "wasm2 wrapper must import only /core, not an environment subpath:\n{rendered}"
     );
     assert!(
-        rendered.contains(r#"import { FfiType } from "@ubjs/wasm/core""#),
+        rendered.contains(r#"from "@ubjs/wasm/core""#),
         "expected the neutral /core import in wasm2 rendering:\n{rendered}"
     );
     assert!(
@@ -85,5 +95,15 @@ fn napi_player_ffi_still_uses_native_module_open() {
     assert!(
         !rendered.contains("export const PLAYER_DEFINITIONS"),
         "napi flavor must not export PLAYER_DEFINITIONS:\n{rendered}"
+    );
+
+    // Wasm2-only: napi must not import from a runtime it does not depend on.
+    assert!(
+        rendered.contains("};"),
+        "napi flavor should close DEFINITIONS plainly:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains("ModuleDefinitions"),
+        "napi flavor must not reference the wasm runtime's ModuleDefinitions:\n{rendered}"
     );
 }

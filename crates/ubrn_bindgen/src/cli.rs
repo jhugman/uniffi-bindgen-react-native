@@ -204,7 +204,7 @@ impl BindingsArgs {
         )?;
         let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
         if switches.flavor.supports_index_ts_at_generation() {
-            generate_index_from_modules(&modules, &switches, &ts_dir, &source_path)?;
+            generate_index_from_modules(&modules, &general_root, &switches, &ts_dir, &source_path)?;
         }
         if !out.no_format {
             gen_typescript::format_directory(&ts_dir)?;
@@ -273,6 +273,7 @@ fn generate_api_from_pipeline(
 
 fn generate_index_from_modules(
     modules: &[ModuleMetadata],
+    general_root: &general::Root,
     switches: &SwitchArgs,
     ts_dir: &Utf8Path,
     source_path: &Utf8Path,
@@ -283,13 +284,23 @@ fn generate_index_from_modules(
     // Staging will run wasm-bindgen over a module that imports its placeholder
     // namespace, leaving a `<stem>_bg.js` beside the wasm. Ask the same
     // question here so the index imports exactly what staging produces.
+    #[cfg(feature = "wasm")]
     let has_wasm_bindgen_glue = switches.flavor.is_wasm2()
         && ubrn_common::has_wasm_bindgen_imports(source_path).unwrap_or(false);
+    // Without the feature only Napi reaches here, and it stages no wasm.
+    #[cfg(not(feature = "wasm"))]
+    let has_wasm_bindgen_glue = false;
+    // Only when every namespace opts in; the index re-exports all of them.
+    let mut strict_type_checking = !general_root.namespaces.is_empty();
+    for namespace in general_root.namespaces.values() {
+        strict_type_checking &= extract_ts_config(namespace)?.strict_type_checking;
+    }
     let code = gen_typescript::generate_index_code(
         modules.to_vec(),
         switches.flavor.clone(),
         wasm_stem,
         has_wasm_bindgen_glue,
+        strict_type_checking,
     )?;
     let path = ts_dir.join("index.ts");
     ubrn_common::write_file(path, code)?;

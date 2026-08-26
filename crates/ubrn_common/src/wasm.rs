@@ -10,6 +10,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 const TABLE_EXPORT: &str = "__indirect_function_table";
 /// The import namespace wasm-bindgen leaves behind for its CLI to rewrite.
 const WBINDGEN_PLACEHOLDER: &str = "__wbindgen_placeholder__";
+/// Declares `<stem>_bg.js` for tsc, which will not take an untyped `.js`.
+const GLUE_DTS: &str = include_str!("templates/glue.d.ts");
 
 /// Copy a built `.wasm` into `out_dir` as `<lib_stem>.wasm`, ready for the
 /// player.
@@ -48,6 +50,9 @@ pub fn stage_wasm(
         for ext in ["js", "d.ts"] {
             let _ = std::fs::remove_file(out_dir.join(format!("{lib_stem}.{ext}")));
         }
+
+        // The generated `index.ts` imports this; wasm-bindgen writes none.
+        crate::write_file(out_dir.join(format!("{lib_stem}_bg.d.ts")), GLUE_DTS)?;
     } else {
         std::fs::copy(built, &dst).with_context(|| format!("copy {built} -> {dst}"))?;
         if strip_dead_code {
