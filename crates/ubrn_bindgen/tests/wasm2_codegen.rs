@@ -20,8 +20,7 @@ fn wasm2_player_ffi_renders_expected_markers() {
 
     // Wasm2 imports from the wasm runtime, not napi.
     assert!(
-        rendered
-            .contains(r#"import { FfiType, type ModuleDefinitions } from "@ubjs/wasm/core""#),
+        rendered.contains(r#"import { FfiType, type ModuleDefinitions } from "@ubjs/wasm/core""#),
         "expected wasm2 runtime import in rendered output:\n{rendered}"
     );
 

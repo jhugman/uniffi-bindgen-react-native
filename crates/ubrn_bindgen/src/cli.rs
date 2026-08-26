@@ -204,13 +204,7 @@ impl BindingsArgs {
         )?;
         let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
         if switches.flavor.supports_index_ts_at_generation() {
-            generate_index_from_modules(
-                &modules,
-                &general_root,
-                &switches,
-                &ts_dir,
-                &source_path,
-            )?;
+            generate_index_from_modules(&modules, &general_root, &switches, &ts_dir, &source_path)?;
         }
         if !out.no_format {
             gen_typescript::format_directory(&ts_dir)?;
