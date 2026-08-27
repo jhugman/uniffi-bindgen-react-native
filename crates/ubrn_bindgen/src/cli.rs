@@ -28,7 +28,6 @@ pub struct BindingsArgs {
     pub(crate) source: SourceArgs,
     #[command(flatten)]
     pub(crate) output: OutputArgs,
-    #[cfg(feature = "wasm")]
     #[command(flatten)]
     switches: SwitchArgs,
 
@@ -38,10 +37,9 @@ pub struct BindingsArgs {
 }
 
 impl BindingsArgs {
-    pub fn new(_switches: SwitchArgs, source: SourceArgs, output: OutputArgs) -> Self {
+    pub fn new(switches: SwitchArgs, source: SourceArgs, output: OutputArgs) -> Self {
         Self {
-            #[cfg(feature = "wasm")]
-            switches: _switches,
+            switches,
             source,
             output,
             lib_resolution: None,
@@ -64,12 +62,6 @@ impl BindingsArgs {
         &self.output.cpp_dir
     }
 
-    #[cfg(not(feature = "wasm"))]
-    pub fn switches(&self) -> SwitchArgs {
-        Default::default()
-    }
-
-    #[cfg(feature = "wasm")]
     pub fn switches(&self) -> SwitchArgs {
         self.switches.clone()
     }
