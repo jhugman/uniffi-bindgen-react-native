@@ -32,4 +32,3 @@ ubrn_fixture_testing = { path = "crates/ubrn_fixture_testing" }
 ubrn_macros = { path = "crates/ubrn_macros" }
 uniffi-runtime-wasm = { path = "runtimes/wasm/helper-crate" }
 walrus = "0.23"
-wasm-bindgen-cli-support = "=0.2.114"

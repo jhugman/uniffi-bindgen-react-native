@@ -46,6 +46,10 @@ Once these changes are done, then you can run:
 yarn ubrn:web
 ```
 
+```admonish note
+This runs the `wasm-bindgen` command, which has to be the version your `Cargo.lock` resolves for the `wasm-bindgen` crate — see [Before you start](pre-installation.md#install-wasm-bindgen). The build names the version it wants when the binary it finds disagrees.
+```
+
 This does a number of things, but you end up with:
 
 - an entrypoint file `src/index.web.ts`

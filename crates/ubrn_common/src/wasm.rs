@@ -3,6 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use std::process::Command;
+
 use anyhow::{anyhow, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 
@@ -12,6 +14,8 @@ const TABLE_EXPORT: &str = "__indirect_function_table";
 const WBINDGEN_PLACEHOLDER: &str = "__wbindgen_placeholder__";
 /// Declares `<stem>_bg.js` for tsc, which will not take an untyped `.js`.
 const GLUE_DTS: &str = include_str!("templates/glue.d.ts");
+const WBINDGEN_SECTION: &str = "__wasm_bindgen_unstable";
+const WBINDGEN_ENV: &str = "UBRN_WASM_BINDGEN";
 
 /// Copy a built `.wasm` into `out_dir` as `<lib_stem>.wasm`, ready for the
 /// player.
@@ -82,19 +86,57 @@ pub fn has_wasm_bindgen_imports(wasm_path: &Utf8Path) -> Result<bool> {
     Ok(found)
 }
 
-/// In-process equivalent of `wasm-bindgen <wasm> --target bundler
-/// --keep-lld-exports --out-dir <out_dir> --out-name <out_name>`.
 pub fn run_wasm_bindgen(wasm_path: &Utf8Path, out_dir: &Utf8Path, out_name: &str) -> Result<()> {
-    use wasm_bindgen_cli_support::Bindgen;
-    Bindgen::new()
-        .input_path(wasm_path.as_std_path())
-        .bundler(true)
-        .map_err(|e| anyhow!("wasm-bindgen: bundler target unavailable: {e}"))?
-        .keep_lld_exports(true)
-        .omit_default_module_path(true)
-        .out_name(out_name)
-        .generate(out_dir.as_std_path())
-        .map_err(|e| anyhow!("wasm-bindgen on {wasm_path}: {e}"))
+    let mut cmd = wasm_bindgen_cmd();
+    cmd.arg(wasm_path)
+        .arg("--target")
+        .arg("bundler")
+        .arg("--keep-lld-exports")
+        .arg("--omit-default-module-path")
+        .arg("--out-dir")
+        .arg(out_dir)
+        .arg("--out-name")
+        .arg(out_name);
+    crate::run_cmd(&mut cmd).with_context(|| wasm_bindgen_context(wasm_path))
+}
+
+pub fn wasm_bindgen_cmd() -> Command {
+    let program = std::env::var(WBINDGEN_ENV).unwrap_or_else(|_| "wasm-bindgen".to_string());
+    crate::command(program)
+}
+
+pub fn wasm_bindgen_context(wasm_path: &Utf8Path) -> String {
+    let Ok(Some(version)) = wasm_bindgen_version(wasm_path) else {
+        return format!("wasm-bindgen on {wasm_path}");
+    };
+    format!(
+        "wasm-bindgen on {wasm_path}\n\
+         It was built against wasm-bindgen {version}, and the rewriter takes \
+         only that version:\n    \
+         cargo install wasm-bindgen-cli --version {version}\n\
+         or a prebuilt binary from \
+         https://github.com/wasm-bindgen/wasm-bindgen/releases/tag/{version}. \
+         Set {WBINDGEN_ENV} to its path if it cannot go on PATH."
+    )
+}
+
+pub fn wasm_bindgen_version(wasm_path: &Utf8Path) -> Result<Option<String>> {
+    let mut module = walrus::Module::from_file(wasm_path.as_std_path())
+        .map_err(|e| anyhow!("walrus parse {wasm_path}: {e}"))?;
+    let Some(section) = module.customs.remove_raw(WBINDGEN_SECTION) else {
+        return Ok(None);
+    };
+    Ok(json_string_field(&section.data, "version"))
+}
+
+fn json_string_field(data: &[u8], key: &str) -> Option<String> {
+    let needle = format!("\"{key}\":\"");
+    let at = data
+        .windows(needle.len())
+        .position(|w| w == needle.as_bytes())?;
+    let rest = &data[at + needle.len()..];
+    let end = rest.iter().position(|&b| b == b'"')?;
+    std::str::from_utf8(&rest[..end]).ok().map(str::to_owned)
 }
 
 /// Strip exports the player can't reach from JS, then run walrus' DCE pass.
@@ -170,4 +212,28 @@ pub fn export_growable_table(wasm_path: &Utf8Path) -> Result<()> {
 
     std::fs::write(wasm_path, module.emit_wasm())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::json_string_field;
+
+    #[test]
+    fn reads_the_version_and_not_the_schema_version() {
+        let blob = br#"{"schema_version":"0.2.122","version":"0.2.127"}"#;
+        assert_eq!(
+            json_string_field(blob, "version").as_deref(),
+            Some("0.2.127")
+        );
+        assert_eq!(
+            json_string_field(blob, "schema_version").as_deref(),
+            Some("0.2.122")
+        );
+    }
+
+    #[test]
+    fn absent_key_is_none() {
+        assert_eq!(json_string_field(br#"{"version":"#, "version"), None);
+        assert_eq!(json_string_field(b"", "version"), None);
+    }
 }
