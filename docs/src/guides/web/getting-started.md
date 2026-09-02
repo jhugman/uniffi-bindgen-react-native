@@ -2,6 +2,10 @@
 
 This extends the [Step-by-step tutorial with React Native](../rn/getting-started.md). We've split this out running the library under WASM involves creating an expo app.
 
+```admonish note
+This page covers the `web` flavor, which builds a wasm-bindgen crate around your library. There is now a second way to run the same crate as WebAssembly, from a single build and with no generated crate: see [WebAssembly (`wasm2`) support](../../reference/wasm2/overview.md), and [Moving from `web` to `wasm2`](wasm2-migration.md) once you have this working.
+```
+
 ## Preparing the library
 
 ```admonish note
