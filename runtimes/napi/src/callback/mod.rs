@@ -122,6 +122,7 @@ struct CallbackUserData {
 //   `owner_thread` — marshalling always runs there, on the same-thread path or after the
 //   `tsfn` dispatch.
 unsafe impl Send for CallbackUserData {}
+// SAFETY: see above.
 unsafe impl Sync for CallbackUserData {}
 
 // ---------------------------------------------------------------------------
@@ -171,6 +172,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
         if !ret.is_null() {
             let ret_size = ud.ret_size;
             if ret_size > 0 {
+                // SAFETY: `ret` is non-null here and points to at least
+                // `ret_size` bytes, per this function's `# Safety` contract.
                 unsafe { std::ptr::write_bytes(ret, 0, ret_size) };
             }
         }
@@ -182,6 +185,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
 
     // Resolve the JS function from the persistent reference.
     let mut raw_fn: napi::sys::napi_value = std::ptr::null_mut();
+    // SAFETY: We are on the owning thread (checked by the caller per this
+    // function's `# Safety` contract), so `raw_env` and `fn_ref` are valid.
     let status = unsafe { napi::sys::napi_get_reference_value(ud.raw_env, ud.fn_ref, &mut raw_fn) };
     if status != napi::sys::Status::napi_ok || raw_fn.is_null() {
         #[cfg(debug_assertions)]
@@ -191,6 +196,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
         return;
     }
 
+    // SAFETY: We are on the owning thread, so `raw_env` is valid; `raw_fn`
+    // was just resolved as non-null from `fn_ref` above.
     let js_fn = match unsafe { napi::JsFunction::from_raw(ud.raw_env, raw_fn) } {
         Ok(f) => f,
         Err(_) => {
@@ -240,6 +247,9 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
     let mut status_ptr: *mut RustCallStatusForVTable = std::ptr::null_mut();
     if ud.has_rust_call_status {
         if let Some(ref rcs_slot) = ud.arg_layout.rust_call_status_slot {
+            // SAFETY: `args` points to a buffer laid out per `arg_layout`,
+            // per this function's `# Safety` contract; `rcs_slot.offset`/
+            // `.size` are within bounds.
             unsafe {
                 let ptr_bytes =
                     std::slice::from_raw_parts(args.add(rcs_slot.offset), rcs_slot.size);
@@ -252,6 +262,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
     // and append to js_args (pass-by-reference status protocol).
     if ud.has_rust_call_status && !ud.out_return {
         let code = if !status_ptr.is_null() {
+            // SAFETY: `status_ptr` was just read from the arg buffer above
+            // and is non-null here, per the RustCallStatus slot contract.
             unsafe { (*status_ptr).code as i32 }
         } else {
             0
@@ -276,6 +288,10 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
         if let Ok(js_ret) = call_result {
             if ud.has_rust_call_status {
                 // UniffiResult protocol: JS returns { code, pointee?, errorBuf? }
+                // SAFETY: We are on the owning thread, so `raw_env` is valid
+                // and `js_ret.raw()` is a live handle; `status_ptr`/
+                // `out_return_ptr` satisfy `write_uniffi_result`'s contract
+                // per the RustCallStatus/out-return slots read above.
                 unsafe {
                     if let Ok(result_obj) = napi::JsObject::from_raw(ud.raw_env, js_ret.raw()) {
                         write_uniffi_result(
@@ -292,6 +308,9 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
             } else if !out_return_ptr.is_null() {
                 // Direct struct return (no UniffiResult wrapping).
                 // Marshal the JS return value to bytes and write to the out-return pointer.
+                // SAFETY: `out_return_ptr` is non-null here and was read from
+                // the out-return slot above, satisfying
+                // `write_js_value_to_pointer`'s contract for `ud.ret_type`.
                 unsafe {
                     write_js_value_to_pointer(
                         &env,
@@ -310,6 +329,10 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
         // Read back mutated status code from the JS status object (pass-by-reference).
         if ud.has_rust_call_status && !status_ptr.is_null() {
             if let Some(js_status_unknown) = js_args.last() {
+                // SAFETY: We are on the owning thread, so `raw_env` is valid
+                // and `js_status_unknown.raw()` is a live handle; `status_ptr`
+                // was checked non-null above and points to a valid
+                // `RustCallStatusForVTable`.
                 unsafe {
                     if let Ok(js_status_obj) =
                         napi::JsObject::from_raw(ud.raw_env, js_status_unknown.raw())
@@ -335,6 +358,10 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
             if !ret.is_null() {
                 let ret_size = ud.ret_size;
                 if ret_size > 0 {
+                    // SAFETY: `ret` is non-null here and points to at least
+                    // `ret_size` bytes, per this function's `# Safety`
+                    // contract, satisfying `write_js_return_to_bytes`'s
+                    // contract too.
                     unsafe {
                         let ret_bytes = std::slice::from_raw_parts_mut(ret, ret_size);
                         let _ = write_js_return_to_bytes(
@@ -421,6 +448,8 @@ pub extern "C" fn dispatch_to_js_thread(
         Err(_) => {
             // The sender was dropped (e.g., shutdown). Zero the return buffer.
             if ret_len > 0 && !ret.is_null() {
+                // SAFETY: `ret` is non-null here and points to at least
+                // `ret_len` bytes, per this function's `# Safety` contract.
                 unsafe { std::ptr::write_bytes(ret, 0, ret_len) };
             }
         }
@@ -453,7 +482,7 @@ pub extern "C" fn is_js_thread(user_data: *const c_void) -> bool {
 /// This function:
 /// 1. Creates a persistent `napi_ref` for the JS function.
 /// 2. Looks up the callback def from the module spec.
-/// 3. Computes the `ArgLayout` (including extra pointer arg for out_return).
+/// 3. Reads the `ArgLayout` and return width core's trampoline uses.
 /// 4. Creates a `ThreadsafeFunction` for cross-thread dispatch.
 /// 5. Leaks the `CallbackUserData` and returns it as `*const c_void`.
 pub fn create_callback_user_data(
@@ -468,30 +497,20 @@ pub fn create_callback_user_data(
         .get(callback_name)
         .ok_or_else(|| napi::Error::from_reason(format!("Unknown callback: {callback_name}")))?;
 
-    // Compute ArgLayout. When out_return is true, we must include an extra
-    // VoidPointer arg (for the out-return pointer) between the declared args
-    // and the RustCallStatus slot.
-    let mut layout_args = def.args.clone();
-    if def.out_return {
-        layout_args.push(FfiTypeDesc::VoidPointer);
-    }
-    let arg_layout =
-        ArgLayout::compute(&layout_args, def.has_rust_call_status).map_err(crate::core_err)?;
-
-    // Precompute the return value size.
-    let ret_size = if def.out_return {
-        0
-    } else {
-        match &def.ret {
-            FfiTypeDesc::Void => 0,
-            other => uniffi_runtime_core::slot_size_align(other)
-                .map(|(s, _)| s)
-                .unwrap_or(0),
-        }
-    };
+    // `on_js_thread` reads args at these offsets and writes `ret_size` bytes
+    // back, so both come from the accessors `make_callback_trampoline` packs
+    // by — a second copy of the CIF ordering here could drift from core's.
+    let arg_layout = module
+        .callback_arg_layout(callback_name)
+        .map_err(crate::core_err)?;
+    let ret_size = module
+        .callback_return_size(callback_name)
+        .map_err(crate::core_err)?;
 
     // Create a GC-preventing reference to the JS function.
     let mut fn_ref: napi::sys::napi_ref = std::ptr::null_mut();
+    // SAFETY: `env.raw()` and `js_fn.raw()` are live handles for the current
+    // call scope (registration runs on the JS thread that owns them).
     let ref_status =
         unsafe { napi::sys::napi_create_reference(env.raw(), js_fn.raw(), 1, &mut fn_ref) };
     if ref_status != napi::sys::Status::napi_ok {
@@ -609,6 +628,9 @@ fn read_arg_bytes_to_js(
         FfiTypeDesc::RustBuffer => {
             let rb = slot::read_rust_buffer(arg_bytes);
             let len = usize::try_from(rb.len).map_err(|_| {
+                // SAFETY: `rb_free_ptr` is the module's `rustbuffer_free` symbol
+                // and `rb` was just read from the arg buffer, so it is a valid,
+                // still-owned RustBuffer.
                 unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
                 napi::Error::from_reason("RustBuffer len exceeds addressable memory")
             })?;
@@ -619,8 +641,12 @@ fn read_arg_bytes_to_js(
             let typedarray = unsafe { napi_utils::create_uint8array(raw_env, rb.data, len)? };
 
             // Free the original RustBuffer—the JS Uint8Array now owns its copy.
+            // SAFETY: `rb_free_ptr` is the module's `rustbuffer_free` symbol;
+            // `rb` is still valid and not yet freed.
             unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
 
+            // SAFETY: `raw_env` is a live handle for the current call scope;
+            // `typedarray` is the napi_value just created above.
             Ok(unsafe { napi::JsUnknown::from_raw(raw_env, typedarray)? })
         }
         FfiTypeDesc::Callback(cb_name) => {
@@ -664,54 +690,74 @@ unsafe fn write_js_return_to_bytes(
     match desc {
         FfiTypeDesc::Void => Ok(()),
         FfiTypeDesc::UInt8 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_u8(ret_bytes, num.get_double()? as u8);
             Ok(())
         }
         FfiTypeDesc::Int8 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_i8(ret_bytes, num.get_double()? as i8);
             Ok(())
         }
         FfiTypeDesc::UInt16 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_u16(ret_bytes, num.get_double()? as u16);
             Ok(())
         }
         FfiTypeDesc::Int16 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_i16(ret_bytes, num.get_double()? as i16);
             Ok(())
         }
         FfiTypeDesc::UInt32 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_u32(ret_bytes, num.get_double()? as u32);
             Ok(())
         }
         FfiTypeDesc::Int32 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_i32(ret_bytes, num.get_double()? as i32);
             Ok(())
         }
         FfiTypeDesc::UInt64 | FfiTypeDesc::Handle => {
-            let bigint = napi::JsBigInt::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let bigint = unsafe { napi::JsBigInt::from_raw(raw_env, js_val.raw())? };
             let (v, _) = bigint.get_u64()?;
             slot::write_u64(ret_bytes, v);
             Ok(())
         }
         FfiTypeDesc::Int64 => {
-            let bigint = napi::JsBigInt::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let bigint = unsafe { napi::JsBigInt::from_raw(raw_env, js_val.raw())? };
             let (v, _) = bigint.get_i64()?;
             slot::write_i64(ret_bytes, v);
             Ok(())
         }
         FfiTypeDesc::Float32 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_f32(ret_bytes, num.get_double()? as f32);
             Ok(())
         }
         FfiTypeDesc::Float64 => {
-            let num = napi::JsNumber::from_raw(raw_env, js_val.raw())?;
+            // SAFETY: `raw_env` and `js_val.raw()` are live handles for the
+            // current call scope; `from_raw` borrows without taking ownership.
+            let num = unsafe { napi::JsNumber::from_raw(raw_env, js_val.raw())? };
             slot::write_f64(ret_bytes, num.get_double()?);
             Ok(())
         }
@@ -719,12 +765,16 @@ unsafe fn write_js_return_to_bytes(
             // Read Uint8Array -> rustbuffer_from_bytes -> write RustBufferC bytes.
             // Truncating copy: caller may pass a `ret_bytes` smaller than RustBufferC
             // when the return slot is a different shape; preserve historical behavior.
-            let rb = napi_utils::js_uint8array_to_rust_buffer(
-                raw_env,
-                js_val,
-                rb_from_bytes_ptr,
-                &registration.capacity_symbol,
-            )?;
+            // SAFETY: `raw_env` is a live handle for the current call scope;
+            // `js_val` is a valid JS value per this function's contract on `desc`.
+            let rb = unsafe {
+                napi_utils::js_uint8array_to_rust_buffer(
+                    raw_env,
+                    js_val,
+                    rb_from_bytes_ptr,
+                    &registration.capacity_symbol,
+                )?
+            };
             let rb_bytes = slot::rust_buffer_to_bytes(&rb);
             let copy_len = rb_bytes.len().min(ret_bytes.len());
             ret_bytes[..copy_len].copy_from_slice(&rb_bytes[..copy_len]);
@@ -758,7 +808,9 @@ unsafe fn write_js_value_to_pointer(
     // the full C struct layout (slot_size_align doesn't support Struct types).
     if let FfiTypeDesc::Struct(struct_name) = desc {
         let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
-        if let Ok(js_obj) = napi::JsObject::from_raw(env.raw(), js_val.raw()) {
+        // SAFETY: `env.raw()` and `js_val.raw()` are live handles for the
+        // current call scope; `from_raw` borrows without taking ownership.
+        if let Ok(js_obj) = unsafe { napi::JsObject::from_raw(env.raw(), js_val.raw()) } {
             if let Ok(bytes) = self::marshal::marshal_js_struct_to_bytes(
                 env,
                 &js_obj,
@@ -767,7 +819,9 @@ unsafe fn write_js_value_to_pointer(
                 rb_from_bytes_ptr,
                 registration,
             ) {
-                std::ptr::copy_nonoverlapping(bytes.as_ptr(), dest, bytes.len());
+                // SAFETY: `dest` points to a writable buffer of at least
+                // `bytes.len()` bytes, per this function's `# Safety` contract.
+                unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), dest, bytes.len()) };
             }
         }
         return;
@@ -783,8 +837,15 @@ unsafe fn write_js_value_to_pointer(
     // Max non-struct size is RustBufferC (24 bytes: {u64, u64, *mut u8}).
     let mut buf = [0u8; std::mem::size_of::<RustBufferC>()];
     debug_assert!(size <= buf.len());
-    if write_js_return_to_bytes(env, desc, js_val, &mut buf[..size], module, registration).is_ok() {
-        std::ptr::copy_nonoverlapping(buf.as_ptr(), dest, size);
+    // SAFETY: `write_js_return_to_bytes`'s contract requires `ret_bytes` to
+    // have sufficient size for `desc`; `&mut buf[..size]` satisfies that.
+    let wrote = unsafe {
+        write_js_return_to_bytes(env, desc, js_val, &mut buf[..size], module, registration)
+    };
+    if wrote.is_ok() {
+        // SAFETY: `dest` points to a writable buffer of at least `size`
+        // bytes, per this function's `# Safety` contract.
+        unsafe { std::ptr::copy_nonoverlapping(buf.as_ptr(), dest, size) };
     }
 }
 
@@ -811,22 +872,33 @@ unsafe fn write_uniffi_result(
     // Read and write the status code.
     if !status_ptr.is_null() {
         if let Ok(code) = result_obj.get_named_property::<i32>("code") {
-            (*status_ptr).code = code as i8;
+            // SAFETY: `status_ptr` is non-null here and points to a valid
+            // `RustCallStatusForVTable`, per this function's `# Safety` contract.
+            unsafe { (*status_ptr).code = code as i8 };
         }
 
         // If code != 0, check for errorBuf.
-        if (*status_ptr).code != 0 {
+        // SAFETY: `status_ptr` is non-null here and points to a valid
+        // `RustCallStatusForVTable`, per this function's `# Safety` contract.
+        if unsafe { (*status_ptr).code } != 0 {
             if let Ok(error_buf_val) = result_obj.get_named_property::<napi::JsUnknown>("errorBuf")
             {
                 // Check if the value is a TypedArray (not undefined/null).
-                if let Some((data, length)) =
-                    napi_utils::read_typedarray_data(env.raw(), error_buf_val.raw())
-                {
+                // SAFETY: `env.raw()` is a live handle for the current call
+                // scope; `error_buf_val.raw()` is a live handle for the value
+                // just read above.
+                let typedarray =
+                    unsafe { napi_utils::read_typedarray_data(env.raw(), error_buf_val.raw()) };
+                if let Some((data, length)) = typedarray {
                     if length > 0 && !data.is_null() {
-                        if let Ok(rb) =
+                        // SAFETY: `data`/`length` describe the TypedArray's
+                        // backing bytes just read above via `read_typedarray_data`.
+                        if let Ok(rb) = unsafe {
                             napi_utils::rustbuffer_from_raw_bytes(data, length, rb_from_bytes_ptr)
-                        {
-                            (*status_ptr).error_buf = rb;
+                        } {
+                            // SAFETY: `status_ptr` is non-null here and points to a
+                            // valid `RustCallStatusForVTable`.
+                            unsafe { (*status_ptr).error_buf = rb };
                         }
                     }
                 }
@@ -837,21 +909,28 @@ unsafe fn write_uniffi_result(
     // Write the pointee if present and status is success.
     if !out_return_ptr.is_null() {
         let code = if !status_ptr.is_null() {
-            (*status_ptr).code
+            // SAFETY: `status_ptr` is non-null here and points to a valid
+            // `RustCallStatusForVTable`, per this function's `# Safety` contract.
+            unsafe { (*status_ptr).code }
         } else {
             0
         };
         // Only write pointee when code == 0 (success).
         if code == 0 {
             if let Ok(pointee) = result_obj.get_named_property::<napi::JsUnknown>("pointee") {
-                write_js_value_to_pointer(
-                    env,
-                    ret_type,
-                    pointee,
-                    out_return_ptr as *mut u8,
-                    module,
-                    registration,
-                );
+                // SAFETY: `out_return_ptr` is non-null here and, per this
+                // function's `# Safety` contract, points to a writable buffer
+                // for `ret_type` — satisfying `write_js_value_to_pointer`'s contract.
+                unsafe {
+                    write_js_value_to_pointer(
+                        env,
+                        ret_type,
+                        pointee,
+                        out_return_ptr as *mut u8,
+                        module,
+                        registration,
+                    )
+                };
             }
         }
     }
@@ -872,13 +951,21 @@ unsafe fn write_error_buf_from_status_obj(
         return;
     }
     if let Ok(error_buf_val) = js_status_obj.get_named_property::<napi::JsUnknown>("errorBuf") {
-        if let Some((data, length)) = napi_utils::read_typedarray_data(raw_env, error_buf_val.raw())
-        {
+        // SAFETY: `raw_env` is valid per this function's contract (it is
+        // forwarded from `on_js_thread`'s live env); `error_buf_val.raw()`
+        // is a live handle for the value just read above.
+        let typedarray = unsafe { napi_utils::read_typedarray_data(raw_env, error_buf_val.raw()) };
+        if let Some((data, length)) = typedarray {
             if length > 0 && !data.is_null() {
-                if let Ok(rb) =
+                // SAFETY: `data`/`length` describe the TypedArray's backing
+                // bytes just read above via `read_typedarray_data`.
+                if let Ok(rb) = unsafe {
                     napi_utils::rustbuffer_from_raw_bytes(data, length, rb_from_bytes_ptr)
-                {
-                    (*status_ptr).error_buf = rb;
+                } {
+                    // SAFETY: `status_ptr` is non-null (checked above) and
+                    // points to a valid `RustCallStatusForVTable`, per this
+                    // function's `# Safety` contract.
+                    unsafe { (*status_ptr).error_buf = rb };
                 }
             }
         }

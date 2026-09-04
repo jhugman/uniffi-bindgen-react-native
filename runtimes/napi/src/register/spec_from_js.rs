@@ -9,37 +9,19 @@ use std::collections::HashMap;
 
 use napi::{JsObject, Result};
 use uniffi_runtime_core::{
-    CallbackDef, FfiTypeDesc, FunctionDef, ModuleSpec, RustBufferSymbols, StructDef, StructField,
+    desc_from_name, CallbackDef, FfiTypeDesc, FunctionDef, ModuleSpec, RustBufferSymbols,
+    StructDef, StructField,
 };
 
 /// Parse an `FfiTypeDesc` from a JS object with shape `{ tag: string, ...params }`.
 fn ffi_type_desc_from_js(obj: &JsObject) -> Result<FfiTypeDesc> {
     let tag: String = obj.get_named_property::<String>("tag")?;
     match tag.as_str() {
-        "UInt8" => Ok(FfiTypeDesc::UInt8),
-        "Int8" => Ok(FfiTypeDesc::Int8),
-        "UInt16" => Ok(FfiTypeDesc::UInt16),
-        "Int16" => Ok(FfiTypeDesc::Int16),
-        "UInt32" => Ok(FfiTypeDesc::UInt32),
-        "Int32" => Ok(FfiTypeDesc::Int32),
-        "UInt64" => Ok(FfiTypeDesc::UInt64),
-        "Int64" => Ok(FfiTypeDesc::Int64),
-        "Float32" => Ok(FfiTypeDesc::Float32),
-        "Float64" => Ok(FfiTypeDesc::Float64),
-        "Handle" => Ok(FfiTypeDesc::Handle),
-        "RustBuffer" => Ok(FfiTypeDesc::RustBuffer),
+        // No wire tag, so not on core's table: napi resolves these itself.
         "ForeignBytes" => Ok(FfiTypeDesc::ForeignBytes),
-        "RustCallStatus" => Ok(FfiTypeDesc::RustCallStatus),
         "VoidPointer" => Ok(FfiTypeDesc::VoidPointer),
-        "Void" => Ok(FfiTypeDesc::Void),
-        "Callback" => {
-            let name: String = obj.get_named_property::<String>("name")?;
-            Ok(FfiTypeDesc::Callback(name))
-        }
-        "Struct" => {
-            let name: String = obj.get_named_property::<String>("name")?;
-            Ok(FfiTypeDesc::Struct(name))
-        }
+        // A reference's target is another type object, so it recurses rather
+        // than resolving through a tag (the wire tag only ever wraps a Struct).
         "Reference" => {
             let inner: JsObject = obj.get_named_property("inner")?;
             Ok(FfiTypeDesc::Reference(Box::new(ffi_type_desc_from_js(
@@ -52,9 +34,16 @@ fn ffi_type_desc_from_js(obj: &JsObject) -> Result<FfiTypeDesc> {
                 &inner,
             )?)))
         }
-        other => Err(napi::Error::from_reason(format!(
-            "Unknown FfiType tag: {other}"
-        ))),
+        other => {
+            // Callback and Struct take their name from the same object; core
+            // rejects them without one.
+            let name: Option<String> = match other {
+                "Callback" | "Struct" => Some(obj.get_named_property::<String>("name")?),
+                _ => None,
+            };
+            desc_from_name(other, name.as_deref())
+                .map_err(|e| napi::Error::from_reason(e.to_string()))
+        }
     }
 }
 
