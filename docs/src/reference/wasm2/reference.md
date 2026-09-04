@@ -12,6 +12,7 @@ The examples come from a made-up crate called `receipt-scanner`, whose library n
 | [`uniffi-runtime-wasm`](https://crates.io/crates/uniffi-runtime-wasm) | crates.io | the allocator and panic hook, exported from your `cdylib` |
 | [`@ubjs/wasm`](https://www.npmjs.com/package/@ubjs/wasm) | npm | the player: reads the signature table, calls the module |
 | [`@ubjs/core`](https://www.npmjs.com/package/@ubjs/core) | npm | the shared TypeScript runtime, a peer dependency of `@ubjs/wasm` |
+| [`wasm-bindgen`](https://crates.io/crates/wasm-bindgen-cli) | cargo, only if your crate needs it | rewrites the imports a wasm-bindgen-using dependency leaves behind |
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -19,6 +20,14 @@ npm install @ubjs/wasm @ubjs/core
 ```
 
 The player runs wherever `WebAssembly` does: modern browsers, Node.js 18 or later, Bun, and web bundlers.
+
+If anything in your crate's dependency tree reaches `wasm-bindgen` — `js-sys`, `web-sys`, `getrandom`'s wasm backend, a HTTP client — the build needs the `wasm-bindgen` command too, at exactly the version your `Cargo.lock` resolves for the crate:
+
+```sh
+cargo install wasm-bindgen-cli --version 0.2.127  # whatever your lock says
+```
+
+`ubrn` pins no version of its own: it reads the one the module was built against out of the module, and names it if the binary it finds disagrees. Set `UBRN_WASM_BINDGEN` to a path when the right binary cannot go on `PATH` — a machine building two projects can need two of them.
 
 ## Preparing the crate
 

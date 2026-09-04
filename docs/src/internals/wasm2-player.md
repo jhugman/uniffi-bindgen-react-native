@@ -93,7 +93,7 @@ Generate from cargo's output, and stage a copy. Staging rewrites the module, and
 
 Three things happen to the copy, in [`ubrn_common::wasm`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_common/src/wasm.rs).
 
-**wasm-bindgen runs, if the module needs it.** A crate whose dependencies reach `wasm-bindgen` links imports against a placeholder namespace only wasm-bindgen's rewriter can resolve. Staging asks the *import section* rather than scanning the file for the name — which also appears in the name section and in data segments — and if the answer is yes, runs the rewriter in-process against the bundler target. That leaves a `_bg.wasm`, renamed into place, and a `_bg.js` of glue. wasm-bindgen's own entry module is deleted: it instantiates the wasm for you, which is the player's job, and its filename would shadow the generated bindings under a bundler.
+**wasm-bindgen runs, if the module needs it.** A crate whose dependencies reach `wasm-bindgen` links imports against a placeholder namespace only wasm-bindgen's rewriter can resolve. Staging asks the *import section* rather than scanning the file for the name — which also appears in the name section and in data segments — and if the answer is yes, runs `wasm-bindgen` against the bundler target. That leaves a `_bg.wasm`, renamed into place, and a `_bg.js` of glue. wasm-bindgen's own entry module is deleted: it instantiates the wasm for you, which is the player's job, and its filename would shadow the generated bindings under a bundler.
 
 **The function table is exported, and made growable.** The player adds trampolines to `__indirect_function_table`, so the module must export it without an upper bound. `wasm-ld` will do that given `--export-table --growable-table`, but link arguments belong to the `cdylib`'s own link step, which a dependency cannot reach — every consumer would need `RUSTFLAGS`. Rewriting after the link works whatever built the module.
 
@@ -208,7 +208,7 @@ Where this design gives something up, it gives it up for a reason, and the reaso
 
 **Views alias wasm memory.** The alternative — copying every buffer to the JavaScript heap — would be safe and slower. The player takes the fast path and throws a specific error when the contract is broken, rather than reading garbage.
 
-**The wasm-bindgen rewriter is version-locked.** It must match the schema of the `wasm-bindgen` crate the module was built against, so the workspace pins both. A bump is a coordinated change, not a dependency update.
+**The wasm-bindgen rewriter is version-locked.** It takes only the version of the `wasm-bindgen` crate the module was built against, and that version belongs to the crate's dependency tree, not to us. So staging shells out to whatever binary the project provides and this workspace pins no version at all; when the two disagree, the version read from the module's own descriptor section names the one to install.
 
 **Metadata extraction reads module structure.** Exported i32 globals pointing into active data segments is how rustc and lld lay this out today, not a guarantee. A test extracts metadata from every fixture wasm to catch a change early.
 

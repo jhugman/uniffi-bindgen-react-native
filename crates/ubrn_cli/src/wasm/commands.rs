@@ -5,10 +5,10 @@
  */
 use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use ubrn_common::{run_cmd, run_in_process, CrateMetadata};
+use ubrn_common::{run_cmd, wasm_bindgen_cmd, wasm_bindgen_context, CrateMetadata};
 
 use super::{
     config::{Target, WasmTarget},
@@ -150,15 +150,6 @@ impl WebBuildArgs {
         Ok(())
     }
 
-    /// Run the wasm-bindgen rewriter on `library_path`. Uses the
-    /// `wasm-bindgen-cli-support` library directly rather than shelling
-    /// out, so the version follows the workspace's pin and clients don't
-    /// need a separately-installed `wasm-bindgen` binary.
-    ///
-    /// `wasm_bindgen_extras` is the project-config escape hatch for raw CLI
-    /// args. Common flags such as `--debug` and `--keep-debug` map onto
-    /// `Bindgen` methods; anything unrecognized errors out with a migration
-    /// message rather than being dropped silently.
     fn wasm_bindgen(
         &self,
         library_path: &Utf8Path,
@@ -166,61 +157,8 @@ impl WebBuildArgs {
         wasm_bindgen_extras: &ExtraArgs,
         out_dir: &Utf8Path,
     ) -> Result<()> {
-        use wasm_bindgen_cli_support::Bindgen;
-        let mut bindgen = Bindgen::new();
-        bindgen.input_path(library_path.as_std_path());
-        bindgen.out_name("index");
-        bindgen.omit_default_module_path(true);
-        match target {
-            WasmTarget::Bundler => bindgen.bundler(true)?,
-            WasmTarget::Nodejs => bindgen.nodejs(true)?,
-            WasmTarget::Web => bindgen.web(true)?,
-            WasmTarget::NoModules => bindgen.no_modules(true)?,
-            WasmTarget::Deno => bindgen.deno(true)?,
-            WasmTarget::ExperimentalNodejsModule => bindgen.nodejs_module(true)?,
-        };
-        for extra in wasm_bindgen_extras.clone() {
-            match extra.as_str() {
-                "--debug" => {
-                    bindgen.debug(true);
-                }
-                "--keep-debug" => {
-                    bindgen.keep_debug(true);
-                }
-                "--keep-lld-exports" => {
-                    bindgen.keep_lld_exports(true);
-                }
-                "--no-demangle" => {
-                    bindgen.demangle(false);
-                }
-                "--remove-name-section" => {
-                    bindgen.remove_name_section(true);
-                }
-                "--remove-producers-section" => {
-                    bindgen.remove_producers_section(true);
-                }
-                "--no-typescript" => {
-                    bindgen.typescript(false);
-                }
-                "--reference-types" => {
-                    // wasm-bindgen 0.2.114 deprecates this — reference types
-                    // are auto-detected from `-Ctarget-feature=+reference-types`.
-                    // Drop silently rather than break old configs.
-                }
-                "--split-linked-modules" => {
-                    bindgen.split_linked_modules(true);
-                }
-                other => anyhow::bail!(
-                    "wasm_bindgen_extras: {other} not yet mapped to wasm-bindgen-cli-support; \
-                     either drop it or add a `Bindgen` method match in src/wasm/commands.rs"
-                ),
-            }
-        }
-        // The equivalent `wasm-bindgen` command line, for the benefit of
-        // anything watching what the build does from the outside.
-        let mut descriptor = Command::new("wasm-bindgen");
-        descriptor
-            .arg("--target")
+        let mut cmd = wasm_bindgen_cmd();
+        cmd.arg("--target")
             .arg(target.to_string())
             .arg("--omit-default-module-path")
             .arg("--out-name")
@@ -230,9 +168,6 @@ impl WebBuildArgs {
             .args(wasm_bindgen_extras.clone())
             .arg(library_path);
 
-        run_in_process(&descriptor, || {
-            bindgen.generate(out_dir.as_std_path())?;
-            Ok(())
-        })
+        run_cmd(&mut cmd).with_context(|| wasm_bindgen_context(library_path))
     }
 }

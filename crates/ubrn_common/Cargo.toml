@@ -6,9 +6,9 @@ publish = false
 
 [features]
 default = []
-# Post-processing of built `.wasm` modules. Off by default so the walrus and
-# wasm-bindgen dependencies stay out of builds that never touch wasm.
-wasm = ["dep:walrus", "dep:wasm-bindgen-cli-support"]
+# Post-processing of built `.wasm` modules. Off by default so the walrus
+# dependency stays out of builds that never touch wasm.
+wasm = ["dep:walrus"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -22,5 +22,4 @@ serde_json = "1.0.117"
 serde_yaml = "0.9.34"
 toml = { workspace = true }
 walrus = { workspace = true, optional = true }
-wasm-bindgen-cli-support = { workspace = true, optional = true }
 which = "6.0.1"

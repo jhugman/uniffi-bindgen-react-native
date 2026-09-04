@@ -138,7 +138,7 @@ Either way, remember to point `browser` at whichever file you chose.
 
 - **The generated wasm crate**, wherever `web.manifestPath` pointed — usually `rust_modules/wasm/`. Nothing generates or reads it now.
 - **The `wasm-bindgen` output directory** under your bindings, holding `index.js`, `index_bg.wasm` and their `.d.ts` files. `wasm2` stages a single `.wasm` beside the bindings instead.
-- **`cargo install wasm-bindgen-cli`** from your setup instructions and CI. If your crate's dependencies reach wasm-bindgen, staging runs the rewrite in-process; there is no command to install.
+- **`cargo install wasm-bindgen-cli`** from your setup instructions and CI — but only if nothing in your crate's dependency tree reaches wasm-bindgen. If something does, staging still runs the rewrite, and the binary has to be the version your `Cargo.lock` resolves.
 - **`console_error_panic_hook`**, if you added it to see panics. The player installs a panic hook while opening the module, and prints `[Rust panic] <message>` with the JavaScript stack.
 - **Any `noOverwrite` globs** covering the generated web crate — nothing generates it now. Keep, or add, one for `src/index.web.ts` if you wrote your own and anything in your pipeline still calls `generate all`.
 - **The COEP and COOP headers** in `metro.config.js`, if you added them only for the `web` flavor. Those exist for `SharedArrayBuffer`, which the player does not use. Keep `assetExts.push('wasm')`, which `wasm2` still needs.
