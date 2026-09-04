@@ -13,12 +13,13 @@
 //!    into a flat buffer without per-call allocation.
 //! 2. **Buffer** ([`PreparedCall`]) — a zeroed byte vec sized for one call, with
 //!    accessor methods that hand out correctly-sized mutable slices per argument.
-//! 3. **Invocation** ([`invoke`]) — builds libffi `Arg` references from the
-//!    buffer and calls the resolved symbol, returning a typed [`CallReturn`].
+//! 3. **Invocation** ([`Module::call`]) — builds libffi `Arg` references from
+//!    the buffer, calls the resolved symbol, and writes the return value's
+//!    native-endian bytes into a caller-provided buffer.
 //!
 //! The bridge layer (e.g. napi) is responsible for converting JS values into
-//! the bytes that fill each slot, and for interpreting `CallReturn` variants
-//! back into JS values. Core never touches JS types.
+//! the bytes that fill each slot, and for interpreting the written return
+//! bytes back into JS values. Core never touches JS types.
 
 use std::ffi::c_void;
 use std::mem::{align_of, size_of};
@@ -135,37 +136,11 @@ impl<'m> PreparedCall<'m> {
         Some(&mut self.bytes[slot.offset..slot.offset + slot.size])
     }
 
-    /// Consume the buffer and invoke the resolved function.
-    pub(crate) fn invoke(self) -> Result<CallReturn> {
-        self.function.invoke(&self.bytes)
+    /// Consume the buffer, invoke the resolved function, and write the return
+    /// value's native-endian bytes into `out`.
+    pub(crate) fn invoke(self, out: &mut [u8]) -> Result<usize> {
+        self.function.invoke(&self.bytes, out)
     }
-}
-
-/// The typed return value from an FFI call.
-///
-/// Each variant carries the Rust-native type that libffi produced. The bridge
-/// layer pattern-matches on this to create the appropriate JS representation
-/// (e.g. `U32` -> `env.create_uint32()`, `I64` -> `env.create_bigint_from_i64()`).
-///
-/// Byte-level serialisation is deliberately *not* done here — that's the
-/// bridge layer's responsibility.
-#[derive(Debug)]
-pub enum CallReturn {
-    Void,
-    U8(u8),
-    I8(i8),
-    U16(u16),
-    I16(i16),
-    U32(u32),
-    I32(i32),
-    U64(u64),
-    I64(i64),
-    F32(f32),
-    F64(f64),
-    /// A raw pointer return (void*, references, callback fn pointers).
-    Pointer(usize),
-    /// An owned `RustBuffer` that the bridge layer must eventually free.
-    RustBuffer(RustBufferC),
 }
 
 // ---------------------------------------------------------------------------
@@ -187,18 +162,44 @@ impl Module {
         })
     }
 
-    /// Invoke a [`PreparedCall`] whose argument slots have been filled by the
-    /// bridge layer.
+    /// Invoke a [`PreparedCall`], writing the return value's native-endian bytes
+    /// into `out`. Returns the number of bytes written (0 for a void return).
     ///
     /// Guards the call with lifecycle checks: returns `Err(Unloading)` if the
     /// module is shutting down. The `PreparedCall` is consumed.
-    pub fn call(&self, args: PreparedCall<'_>) -> Result<CallReturn> {
+    pub fn call(&self, args: PreparedCall<'_>, out: &mut [u8]) -> Result<usize> {
         if !self.lifecycle.try_begin_call() {
             return Err(Error::Unloading);
         }
-        let result = args.invoke();
+        let result = args.invoke(out);
         self.lifecycle.end_call();
         result
+    }
+
+    /// Allocate a Rust-owned buffer of `size` bytes via the library's `rustbuffer_alloc`.
+    pub fn rustbuffer_alloc(&self, size: i32) -> Result<RustBufferC> {
+        use crate::ffi_c_types::{RustBufferAllocFn, RustCallStatusC};
+        if !self.lifecycle.try_begin_call() {
+            return Err(Error::Unloading);
+        }
+        // SAFETY: `alloc_ptr` is the address dlsym returned at registration for the
+        // name the spec gave as `rustbuffer_alloc`, and the caller of `Module::new`
+        // warrants that name denotes a UniFFI-generated `rustbuffer_alloc`, whose
+        // signature is `RustBufferAllocFn`. The library it came from is kept open
+        // for the Module's lifetime.
+        let func: RustBufferAllocFn = unsafe { std::mem::transmute(self.rb_ops.alloc_ptr) };
+        let mut status = RustCallStatusC::default();
+        // SAFETY: `func` has the signature transmuted above; `status` is a live
+        // local the callee may write its error out-param through.
+        let rb = unsafe { func(size, &mut status) };
+        self.lifecycle.end_call();
+        if status.code != 0 {
+            return Err(Error::Other(format!(
+                "rustbuffer_alloc failed: status code {}",
+                status.code
+            )));
+        }
+        Ok(rb)
     }
 
     /// Copy JS-owned bytes into a new Rust-allocated `RustBufferC`.
@@ -298,6 +299,14 @@ impl Module {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use crate::module::AbortCallbacksFn;
+    use crate::spec::{FunctionDef, ModuleSpec};
+    use crate::test_support::{
+        fixture_cdylib_path, hello_world_rustbuffer_symbols, noop_abort_callbacks,
+    };
 
     #[test]
     fn layout_int32_int64() {
@@ -314,5 +323,96 @@ mod tests {
     fn layout_with_rust_call_status() {
         let lay = ArgLayout::compute(&[FfiTypeDesc::Int32], true).unwrap();
         assert!(lay.rust_call_status_slot.is_some());
+    }
+
+    /// Build the `hello-world` fixture cdylib and load it as a `Module` wired only
+    /// with the RustBuffer symbols (no functions/callbacks/structs) — enough for
+    /// the rustbuffer_* guard tests, which don't need a real function call.
+    fn test_module() -> Arc<Module> {
+        let spec = ModuleSpec {
+            rustbuffer_symbols: hello_world_rustbuffer_symbols(),
+            functions: Default::default(),
+            callbacks: Default::default(),
+            structs: Default::default(),
+        };
+        let abort: AbortCallbacksFn = noop_abort_callbacks;
+        Module::new(&fixture_cdylib_path(), spec, abort, std::ptr::null()).expect("module load")
+    }
+
+    /// The `hello-world` fixture with `add(u32, u32) -> u32` registered.
+    fn test_module_with_add() -> Arc<Module> {
+        let mut functions = HashMap::new();
+        functions.insert(
+            "uniffi_hello_world_fn_func_add".to_string(),
+            FunctionDef {
+                args: vec![FfiTypeDesc::UInt32, FfiTypeDesc::UInt32],
+                ret: FfiTypeDesc::UInt32,
+                has_rust_call_status: true,
+            },
+        );
+        let spec = ModuleSpec {
+            rustbuffer_symbols: hello_world_rustbuffer_symbols(),
+            functions,
+            callbacks: Default::default(),
+            structs: Default::default(),
+        };
+        let abort: AbortCallbacksFn = noop_abort_callbacks;
+        Module::new(&fixture_cdylib_path(), spec, abort, std::ptr::null()).expect("module load")
+    }
+
+    #[test]
+    fn rustbuffer_alloc_refuses_after_unload() {
+        let m = test_module();
+        m.unload().expect("unload");
+        assert!(matches!(m.rustbuffer_alloc(16), Err(Error::Unloading)));
+    }
+
+    #[test]
+    fn call_writes_native_endian_return_bytes() {
+        use crate::ffi_c_types::RustCallStatusC;
+
+        let m = test_module_with_add();
+        let mut call = m
+            .prepare_call("uniffi_hello_world_fn_func_add")
+            .expect("prepare_call");
+        call.arg_slot(0)
+            .expect("arg 0")
+            .copy_from_slice(&20u32.to_ne_bytes());
+        call.arg_slot(1)
+            .expect("arg 1")
+            .copy_from_slice(&22u32.to_ne_bytes());
+        // The callee's signature takes `&mut RustCallStatus`; it must point
+        // somewhere real even though this call can't fail.
+        let mut status = RustCallStatusC::default();
+        if let Some(slot) = call.rust_call_status_slot() {
+            crate::slot::write_pointer(slot, &mut status as *mut RustCallStatusC as *const c_void);
+        }
+        let mut out = [0u8; 8];
+        let n = m.call(call, &mut out).expect("call");
+        assert_eq!(n, 4, "u32 return is 4 bytes");
+        assert_eq!(u32::from_ne_bytes(out[..4].try_into().unwrap()), 42);
+    }
+
+    #[test]
+    fn call_rejects_a_return_buffer_that_is_too_small() {
+        use crate::ffi_c_types::RustCallStatusC;
+
+        let m = test_module_with_add();
+        let mut call = m
+            .prepare_call("uniffi_hello_world_fn_func_add")
+            .expect("prepare_call");
+        call.arg_slot(0)
+            .expect("arg 0")
+            .copy_from_slice(&1u32.to_ne_bytes());
+        call.arg_slot(1)
+            .expect("arg 1")
+            .copy_from_slice(&1u32.to_ne_bytes());
+        // Same as above: give the callee a real status slot to write through.
+        let mut status = RustCallStatusC::default();
+        if let Some(slot) = call.rust_call_status_slot() {
+            crate::slot::write_pointer(slot, &mut status as *mut RustCallStatusC as *const c_void);
+        }
+        let mut out = [0u8; 2];
+        assert!(m.call(call, &mut out).is_err());
     }
 }

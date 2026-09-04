@@ -70,6 +70,34 @@ impl Module {
         self.lifecycle.is_unloading()
     }
 
+    /// Stop this module serving its frontend: set the unloading flag, then call
+    /// whatever abort hook was registered. Nothing is drained, nothing is freed
+    /// and the library stays mapped, so there is nothing to wait for.
+    ///
+    /// Releasing parked callbacks is the abort hook's job, and the hook is the
+    /// frontend's to supply.
+    ///
+    /// The trampoline map is left intact on purpose: the flag alone makes every
+    /// entry inert, and clearing it would only let a later marshal build a
+    /// replacement nothing can ever call.
+    ///
+    /// One way, and it forecloses the others: `unload` keys off the same flag,
+    /// so after a `disarm` it early-returns without draining or clearing the
+    /// map, and an `unload_force` behind it would `dlclose` a library with
+    /// in-flight calls and a map still full of pointers into it. No frontend
+    /// does both today — jsi disarms and never unloads, napi unloads and never
+    /// disarms — and one that wanted both would have to give `unload` a
+    /// stronger test than the flag.
+    ///
+    /// Returns `Ok(())` immediately if the module is already unloading.
+    pub fn disarm(&self) -> Result<()> {
+        if !self.lifecycle.begin_unload() {
+            return Ok(());
+        }
+        (self.abort_callbacks)(self.abort_user_data);
+        Ok(())
+    }
+
     /// Initiate orderly shutdown: set the unloading flag, abort frontend callbacks,
     /// then wait for in-flight calls to drain.
     ///
@@ -80,6 +108,10 @@ impl Module {
         }
         (self.abort_callbacks)(self.abort_user_data);
         self.lifecycle.wait_for_drain();
+        self.trampolines
+            .lock()
+            .expect("trampolines mutex poisoned")
+            .clear();
         Ok(())
     }
 
