@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, PoisonError};
 
 use libffi::low;
@@ -225,11 +225,30 @@ impl Module {
         let fn_ptr = *closure.code_ptr() as *const c_void;
         std::mem::forget(closure);
 
+        // Counted here rather than at the frontends' call sites: this is the one
+        // place either bridge can build a trampoline, and a build that is never
+        // remembered still leaks.
+        self.trampolines_built.fetch_add(1, Ordering::Relaxed);
+
         Ok(fn_ptr)
     }
 }
 
 impl Module {
+    /// How many trampolines this module has built.
+    ///
+    /// A trampoline and its userdata are leaked by design — the library may
+    /// invoke the pointer from any thread long after the call that produced it —
+    /// so reuse is the only thing keeping the total bounded. That makes this a
+    /// leak counter a test can assert on: over a workload that marshals the same
+    /// JS function repeatedly, it must not move.
+    ///
+    /// Counts builds, not live map entries. The two differ when a frontend
+    /// builds without remembering, which is exactly the case worth catching.
+    pub fn trampolines_built(&self) -> u64 {
+        self.trampolines_built.load(Ordering::Relaxed)
+    }
+
     /// Look up a previously-remembered trampoline for this callback name and JS
     /// function identity, if any.
     ///
