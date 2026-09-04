@@ -6,6 +6,8 @@
 #include <ReactCommon/CallInvoker.h>
 #include <jsi/jsi.h>
 
+#include <atomic>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <deque>
@@ -15,8 +17,8 @@
 #include <vector>
 
 #include "callbacks.h" // Rust -> JS callback machinery (vtable building, the three fns)
-#include "ubrn_jsi.h" // from runtimes/jsi/include
-#include "value_conv.h" // tagSize / scalarToBytes / bytesToScalar / arrayBytes / ArgDesc
+#include "ubrn_jsi.h"   // from runtimes/jsi/include
+#include "value_conv.h" // ArgDesc / scalarToBytes / bytesToScalar / arrayBytes
 
 namespace jsi = facebook::jsi;
 
@@ -33,6 +35,8 @@ struct FnInfo {
   std::string name;
   std::vector<ArgDesc> args;
   uint8_t retTag;
+  // Core's slot width for retTag, resolved at registration (0 for void).
+  size_t retSize;
   bool hasRcs;
 };
 
@@ -85,24 +89,32 @@ jsi::Value rustBufferToUint8Array(jsi::Runtime &rt, UbrnJsiModule *m,
 // acceptable while out of scope. Reference(Struct) (vtable) args and plain
 // Callback fn-ptr args ARE supported here (the `callbacks` fixture).
 //
-// Note: UBRN_TY_UNSUPPORTED, ArgDesc and argDescFromDefObject now live in
+// Note: ArgDesc, argDescFromDefObject, and UBRN_TY_UNSUPPORTED all live in
 // value_conv.h (shared with the callback machinery).
+
+// The `uniffi` global, defined below.
+class UniffiPlayerRoot;
 
 // Build the native module object from a parsed DEFINITIONS and a registered
 // handle.
+//
+// `root` is captured, not used: a module object that JS can still call keeps
+// alive the root that disarms it, so reassigning `globalThis.uniffi` cannot
+// collect the root out from under a live module.
 jsi::Value
 buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
                   std::shared_ptr<std::vector<FnInfo>> fns,
-                  std::shared_ptr<ubrn_cb::ModuleCallbackInfo> cbInfo) {
+                  std::shared_ptr<ubrn_cb::ModuleCallbackInfo> cbInfo,
+                  std::shared_ptr<UniffiPlayerRoot> root) {
   jsi::Object mod(rt);
   for (const auto &fn : *fns) {
     FnInfo info = fn; // copy into the closure
     auto hostFn = jsi::Function::createFromHostFunction(
         rt, jsi::PropNameID::forUtf8(rt, info.name),
         (unsigned)info.args.size() + (info.hasRcs ? 1 : 0),
-        [handle, info, cbInfo](jsi::Runtime &rt, const jsi::Value &,
-                               const jsi::Value *args,
-                               size_t count) -> jsi::Value {
+        [handle, info, cbInfo, root](jsi::Runtime &rt, const jsi::Value &,
+                                     const jsi::Value *args,
+                                     size_t count) -> jsi::Value {
           size_t nDeclared = info.args.size();
 
           // Guard the lower bound before indexing args[i] below: a JS caller
@@ -116,14 +128,14 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
 
           // Marshal args into contiguous backing storage. Scalars are written
           // as native bytes; a RustBuffer arg is a JS Uint8Array that we copy
-          // into a Rust-owned buffer (via rustbuffer_from_bytes) whose 24-byte
-          // repr(C) layout is then stored as the arg payload.
+          // into a Rust-owned buffer (via rustbuffer_from_bytes) whose repr(C)
+          // layout (size target-dependent) is then stored as the arg payload.
           std::vector<std::vector<uint8_t>> backing(nDeclared);
           std::vector<const void *> argPtrs(nDeclared);
           std::vector<size_t> argSizes(nDeclared);
           for (size_t i = 0; i < nDeclared; i++) {
             uint8_t tag = info.args[i].tag;
-            size_t sz = tagSize(tag);
+            size_t sz = info.args[i].size;
             backing[i].resize(sz);
             if (tag == UBRN_TY_RUSTBUFFER) {
               UbrnRustBuffer rb = rustBufferForArg(rt, handle, args[i]);
@@ -165,12 +177,20 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
           RustCallStatus status{};
           void *statusPtr = info.hasRcs ? &status : nullptr;
 
-          size_t retSize = tagSize(info.retTag);
-          std::vector<uint8_t> out(retSize ? retSize : 1, 0);
+          // A return is never wider than a RustBuffer, so it fits a stack
+          // buffer. This runs on every call, so it must not allocate.
+          size_t retSize = info.retSize;
+          uint8_t out[sizeof(UbrnRustBuffer)] = {};
+          if (retSize > sizeof(out)) {
+            throw jsi::JSError(
+                rt, "uniffi jsi player: return wider than RustBuffer "
+                    "for " +
+                        info.name);
+          }
 
           int rc = ubrn_jsi_call(handle, info.name.c_str(), argPtrs.data(),
-                                 argSizes.data(), nDeclared, statusPtr,
-                                 out.data(), retSize);
+                                 argSizes.data(), nDeclared, statusPtr, out,
+                                 retSize);
           if (rc != 0) {
             throw jsi::JSError(
                 rt, "uniffi jsi player: ubrn_jsi_call failed, code " +
@@ -201,16 +221,17 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
             }
           }
 
-          // A RustBuffer return is the 24-byte repr(C) UbrnRustBuffer written
-          // into `out`. Alias it as a Uint8Array whose backing memory is freed
-          // when the JS view is GC'd (see RustOwnedBuffer).
+          // A RustBuffer return is the repr(C) UbrnRustBuffer (size target-
+          // dependent) written into `out`. Alias it as a Uint8Array whose
+          // backing memory is freed when the JS view is GC'd (see
+          // RustOwnedBuffer).
           if (info.retTag == UBRN_TY_RUSTBUFFER) {
             UbrnRustBuffer rb;
-            memcpy(&rb, out.data(), sizeof(rb));
+            memcpy(&rb, out, sizeof(rb));
             return rustBufferToUint8Array(rt, handle, rb);
           }
 
-          return bytesToScalar(rt, info.retTag, out.data());
+          return bytesToScalar(rt, info.retTag, out);
         });
     mod.setProperty(rt, info.name.c_str(), hostFn);
   }
@@ -252,14 +273,14 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
   //
   // The `$` prefix cannot collide with a real entry: every other property here
   // is an FFI symbol name from the module spec.
-  mod.setProperty(
-      rt, "$uniffiTrampolineCount",
-      jsi::Function::createFromHostFunction(
-          rt, jsi::PropNameID::forUtf8(rt, "$uniffiTrampolineCount"), 0,
-          [cbInfo](jsi::Runtime &, const jsi::Value &, const jsi::Value *,
-                   size_t) -> jsi::Value {
-            return jsi::Value((double)cbInfo->trampolines.size());
-          }));
+  mod.setProperty(rt, "$uniffiTrampolineCount",
+                  jsi::Function::createFromHostFunction(
+                      rt,
+                      jsi::PropNameID::forUtf8(rt, "$uniffiTrampolineCount"), 0,
+                      [cbInfo](jsi::Runtime &, const jsi::Value &,
+                               const jsi::Value *, size_t) -> jsi::Value {
+                        return jsi::Value((double)cbInfo->trampolinesBuilt);
+                      }));
 
   // rustbuffer_free(view) — the RustOwnedBuffer destructor frees the underlying
   // allocation on GC, so this is a no-op. Codegen calls it eagerly in a
@@ -393,12 +414,101 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
   return jsi::Value(rt, mod);
 }
 
+// Process-wide count of player roots destroyed, exposed to JS as
+// `uniffi.$teardownCount`. Diagnostic only: everything else the destructor
+// below does is invisible from the runtime that replaces it, so this is the
+// only way a test can prove the trigger fired at all.
+std::atomic<uint64_t> g_rootTeardowns{0};
+
+// The `uniffi` global.
+//
+// A HostObject rather than a plain Object because JSI destroys host objects
+// with the runtime that owns them: ~UniffiPlayerRoot is the teardown hook a
+// full reload otherwise does not give us, and no caller can forget to trigger
+// it. Every module registered through this root is disarmed there, so a
+// trampoline that outlives the runtime returns without touching it, rather than
+// dereferencing a destroyed one. It zeroes whatever return bytes the callback
+// has; an out_return callback has none, so Rust reads back
+// FfiDefault::ffi_default() with call_status.code still 0.
+//
+// Every module object built from this root holds a strong reference back to it,
+// so the set of armed modules and the root that disarms them live and die
+// together, whatever JS does to the `uniffi` global.
+//
+// The destructor performs no VM operation — no jsi::Value, no property, no call
+// into the runtime. JSI runs host-object dtors from inside the GC with no
+// usable Runtime& guaranteed, so it may only touch the shim's own mutexes and a
+// C flag, and must stay cheap.
+class UniffiPlayerRoot : public jsi::HostObject,
+                         public std::enable_shared_from_this<UniffiPlayerRoot> {
+public:
+  UniffiPlayerRoot(std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+                   std::thread::id jsThreadId)
+      : callInvoker_(std::move(callInvoker)), jsThreadId_(jsThreadId) {}
+
+  ~UniffiPlayerRoot() override {
+    // Reachability makes this the runtime's own teardown (see abortModule), but
+    // JSI reserves the right to finalize a host object on any thread, so the
+    // thread is checked and not merely asserted: the shim ships with NDEBUG.
+    const bool onJsThread = std::this_thread::get_id() == jsThreadId_;
+    assert(onJsThread && "uniffi player root finalized off the JS thread");
+    for (const auto &info : modules_) {
+      // Per module, because one that fails must not strand the rest still
+      // armed — and because a destructor that throws terminates.
+      try {
+        // abortModule releases workers whose posted tasks still hold pointers
+        // into the frames those workers are about to pop, and only this thread
+        // discards those tasks before they can run. Off it, leave the workers
+        // parked: a stuck worker is a leak, a task writing a popped frame is
+        // memory corruption. Disarm regardless — a flag and a hook, safe from
+        // any thread, and the half that stops the next call reaching a dead
+        // runtime. A worker released here loops straight back into another
+        // call; what turns that call away is the aborted flag, which
+        // cb_dispatch checks before posting, since the disarm below has not run
+        // yet.
+        if (onJsThread) {
+          ubrn_cb::abortModule(*info);
+        }
+        ubrn_jsi_disarm(info->module);
+      } catch (...) {
+      }
+    }
+    g_rootTeardowns.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  jsi::Value get(jsi::Runtime &rt, const jsi::PropNameID &name) override;
+
+  // The invoker and JS thread of the runtime this root belongs to.
+  const std::shared_ptr<facebook::react::CallInvoker> &callInvoker() const {
+    return callInvoker_;
+  }
+  std::thread::id jsThreadId() const { return jsThreadId_; }
+
+  // A registration is added before anything that can throw, so a module core
+  // accepted is never left armed with no owner to disarm it.
+  void addModule(std::shared_ptr<ubrn_cb::ModuleCallbackInfo> info) {
+    modules_.push_back(std::move(info));
+  }
+
+private:
+  std::shared_ptr<facebook::react::CallInvoker> callInvoker_;
+  std::thread::id jsThreadId_;
+  // An additional owner, not the only one: the module object's host-function
+  // closures hold the same infos. Every owner is a JS object of this runtime,
+  // so the infos die here — while the leaked trampoline userdata pointing at
+  // them does not. That back-pointer outliving its target is exactly why
+  // disarming each module above is not optional: the flag is what keeps the
+  // dangling pointer from ever being read.
+  std::vector<std::shared_ptr<ubrn_cb::ModuleCallbackInfo>> modules_;
+};
+
 // `register(definitions)` host function, bound to a library path.
-jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
+jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath,
+                        std::shared_ptr<UniffiPlayerRoot> root) {
   return jsi::Function::createFromHostFunction(
       rt, jsi::PropNameID::forUtf8(rt, "register"), 1,
-      [libPath](jsi::Runtime &rt, const jsi::Value &, const jsi::Value *args,
-                size_t count) -> jsi::Value {
+      [libPath, root](jsi::Runtime &rt, const jsi::Value &,
+                      const jsi::Value *args, size_t count) -> jsi::Value {
         if (count < 1 || !args[0].isObject()) {
           throw jsi::JSError(
               rt, "uniffi jsi player: register() needs a definitions object");
@@ -418,9 +528,9 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
         size_t nFns = names.size(rt);
 
         auto fns = std::make_shared<std::vector<FnInfo>>();
-        // The callback/struct layouts are kept alive for the process lifetime
-        // (captured by the module object's closures, used on every vtable
-        // build).
+        // The callback/struct layouts live as long as this runtime: the module
+        // object's closures and the player root capture them, and both are JS
+        // objects of the runtime registering here. Used on every vtable build.
         auto cbInfo = std::make_shared<ubrn_cb::ModuleCallbackInfo>();
 
         // C-side storage that must outlive ubrn_jsi_register. All raw pointers
@@ -428,14 +538,15 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
         // ends, AFTER ubrn_jsi_register has copied everything into core's owned
         // ModuleSpec.
         std::vector<std::string> nameStore; // function symbol names
-        std::vector<std::vector<uint8_t>> tagStore;
+        std::vector<std::vector<const char *>>
+            tagNameStore; // per-fn arg tag-name arrays
         std::vector<std::vector<const char *>>
             argNameStore; // per-fn arg type-name arrays
         std::deque<std::string>
-            strPool; // stable backing for all type-name strings
+            strPool; // stable backing for all tag- and type-name strings
         std::vector<UbrnFunctionSpec> specs;
         nameStore.reserve(nFns);
-        tagStore.reserve(nFns);
+        tagNameStore.reserve(nFns);
         argNameStore.reserve(nFns);
         specs.reserve(nFns);
 
@@ -477,6 +588,21 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
           return store.back().data();
         };
 
+        // Helper: the tag name is what core parses, so every arg carries one.
+        // Build the full parallel `const char*` array interned in strPool, push
+        // it into `store` so it outlives ubrn_jsi_register, and return its
+        // data() pointer.
+        auto makeArgTagNames =
+            [&intern](const std::vector<ArgDesc> &descs,
+                      std::vector<std::vector<const char *>> &store)
+            -> const char *const * {
+          std::vector<const char *> tagNames(descs.size(), nullptr);
+          for (size_t j = 0; j < descs.size(); j++)
+            tagNames[j] = intern(descs[j].tagName);
+          store.push_back(std::move(tagNames));
+          return store.back().data();
+        };
+
         for (size_t i = 0; i < nFns; i++) {
           auto key = names.getValueAtIndex(rt, i).asString(rt).utf8(rt);
           auto f = fnsObj.getProperty(rt, key.c_str()).asObject(rt);
@@ -486,19 +612,18 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
           FnInfo info;
           info.name = key;
           std::vector<ArgDesc> argDescs(nArgs);
-          std::vector<uint8_t> tags(nArgs);
           bool supported = true;
           for (size_t j = 0; j < nArgs; j++) {
             argDescs[j] = argDescFromDefObject(
                 rt, argsArr.getValueAtIndex(rt, j).asObject(rt));
-            tags[j] = argDescs[j].tag;
-            if (tags[j] == UBRN_TY_UNSUPPORTED)
+            if (argDescs[j].tag == UBRN_TY_UNSUPPORTED)
               supported = false;
           }
           info.args = argDescs;
           ArgDesc retDesc =
               argDescFromDefObject(rt, f.getProperty(rt, "ret").asObject(rt));
           info.retTag = retDesc.tag;
+          info.retSize = retDesc.size;
           if (info.retTag == UBRN_TY_UNSUPPORTED)
             supported = false;
           info.hasRcs = f.getProperty(rt, "hasRustCallStatus").getBool();
@@ -512,29 +637,39 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
           fns->push_back(info);
 
           nameStore.push_back(key);
-          tagStore.push_back(tags);
           UbrnFunctionSpec s;
           s.name = nameStore.back().c_str();
-          s.arg_tags = tagStore.back().data();
+          s.arg_tag_names = makeArgTagNames(argDescs, tagNameStore);
           s.n_args = nArgs;
           s.arg_type_names = makeArgTypeNames(argDescs, argNameStore);
-          s.ret_tag = info.retTag;
+          s.ret_tag_name = intern(retDesc.tagName);
           s.has_rust_call_status = info.hasRcs ? 1 : 0;
           specs.push_back(s);
         }
 
         // --- Parse callbacks: name -> { args, ret, hasRustCallStatus,
         // outReturn }.
+        // A callback's CallbackShape needs the registered module (core owns the
+        // arg layout), so the parsed pieces wait here until after register.
+        struct PendingCallback {
+          std::string name;
+          std::vector<ArgDesc> args;
+          ArgDesc ret;
+          bool hasRcs;
+          bool outReturn;
+        };
+        std::vector<PendingCallback> pendingCbs;
         std::vector<UbrnCallbackSpec> cbSpecs;
-        std::vector<std::vector<uint8_t>> cbTagStore;
+        std::vector<std::vector<const char *>> cbTagNameStore;
         std::vector<std::vector<const char *>> cbArgNameStore;
         if (defs.hasProperty(rt, "callbacks")) {
           auto cbObj = defs.getProperty(rt, "callbacks").asObject(rt);
           auto cbNames = cbObj.getPropertyNames(rt);
           size_t nCb = cbNames.size(rt);
           cbSpecs.reserve(nCb);
-          cbTagStore.reserve(nCb);
+          cbTagNameStore.reserve(nCb);
           cbArgNameStore.reserve(nCb);
+          pendingCbs.reserve(nCb);
           for (size_t i = 0; i < nCb; i++) {
             auto cbName = cbNames.getValueAtIndex(rt, i).asString(rt).utf8(rt);
             auto c = cbObj.getProperty(rt, cbName.c_str()).asObject(rt);
@@ -542,11 +677,9 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
             size_t nArgs = argsArr.size(rt);
 
             std::vector<ArgDesc> argDescs(nArgs);
-            std::vector<uint8_t> tags(nArgs);
             for (size_t j = 0; j < nArgs; j++) {
               argDescs[j] = argDescFromDefObject(
                   rt, argsArr.getValueAtIndex(rt, j).asObject(rt));
-              tags[j] = argDescs[j].tag;
             }
             ArgDesc retDesc =
                 argDescFromDefObject(rt, c.getProperty(rt, "ret").asObject(rt));
@@ -555,18 +688,15 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
             bool outReturn = c.hasProperty(rt, "outReturn") &&
                              c.getProperty(rt, "outReturn").getBool();
 
-            // Cache the shape for vtable building / callback invocation.
-            cbInfo->callbacks.emplace(
-                cbName, ubrn_cb::buildShape(argDescs, retDesc.tag, retDesc.name,
-                                            hasRcs, outReturn));
+            pendingCbs.push_back(
+                {cbName, argDescs, retDesc, hasRcs, outReturn});
 
-            cbTagStore.push_back(tags);
             UbrnCallbackSpec s;
             s.name = intern(cbName);
-            s.arg_tags = cbTagStore.back().data();
+            s.arg_tag_names = makeArgTagNames(argDescs, cbTagNameStore);
             s.n_args = nArgs;
             s.arg_type_names = makeArgTypeNames(argDescs, cbArgNameStore);
-            s.ret_tag = retDesc.tag;
+            s.ret_tag_name = intern(retDesc.tagName);
             s.has_rust_call_status = hasRcs ? 1 : 0;
             s.out_return = outReturn ? 1 : 0;
             // Carry the struct name for a Struct return (e.g. the out_return
@@ -607,7 +737,8 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
                   rt, fieldObj.getProperty(rt, "type").asObject(rt));
               UbrnStructField sf;
               sf.field_name = intern(fieldName);
-              sf.type_tag = typeDesc.tag; // UBRN_TY_CALLBACK for vtable methods
+              // "Callback" for a vtable's method fields.
+              sf.type_tag_name = intern(typeDesc.tagName);
               sf.type_name =
                   typeDesc.name.empty() ? nullptr : intern(typeDesc.name);
               fields.push_back(sf);
@@ -652,33 +783,62 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath) {
           throw jsi::JSError(
               rt, std::string("uniffi jsi player: register failed: ") + err);
         }
-        // `handle` is intentionally not freed here: it is captured by the
-        // module object's host-function closures and lives for the process
-        // lifetime of this test-runner shim. A future module-teardown lifecycle
-        // (distribution packaging phase) will call ubrn_jsi_free at unload
-        // time.
-        return buildModuleObject(rt, handle, fns, cbInfo);
+        // `handle` is never freed: it is captured by the module object's
+        // host-function closures and by leaked trampoline userdata, either of
+        // which can outlive the runtime that registered it. The root disarms it
+        // when that runtime goes away, which is what makes those survivors
+        // inert rather than dangerous.
+        cbInfo->module = handle;
+        cbInfo->bindRuntime(root->callInvoker(), root->jsThreadId());
+        root->addModule(cbInfo);
+
+        // Now that core knows every callback, cache each shape (with core's
+        // slot offsets) for vtable building / callback invocation.
+        for (const auto &p : pendingCbs) {
+          cbInfo->callbacks.emplace(
+              p.name, ubrn_cb::buildShape(rt, handle, p.name, p.args, p.ret,
+                                          p.hasRcs, p.outReturn));
+        }
+
+        return buildModuleObject(rt, handle, fns, cbInfo, root);
       });
 }
 
-void installUniffiHostObject(jsi::Runtime &rt) {
-  jsi::Object uniffi(rt);
-  // open(path) -> { register(defs) -> nativeModule }
-  auto openFn = jsi::Function::createFromHostFunction(
-      rt, jsi::PropNameID::forUtf8(rt, "open"), 1,
-      [](jsi::Runtime &rt, const jsi::Value &, const jsi::Value *args,
-         size_t count) -> jsi::Value {
-        if (count < 1 || !args[0].isString()) {
-          throw jsi::JSError(rt,
-                             "uniffi jsi player: open() needs a path string");
-        }
-        std::string path = args[0].getString(rt).utf8(rt);
-        jsi::Object handle(rt);
-        handle.setProperty(rt, "register", makeRegister(rt, path));
-        return jsi::Value(rt, handle);
-      });
-  uniffi.setProperty(rt, "open", openFn);
-  rt.global().setProperty(rt, "uniffi", uniffi);
+jsi::Value UniffiPlayerRoot::get(jsi::Runtime &rt,
+                                 const jsi::PropNameID &name) {
+  auto prop = name.utf8(rt);
+  if (prop == "open") {
+    // The closure keeps the root alive for as long as JS holds the returned
+    // function. Not a retain cycle: the root does not own the function, and
+    // both die with the runtime.
+    auto self = shared_from_this();
+    return jsi::Function::createFromHostFunction(
+        rt, jsi::PropNameID::forUtf8(rt, "open"), 1,
+        [self](jsi::Runtime &rt, const jsi::Value &, const jsi::Value *args,
+               size_t count) -> jsi::Value {
+          if (count < 1 || !args[0].isString()) {
+            throw jsi::JSError(rt,
+                               "uniffi jsi player: open() needs a path string");
+          }
+          std::string path = args[0].getString(rt).utf8(rt);
+          jsi::Object handle(rt);
+          handle.setProperty(rt, "register", makeRegister(rt, path, self));
+          return jsi::Value(rt, handle);
+        });
+  }
+  if (prop == "$teardownCount") {
+    return jsi::Value((double)g_rootTeardowns.load(std::memory_order_relaxed));
+  }
+  return jsi::Value::undefined();
+}
+
+void installUniffiHostObject(
+    jsi::Runtime &rt,
+    std::shared_ptr<facebook::react::CallInvoker> callInvoker) {
+  auto root = std::make_shared<UniffiPlayerRoot>(std::move(callInvoker),
+                                                 std::this_thread::get_id());
+  rt.global().setProperty(
+      rt, "uniffi", jsi::Object::createFromHostObject(rt, std::move(root)));
 }
 
 } // namespace
@@ -687,10 +847,5 @@ void installUniffiHostObject(jsi::Runtime &rt) {
 extern "C" void
 registerNatives(jsi::Runtime &rt,
                 std::shared_ptr<facebook::react::CallInvoker> callInvoker) {
-  // Capture the CallInvoker + JS thread id for cross-thread Rust -> JS
-  // callbacks (see callbacks.cpp). Same-thread callbacks bypass the invoker
-  // entirely.
-  ubrn_cb::g_callInvoker = std::move(callInvoker);
-  ubrn_cb::g_jsThreadId = std::this_thread::get_id();
-  installUniffiHostObject(rt);
+  installUniffiHostObject(rt, std::move(callInvoker));
 }

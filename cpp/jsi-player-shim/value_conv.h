@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -22,167 +23,142 @@
 
 namespace jsi = facebook::jsi;
 
-// 24-byte UbrnRustBuffer matches core::RustBufferC exactly.
-static_assert(sizeof(UbrnRustBuffer) == 24, "RustBuffer ABI mismatch");
+// UbrnRustBuffer must match core::RustBufferC exactly; abi_assert.cpp pins
+// that layout for every ABI, and is compiled into every build of this library.
 
-// Sentinel returned for FfiType tags the player cannot marshal at all.
-// Functions whose signature contains an unsupported tag are skipped at
-// registration time (e.g. a Reference/MutReference to a non-Struct inner type,
-// or any unrecognized tag — see argDescFromDefObject below).
-constexpr uint8_t UBRN_TY_UNSUPPORTED = 0xFF;
+// The shim's own marshalling discriminant. Not an ABI type: only tag NAMES
+// cross into core. Kept numeric because every per-call marshal switches on it.
+typedef enum {
+  UBRN_TY_VOID = 0,
+  UBRN_TY_U8 = 1,  UBRN_TY_I8 = 2,
+  UBRN_TY_U16 = 3, UBRN_TY_I16 = 4,
+  UBRN_TY_U32 = 5, UBRN_TY_I32 = 6,
+  UBRN_TY_U64 = 7, UBRN_TY_I64 = 8,
+  UBRN_TY_F32 = 9, UBRN_TY_F64 = 10,
+  UBRN_TY_HANDLE = 11,
+  UBRN_TY_RUSTBUFFER = 12, // fully supported (args and return values)
+  UBRN_TY_CALLBACK = 13,   // named; the name travels in the parallel *_type_names array
+  UBRN_TY_STRUCT = 14,     // named; the name travels in the parallel *_type_names array
+  UBRN_TY_REFERENCE = 15,  // pointer to a named struct (vtable); marshalled as
+                           // Reference(Struct(name))
+  UBRN_TY_RUSTCALLSTATUS = 16, // inline RustCallStatus struct ({i8, u64, u64, ptr});
+                               // appears only as a struct field (e.g. inside
+                               // ForeignFutureResult<T>)
+  // Not a type. What ubrnTagFromName answers with for a name the shim cannot
+  // marshal; also marks a signature the player skips.
+  UBRN_TY_UNSUPPORTED = 0xFF,
+} UbrnFfiType;
+
+// Player tag name -> the shim's discriminant. These are core's wire names; a
+// name absent here is one the shim cannot marshal, and the whole function is
+// skipped at registration. Called once per argument at registration, so a scan
+// over 17 entries is the right shape.
+inline UbrnFfiType ubrnTagFromName(std::string_view n) {
+  struct Entry {
+    std::string_view name;
+    UbrnFfiType tag;
+  };
+  static constexpr Entry kTable[] = {
+      {"Void", UBRN_TY_VOID},
+      {"UInt8", UBRN_TY_U8},     {"Int8", UBRN_TY_I8},
+      {"UInt16", UBRN_TY_U16},   {"Int16", UBRN_TY_I16},
+      {"UInt32", UBRN_TY_U32},   {"Int32", UBRN_TY_I32},
+      {"UInt64", UBRN_TY_U64},   {"Int64", UBRN_TY_I64},
+      {"Float32", UBRN_TY_F32},  {"Float64", UBRN_TY_F64},
+      {"Handle", UBRN_TY_HANDLE},
+      {"RustBuffer", UBRN_TY_RUSTBUFFER},
+      {"Callback", UBRN_TY_CALLBACK},
+      {"Struct", UBRN_TY_STRUCT},
+      {"Reference", UBRN_TY_REFERENCE},
+      {"RustCallStatus", UBRN_TY_RUSTCALLSTATUS},
+  };
+  for (const auto &e : kTable) {
+    if (e.name == n) {
+      return e.tag;
+    }
+  }
+  return UBRN_TY_UNSUPPORTED;
+}
 
 // One argument's type, carrying the name for Callback/Struct/Reference tags.
 // For scalars/RustBuffer `name` is empty. `tag` is a UbrnFfiType (or
-// UBRN_TY_UNSUPPORTED).
+// UBRN_TY_UNSUPPORTED). `size` is core's byte width for this type's flat arg
+// slot, resolved once at registration so no call path crosses the ABI for it.
 struct ArgDesc {
   uint8_t tag = UBRN_TY_VOID;
   std::string name; // callback/struct name for named tags, else empty
+  size_t size = 0;  // core's slot width, or 0 where core gives none
+  // The player tag name ("UInt8", "Callback", …) as codegen emits it, after the
+  // shim's own normalisations below. This is what crosses the ABI; `tag` is the
+  // shim's switch discriminant. The two always describe the same type.
+  std::string tagName;
 };
 
-// Classify a DEFINITIONS `{ tag, name?, inner? }` object into an ArgDesc.
+// Classify a DEFINITIONS `{ tag, name?, inner? }` object into an ArgDesc's
+// tag/name. Leaves `size` at 0 — argDescFromDefObject fills that in. The shim
+// owns the name->tag table (ubrnTagFromName); what stays here is the two names
+// core has no number for and the per-tag name/inner lookups off the object.
 //   Callback  -> (UBRN_TY_CALLBACK, name)
 //   Struct    -> (UBRN_TY_STRUCT, name)
 //   Reference(Struct(name)) -> (UBRN_TY_REFERENCE, name)  (vtable pointer arg)
-// Scalars/RustBuffer carry an empty name. Anything else -> UBRN_TY_UNSUPPORTED.
-inline ArgDesc argDescFromDefObject(jsi::Runtime &rt, const jsi::Object &o) {
-  auto tag = o.getProperty(rt, "tag").asString(rt).utf8(rt);
+// Scalars/RustBuffer carry an empty name. Anything else -> UBRN_TY_UNSUPPORTED,
+// which skips the whole function at registration.
+inline ArgDesc argDescTypeFromDefObject(jsi::Runtime &rt,
+                                        const jsi::Object &o) {
+  auto tagName = o.getProperty(rt, "tag").asString(rt).utf8(rt);
   ArgDesc d;
-  if (tag == "Void") {
-    d.tag = UBRN_TY_VOID;
-    return d;
-  }
-  if (tag == "UInt8") {
-    d.tag = UBRN_TY_U8;
-    return d;
-  }
-  if (tag == "Int8") {
-    d.tag = UBRN_TY_I8;
-    return d;
-  }
-  if (tag == "UInt16") {
-    d.tag = UBRN_TY_U16;
-    return d;
-  }
-  if (tag == "Int16") {
-    d.tag = UBRN_TY_I16;
-    return d;
-  }
-  if (tag == "UInt32") {
-    d.tag = UBRN_TY_U32;
-    return d;
-  }
-  if (tag == "Int32") {
-    d.tag = UBRN_TY_I32;
-    return d;
-  }
-  if (tag == "UInt64") {
-    d.tag = UBRN_TY_U64;
-    return d;
-  }
-  if (tag == "Int64") {
-    d.tag = UBRN_TY_I64;
-    return d;
-  }
-  if (tag == "Float32") {
-    d.tag = UBRN_TY_F32;
-    return d;
-  }
-  if (tag == "Float64") {
-    d.tag = UBRN_TY_F64;
-    return d;
-  }
-  if (tag == "Handle") {
-    d.tag = UBRN_TY_HANDLE;
-    return d;
-  }
-  if (tag == "RustBuffer") {
-    d.tag = UBRN_TY_RUSTBUFFER;
-    return d;
-  }
+  // "MutReference" has no tag of its own; the player marshals it exactly as
+  // "Reference" — a pointer, checked for a Struct target below.
+  if (tagName == "MutReference")
+    tagName = "Reference";
+  d.tag = ubrnTagFromName(tagName);
   // A VoidPointer is pointer-sized; we treat it like a Handle for byte layout.
-  // (Appears as a callback's out_return arg type / void return; never needs a
-  // name.)
-  if (tag == "VoidPointer") {
+  // A shim-local parsing choice, not an ABI tag. (Appears as a callback's
+  // out_return arg type / void return; never needs a name.)
+  if (d.tag == UBRN_TY_UNSUPPORTED && tagName == "VoidPointer") {
     d.tag = UBRN_TY_HANDLE;
-    return d;
+    tagName = "Handle";
   }
-  // RustCallStatus only appears as an inline struct field (e.g. inside
-  // ForeignFutureResult<T>); its byte layout is computed by core via
-  // struct_field_offsets, so it needs no tagSize entry of its own.
-  if (tag == "RustCallStatus") {
-    d.tag = UBRN_TY_RUSTCALLSTATUS;
-    return d;
-  }
-  if (tag == "Callback") {
-    d.tag = UBRN_TY_CALLBACK;
+  d.tagName = tagName;
+
+  switch (d.tag) {
+  case UBRN_TY_CALLBACK:
+  case UBRN_TY_STRUCT:
     d.name = o.getProperty(rt, "name").asString(rt).utf8(rt);
-    return d;
-  }
-  if (tag == "Struct") {
-    d.tag = UBRN_TY_STRUCT;
-    d.name = o.getProperty(rt, "name").asString(rt).utf8(rt);
-    return d;
-  }
-  if (tag == "Reference" || tag == "MutReference") {
+    break;
+  case UBRN_TY_REFERENCE: {
+    // Only a pointer to a named struct (a vtable) is marshallable; a reference
+    // to anything else the player skips.
     auto inner = o.getProperty(rt, "inner").asObject(rt);
     auto innerTag = inner.getProperty(rt, "tag").asString(rt).utf8(rt);
-    if (innerTag == "Struct") {
-      d.tag = UBRN_TY_REFERENCE;
+    if (ubrnTagFromName(innerTag) == UBRN_TY_STRUCT) {
       d.name = inner.getProperty(rt, "name").asString(rt).utf8(rt);
-      return d;
+    } else {
+      d.tag = UBRN_TY_UNSUPPORTED;
     }
-    d.tag = UBRN_TY_UNSUPPORTED;
-    return d;
+    break;
   }
-  d.tag = UBRN_TY_UNSUPPORTED;
+  default:
+    break;
+  }
   return d;
 }
 
-// Byte width of a type tag. RustBuffer marshals as its 24-byte repr(C) layout.
-inline size_t tagSize(uint8_t tag) {
-  switch (tag) {
-  case UBRN_TY_VOID:
-    return 0;
-  case UBRN_TY_U8:
-  case UBRN_TY_I8:
-    return 1;
-  case UBRN_TY_U16:
-  case UBRN_TY_I16:
-    return 2;
-  case UBRN_TY_U32:
-  case UBRN_TY_I32:
-  case UBRN_TY_F32:
-    return 4;
-  case UBRN_TY_U64:
-  case UBRN_TY_I64:
-  case UBRN_TY_F64:
-  case UBRN_TY_HANDLE:
-    return 8;
-  // Callback/Struct(pointer)/Reference all marshal as a pointer-sized slot in a
-  // callback's flat arg buffer (mirrors core::slot_size_align for these).
-  case UBRN_TY_CALLBACK:
-  case UBRN_TY_STRUCT:
-  case UBRN_TY_REFERENCE:
-    return sizeof(void *);
-  case UBRN_TY_RUSTBUFFER:
-    return sizeof(UbrnRustBuffer); // 24
-  default:
-    return 0;
-  }
-}
-
-// Natural alignment of a tag's slot. Mirrors core::slot_size_align: every
-// primitive/pointer slot has align == size; RustBuffer aligns to 8 (its first
-// field is u64). Used to reproduce core's ArgLayout offsets on the C++ side.
-inline size_t tagAlign(uint8_t tag) {
-  switch (tag) {
-  case UBRN_TY_VOID:
-    return 1;
-  case UBRN_TY_RUSTBUFFER:
-    return 8; // RustBufferC{u64,u64,*}
-  default:
-    return tagSize(tag) ? tagSize(tag) : 1;
-  }
+// Classify a DEFINITIONS type object AND resolve its flat-slot byte width from
+// core's geometry table, so the shim never derives a size of its own. Called at
+// registration; every call path then reads ArgDesc::size.
+inline ArgDesc argDescFromDefObject(jsi::Runtime &rt, const jsi::Object &o) {
+  ArgDesc d = argDescTypeFromDefObject(rt, o);
+  // Core gives no geometry for a bare Struct (it only travels behind a
+  // pointer), and an unsupported desc must not carry one either — a
+  // Reference to a non-Struct keeps the marshallable tag name, so ask only
+  // for tags the shim can actually marshal. Both keep size 0, and every call
+  // path that would read a width intercepts them before reaching it.
+  size_t size = 0;
+  if (d.tag != UBRN_TY_UNSUPPORTED &&
+      ubrn_jsi_scalar_slot_size_align(d.tagName.c_str(), &size, nullptr))
+    d.size = size;
+  return d;
 }
 
 // Read the raw 64-bit pattern from a jsi value for a U64/I64/Handle slot. The
@@ -200,7 +176,7 @@ inline uint64_t bits64FromValue(jsi::Runtime &rt, const jsi::Value &v) {
   return (uint64_t)(int64_t)v.asNumber();
 }
 
-// Write a jsi number/bool/bigint into `dst` (size tagSize(tag)) as native
+// Write a jsi number/bool/bigint into `dst` (the tag's slot width) as native
 // bytes.
 inline void scalarToBytes(jsi::Runtime &rt, uint8_t tag, const jsi::Value &v,
                           uint8_t *dst) {
