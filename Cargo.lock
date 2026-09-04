@@ -1794,6 +1794,7 @@ dependencies = [
  "textwrap",
  "toml 0.9.12+spec-1.1.0",
  "ubrn_common",
+ "uniffi-runtime-core",
  "uniffi_bindgen",
  "uniffi_meta",
  "wasmparser 0.255.0",

@@ -15,6 +15,23 @@ use crate::bindings::gen_typescript::ffi_module::{
     namespace_has_async, FfiArgDecl, FfiFunctionDecl, TsFfiModule,
 };
 
+/// The player tag for a callback's `uniffi_out_return` argument type.
+///
+/// A `VoidPointer` out-return is uniffi's encoding for a method that returns
+/// nothing, so it emits `Void`: a pointer tag here makes a consumer write a
+/// value through the out-return pointer for a method that has none.
+/// `Reference`/`MutReference` wrap the real type and are unwrapped.
+pub(crate) fn ret_tag_for_out_return(ty: &general::FfiType) -> String {
+    let inner = match ty {
+        general::FfiType::Reference(t) | general::FfiType::MutReference(t) => t.as_ref(),
+        t => t,
+    };
+    match inner {
+        general::FfiType::VoidPointer => "FfiType.Void".into(),
+        other => ffi_type_to_player(other),
+    }
+}
+
 impl PlayerFfiModule {
     pub(crate) fn from_general(
         namespace: &general::Namespace,
@@ -117,14 +134,7 @@ impl PlayerFfiModule {
                         .find(|a| {
                             a.name == "uniffi_out_return" || a.name == "uniffi_out_dropped_callback"
                         })
-                        .map(|a| {
-                            let inner = match &a.ty.ty {
-                                general::FfiType::Reference(t)
-                                | general::FfiType::MutReference(t) => t.as_ref(),
-                                t => t,
-                            };
-                            ffi_type_to_player(inner)
-                        })
+                        .map(|a| ret_tag_for_out_return(&a.ty.ty))
                         .unwrap_or_else(|| "FfiType.Void".into())
                 } else {
                     ft.return_type
@@ -243,5 +253,32 @@ impl PlayerFfiModule {
             arguments,
             return_type,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_void_pointer_out_return_emits_void() {
+        assert_eq!(
+            ret_tag_for_out_return(&general::FfiType::VoidPointer),
+            "FfiType.Void"
+        );
+    }
+
+    #[test]
+    fn a_reference_out_return_still_unwraps_to_its_inner_type() {
+        let inner = general::FfiType::Reference(Box::new(general::FfiType::UInt32));
+        assert_eq!(ret_tag_for_out_return(&inner), "FfiType.UInt32");
+    }
+
+    #[test]
+    fn a_plain_out_return_type_is_emitted_as_itself() {
+        assert_eq!(
+            ret_tag_for_out_return(&general::FfiType::UInt64),
+            "FfiType.UInt64"
+        );
     }
 }
