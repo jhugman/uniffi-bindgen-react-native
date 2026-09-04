@@ -14,6 +14,10 @@ export class UniffiHandleMap<T> {
   // "Foreign handles are generated with a handle map that only generates odd values."
   // "Foreign handles must always have the lowest bit set"
   // "0 is an invalid value."
+  //
+  // Numbering restarts here in every runtime, so handles collide across a
+  // reload: dropping an object stashed by the previous runtime frees the same
+  // number in this one, evicting whatever now holds it.
   private currentHandle: UniffiHandle = BigInt(1);
 
   insert(value: T): UniffiHandle {
