@@ -221,5 +221,18 @@ pub fn register(
     })?;
     result.set_named_property("rustbuffer_free", free_fn)?;
 
+    // A diagnostic, not part of the FFI surface: how many callback trampolines
+    // this module has built. Trampolines are leaked by design, so reuse is the
+    // only thing bounding the total, and nothing else observable moves when
+    // reuse breaks — the leak pins the same JS function object every time.
+    // Named to match the JSI player's identical hook, and counting the same
+    // thing: builds, from core's single build point.
+    let count_module = Arc::clone(&module);
+    let count_fn = env.create_function_from_closure("$uniffiTrampolineCount", move |ctx| {
+        ctx.env
+            .create_int64(count_module.trampolines_built() as i64)
+    })?;
+    result.set_named_property("$uniffiTrampolineCount", count_fn)?;
+
     Ok((result, module))
 }

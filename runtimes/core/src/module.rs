@@ -20,6 +20,7 @@
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::path::Path;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
 use libffi::low::CodePtr;
@@ -186,6 +187,12 @@ pub struct Module {
     /// callback marshal. Stores `usize`, not a raw pointer, so the field carries
     /// no pointer of its own; the `Mutex` is what the impls below rest on.
     pub(crate) trampolines: Mutex<HashMap<u64, HashMap<String, usize>>>,
+    /// Trampolines this module has built, counting those the frontend never
+    /// remembered. Monotonic: a trampoline is leaked by design, so nothing here
+    /// ever decreases and the count is a leak total, not a live-entry count.
+    /// Reuse is the only thing bounding it, which is what makes it worth
+    /// exposing — see [`Module::trampolines_built`].
+    pub(crate) trampolines_built: AtomicU64,
 }
 
 // SAFETY: interior mutability is via atomics in UnloadState and via Mutex (library,
@@ -279,6 +286,7 @@ impl Module {
             abort_user_data,
             lifecycle: crate::lifecycle::UnloadState::new(),
             trampolines: Mutex::new(HashMap::new()),
+            trampolines_built: AtomicU64::new(0),
         }))
     }
 }
