@@ -7,7 +7,7 @@
 //! Builds the fixture, dlopens it via the C ABI, and calls `add(2, 3)`.
 
 mod common;
-use common::{fixture_cdylib, UBRN_TY_U32};
+use common::{fixture_cdylib, TAG_UINT32};
 
 use std::ffi::{c_void, CString};
 use std::mem::size_of;
@@ -27,13 +27,14 @@ fn add_roundtrip() {
     let add_name = CString::new("uniffi_hello_world_fn_func_add").unwrap();
 
     // add(u32, u32) -> u32, with a trailing RustCallStatus.
-    let arg_tags: [u8; 2] = [UBRN_TY_U32, UBRN_TY_U32];
+    let u32_tag = CString::new(TAG_UINT32).unwrap();
+    let arg_tag_names = [u32_tag.as_ptr(), u32_tag.as_ptr()];
     let fn_spec = UbrnFunctionSpec {
         name: add_name.as_ptr(),
-        arg_tags: arg_tags.as_ptr(),
+        arg_tag_names: arg_tag_names.as_ptr(),
         n_args: 2,
         arg_type_names: std::ptr::null(),
-        ret_tag: UBRN_TY_U32,
+        ret_tag_name: u32_tag.as_ptr(),
         has_rust_call_status: 1,
     };
     let spec = UbrnModuleSpec {
