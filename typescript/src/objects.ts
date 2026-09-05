@@ -111,11 +111,13 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
   }
 
   lift(value: UniffiHandle): T {
-    if (this.handleMap.has(value)) {
+    // Odd is foreign, even is an Arc pointer. Deciding by map membership instead
+    // would pass a stale foreign handle — one a hot reload's old runtime minted —
+    // to Rust as a pointer.
+    if ((value & BigInt(1)) === BigInt(1)) {
       return this.handleMap.get(value);
-    } else {
-      return super.lift(value);
     }
+    return super.lift(value);
   }
 
   drop(handle: UniffiHandle): T | undefined {
