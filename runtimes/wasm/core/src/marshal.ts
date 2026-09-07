@@ -68,6 +68,14 @@ export function writeRustBufferPayload(
   bytes: Uint8Array,
 ): void {
   const len = bytes.byteLength;
+  // A lowered view may be narrower than the allocation behind it: the string
+  // converter sizes for the worst case, encodes, then shrinks the view to the
+  // bytes actually written, recording the real allocation size here. Rust
+  // frees a `RustBuffer` by its `capacity`, so passing `len` for a shrunk view
+  // would deallocate with the wrong size and corrupt the allocator.
+  const marked = (bytes as unknown as { __ubrnRustCapacity?: number })
+    .__ubrnRustCapacity;
+  let capacity = typeof marked === "number" && marked > len ? marked : len;
   let dataPtr = 0;
   if (len > 0) {
     if (bytes.buffer === m.buffer()) {
@@ -83,13 +91,21 @@ export function writeRustBufferPayload(
           "be held across any operation that can grow wasm memory.",
       );
     } else {
-      // JS-owned `Uint8Array` — allocate wasm memory and copy.
+      // JS-owned `Uint8Array` — allocate wasm memory and copy. The fresh
+      // allocation is exactly `len`, so any marker from the source view does
+      // not describe it.
       dataPtr = alloc(len, 1);
       m.writeBytes(dataPtr, bytes);
+      capacity = len;
     }
+  } else {
+    capacity = 0;
   }
-  const blen = BigInt(len);
-  writeRustBuffer(m, ptr, { capacity: blen, len: blen, dataPtr });
+  writeRustBuffer(m, ptr, {
+    capacity: BigInt(capacity),
+    len: BigInt(len),
+    dataPtr,
+  });
 }
 
 const RCS_CODE_OFF = 0;
