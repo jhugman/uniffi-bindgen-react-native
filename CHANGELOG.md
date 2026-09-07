@@ -14,7 +14,7 @@ full host-side parity with the `Jsi` and `Napi` oracle flavours. All 23
 applicable fixtures pass, covering scalars, RustBuffer / strings / errors,
 object handles, callback interfaces and vtables, async functions, and async
 callbacks / traits with struct-by-value completers. A compile-time ABI drift
-guard (`cpp/jsi-player-shim/abi_assert.cpp`) ensures the C and Rust struct
+guard (`runtimes/jsi/cpp/abi_assert.cpp`) ensures the C and Rust struct
 layouts stay in sync.
 
 Three fixtures are intentionally excluded from `Jsi2` (each marked with an
@@ -23,6 +23,23 @@ for performance measurement), `examples/arithmetic` (a pre-existing cdylib-name
 collision that breaks all flavours equally), and `ext-types/index-bundle`
 (N-API-only `tsconfig` setup). Distribution packaging and the `gen_cpp` cutover
 are separate later plans and are out of scope for this runtime layer.
+
+### 📦 `@ubjs/react-native` — the JSI player as an npm package
+
+The `Jsi2` player now ships as `@ubjs/react-native`. An app installs it once as
+a direct dependency; its C++ shim compiles inside the app's own iOS and Android
+builds, and its Rust half (dispatch, libffi, `dlopen`) arrives prebuilt as a
+shared library for `arm64-v8a`, `x86_64`, iOS `arm64` and the simulators, about
+half a megabyte per slice — so an app developer never needs a Rust toolchain.
+One TurboModule per platform hands the player its JS runtime and `CallInvoker`,
+and a resolver maps the name a generated binding passes to
+`globalThis.uniffi.open({ name })` onto `lib<name>.so` (Android) or the
+embedded `<name>.framework` (iOS). Generated bindings gain `--lib-name <name>`
+for this, where `<name>` is the built library's name; the two-argument
+`registerNatives` entry the Hermes test-runner uses is unchanged, and the new
+`ubrnRegisterPlayer` carries the resolver. A CI gate builds a fresh React
+Native app with the package installed on both platforms. Generating libraries
+that ship through the player is the next release's work.
 
 ## 🦊 What's Changed
 
