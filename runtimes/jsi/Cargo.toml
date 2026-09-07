@@ -6,10 +6,10 @@ license = "MPL-2.0"
 publish = false
 
 [lib]
-# staticlib for host-side linking into the shim; the cdylib for device
-# distribution is added in the packaging plan (Plan C). rlib is also produced
-# so unit/integration tests can build a test harness against this crate.
-crate-type = ["staticlib", "rlib"]
+# staticlib links into the Hermes test-runner's host shim; cdylib is what the
+# React Native package ships, one per slice; rlib lets the integration tests
+# build a harness against this crate.
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 uniffi-runtime-core = { path = "../core" }
