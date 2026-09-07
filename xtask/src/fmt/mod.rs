@@ -169,12 +169,17 @@ struct CppArgs;
 impl CodeFormatter for CppArgs {
     fn format_code(&self, check_only: bool) -> Result<()> {
         let root = repository_root()?;
-        if let Some(mut clang_format) =
-            ubrn_common::fmt::clang_format(root.join("cpp"), check_only)?
-        {
-            run_cmd_quietly(&mut clang_format)?;
-        } else {
-            eprintln!("clang-format doesn't seem to be installed")
+        // The shim lives with its Rust half under runtimes/jsi, not under cpp/.
+        for dir in [
+            root.join("cpp"),
+            root.join("runtimes").join("jsi").join("cpp"),
+        ] {
+            if let Some(mut clang_format) = ubrn_common::fmt::clang_format(dir, check_only)? {
+                run_cmd_quietly(&mut clang_format)?;
+            } else {
+                eprintln!("clang-format doesn't seem to be installed");
+                break;
+            }
         }
         Ok(())
     }

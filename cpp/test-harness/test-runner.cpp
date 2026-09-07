@@ -7,9 +7,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <string>
 #include <thread>
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -45,56 +47,80 @@ static std::optional<std::string> readFile(const char *path) {
   return stringStream.str();
 }
 
-/// The signature of the function that initializes the library.
+using Resolver = std::function<std::string(const std::string &)>;
 typedef void (*RegisterNativesFN)(
     facebook::jsi::Runtime &rt,
     std::shared_ptr<facebook::react::CallInvoker> callInvoker);
+typedef void (*RegisterPlayerFN)(
+    facebook::jsi::Runtime &rt,
+    std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+    Resolver resolver);
+
+// A native library exports one of two entries: the player's three-argument
+// `ubrnRegisterPlayer`, or v1's two-argument `registerNatives`.
+struct NativeLib {
+  RegisterNativesFN legacy = nullptr;
+  RegisterPlayerFN player = nullptr;
+};
 
 #ifndef _WIN32
-/// Load the library and return the "registerNatives()" function.
-static RegisterNativesFN loadRegisterNatives(const char *libraryPath) {
-  // Open the library.
+static NativeLib loadNativeLib(const char *libraryPath) {
   void *handle = dlopen(libraryPath, RTLD_LAZY);
   if (!handle) {
     std::cerr << "*** Cannot open library: " << dlerror() << '\n';
-    return nullptr;
+    return {};
   }
-
-  // Clear any existing error.
+  NativeLib lib;
   dlerror();
-  // Load the symbol (function).
-  auto func = (RegisterNativesFN)dlsym(handle, "registerNatives");
-  if (const char *dlsym_error = dlerror()) {
-    std::cerr << "Cannot load symbol 'registerNatives': " << dlsym_error
-              << '\n';
-    dlclose(handle);
-    return nullptr;
+  lib.player = (RegisterPlayerFN)dlsym(handle, "ubrnRegisterPlayer");
+  if (!lib.player) {
+    dlerror();
+    lib.legacy = (RegisterNativesFN)dlsym(handle, "registerNatives");
   }
-
-  return func;
+  if (!lib.player && !lib.legacy) {
+    std::cerr << "Cannot load 'ubrnRegisterPlayer' or 'registerNatives': "
+              << dlerror() << '\n';
+    dlclose(handle);
+    return {};
+  }
+  return lib;
 }
 #else
-/// Load the library and return the "registerNatives()" function.
-static RegisterNativesFN loadRegisterNatives(const char *libraryPath) {
-  // Load the library
+static NativeLib loadNativeLib(const char *libraryPath) {
   HMODULE hModule = LoadLibraryA(libraryPath);
   if (!hModule) {
     std::cerr << "Cannot open library: " << GetLastError() << '\n';
-    return nullptr;
+    return {};
   }
-
-  // Get the function address
-  auto func = (RegisterNativesFN)GetProcAddress(hModule, "registerNatives");
-  if (!func) {
-    std::cerr << "Cannot load symbol 'registerNatives': " << GetLastError()
-              << '\n';
+  NativeLib lib;
+  lib.player = (RegisterPlayerFN)GetProcAddress(hModule, "ubrnRegisterPlayer");
+  if (!lib.player) {
+    lib.legacy = (RegisterNativesFN)GetProcAddress(hModule, "registerNatives");
+  }
+  if (!lib.player && !lib.legacy) {
+    std::cerr << "Cannot load 'ubrnRegisterPlayer' or 'registerNatives': "
+              << GetLastError() << '\n';
     FreeLibrary(hModule);
-    return nullptr;
+    return {};
   }
-
-  return func;
+  return lib;
 }
 #endif
+
+// $UBRN_JSI_LIB_DIR/lib<name>.<ext>: where the fixture harness puts cdylibs.
+static Resolver makeResolver() {
+  const char *dir = std::getenv("UBRN_JSI_LIB_DIR");
+  std::string base = dir ? dir : ".";
+  return [base](const std::string &name) {
+#if defined(_WIN32)
+    return base + "\\" + name + ".dll";
+#elif defined(__APPLE__)
+    return base + "/lib" + name + ".dylib";
+#else
+    return base + "/lib" + name + ".so";
+#endif
+  };
+}
 
 static std::shared_ptr<facebook::jsi::Runtime> createRuntime() {
   // Cap the GC heap well below Hermes' 3 GB default. A real RN host runs Hermes
@@ -115,25 +141,29 @@ static std::shared_ptr<facebook::jsi::Runtime> createRuntime() {
   return facebook::hermes::makeHermesRuntime(runtimeConfig);
 }
 
-static std::vector<RegisterNativesFN> loadNativeLibraryFunctions(int argc,
-                                                                 char **argv) {
-  std::vector<RegisterNativesFN> functions;
+static std::vector<NativeLib> loadNativeLibraries(int argc, char **argv) {
+  std::vector<NativeLib> libs;
   for (int i = 2; i < argc; i++) {
-    auto func = loadRegisterNatives(argv[i]);
-    if (!func) {
+    auto lib = loadNativeLib(argv[i]);
+    if (!lib.player && !lib.legacy) {
       throw std::runtime_error("Failed to load native library");
     }
-    functions.push_back(func);
+    libs.push_back(lib);
   }
-  return functions;
+  return libs;
 }
 
 static void
 registerNativeLibraries(facebook::jsi::Runtime &rt,
                         std::shared_ptr<facebook::react::CallInvoker> invoker,
-                        const std::vector<RegisterNativesFN> &functions) {
-  for (const auto &func : functions) {
-    func(rt, invoker);
+                        const std::vector<NativeLib> &libs) {
+  auto resolver = makeResolver();
+  for (const auto &lib : libs) {
+    if (lib.player) {
+      lib.player(rt, invoker, resolver);
+    } else {
+      lib.legacy(rt, invoker);
+    }
   }
 }
 
@@ -292,7 +322,7 @@ int main(int argc, char **argv) {
     return 1;
 
   try {
-    auto nativeFunctions = loadNativeLibraryFunctions(argc, argv);
+    auto nativeLibs = loadNativeLibraries(argc, argv);
 
     // Run the test twice
     for (int i = 0; i < 2; i++) {
@@ -306,7 +336,7 @@ int main(int argc, char **argv) {
                   << ")" << std::endl;
       });
 
-      registerNativeLibraries(*runtime, invoker, nativeFunctions);
+      registerNativeLibraries(*runtime, invoker, nativeLibs);
 
       int status = runEventLoop(*runtime, invoker, *optCode, jsPath);
       if (status != 0)
