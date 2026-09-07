@@ -1,0 +1,63 @@
+name: Player package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "runtimes/jsi/**"
+      - "typescript/**"
+      - "scripts/test-player-package.sh"
+      - ".github/workflows/player-package.yml"
+  pull_request:
+    paths:
+      - "runtimes/jsi/**"
+      - "typescript/**"
+      - "scripts/test-player-package.sh"
+      - ".github/workflows/player-package.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ios:
+    name: "iOS simulator · rn latest"
+    # macos-26's Xcode 26 breaks fmt in RN 0.77/0.78; the gate targets latest RN
+    # on a runner the whole compat window builds on.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim, x86_64-apple-ios
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+      - run: scripts/test-player-package.sh --ios
+
+  android:
+    name: "Android · rn latest"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, x86_64-linux-android
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - run: cargo install cargo-ndk
+      - run: scripts/test-player-package.sh --android
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
