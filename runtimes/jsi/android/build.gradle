@@ -1,0 +1,102 @@
+buildscript {
+  def kotlin_version = rootProject.ext.has("kotlinVersion") ? rootProject.ext.get("kotlinVersion") : project.properties["UbjsReactNative_kotlinVersion"]
+
+  repositories {
+    google()
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath "com.android.tools.build:gradle:8.7.2"
+    // noinspection DifferentKotlinGradleVersion
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+  }
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+apply plugin: "com.facebook.react"
+
+def getExtOrDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties["UbjsReactNative_" + name]
+}
+
+def getExtOrIntegerDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["UbjsReactNative_" + name]).toInteger()
+}
+
+android {
+  namespace "dev.ubjs.reactnative"
+
+  ndkVersion getExtOrDefault("ndkVersion")
+  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+
+    buildFeatures {
+      prefab true
+    }
+    externalNativeBuild {
+      cmake {
+        arguments "-DANDROID_STL=c++_shared"
+      }
+    }
+    ndk {
+      // The prebuilt Rust half ships for these two ABIs.
+      abiFilters "arm64-v8a", "x86_64"
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path "CMakeLists.txt"
+    }
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+    }
+  }
+
+  lintOptions {
+    disable "GradleCompatible"
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs += [
+        // Codegen output for NativeUniffiPlayerSpec.
+        "${project.buildDir}/generated/source/codegen/java"
+      ]
+      // The prebuilt Rust half, one .so per ABI; nothing here compiles it.
+      jniLibs.srcDirs += ["../prebuilt/android"]
+    }
+  }
+}
+
+repositories {
+  mavenCentral()
+  google()
+}
+
+def kotlin_version = getExtOrDefault("kotlinVersion")
+
+dependencies {
+  //noinspection GradleDynamicVersion
+  implementation "com.facebook.react:react-native:+"
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+}
+
+react {
+  jsRootDir = file("../typescript/src/")
+  libraryName = "UniffiPlayer"
+  codegenJavaPackageName = "dev.ubjs.reactnative"
+}
