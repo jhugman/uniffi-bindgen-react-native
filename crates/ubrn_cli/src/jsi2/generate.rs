@@ -47,7 +47,7 @@ impl Cmd {
 #[derive(Args, Debug)]
 #[command(group(
     ArgGroup::new("lib_resolution")
-        .args(["lib_colocated", "lib_absolute", "lib_package_base"])
+        .args(["lib_colocated", "lib_absolute", "lib_package_base", "lib_name"])
         .multiple(false)
         .required(true)
 ))]
@@ -87,6 +87,14 @@ pub(crate) struct BindingsArgs {
     )]
     pub(crate) lib_package_base: Option<String>,
 
+    /// The built library's name. Generated bindings pass `{ name: "<NAME>" }`
+    /// to `globalThis.uniffi.open` and the host resolves it: the React Native
+    /// player looks in the app's native libraries; the Hermes test-runner looks
+    /// in $UBRN_JSI_LIB_DIR. Every module generated from that library shares the
+    /// name, so its uniffi statics are opened once.
+    #[clap(long = "lib-name", value_name = "NAME")]
+    pub(crate) lib_name: Option<String>,
+
     /// With --lib-package-base, emit node-style triples (e.g. `darwin-arm64`,
     /// `linux-x64-gnu`, `win32-x64-msvc`) instead of cargo-style triples.
     /// Has no effect without --lib-package-base; rejected at runtime if used
@@ -99,6 +107,12 @@ impl BindingsArgs {
     fn resolve_lib_resolution(&self) -> Result<LibResolution> {
         if self.lib_node_triple && self.lib_package_base.is_none() {
             anyhow::bail!("--lib-node-triple requires --lib-package-base");
+        }
+        if let Some(name) = &self.lib_name {
+            if name.is_empty() {
+                anyhow::bail!("--lib-name requires a non-empty library name");
+            }
+            return Ok(LibResolution::Name(name.clone()));
         }
         if self.lib_colocated {
             return Ok(LibResolution::Colocated);
@@ -133,7 +147,9 @@ impl BindingsArgs {
             return Ok(LibResolution::Require { base, triple_style });
         }
         // clap's ArgGroup(required = true) on lib_resolution rejects this case at parse.
-        unreachable!("clap should have rejected: no --lib-* flag passed")
+        unreachable!(
+            "clap should have rejected: no --lib-* flag passed (colocated, absolute, package-base, name)"
+        )
     }
 }
 
@@ -424,5 +440,43 @@ mod tests {
         assert_eq!(normalize_package_base("@scope/foo/"), "@scope/foo/");
         assert_eq!(normalize_package_base("foo_"), "foo_");
         assert_eq!(normalize_package_base("foo."), "foo.");
+    }
+
+    #[test]
+    fn lib_name_parses_and_resolves() {
+        let cli = parse(&[
+            "--ts-dir",
+            "/tmp/ts",
+            "--lib-name",
+            "my_lib",
+            "/tmp/foo.dylib",
+        ])
+        .expect("clap should accept");
+        let Cmd::Bindings(b) = cli.cmd;
+        assert!(matches!(
+            b.resolve_lib_resolution().expect("resolve"),
+            LibResolution::Name(n) if n == "my_lib"
+        ));
+    }
+
+    #[test]
+    fn lib_name_empty_errors() {
+        let cli = parse(&["--ts-dir", "/tmp/ts", "--lib-name", "", "/tmp/foo.dylib"])
+            .expect("clap should accept");
+        let Cmd::Bindings(b) = cli.cmd;
+        assert!(b.resolve_lib_resolution().is_err());
+    }
+
+    #[test]
+    fn lib_name_with_another_lib_flag_errors() {
+        let r = parse(&[
+            "--ts-dir",
+            "/tmp/ts",
+            "--lib-name",
+            "my_lib",
+            "--lib-colocated",
+            "/tmp/foo.dylib",
+        ]);
+        assert!(r.is_err());
     }
 }

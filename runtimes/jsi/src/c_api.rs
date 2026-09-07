@@ -1108,7 +1108,7 @@ pub unsafe extern "C" fn ubrn_jsi_callback_arg_layout(
 // `cargo check --target <32-bit triple>` included, with nothing to run.
 
 /// Rust side of the ABI drift guard: pins the same facts that
-/// `cpp/jsi-player-shim/abi_assert.cpp` pins on the C++ side. The two must
+/// `runtimes/jsi/cpp/abi_assert.cpp` pins on the C++ side. The two must
 /// agree exactly or a registration silently corrupts memory.
 ///
 /// Spelled in pointer width and u64 alignment rather than 64-bit numbers,

@@ -263,7 +263,7 @@ extern "C" fn test_is_js_thread(_user_data: *const c_void) -> bool {
 /// The invariant the shim's slotless-shape tolerance rests on: a callback core
 /// gives NO flat arg layout for also gets NO trampoline.
 ///
-/// `buildShape` (cpp/jsi-player-shim/callbacks.cpp) keeps a shape with empty
+/// `buildShape` (runtimes/jsi/cpp/callbacks.cpp) keeps a shape with empty
 /// slots when `ubrn_jsi_callback_arg_layout` returns -1 — the generated
 /// `ForeignFutureComplete*` completers take their result struct by value, and
 /// core will not lay that out in a flat buffer. That empty shape is only safe
