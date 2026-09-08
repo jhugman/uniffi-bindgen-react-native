@@ -56,7 +56,7 @@ pub(crate) enum GenerateCmd {
     #[clap(aliases = ["node"])]
     Napi(napi::CmdArg),
 
-    /// Commands to generate the generic JSI player (Jsi2) bindings (TypeScript only).
+    /// Commands to generate the bindings and the assets-only library for the JSI player (Jsi2).
     Jsi2(jsi2::CmdArg),
 
     /// Commands to generate a WASM crate.
