@@ -21,3 +21,4 @@ public class {{ self.config.project.module_cpp() }}Package implements ReactPacka
     return Collections.emptyList();
   }
 }
+{# space #}
