@@ -17,7 +17,9 @@ rnapp_log() { echo "-- $*"; }
 # rnapp_scaffold DIR APP RN_VERSION: a fresh app at DIR/APP, dependencies installed.
 rnapp_scaffold() {
   local dir=$1 app=$2 rn_version=$3
-  rm -rf "$dir"; mkdir -p "$dir"
+  # Only the app, never DIR itself: the library lane keeps its packed tarball
+  # in a sibling directory that has to survive this.
+  rm -rf "${dir:?}/${app:?}"; mkdir -p "$dir"
   npx --yes @react-native-community/cli@latest init "$app" \
     --version "$rn_version" --directory "$dir/$app" --skip-install --skip-git-init --pm npm
   (cd "$dir/$app" && npm install)
