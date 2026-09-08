@@ -9,6 +9,7 @@ mod build;
 mod codegen;
 mod config;
 mod generate;
+mod ios;
 
 pub(crate) use bindings::bindings;
 pub(crate) use build::BuildArgs;
