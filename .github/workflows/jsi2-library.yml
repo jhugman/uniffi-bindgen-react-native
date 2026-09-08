@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - "runtimes/jsi/**"
+      - "runtimes/core/**"
       - "typescript/**"
       - "crates/ubrn_cli/**"
       - "crates/ubrn_bindgen/**"
+      - "crates/ubrn_common/**"
       - "examples/arithmetic/**"
       - "scripts/lib/rn-app.sh"
       - "scripts/test-jsi2-library.sh"
@@ -15,9 +17,11 @@ on:
   pull_request:
     paths:
       - "runtimes/jsi/**"
+      - "runtimes/core/**"
       - "typescript/**"
       - "crates/ubrn_cli/**"
       - "crates/ubrn_bindgen/**"
+      - "crates/ubrn_common/**"
       - "examples/arithmetic/**"
       - "scripts/lib/rn-app.sh"
       - "scripts/test-jsi2-library.sh"
