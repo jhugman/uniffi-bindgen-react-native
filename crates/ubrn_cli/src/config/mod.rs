@@ -54,6 +54,10 @@ pub(crate) struct ProjectConfig {
     #[serde(default, rename = "turboModule")]
     pub(crate) tm: TurboModulesConfig,
 
+    #[allow(dead_code)]
+    #[serde(default)]
+    pub(crate) jsi2: crate::jsi2::Jsi2Config,
+
     /// Set of globs of file paths not to be overwritten by
     /// the `generate` commands.
     #[serde(default, rename = "noOverwrite")]
@@ -186,6 +190,15 @@ impl ProjectConfig {
 
     pub(crate) fn codegen_filename(&self) -> String {
         format!("Native{}", self.spec_name())
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn jsi2_bindings_ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.jsi2
+            .ts_bindings
+            .as_deref()
+            .map(|ts| project_root.join(ts))
+            .unwrap_or_else(|| self.bindings.ts_path(project_root))
     }
 
     pub(crate) fn spec_name(&self) -> String {
