@@ -253,6 +253,7 @@ mod tests {
                 wasm2,
                 bindings,
                 tm,
+                jsi2: Default::default(),
                 exclude_files: Default::default(),
             }
         }
