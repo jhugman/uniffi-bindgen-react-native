@@ -56,6 +56,8 @@ impl TryFrom<Utf8PathBuf> for ProjectConfig {
 pub enum Platform {
     Android,
     Ios,
+    /// Both jsi2 builds render the same library files, so one platform serves them.
+    Jsi2,
     #[cfg(feature = "wasm")]
     Wasm,
     #[cfg(feature = "wasm")]
@@ -69,6 +71,7 @@ impl From<&Platform> for AbiFlavor {
             Platform::Wasm => AbiFlavor::Wasm,
             #[cfg(feature = "wasm")]
             Platform::Wasm2 => AbiFlavor::Wasm2,
+            Platform::Jsi2 => AbiFlavor::Jsi2,
             _ => AbiFlavor::Jsi,
         }
     }
