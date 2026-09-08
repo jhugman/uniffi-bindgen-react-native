@@ -78,6 +78,11 @@ it to `lib<name>.so` on Android and the embedded `<name>.framework` on iOS.
 | `android/src/main/java/<pkg>/<Name>Package.java` | an empty `ReactPackage`: autolinking includes a library only if it has one |
 | `package.json` | gains `peerDependencies["@ubjs/react-native"]` and `dependencies["@ubjs/core"]` when missing |
 
+The library's `package.json` `files` field must include `ios/` (the
+xcframework) and `android/src/main/jniLibs/` (the `.so` files), or the
+published tarball carries the TypeScript and none of the binaries.
+`create-react-native-library`'s scaffold lists both already.
+
 ## Release check on a device
 
 The simulator never signs anything, so before a release run the library's app
