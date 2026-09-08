@@ -41,6 +41,21 @@ for this, where `<name>` is the built library's name; the two-argument
 Native app with the package installed on both platforms. Generating libraries
 that ship through the player is the next release's work.
 
+### 🛠 `ubrn build jsi2` and `ubrn generate jsi2 all`
+
+A library author can now ship a crate through the player. `ubrn build jsi2
+android` cross-compiles it as `lib<name>.so` per ABI into `jniLibs`, 64-bit
+only by default; `ubrn build jsi2 ios` wraps each platform's dylib as a
+`<name>.framework` bundle and combines them into an xcframework that CocoaPods
+embeds and signs. `ubrn generate jsi2 all` emits an assets-only library: the
+bindings, an entrypoint that imports `@ubjs/react-native` first and throws a
+clear message if the app forgot to list it, a podspec, a Gradle file, and an
+empty `ReactPackage` so Android autolinking keeps the library. Two runtime
+lanes prove it: a fresh app importing the player logs `globalThis.uniffi`, and
+a library generated from `examples/arithmetic` calls `add(2, 3)` on the iOS
+simulator in CI and on an Android emulator locally. See the new
+[`jsi2` reference](reference/jsi2.md).
+
 ## 🦊 What's Changed
 
 - `wasm-bindgen` runs as a command again, at whatever version your project provides, and this workspace pins none of its own. 0.31.0-5 linked `wasm-bindgen-cli-support` and ran the rewrite in-process, which made our pin a third party to an agreement between your crate and its dependencies: `js-sys` and `web-sys` pin `wasm-bindgen` exactly, so a lock file moving — a `matrix-rust-sdk` bump raising its `web-sys` floor, carrying `wasm-bindgen` from 0.2.114 to 0.2.127 with it — could not build until we released a matching version. Both the `web` and `wasm2` flavors shell out now. When the binary is missing or refuses, the version read out of the module's own descriptor section names the one to install, which beats wasm-bindgen's schema-mismatch text; `UBRN_WASM_BINDGEN` points at a specific binary on a machine carrying several ([#454](https://github.com/jhugman/uniffi-bindgen-react-native/pull/454)).
