@@ -4,6 +4,7 @@ dirs = [
     "templates/jsi/crossplatform",
     "templates/jsi/android",
     "templates/jsi/ios",
+    "templates/jsi2",
     "templates/wasm",
     "templates/wasm2",
 ]

@@ -1916,6 +1916,7 @@ dependencies = [
  "pathdiff",
  "serde",
  "serde-toml-merge",
+ "serde_json",
  "textwrap",
  "toml 0.8.23",
  "topological-sort",

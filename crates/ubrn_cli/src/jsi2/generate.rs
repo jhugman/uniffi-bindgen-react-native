@@ -12,6 +12,12 @@ use ubrn_bindgen::{
     AbiFlavor, OutputArgs, SourceArgs, SwitchArgs,
 };
 
+use crate::{
+    commands::{generate::GenerateAllCommand, ConfigArgs},
+    config::ProjectConfig,
+    Platform,
+};
+
 #[derive(Args, Debug)]
 pub(crate) struct CmdArg {
     #[clap(subcommand)]
@@ -28,6 +34,9 @@ impl CmdArg {
 enum Cmd {
     /// Generate just the Typescript bindings for the generic JSI player (Jsi2)
     Bindings(BindingsArgs),
+
+    /// Generate the bindings and every file of an assets-only library
+    All(GenerateAllArgs),
 }
 
 impl Cmd {
@@ -39,6 +48,16 @@ impl Cmd {
                 let bb = ubrn_bindgen::BindingsArgs::from(b).with_lib_resolution(resolution);
                 bb.run(None)?;
                 Ok(())
+            }
+            Self::All(a) => {
+                let project: ProjectConfig = a.config.clone().try_into()?;
+                GenerateAllCommand::platform_specific(
+                    a.lib_file.clone(),
+                    project,
+                    Platform::Jsi2,
+                    false,
+                )
+                .run()
             }
         }
     }
@@ -178,6 +197,52 @@ impl From<&BindingsArgs> for ubrn_bindgen::BindingsArgs {
     }
 }
 
+#[derive(Args, Debug)]
+pub(crate) struct GenerateAllArgs {
+    #[clap(flatten)]
+    config: ConfigArgs,
+
+    /// The built library (any slice); bindgen reads uniffi's metadata from it.
+    lib_file: Utf8PathBuf,
+}
+
+/// The app must list the player itself (autolinking reads only the app's
+/// package.json), so the library declares it as a peer; `@ubjs/core` is the
+/// runtime the bindings import. Both are added in place only when missing.
+pub(crate) fn ensure_package_dependencies(project: &ProjectConfig) -> Result<()> {
+    let path = project.project_root().join("package.json");
+    if project.exclude_files().is_match("package.json") {
+        return Ok(());
+    }
+    let text = ubrn_common::read_to_string(&path)?;
+    let mut json: serde_json::Value = serde_json::from_str(&text)?;
+    let range = format!("^{}", project.ubrn_version());
+    let root = json
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("{path} is not a JSON object"))?;
+    let mut changed = false;
+    for (section, name) in [
+        ("peerDependencies", "@ubjs/react-native"),
+        ("dependencies", "@ubjs/core"),
+    ] {
+        let deps = root
+            .entry(section)
+            .or_insert_with(|| serde_json::Value::Object(Default::default()))
+            .as_object_mut()
+            .ok_or_else(|| anyhow::anyhow!("{path}: {section} is not an object"))?;
+        if !deps.contains_key(name) {
+            deps.insert(name.to_string(), serde_json::Value::String(range.clone()));
+            changed = true;
+        }
+    }
+    if changed {
+        let mut out = serde_json::to_string_pretty(&json)?;
+        out.push('\n');
+        ubrn_common::write_file(&path, out)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,7 +294,9 @@ mod tests {
             "rel/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         assert!(b.resolve_lib_resolution().is_err());
     }
 
@@ -272,7 +339,9 @@ mod tests {
             "/tmp/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         let res = b.resolve_lib_resolution().expect("resolve");
         match res {
             LibResolution::Require { base, triple_style } => {
@@ -295,7 +364,9 @@ mod tests {
             "/tmp/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         let res = b.resolve_lib_resolution().expect("resolve");
         match res {
             LibResolution::Require { base, triple_style } => {
@@ -319,7 +390,9 @@ mod tests {
             "/tmp/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         let err = b.resolve_lib_resolution().expect_err("should reject");
         assert!(err.to_string().contains("--lib-node-triple"), "got: {err}");
     }
@@ -336,7 +409,9 @@ mod tests {
             "/tmp/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         match b.resolve_lib_resolution().expect("resolve") {
             LibResolution::Require { base, .. } => assert_eq!(base, "@scope/foo/"),
             other => panic!("expected Require, got {other:?}"),
@@ -355,7 +430,9 @@ mod tests {
             "/tmp/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         match b.resolve_lib_resolution().expect("resolve") {
             LibResolution::Require { base, .. } => assert_eq!(base, "@scope/foo-"),
             other => panic!("expected Require, got {other:?}"),
@@ -414,7 +491,9 @@ mod tests {
             "/tmp/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         assert!(b.resolve_lib_resolution().is_err());
     }
 
@@ -452,7 +531,9 @@ mod tests {
             "/tmp/foo.dylib",
         ])
         .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         assert!(matches!(
             b.resolve_lib_resolution().expect("resolve"),
             LibResolution::Name(n) if n == "my_lib"
@@ -463,7 +544,9 @@ mod tests {
     fn lib_name_empty_errors() {
         let cli = parse(&["--ts-dir", "/tmp/ts", "--lib-name", "", "/tmp/foo.dylib"])
             .expect("clap should accept");
-        let Cmd::Bindings(b) = cli.cmd;
+        let Cmd::Bindings(b) = cli.cmd else {
+            panic!("expected the bindings subcommand")
+        };
         assert!(b.resolve_lib_resolution().is_err());
     }
 

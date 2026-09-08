@@ -187,6 +187,11 @@ impl GenerateAllCommand {
         // Step 2: Generate template files
         self.generate_template_files(modules, native_bindings)?;
 
+        // Step 3: an assets-only library also declares what it loads through.
+        if self.platform == Some(Platform::Jsi2) {
+            jsi2::ensure_package_dependencies(&self.project_config)?;
+        }
+
         Ok(())
     }
 
@@ -215,6 +220,7 @@ impl GenerateAllCommand {
             Some(Platform::Wasm) => wasm::bindings(project, switches, lib_file)?,
             #[cfg(feature = "wasm")]
             Some(Platform::Wasm2) => wasm2::bindings(project, switches, lib_file)?,
+            Some(Platform::Jsi2) => jsi2::bindings(project, switches, lib_file)?,
             _ => jsi::bindings(project, switches, lib_file)?,
         })
     }
