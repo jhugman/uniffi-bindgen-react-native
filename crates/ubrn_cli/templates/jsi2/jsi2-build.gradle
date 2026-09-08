@@ -23,12 +23,9 @@ android {
   defaultConfig {
     minSdkVersion getExtOrDefault("minSdkVersion", 24)
     targetSdkVersion getExtOrDefault("targetSdkVersion", 34)
-    ndk {
-      // The ABIs `ubrn build jsi2 android` produced.
-      abiFilters {% for t in self.config.project.jsi2.android_targets -%}
-      "{{ t }}"{% if !loop.last %}, {% endif %}
-      {%- endfor %}
-    }
+    // jniLibs/ decides which ABIs ship: `ubrn build jsi2 android` wipes and
+    // rewrites it with exactly the ABIs it built. Filtering here would only
+    // let a mismatched build silently drop a dlopen target.
   }
 
   sourceSets {

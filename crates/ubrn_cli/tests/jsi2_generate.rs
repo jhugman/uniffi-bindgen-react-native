@@ -48,7 +48,7 @@ fn generate_all_emits_an_assets_only_library() -> Result<()> {
             // Android: jniLibs, the player project, and an empty ReactPackage.
             File::new("android/build.gradle")
                 .contains("namespace \"com.jsi2fixture\"")
-                .contains("abiFilters \"arm64-v8a\", \"x86_64\"")
+                .does_not_contain("abiFilters")
                 .contains("implementation project(\":ubjs_react-native\")")
                 .does_not_contain("externalNativeBuild"),
             File::new("android/src/main/AndroidManifest.xml").contains("<manifest"),
@@ -56,11 +56,23 @@ fn generate_all_emits_an_assets_only_library() -> Result<()> {
                 .contains("package com.jsi2fixture;")
                 .contains("public class Jsi2FixturePackage implements ReactPackage")
                 .contains("Collections.emptyList()"),
-            // package.json gains the peer; @ubjs/core was already there.
+            // package.json gains the peer and the devDependency; @ubjs/core
+            // was already there.
             File::new("package.json")
                 .contains("\"@ubjs/react-native\": \"^0.31.0-5\"")
-                .contains("\"@ubjs/core\": \"^0.31.0-5\""),
+                .contains("\"@ubjs/core\": \"^0.31.0-5\"")
+                .contains("\"devDependencies\""),
         ]);
+
+        // The peer alone can't be resolved by the library's own tsc/bob
+        // build; it also needs the devDependency copy.
+        let package_json = get_recorded_files()
+            .into_iter()
+            .find(|f| f.path.ends_with("package.json"))
+            .expect("package.json was recorded");
+        let json: serde_json::Value = serde_json::from_str(&package_json.content)?;
+        assert_eq!(json["peerDependencies"]["@ubjs/react-native"], "^0.31.0-5");
+        assert_eq!(json["devDependencies"]["@ubjs/react-native"], "^0.31.0-5");
 
         // Nothing native: no C++, no Kotlin, no CMake, no codegen spec.
         // Matched against the path within the library and the file name, never
