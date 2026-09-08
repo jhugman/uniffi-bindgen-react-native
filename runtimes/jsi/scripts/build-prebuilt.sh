@@ -58,6 +58,10 @@ builtins_archive() {
   [ -e "${found[0]}" ] || {
     echo "libclang_rt.builtins-$arch-android.a not found under $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$host/lib/clang/*/lib/linux/" >&2
     return 1; }
+  [ "${#found[@]}" -eq 1 ] || {
+    printf '%s\n' "${found[@]}" >&2
+    echo "several clang versions carry libclang_rt.builtins-$arch-android.a; pick one NDK" >&2
+    return 1; }
   echo "${found[0]}"
 }
 
@@ -152,13 +156,12 @@ for t in "${TARGETS[@]}"; do
     *-linux-android*)
       : "${ANDROID_NDK_HOME:?ANDROID_NDK_HOME must be set to build Android libraries}"
       ndk_bin="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$(ndk_host)/bin"
-      # libffi-sys builds libffi from source with autotools, whose configure
-      # falls back to the host archiver when it finds no target-prefixed one.
-      # Apple's ar writes an archive with no members from the ELF objects, so
-      # libffi.a comes out empty and every ffi_* symbol is left undefined. Set
-      # the plain and the target-suffixed forms both, so cargo-ndk's own
-      # target-suffixed settings cannot shadow them.
-      target_env=$(echo "$t" | tr '-' '_')
+      # libffi-sys builds libffi from source with autotools, and its configure
+      # reads the plain AR/RANLIB out of the environment -- cargo-ndk sets only
+      # the target-suffixed forms, which autoconf ignores. Left unset, configure
+      # falls back to the host archiver, and Apple's ar writes an archive with
+      # no members from the ELF objects: libffi.a comes out empty and every
+      # ffi_* symbol is left undefined.
       builtins=$(builtins_archive "$t")
       # 16 KB page alignment: Android 15 refuses libraries without it. The
       # soname is what a consumer records in DT_NEEDED; without it the linker
@@ -166,7 +169,6 @@ for t in "${TARGETS[@]}"; do
       (cd "$ROOT" && \
         env \
         AR="$ndk_bin/llvm-ar" RANLIB="$ndk_bin/llvm-ranlib" \
-        "AR_$target_env=$ndk_bin/llvm-ar" "RANLIB_$target_env=$ndk_bin/llvm-ranlib" \
         "CARGO_TARGET_$(echo "$t" | tr 'a-z-' 'A-Z_')_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-soname,libuniffi_runtime_jsi.so -C link-arg=$builtins" \
         cargo ndk -t "$(abi_for "$t")" build --release -p uniffi-runtime-jsi)
       lib=libuniffi_runtime_jsi.so ;;
