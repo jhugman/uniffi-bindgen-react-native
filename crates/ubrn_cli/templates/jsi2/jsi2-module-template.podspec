@@ -24,3 +24,4 @@ Pod::Spec.new do |s|
   # earliest sign that @ubjs/react-native is not a direct dependency of the app.
   s.dependency "UbjsReactNative"
 end
+{# space #}
