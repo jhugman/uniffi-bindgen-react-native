@@ -1,0 +1,47 @@
+name: jsi2 library
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "runtimes/jsi/**"
+      - "typescript/**"
+      - "crates/ubrn_cli/**"
+      - "crates/ubrn_bindgen/**"
+      - "examples/arithmetic/**"
+      - "scripts/lib/rn-app.sh"
+      - "scripts/test-jsi2-library.sh"
+      - ".github/workflows/jsi2-library.yml"
+  pull_request:
+    paths:
+      - "runtimes/jsi/**"
+      - "typescript/**"
+      - "crates/ubrn_cli/**"
+      - "crates/ubrn_bindgen/**"
+      - "examples/arithmetic/**"
+      - "scripts/lib/rn-app.sh"
+      - "scripts/test-jsi2-library.sh"
+      - ".github/workflows/jsi2-library.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ios:
+    name: "iOS simulator · rn latest"
+    # iOS only: the Android half of this lane needs an emulator, so it runs
+    # locally against a developer's AVD.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim, x86_64-apple-ios
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+      - run: scripts/test-jsi2-library.sh --ios
