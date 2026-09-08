@@ -208,7 +208,9 @@ pub(crate) struct GenerateAllArgs {
 
 /// The app must list the player itself (autolinking reads only the app's
 /// package.json), so the library declares it as a peer; `@ubjs/core` is the
-/// runtime the bindings import. Both are added in place only when missing.
+/// runtime the bindings import. Peers aren't installed for the package
+/// itself, so the library also needs `@ubjs/react-native` as a devDependency
+/// to typecheck (tsc/bob build). All three are added in place only when missing.
 pub(crate) fn ensure_package_dependencies(project: &ProjectConfig) -> Result<()> {
     let path = project.project_root().join("package.json");
     if project.exclude_files().is_match("package.json") {
@@ -223,6 +225,7 @@ pub(crate) fn ensure_package_dependencies(project: &ProjectConfig) -> Result<()>
     let mut changed = false;
     for (section, name) in [
         ("peerDependencies", "@ubjs/react-native"),
+        ("devDependencies", "@ubjs/react-native"),
         ("dependencies", "@ubjs/core"),
     ] {
         let deps = root
