@@ -3,6 +3,9 @@
 // the app's package.json, so a transitive @ubjs/react-native never installs.
 import "@ubjs/react-native";
 
+// Load-bearing order: imports are hoisted, so the guard runs after every
+// binding module is evaluated but before any of them opens the library, whose
+// getters are lazy.
 if (typeof (globalThis as any).uniffi === "undefined") {
   throw new Error(
     "@ubjs/react-native must be a direct dependency of the app; add it and re-run pod install",

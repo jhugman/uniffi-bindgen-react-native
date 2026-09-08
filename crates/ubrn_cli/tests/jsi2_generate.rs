@@ -7,6 +7,7 @@
 //! harness. Bindgen runs for real against the host cdylib; every file lands in
 //! the recorder instead of the fixture directory.
 use anyhow::Result;
+use camino::Utf8Path;
 
 use ubrn_cli::test_utils::{cargo_build, fixtures_dir, run_cli};
 use ubrn_cli_testing::{assert_files, shim_path, with_fixture, File};
@@ -16,7 +17,7 @@ use ubrn_common::get_recorded_files;
 fn generate_all_emits_an_assets_only_library() -> Result<()> {
     let target_crate = cargo_build("arithmetic")?;
     let fixtures = fixtures_dir();
-    with_fixture(fixtures.clone(), "jsi2", |_| {
+    with_fixture(fixtures.clone(), "jsi2", |fixture_dir| {
         shim_path("package.json", fixtures.join("jsi2/package.json"));
         shim_path("ubrn.config.yaml", fixtures.join("jsi2/ubrn.config.yaml"));
         shim_path("rust/shim/Cargo.toml", target_crate.manifest_path());
@@ -62,10 +63,19 @@ fn generate_all_emits_an_assets_only_library() -> Result<()> {
         ]);
 
         // Nothing native: no C++, no Kotlin, no CMake, no codegen spec.
+        // Matched against the path within the library and the file name, never
+        // the absolute path: an ancestor directory may contain anything.
         for file in get_recorded_files() {
-            for forbidden in ["cpp/", ".kt", "CMakeLists", "Native", ".mm", ".h"] {
+            let path = Utf8Path::new(&file.path);
+            let rel = path.strip_prefix(&fixture_dir).unwrap_or(path);
+            assert!(
+                !rel.as_str().contains("cpp/"),
+                "assets-only library wrote {rel}"
+            );
+            let name = path.file_name().expect("a recorded file has a name");
+            for forbidden in [".kt", "CMakeLists", "Native", ".mm", ".h"] {
                 assert!(
-                    !file.path.contains(forbidden),
+                    !name.contains(forbidden),
                     "assets-only library wrote {}",
                     file.path
                 );

@@ -30,7 +30,8 @@ paste = { workspace = true }
 pathdiff = { workspace = true }
 serde = { workspace = true }
 serde-toml-merge = "=0.3.9"
-serde_json = "1"
+# preserve_order: rewriting a user's package.json must not reorder its keys.
+serde_json = { version = "1", features = ["preserve_order"] }
 textwrap = "0.16.1"
 toml = { workspace = true, features = ["display"] }
 topological-sort = "0.2.2"

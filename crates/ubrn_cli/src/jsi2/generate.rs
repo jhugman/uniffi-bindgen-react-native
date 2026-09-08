@@ -236,6 +236,8 @@ pub(crate) fn ensure_package_dependencies(project: &ProjectConfig) -> Result<()>
         }
     }
     if changed {
+        // serde_json's preserve_order keeps the file's own key order: an
+        // `exports` map resolves differently once its keys are sorted.
         let mut out = serde_json::to_string_pretty(&json)?;
         out.push('\n');
         ubrn_common::write_file(&path, out)?;
