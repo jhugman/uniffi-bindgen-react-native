@@ -54,7 +54,7 @@ empty `ReactPackage` so Android autolinking keeps the library. Two runtime
 lanes prove it: a fresh app importing the player logs `globalThis.uniffi`, and
 a library generated from `examples/arithmetic` calls `add(2, 3)` on the iOS
 simulator in CI and on an Android emulator locally. See the new
-[`jsi2` reference](reference/jsi2.md).
+[`jsi2` reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/jsi2.html).
 
 ## 🦊 What's Changed
 
