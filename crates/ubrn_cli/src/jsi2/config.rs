@@ -27,15 +27,11 @@ pub(crate) struct Jsi2Config {
 
     /// Stamped into the dylib (IPHONEOS_DEPLOYMENT_TARGET) and the framework's
     /// Info.plist. React Native 0.77, the compat floor, requires 15.1.
-    // Read by the iOS build, which does not exist yet.
-    #[allow(dead_code)]
     #[serde(default = "Jsi2Config::default_min_ios_version")]
     pub(crate) min_ios_version: String,
 
     /// Reverse-DNS prefix of the framework's CFBundleIdentifier. Defaults to
     /// the Android package name, the one reverse-DNS name every RN library has.
-    // Read by the iOS build, which does not exist yet.
-    #[allow(dead_code)]
     #[serde(default)]
     pub(crate) bundle_id_prefix: Option<String>,
 }
@@ -55,8 +51,6 @@ impl Jsi2Config {
         "15.1".to_string()
     }
 
-    // Read by the iOS build, which does not exist yet.
-    #[allow(dead_code)]
     pub(crate) fn bundle_id_prefix(&self) -> String {
         self.bundle_id_prefix
             .clone()
