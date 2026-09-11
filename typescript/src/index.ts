@@ -21,3 +21,4 @@ export * from "./result.ts";
 export * from "./rust-call.ts";
 export * from "./symbols.ts";
 export * from "./type-utils.ts";
+export { FfiType } from "./ffi-types-player.ts";

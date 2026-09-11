@@ -24,6 +24,11 @@ impl PlayerFfiModule {
         lib_resolution: Option<LibResolution>,
     ) -> Self {
         let has_async = namespace_has_async(namespace);
+        let host_source = PlayerHostSource::for_flavor(flavor);
+        // When the flavor lacks a JS TextDecoder (Jsi2), the generated string
+        // converter routes through the native shim helpers, so they must
+        // appear on NativeModuleInterface.
+        let installs_string_helpers = !flavor.supports_text_encoder();
 
         let symbols = Self::build_symbols(namespace);
         let functions = Self::build_functions(namespace, has_async);
@@ -32,13 +37,13 @@ impl PlayerFfiModule {
 
         // Reuse TsFfiModule for the typed interface, but we'll use raw
         // symbol names (no ubrn_ prefix) in the NativeModuleInterface.
-        let ts_module = Self::build_typed_module(namespace, has_async);
+        let ts_module = Self::build_typed_module(namespace, has_async, installs_string_helpers);
 
         Self {
             strict_type_checking: config.strict_type_checking,
-            flavor: flavor.clone(),
             crate_name,
             lib_resolution,
+            host_source,
             symbols,
             functions,
             callbacks,
@@ -168,13 +173,25 @@ impl PlayerFfiModule {
 
     /// Build a `TsFfiModule` for the player, using raw symbol names
     /// (no `ubrn_` prefix) so the interface matches what `register()` returns.
-    fn build_typed_module(namespace: &general::Namespace, has_async: bool) -> TsFfiModule {
+    fn build_typed_module(
+        namespace: &general::Namespace,
+        has_async: bool,
+        installs_string_helpers: bool,
+    ) -> TsFfiModule {
         use heck::ToUpperCamelCase;
         let module_name = format!("Native{}", namespace.name.to_upper_camel_case());
 
-        // No synthetic string functions or bless_pointer for the player —
-        // the player runtime handles these internally.
-        let mut functions = Vec::new();
+        // No bless_pointer for the player — the player runtime handles that
+        // internally. The synthetic string helpers, however, ARE installed on
+        // the native module by the player shim (createFromUtf8 fast path) for
+        // flavors without a JS TextDecoder (Jsi2), so the converter's calls to
+        // them must typecheck against NativeModuleInterface. Their names keep
+        // the `ubrn_` prefix to match build_string_helper / the shim methods.
+        let mut functions = if installs_string_helpers {
+            TsFfiModule::synthetic_string_functions()
+        } else {
+            Vec::new()
+        };
 
         for def in &namespace.ffi_definitions {
             if let general::FfiDefinition::RustFunction(func) = def {

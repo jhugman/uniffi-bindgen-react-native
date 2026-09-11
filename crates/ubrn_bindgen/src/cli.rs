@@ -165,6 +165,9 @@ impl BindingsArgs {
                 generate_cpp(&components, &abi_dir, !out.no_format)?;
             }
             AbiFlavor::Napi => { /* No C++ generation for Napi */ }
+            // Jsi2 is a player flavor: no per-fixture native codegen. The player
+            // TS routing lives in `generate_ffi_from_pipeline` (host_source).
+            AbiFlavor::Jsi2 => { /* No C++ generation for Jsi2 (player) */ }
             #[cfg(feature = "wasm")]
             AbiFlavor::Wasm => {
                 let metadata = load_metadata(&loader, &source_path)?;
@@ -329,10 +332,10 @@ fn generate_ffi_from_pipeline(
 
         let config = extract_ts_config(namespace)?;
         let code = match &switches.flavor {
-            AbiFlavor::Napi => {
+            AbiFlavor::Napi | AbiFlavor::Jsi2 => {
                 let lib_resolution = lib_resolution.clone().ok_or_else(|| {
                     anyhow::anyhow!(
-                        "napi codegen requires a LibResolution; pass --lib-colocated, --lib-absolute, or --lib-package-base"
+                        "player codegen requires a LibResolution; pass --lib-colocated, --lib-absolute, or --lib-package-base"
                     )
                 })?;
                 let crate_name = namespace.crate_name.clone();

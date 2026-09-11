@@ -96,7 +96,13 @@ impl Bootstrap for HermesCmd {
                 "Ninja"
             })
             .arg("-DHERMES_BUILD_APPLE_FRAMEWORK=OFF")
-            .arg("-DCMAKE_BUILD_TYPE=Release");
+            .arg("-DCMAKE_BUILD_TYPE=Release")
+            // Debugger support compiles hooks into the interpreter loop; we
+            // never attach a debugger to the test runner, so pay nothing for it.
+            .arg("-DHERMES_ENABLE_DEBUGGER=OFF")
+            // Defaults to follow HERMES_ENABLE_DEBUGGER, but the test runner's
+            // GC watchdog and process.memoryUsage() both need getHeapInfo().
+            .arg("-DHERMES_MEMORY_INSTRUMENTATION=ON");
         if cfg!(target_os = "windows") {
             // The VS generator defaults to static libs, which would require
             // consumers to link the entire Hermes transitive dependency chain.

@@ -1,22 +1,27 @@
 {%- macro string_helper(helper) %}
 {%- if helper.supports_text_encoder %}
 const stringConverter = (() => {
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
+    // Lazily construct the codecs on first use. A module may be imported on a
+    // runtime that lacks `TextDecoder` (e.g. Hermes) yet never marshal a
+    // string, so constructing eagerly at module load would crash needlessly.
+    let _encoder: InstanceType<typeof TextEncoder> | undefined;
+    let _decoder: InstanceType<typeof TextDecoder> | undefined;
+    const encoder = () => (_encoder ??= new TextEncoder());
+    const decoder = () => (_decoder ??= new TextDecoder());
     return {
-        stringToBytes: (s: string) => encoder.encode(s),
-        bytesToString: (ab: UniffiByteArray) => decoder.decode(ab),
-        stringByteLength: (s: string) => encoder.encode(s).byteLength,
+        stringToBytes: (s: string) => encoder().encode(s),
+        bytesToString: (ab: UniffiByteArray) => decoder().decode(ab),
+        stringByteLength: (s: string) => encoder().encode(s).byteLength,
         writeStringIntoBuffer: (s: string, buf: any, offset: number): number => {
             const view = new Uint8Array(
                 buf.arrayBuffer,
                 offset,
                 buf.arrayBuffer.byteLength - offset,
             );
-            return encoder.encodeInto(s, view).written;
+            return encoder().encodeInto(s, view).written;
         },
         readStringFromBuffer: (buf: any, offset: number, length: number): string =>
-            decoder.decode(new Uint8Array(buf.arrayBuffer, offset, length)),
+            decoder().decode(new Uint8Array(buf.arrayBuffer, offset, length)),
     };
 })();
 {%- else %}

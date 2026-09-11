@@ -120,6 +120,7 @@ impl From<&AbiFlavor> for FlavorParams<'_> {
     fn from(value: &AbiFlavor) -> Self {
         match value {
             AbiFlavor::Jsi => unreachable!("Jsi should be only generating C++ not Rust"),
+            AbiFlavor::Jsi2 => unreachable!("Jsi2 should be only generating TypeScript not Rust"),
             AbiFlavor::Napi => unreachable!("Napi should be only generating TypeScript not Rust"),
             AbiFlavor::Wasm => wasm_flavor(),
             AbiFlavor::Wasm2 => unreachable!("Wasm2 has no per-crate Rust shim"),

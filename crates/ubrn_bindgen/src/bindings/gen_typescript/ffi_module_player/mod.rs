@@ -9,17 +9,21 @@ mod nodes;
 mod type_mapping;
 
 pub(crate) use nodes::PlayerFfiModule;
-pub use nodes::{LibResolution, TripleStyle};
+pub use nodes::{LibResolution, PlayerHostSource, TripleStyle};
 
 /// Render a minimal player template for snapshot testing. Hidden from API docs.
 #[doc(hidden)]
-pub fn render_minimal_for_test(lib_resolution: LibResolution, crate_name: &str) -> String {
+pub fn render_minimal_for_test(
+    lib_resolution: LibResolution,
+    crate_name: &str,
+    host_source: PlayerHostSource,
+) -> String {
     use nodes::{PlayerFfiModule, PlayerSymbols};
     let module = PlayerFfiModule {
         strict_type_checking: false,
-        flavor: crate::AbiFlavor::Napi,
         crate_name: crate_name.to_string(),
         lib_resolution: Some(lib_resolution),
+        host_source,
         symbols: PlayerSymbols {
             rustbuffer_alloc: "ubrn_test_alloc".into(),
             rustbuffer_free: "ubrn_test_free".into(),

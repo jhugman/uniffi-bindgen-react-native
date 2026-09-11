@@ -180,7 +180,11 @@ fn compile_cpp(
         .arg(format!("-DHERMES_BUILD_DIR={}", paths::hermes_build_dir()))
         .arg(format!("-DHERMES_EXTENSION_NAME=rn-{lib_name}"))
         .arg(format!("-DRUST_LIB_NAME={lib_name}"))
-        .arg(format!("-DRUST_TARGET_DIR={}/debug", target_dir))
+        .arg(format!(
+            "-DRUST_TARGET_DIR={}/{}",
+            target_dir,
+            crate::metadata::cargo_profile()
+        ))
         .arg(format!("-DHERMES_EXTENSION_CPP={cpp_files_str}"))
         .arg(cmake_lists_dir.as_str())
         .current_dir(&build_dir);

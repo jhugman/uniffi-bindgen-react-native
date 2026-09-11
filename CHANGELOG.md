@@ -5,6 +5,25 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+## ✨ What's New ✨
+
+### 🎮 JSI Player (`Jsi2` flavour) — host-side fixture parity
+
+The `Jsi2` test flavour (the generic libffi-based JSI player shim) now has
+full host-side parity with the `Jsi` and `Napi` oracle flavours. All 23
+applicable fixtures pass, covering scalars, RustBuffer / strings / errors,
+object handles, callback interfaces and vtables, async functions, and async
+callbacks / traits with struct-by-value completers. A compile-time ABI drift
+guard (`cpp/jsi-player-shim/abi_assert.cpp`) ensures the C and Rust struct
+layouts stay in sync.
+
+Three fixtures are intentionally excluded from `Jsi2` (each marked with an
+inline `// Jsi2: <reason>` comment): the `benchmark` fixture (run separately
+for performance measurement), `examples/arithmetic` (a pre-existing cdylib-name
+collision that breaks all flavours equally), and `ext-types/index-bundle`
+(N-API-only `tsconfig` setup). Distribution packaging and the `gen_cpp` cutover
+are separate later plans and are out of scope for this runtime layer.
+
 ## 🦊 What's Changed
 
 - `wasm-bindgen` runs as a command again, at whatever version your project provides, and this workspace pins none of its own. 0.31.0-5 linked `wasm-bindgen-cli-support` and ran the rewrite in-process, which made our pin a third party to an agreement between your crate and its dependencies: `js-sys` and `web-sys` pin `wasm-bindgen` exactly, so a lock file moving — a `matrix-rust-sdk` bump raising its `web-sys` floor, carrying `wasm-bindgen` from 0.2.114 to 0.2.127 with it — could not build until we released a matching version. Both the `web` and `wasm2` flavors shell out now. When the binary is missing or refuses, the version read out of the module's own descriptor section names the one to install, which beats wasm-bindgen's schema-mismatch text; `UBRN_WASM_BINDGEN` points at a specific binary on a machine carrying several ([#454](https://github.com/jhugman/uniffi-bindgen-react-native/pull/454)).
