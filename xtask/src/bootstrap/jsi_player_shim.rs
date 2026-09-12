@@ -22,7 +22,7 @@ pub(crate) struct JsiPlayerShimCmd;
 
 impl JsiPlayerShimCmd {
     fn src_dir() -> Result<Utf8PathBuf> {
-        Ok(repository_root()?.join("cpp").join("jsi-player-shim"))
+        Ok(repository_root()?.join("runtimes").join("jsi").join("cpp"))
     }
     fn build_dir() -> Result<Utf8PathBuf> {
         Ok(build_root()?.join("jsi-player-shim"))

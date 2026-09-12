@@ -218,3 +218,30 @@ fn template_jsi_global_absolute() {
         export default getter;"#]]
     .assert_eq(&extract_getter_block(&rendered));
 }
+
+#[test]
+fn template_jsi_global_name() {
+    // Name resolution: the binding names the built library and the host maps
+    // that to a path (jniLibs soname on Android, an embedded framework on iOS).
+    // Library and crate deliberately differ: several crates share one built
+    // library, and only the library name may reach `uniffi.open`. Were they
+    // equal, emitting the crate name would render identically and pass.
+    let rendered = render_minimal_for_test(
+        LibResolution::Name("my_lib".into()),
+        "my_crate",
+        PlayerHostSource::JsiGlobal,
+    );
+    expect![[r#"
+        let _nativeModule: NativeModuleInterface | undefined;
+        const getter: () => NativeModuleInterface = () => {
+          if (!_nativeModule) {
+            const libPath = { name: "my_lib" };
+            const uniffi = (globalThis as any).uniffi;
+            const mod_ = uniffi.open(libPath);
+            _nativeModule = mod_.register(DEFINITIONS) as unknown as NativeModuleInterface;
+          }
+          return _nativeModule;
+        };
+        export default getter;"#]]
+    .assert_eq(&extract_getter_block(&rendered));
+}

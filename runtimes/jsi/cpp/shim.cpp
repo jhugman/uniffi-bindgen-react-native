@@ -17,7 +17,8 @@
 #include <vector>
 
 #include "callbacks.h" // Rust -> JS callback machinery (vtable building, the three fns)
-#include "ubrn_jsi.h"   // from runtimes/jsi/include
+#include "ubrn_jsi.h"        // from runtimes/jsi/include
+#include "ubrn_jsi_player.h" // the host-facing install() and its Resolver
 #include "value_conv.h" // ArgDesc / scalarToBytes / bytesToScalar / arrayBytes
 
 namespace jsi = facebook::jsi;
@@ -443,8 +444,10 @@ class UniffiPlayerRoot : public jsi::HostObject,
                          public std::enable_shared_from_this<UniffiPlayerRoot> {
 public:
   UniffiPlayerRoot(std::shared_ptr<facebook::react::CallInvoker> callInvoker,
-                   std::thread::id jsThreadId)
-      : callInvoker_(std::move(callInvoker)), jsThreadId_(jsThreadId) {}
+                   std::thread::id jsThreadId,
+                   ubrn::jsi_player::Resolver resolver)
+      : callInvoker_(std::move(callInvoker)), jsThreadId_(jsThreadId),
+        resolver_(std::move(resolver)) {}
 
   ~UniffiPlayerRoot() override {
     // Reachability makes this the runtime's own teardown (see abortModule), but
@@ -484,6 +487,9 @@ public:
   }
   std::thread::id jsThreadId() const { return jsThreadId_; }
 
+  // Where the host says a library of this name lives.
+  std::string resolve(const std::string &name) const { return resolver_(name); }
+
   // A registration is added before anything that can throw, so a module core
   // accepted is never left armed with no owner to disarm it.
   void addModule(std::shared_ptr<ubrn_cb::ModuleCallbackInfo> info) {
@@ -493,6 +499,7 @@ public:
 private:
   std::shared_ptr<facebook::react::CallInvoker> callInvoker_;
   std::thread::id jsThreadId_;
+  ubrn::jsi_player::Resolver resolver_;
   // An additional owner, not the only one: the module object's host-function
   // closures hold the same infos. Every owner is a JS object of this runtime,
   // so the infos die here — while the leaked trampoline userdata pointing at
@@ -816,11 +823,26 @@ jsi::Value UniffiPlayerRoot::get(jsi::Runtime &rt,
         rt, jsi::PropNameID::forUtf8(rt, "open"), 1,
         [self](jsi::Runtime &rt, const jsi::Value &, const jsi::Value *args,
                size_t count) -> jsi::Value {
-          if (count < 1 || !args[0].isString()) {
-            throw jsi::JSError(rt,
-                               "uniffi jsi player: open() needs a path string");
+          // A bare string is a path (the pre-resolver contract, still used by
+          // v1-style callers); `{ path }` says so explicitly; `{ name }` asks
+          // the host where a library of that name lives.
+          std::string path;
+          if (count >= 1 && args[0].isString()) {
+            path = args[0].getString(rt).utf8(rt);
+          } else if (count >= 1 && args[0].isObject()) {
+            auto desc = args[0].getObject(rt);
+            auto p = desc.getProperty(rt, "path");
+            auto n = desc.getProperty(rt, "name");
+            if (p.isString()) {
+              path = p.getString(rt).utf8(rt);
+            } else if (n.isString()) {
+              path = self->resolve(n.getString(rt).utf8(rt));
+            }
           }
-          std::string path = args[0].getString(rt).utf8(rt);
+          if (path.empty()) {
+            throw jsi::JSError(rt, "uniffi jsi player: open() needs a path "
+                                   "string, { path }, or { name }");
+          }
           jsi::Object handle(rt);
           handle.setProperty(rt, "register", makeRegister(rt, path, self));
           return jsi::Value(rt, handle);
@@ -833,19 +855,37 @@ jsi::Value UniffiPlayerRoot::get(jsi::Runtime &rt,
 }
 
 void installUniffiHostObject(
-    jsi::Runtime &rt,
-    std::shared_ptr<facebook::react::CallInvoker> callInvoker) {
-  auto root = std::make_shared<UniffiPlayerRoot>(std::move(callInvoker),
-                                                 std::this_thread::get_id());
+    jsi::Runtime &rt, std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+    ubrn::jsi_player::Resolver resolver) {
+  auto root = std::make_shared<UniffiPlayerRoot>(
+      std::move(callInvoker), std::this_thread::get_id(), std::move(resolver));
   rt.global().setProperty(
       rt, "uniffi", jsi::Object::createFromHostObject(rt, std::move(root)));
 }
 
 } // namespace
 
-// The symbol the Hermes test-runner (and the production TurboModule) calls.
+namespace ubrn::jsi_player {
+void install(jsi::Runtime &rt,
+             std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+             Resolver resolver) {
+  installUniffiHostObject(rt, std::move(callInvoker), std::move(resolver));
+}
+} // namespace ubrn::jsi_player
+
+// Two-argument entry kept for the Hermes test-runner, which dlsyms this symbol
+// from v1's generated Entrypoint too: names are taken as paths.
 extern "C" void
 registerNatives(jsi::Runtime &rt,
                 std::shared_ptr<facebook::react::CallInvoker> callInvoker) {
-  installUniffiHostObject(rt, std::move(callInvoker));
+  ubrn::jsi_player::install(rt, std::move(callInvoker),
+                            [](const std::string &name) { return name; });
+}
+
+// The entry a host that knows its library layout uses.
+extern "C" void
+ubrnRegisterPlayer(jsi::Runtime &rt,
+                   std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+                   ubrn::jsi_player::Resolver resolver) {
+  ubrn::jsi_player::install(rt, std::move(callInvoker), std::move(resolver));
 }

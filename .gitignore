@@ -94,3 +94,14 @@ core
 runtimes/napi/artifacts/
 runtimes/napi/npm/
 runtimes/napi/fixtures/*/Cargo.lock
+
+# @ubjs/react-native build products
+runtimes/jsi/prebuilt/
+runtimes/jsi/artifacts/
+runtimes/jsi/.build/
+runtimes/jsi/typescript/dist/
+runtimes/jsi/node_modules/
+
+# npm pack output, left behind by the compile gate
+typescript/*.tgz
+runtimes/jsi/*.tgz

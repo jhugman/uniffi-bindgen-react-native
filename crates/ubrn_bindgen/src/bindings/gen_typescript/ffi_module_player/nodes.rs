@@ -8,7 +8,8 @@ use camino::Utf8PathBuf;
 
 /// How the generated player should locate the cdylib at load time.
 ///
-/// Maps 1:1 to the three resolveLibPath modes in `@ubjs/node`.
+/// Maps 1:1 to the resolveLibPath modes in `@ubjs/node`, plus `Name` for
+/// hosts that resolve a bare library name themselves.
 #[derive(Clone, Debug)]
 pub enum LibResolution {
     /// Look for the conventional filename next to the binding.
@@ -25,6 +26,12 @@ pub enum LibResolution {
         base: String,
         triple_style: TripleStyle,
     },
+    /// Emit `{ name: "<lib>" }` and let the host's resolver map it to a path.
+    /// The name is the built cdylib's, not a namespace's crate: one library
+    /// serves every module generated from it, and its uniffi statics exist once.
+    /// Android: `lib<name>.so` in the app's native-library dir. iOS: the embedded
+    /// `<name>.framework/<name>`. Hermes test-runner: `$UBRN_JSI_LIB_DIR/lib<name>.<ext>`.
+    Name(String),
 }
 
 /// Which platform-triple naming convention the consuming npm packages use.
