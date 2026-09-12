@@ -18,3 +18,4 @@ export type {
 } from "./types.js";
 export { ChannelClosedError } from "./types.js";
 export { createSender } from "./sender.js";
+export { createReceiver, type ReceiverOptions } from "./receiver.js";
