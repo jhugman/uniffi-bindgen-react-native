@@ -3,6 +3,12 @@ name: Publish @ubjs/react-native
 on:
   release:
     types: [published]
+  # A pull request dry-runs the whole pipeline: every slice, the assembly,
+  # the pack tests and `npm publish --dry-run`. Nothing reaches npm.
+  pull_request:
+    paths:
+      - "runtimes/jsi/**"
+      - ".github/workflows/npm-react-native.yml"
   workflow_dispatch:
     inputs:
       dry-run:
@@ -96,12 +102,14 @@ jobs:
       - name: Prebuilt completeness test
         run: npm run test:prebuilt
       - name: "📦 npm publish: @ubjs/react-native (dry-run)"
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.dry-run) }}
         run: |
           echo "::notice::DRY RUN — not publishing to npm"
           npm publish --dry-run --access public --tag latest
       - name: "📦 npm publish: @ubjs/react-native"
-        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
+        # Only a release, or an explicit dry-run=false dispatch, publishes:
+        # any other event has no inputs, and `!inputs.dry-run` would be true.
+        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry-run) }}
         run: npm publish --provenance --access public --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
