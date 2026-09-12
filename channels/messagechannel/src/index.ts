@@ -8,3 +8,13 @@ export type {
   ChannelListener,
   ChannelMessageEvent,
 } from "./port.js";
+export type {
+  AsyncPlayer,
+  JsValueOf,
+  Sender,
+  SenderControl,
+  RegisteredPlayer,
+  Receiver,
+} from "./types.js";
+export { ChannelClosedError } from "./types.js";
+export { createSender } from "./sender.js";
