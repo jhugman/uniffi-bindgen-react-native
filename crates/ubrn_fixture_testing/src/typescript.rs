@@ -85,9 +85,13 @@ fn prepare_tsconfig(
     // Add @generated/* path mapping if a generated dir was provided.
     if let Some(gen_dir) = generated_dir {
         let rel_gen = relative_path(gen_dir, tsc_dir);
+        // The bare alias is the directory's index.ts, the single import
+        // surface bindgen writes for the player flavors.
         contents = contents.replace(
             "\"@/*\":",
-            &format!("\"@/generated/*\": [\"{rel_gen}/*\"],\n      \"@/*\":"),
+            &format!(
+                "\"@/generated\": [\"{rel_gen}\"],\n      \"@/generated/*\": [\"{rel_gen}/*\"],\n      \"@/*\":"
+            ),
         );
     }
 
@@ -172,7 +176,7 @@ fn rewrite_paths_recursive(
                 Ok(c) => c,
                 Err(_) => continue,
             };
-            let needs_generated = contents.contains("\"@/generated/");
+            let needs_generated = contents.contains("\"@/generated");
             let needs_at = contents.contains("\"@/");
             let needs_ubrn = contents.contains("\"uniffi-bindgen-react-native\"");
             let needs_core = contents.contains("\"@ubjs/core\"");
@@ -190,6 +194,7 @@ fn rewrite_paths_recursive(
                     let rel = relative_path(gen_dir, file_dir);
                     let rel_str = make_relative(&rel);
                     rewritten = rewritten.replace("\"@/generated/", &format!("\"{rel_str}/"));
+                    rewritten = rewritten.replace("\"@/generated\"", &format!("\"{rel_str}\""));
                 }
             }
 

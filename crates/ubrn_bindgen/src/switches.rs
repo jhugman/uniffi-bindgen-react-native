@@ -132,15 +132,16 @@ impl AbiFlavor {
     /// It is the single import surface for a crate with several namespaces.
     /// jsi and wasm get an entrypoint from `ubrn_cli` instead — a turbo module
     /// and `index.web.ts` respectively — so a second index here would be
-    /// redundant for them.
+    /// redundant for them. jsi2's entrypoint only adds the player import and
+    /// its guard in front of this index.
     pub fn supports_index_ts_at_generation(&self) -> bool {
         #[cfg(feature = "wasm")]
         {
-            matches!(self, Self::Napi | Self::Wasm2)
+            matches!(self, Self::Napi | Self::Jsi2 | Self::Wasm2)
         }
         #[cfg(not(feature = "wasm"))]
         {
-            matches!(self, Self::Napi)
+            matches!(self, Self::Napi | Self::Jsi2)
         }
     }
 
