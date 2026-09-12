@@ -61,3 +61,4 @@
 - [Lifting and lowering](./internals/lifting-and-lowering.md)
 - [NativeModule.ts and Codegen](./internals/rn-codegen.md)
 - [The `wasm2` player](./internals/wasm2-player.md)
+- [The player `DEFINITIONS` table](./internals/player-definitions.md)
