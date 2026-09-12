@@ -16,7 +16,7 @@ use crate::wasm::WebBuildArgs;
 use crate::wasm2::Wasm2BuildArgs;
 use crate::{
     commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidBuildArgs,
-    jsi::ios::IosBuildArgs, Platform,
+    jsi::ios::IosBuildArgs, jsi2, Platform,
 };
 
 #[derive(Args, Debug)]
@@ -31,6 +31,8 @@ pub(crate) enum BuildCmd {
     Android(AndroidBuildArgs),
     /// Build the crate for use on an iOS device or simulator
     Ios(IosBuildArgs),
+    /// Build the crate as the shared library the JSI player loads
+    Jsi2(jsi2::BuildArgs),
     /// Build the crate for use in a web page
     #[cfg(feature = "wasm")]
     #[clap(aliases = ["wasm"])]
@@ -70,6 +72,7 @@ impl BuildCmd {
         let mut files = match self {
             Self::Android(a) => a.build()?,
             Self::Ios(a) => a.build()?,
+            Self::Jsi2(j) => j.build()?,
             #[cfg(feature = "wasm")]
             Self::Web(a) => a.build()?,
             #[cfg(feature = "wasm")]
@@ -88,6 +91,7 @@ impl BuildCmd {
         match self {
             Self::Android(a) => a.project_config(),
             Self::Ios(a) => a.project_config(),
+            Self::Jsi2(j) => j.project_config(),
             #[cfg(feature = "wasm")]
             Self::Web(a) => a.project_config(),
             #[cfg(feature = "wasm")]
@@ -99,6 +103,7 @@ impl BuildCmd {
         match self {
             Self::Android(a) => a.common_args.and_generate,
             Self::Ios(a) => a.common_args.and_generate,
+            Self::Jsi2(j) => j.and_generate(),
             #[cfg(feature = "wasm")]
             Self::Web(a) => !a.no_generate,
             #[cfg(feature = "wasm")]
@@ -131,6 +136,7 @@ impl BuildCmd {
         match self {
             Self::Android(a) => a.native_bindings,
             Self::Ios(a) => a.native_bindings,
+            Self::Jsi2(_) => false, // the player has no per-library native code
             #[cfg(feature = "wasm")]
             Self::Web(_) => false, // Web does not support native bindings
             #[cfg(feature = "wasm")]
@@ -175,6 +181,7 @@ impl From<&BuildCmd> for Platform {
         match value {
             BuildCmd::Android(..) => Self::Android,
             BuildCmd::Ios(..) => Self::Ios,
+            BuildCmd::Jsi2(..) => Self::Jsi2,
             #[cfg(feature = "wasm")]
             BuildCmd::Web(..) => Self::Wasm,
             #[cfg(feature = "wasm")]

@@ -169,7 +169,11 @@ pub fn so_extension<'a>(target: Option<&str>, use_shared_library: Option<bool>) 
 fn so_extension_from_target<'a>(target: &str, use_shared_library: Option<bool>) -> &'a str {
     if target.contains("windows") {
         "dll"
-    } else if target.contains("darwin") {
+    } else if target.contains("darwin")
+        || (target.contains("ios") && use_shared_library == Some(true))
+    {
+        // The jsi2 player dlopens the library, so iOS shared builds are
+        // dylibs too; v1 only ever asked for static archives on iOS.
         "dylib"
     } else if target.contains("ios") {
         "a"
@@ -267,4 +271,27 @@ fn find_library_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<St
 
 fn find_package_name(metadata: &Metadata, manifest_path: &Utf8Path) -> Option<String> {
     find_package(metadata, manifest_path).map(|package| package.name.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::so_extension;
+
+    #[test]
+    fn ios_shared_library_is_a_dylib() {
+        // The jsi2 player dlopens the library, so iOS builds are dylibs too;
+        // v1 only ever asked for static archives on iOS.
+        assert_eq!(so_extension(Some("aarch64-apple-ios"), Some(true)), "dylib");
+        assert_eq!(
+            so_extension(Some("aarch64-apple-ios-sim"), Some(true)),
+            "dylib"
+        );
+        assert_eq!(so_extension(Some("x86_64-apple-ios"), Some(true)), "dylib");
+        assert_eq!(so_extension(Some("aarch64-apple-ios"), None), "a");
+        assert_eq!(so_extension(Some("aarch64-apple-ios"), Some(false)), "a");
+        assert_eq!(
+            so_extension(Some("aarch64-linux-android"), Some(true)),
+            "so"
+        );
+    }
 }

@@ -1,0 +1,15 @@
+{
+  "name": "jsi2-fixture",
+  "version": "0.1.0",
+  "description": "An automated test",
+  "react-native": "./src/index.tsx",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/jsi2-fixture.git"
+  },
+  "author": "James <noop@nomail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@ubjs/core": "^0.31.0-5"
+  }
+}

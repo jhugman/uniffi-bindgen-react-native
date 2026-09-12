@@ -150,7 +150,7 @@ pub(crate) mod files {
     use crate::wasm;
     #[cfg(feature = "wasm")]
     use crate::wasm2;
-    use crate::{jsi, Platform};
+    use crate::{jsi, jsi2, Platform};
 
     pub(crate) fn get_files_for(
         config: Rc<TemplateConfig>,
@@ -165,6 +165,9 @@ pub(crate) mod files {
             Platform::Ios => {
                 files.extend(jsi::crossplatform::get_files(config.clone()));
                 files.extend(jsi::ios::get_files(config.clone()));
+            }
+            Platform::Jsi2 => {
+                files.extend(jsi2::get_files(config.clone()));
             }
             #[cfg(feature = "wasm")]
             Platform::Wasm => {
@@ -253,6 +256,7 @@ mod tests {
                 wasm2,
                 bindings,
                 tm,
+                jsi2: Default::default(),
                 exclude_files: Default::default(),
             }
         }
