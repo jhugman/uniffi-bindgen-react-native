@@ -27,8 +27,7 @@ use std::ffi::c_void;
 use napi::{JsUnknown, NapiRaw};
 
 use uniffi_runtime_core::ffi_c_types::{
-    ForeignBytesC, RustBufferAllocFn, RustBufferC, RustBufferFreeFn, RustBufferFromBytesFn,
-    RustCallStatusC,
+    ForeignBytesC, RustBufferC, RustBufferFreeFn, RustBufferFromBytesFn, RustCallStatusC,
 };
 
 /// A per-registration JS Symbol used as a hidden property key for stashing the
@@ -69,6 +68,7 @@ pub struct CapacitySymbol {
 // `env.create_function_from_closure`, and napi-rs requires those closures to
 // be `Send`. The pointers themselves never cross threads.
 unsafe impl Send for CapacitySymbol {}
+// SAFETY: see above.
 unsafe impl Sync for CapacitySymbol {}
 
 impl CapacitySymbol {
@@ -82,12 +82,16 @@ impl CapacitySymbol {
         // Create a JS string for the symbol's description (debug aid only).
         let desc = b"uniffi.rustbuffer.capacity\0";
         let mut desc_val: napi::sys::napi_value = std::ptr::null_mut();
-        let status = napi::sys::napi_create_string_utf8(
-            raw_env,
-            desc.as_ptr() as *const _,
-            desc.len() - 1,
-            &mut desc_val,
-        );
+        // SAFETY: raw_env is valid per this function's contract; desc is a
+        // static NUL-terminated literal and desc.len() - 1 excludes the NUL.
+        let status = unsafe {
+            napi::sys::napi_create_string_utf8(
+                raw_env,
+                desc.as_ptr() as *const _,
+                desc.len() - 1,
+                &mut desc_val,
+            )
+        };
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
                 "Failed to create symbol description string".to_string(),
@@ -95,7 +99,9 @@ impl CapacitySymbol {
         }
 
         let mut sym_val: napi::sys::napi_value = std::ptr::null_mut();
-        let status = napi::sys::napi_create_symbol(raw_env, desc_val, &mut sym_val);
+        // SAFETY: raw_env is valid per this function's contract; desc_val is
+        // the napi_value just created above.
+        let status = unsafe { napi::sys::napi_create_symbol(raw_env, desc_val, &mut sym_val) };
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
                 "Failed to create capacity-hint Symbol".to_string(),
@@ -104,7 +110,9 @@ impl CapacitySymbol {
 
         // Keep the symbol alive past the current callback scope.
         let mut sym_ref: napi::sys::napi_ref = std::ptr::null_mut();
-        let status = napi::sys::napi_create_reference(raw_env, sym_val, 1, &mut sym_ref);
+        // SAFETY: raw_env is valid per this function's contract; sym_val is
+        // the napi_value just created above.
+        let status = unsafe { napi::sys::napi_create_reference(raw_env, sym_val, 1, &mut sym_ref) };
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
                 "Failed to create reference to capacity-hint Symbol".to_string(),
@@ -124,7 +132,10 @@ impl CapacitySymbol {
         raw_env: napi::sys::napi_env,
     ) -> napi::Result<napi::sys::napi_value> {
         let mut sym_val: napi::sys::napi_value = std::ptr::null_mut();
-        let status = napi::sys::napi_get_reference_value(raw_env, self.sym_ref, &mut sym_val);
+        // SAFETY: raw_env is valid per this function's contract; self.sym_ref
+        // was created by `new` and not yet deleted.
+        let status =
+            unsafe { napi::sys::napi_get_reference_value(raw_env, self.sym_ref, &mut sym_val) };
         if status != napi::sys::Status::napi_ok || sym_val.is_null() {
             return Err(napi::Error::from_reason(
                 "Failed to resolve capacity-hint Symbol".to_string(),
@@ -145,11 +156,15 @@ impl CapacitySymbol {
         obj: napi::sys::napi_value,
         capacity: u64,
     ) -> napi::Result<()> {
-        let sym_val = self.value(raw_env)?;
+        // SAFETY: raw_env is valid per this function's contract, satisfying `value`'s contract.
+        let sym_val = unsafe { self.value(raw_env)? };
         // Use a BigInt to hold the full u64 capacity without lossy f64 rounding
         // (matters for the >2^53 corner case; cheap enough in practice).
         let mut cap_val: napi::sys::napi_value = std::ptr::null_mut();
-        let status = napi::sys::napi_create_bigint_uint64(raw_env, capacity, &mut cap_val);
+        // SAFETY: raw_env is valid per this function's contract; cap_val is a
+        // local out-param.
+        let status =
+            unsafe { napi::sys::napi_create_bigint_uint64(raw_env, capacity, &mut cap_val) };
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
                 "Failed to create BigInt for capacity hint".to_string(),
@@ -159,7 +174,9 @@ impl CapacitySymbol {
         // prototype-chain hit would send us down the `napi_set_property` branch, silently
         // creating an enumerable own property that shadows it.
         let mut has = false;
-        let status = napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has);
+        // SAFETY: raw_env is valid and obj is a JS object per this function's
+        // contract; sym_val is the resolved symbol from `value` above.
+        let status = unsafe { napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has) };
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
                 "Failed to inspect RustBuffer ownership metadata",
@@ -168,7 +185,9 @@ impl CapacitySymbol {
 
         let status = if has {
             // Already defined non-enumerable below; a plain set keeps that descriptor.
-            napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val)
+            // SAFETY: raw_env is valid and obj is a JS object per this
+            // function's contract; sym_val/cap_val are the values created above.
+            unsafe { napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val) }
         } else {
             // `writable` only, so the marker is non-enumerable. That is load-bearing:
             // lift now marks every handed-off view, and
@@ -185,7 +204,9 @@ impl CapacitySymbol {
                 attributes: napi::sys::PropertyAttributes::writable,
                 data: std::ptr::null_mut(),
             };
-            napi::sys::napi_define_properties(raw_env, obj, 1, &descriptor)
+            // SAFETY: raw_env is valid and obj is a JS object per this
+            // function's contract; descriptor is a local value valid for the call.
+            unsafe { napi::sys::napi_define_properties(raw_env, obj, 1, &descriptor) }
         };
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
@@ -207,9 +228,12 @@ impl CapacitySymbol {
         raw_env: napi::sys::napi_env,
         obj: napi::sys::napi_value,
     ) -> napi::Result<Option<u64>> {
-        let sym_val = self.value(raw_env)?;
+        // SAFETY: raw_env is valid per this function's contract, satisfying `value`'s contract.
+        let sym_val = unsafe { self.value(raw_env)? };
         let mut has = false;
-        let status = napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has);
+        // SAFETY: raw_env is valid and obj is a JS object per this function's
+        // contract; sym_val is the resolved symbol from `value` above.
+        let status = unsafe { napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has) };
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
                 "Failed to inspect RustBuffer ownership metadata",
@@ -220,7 +244,9 @@ impl CapacitySymbol {
         }
 
         let mut cap_val: napi::sys::napi_value = std::ptr::null_mut();
-        let status = napi::sys::napi_get_property(raw_env, obj, sym_val, &mut cap_val);
+        // SAFETY: raw_env is valid and obj is a JS object per this function's
+        // contract; sym_val is the resolved symbol from `value` above.
+        let status = unsafe { napi::sys::napi_get_property(raw_env, obj, sym_val, &mut cap_val) };
         if status != napi::sys::Status::napi_ok || cap_val.is_null() {
             return Err(napi::Error::from_reason(
                 "Failed to read RustBuffer ownership metadata",
@@ -229,8 +255,11 @@ impl CapacitySymbol {
 
         let mut value: u64 = 0;
         let mut lossless = false;
-        let status =
-            napi::sys::napi_get_value_bigint_uint64(raw_env, cap_val, &mut value, &mut lossless);
+        // SAFETY: raw_env is valid per this function's contract; cap_val was
+        // just read as this object's own property, so it is live.
+        let status = unsafe {
+            napi::sys::napi_get_value_bigint_uint64(raw_env, cap_val, &mut value, &mut lossless)
+        };
         if status != napi::sys::Status::napi_ok || !lossless {
             return Err(napi::Error::from_reason(
                 "Invalid RustBuffer ownership metadata",
@@ -242,10 +271,10 @@ impl CapacitySymbol {
 
 impl Drop for CapacitySymbol {
     fn drop(&mut self) {
-        // SAFETY: `sym_ref` was created from `raw_env` by `napi_create_reference`
-        // and has not been deleted yet. Releasing it tells napi the symbol is
-        // free to GC.
         if !self.sym_ref.is_null() && !self.raw_env.is_null() {
+            // SAFETY: `sym_ref` was created from `raw_env` by `napi_create_reference`
+            // and has not been deleted yet. Releasing it tells napi the symbol is
+            // free to GC.
             unsafe {
                 napi::sys::napi_delete_reference(self.raw_env, self.sym_ref);
             }
@@ -275,8 +304,9 @@ pub unsafe fn create_uint8array(
     let mut arraybuffer = std::ptr::null_mut();
     // SAFETY: raw_env is valid (precondition); output pointers are to local
     // stack variables whose addresses remain stable for the duration of the call.
-    let status =
-        napi::sys::napi_create_arraybuffer(raw_env, len, &mut arraybuffer_data, &mut arraybuffer);
+    let status = unsafe {
+        napi::sys::napi_create_arraybuffer(raw_env, len, &mut arraybuffer_data, &mut arraybuffer)
+    };
     if status != napi::sys::Status::napi_ok {
         return Err(napi::Error::from_reason("Failed to create ArrayBuffer"));
     }
@@ -287,21 +317,23 @@ pub unsafe fn create_uint8array(
         // bytes (guaranteed by napi_create_arraybuffer on success). The two
         // regions cannot overlap because one lives in Rust memory and the other
         // in the JS engine's heap.
-        std::ptr::copy_nonoverlapping(data, arraybuffer_data as *mut u8, len);
+        unsafe { std::ptr::copy_nonoverlapping(data, arraybuffer_data as *mut u8, len) };
     }
 
     let mut typedarray = std::ptr::null_mut();
     // SAFETY: arraybuffer is the napi_value just created above; byte_offset=0
     // and length=len match the ArrayBuffer's size, so the view covers exactly
     // the entire buffer with no out-of-bounds region.
-    let status = napi::sys::napi_create_typedarray(
-        raw_env,
-        napi::sys::TypedarrayType::uint8_array,
-        len,
-        arraybuffer,
-        0,
-        &mut typedarray,
-    );
+    let status = unsafe {
+        napi::sys::napi_create_typedarray(
+            raw_env,
+            napi::sys::TypedarrayType::uint8_array,
+            len,
+            arraybuffer,
+            0,
+            &mut typedarray,
+        )
+    };
     if status != napi::sys::Status::napi_ok {
         return Err(napi::Error::from_reason("Failed to create Uint8Array"));
     }
@@ -337,15 +369,17 @@ pub unsafe fn read_typedarray_data(
     // are to local stack variables. The returned data pointer is into the
     // ArrayBuffer's backing store, which the JS engine manages—we do not
     // free it ourselves.
-    let status = napi::sys::napi_get_typedarray_info(
-        raw_env,
-        raw_val,
-        &mut ta_type,
-        &mut length,
-        &mut data,
-        &mut ab,
-        &mut byte_offset,
-    );
+    let status = unsafe {
+        napi::sys::napi_get_typedarray_info(
+            raw_env,
+            raw_val,
+            &mut ta_type,
+            &mut length,
+            &mut data,
+            &mut ab,
+            &mut byte_offset,
+        )
+    };
     if status != napi::sys::Status::napi_ok {
         return None;
     }
@@ -380,44 +414,15 @@ pub unsafe fn rustbuffer_from_raw_bytes(
     // was provided under `symbols.rustbuffer_from_bytes` in the JS definitions. We
     // transmute it to `RustBufferFromBytesFn`—the correct signature for UniFFI's
     // `rustbuffer_from_bytes`.
-    let from_bytes: RustBufferFromBytesFn = std::mem::transmute(rb_from_bytes_ptr);
+    let from_bytes: RustBufferFromBytesFn = unsafe { std::mem::transmute(rb_from_bytes_ptr) };
     let mut call_status = RustCallStatusC::default();
-    let rb = from_bytes(foreign, &mut call_status as *mut RustCallStatusC);
+    // SAFETY: from_bytes is the library's `rustbuffer_from_bytes` (per the
+    // transmute above); foreign borrows `data` for at least `len` bytes
+    // (this function's contract) and call_status is a valid out-param.
+    let rb = unsafe { from_bytes(foreign, &mut call_status as *mut RustCallStatusC) };
     if call_status.code != 0 {
         return Err(napi::Error::from_reason(
             "rustbuffer_from_bytes failed".to_string(),
-        ));
-    }
-    Ok(rb)
-}
-
-/// Allocate a [`RustBufferC`] of the requested capacity via `rustbuffer_alloc`.
-///
-/// Returned buffer has `capacity == size`, `len == 0`, and a heap-allocated `data`
-/// pointer owned by the Rust library. Callers must hand the buffer back through the
-/// matching `rustbuffer_free` (or pass it across the FFI to a function that consumes it).
-///
-/// # Safety
-///
-/// - `rb_alloc_ptr` must point to a valid `rustbuffer_alloc` function.
-pub unsafe fn rustbuffer_alloc(
-    size: i32,
-    rb_alloc_ptr: *const c_void,
-) -> napi::Result<RustBufferC> {
-    if rb_alloc_ptr.is_null() {
-        return Err(napi::Error::from_reason(
-            "rustbuffer_alloc symbol is unresolved".to_string(),
-        ));
-    }
-    // SAFETY: `rb_alloc_ptr` was obtained via `dlsym` for the symbol whose name was
-    // provided under `symbols.rustbuffer_alloc` in the JS definitions. We transmute
-    // it to `RustBufferAllocFn`—the correct signature for UniFFI's `rustbuffer_alloc`.
-    let alloc: RustBufferAllocFn = std::mem::transmute(rb_alloc_ptr);
-    let mut call_status = RustCallStatusC::default();
-    let rb = alloc(size, &mut call_status as *mut RustCallStatusC);
-    if call_status.code != 0 {
-        return Err(napi::Error::from_reason(
-            "rustbuffer_alloc failed".to_string(),
         ));
     }
     Ok(rb)
@@ -450,14 +455,16 @@ pub unsafe fn create_external_uint8array(
     let mut arraybuffer = std::ptr::null_mut();
     // SAFETY: raw_env is valid (precondition); `data`+`len` describe a valid byte
     // range we intend to expose; the finalizer is a static extern "C" function.
-    let status = napi::sys::napi_create_external_arraybuffer(
-        raw_env,
-        data as *mut c_void,
-        len,
-        Some(noop_finalize),
-        std::ptr::null_mut(),
-        &mut arraybuffer,
-    );
+    let status = unsafe {
+        napi::sys::napi_create_external_arraybuffer(
+            raw_env,
+            data as *mut c_void,
+            len,
+            Some(noop_finalize),
+            std::ptr::null_mut(),
+            &mut arraybuffer,
+        )
+    };
     if status != napi::sys::Status::napi_ok {
         return Err(napi::Error::from_reason(
             "Failed to create external ArrayBuffer".to_string(),
@@ -468,14 +475,16 @@ pub unsafe fn create_external_uint8array(
     // SAFETY: arraybuffer is the napi_value just created above; byte_offset=0
     // and length=len match the ArrayBuffer's size, so the view covers exactly
     // the entire buffer with no out-of-bounds region.
-    let status = napi::sys::napi_create_typedarray(
-        raw_env,
-        napi::sys::TypedarrayType::uint8_array,
-        len,
-        arraybuffer,
-        0,
-        &mut typedarray,
-    );
+    let status = unsafe {
+        napi::sys::napi_create_typedarray(
+            raw_env,
+            napi::sys::TypedarrayType::uint8_array,
+            len,
+            arraybuffer,
+            0,
+            &mut typedarray,
+        )
+    };
     if status != napi::sys::Status::napi_ok {
         return Err(napi::Error::from_reason(
             "Failed to create Uint8Array view".to_string(),
@@ -519,18 +528,26 @@ pub unsafe fn js_uint8array_to_rust_buffer(
     rb_from_bytes_ptr: *const c_void,
     capacity_symbol: &CapacitySymbol,
 ) -> napi::Result<RustBufferC> {
-    let raw_val = js_val.raw();
-    let (data_ptr, length) = read_typedarray_data(raw_env, raw_val).ok_or_else(|| {
-        napi::Error::from_reason("Expected a Uint8Array argument for RustBuffer".to_string())
-    })?;
+    // SAFETY: `raw()` drops the handle's lifetime tracking, so it needs the value
+    // to be live for the rest of this call — `js_val` is owned here and only read
+    // below, within the callback scope this function's contract names.
+    let raw_val = unsafe { js_val.raw() };
+    // SAFETY: raw_env is valid and raw_val refers to a TypedArray, per this function's contract.
+    let (data_ptr, length) =
+        unsafe { read_typedarray_data(raw_env, raw_val) }.ok_or_else(|| {
+            napi::Error::from_reason("Expected a Uint8Array argument for RustBuffer".to_string())
+        })?;
 
     // An empty view owns no allocation, so there is nothing to adopt. `rustbuffer_alloc(0)`
     // never sets a hint, and the copy path yields the correct empty `RustBufferC`.
     if length == 0 {
-        return rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr);
+        // SAFETY: data_ptr/length came from read_typedarray_data above;
+        // rb_from_bytes_ptr is a valid rustbuffer_from_bytes per this function's contract.
+        return unsafe { rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr) };
     }
 
-    if let Some(capacity) = capacity_symbol.get(raw_env, raw_val)? {
+    // SAFETY: raw_env is valid and raw_val is a JS object (a TypedArray), per this function's contract.
+    if let Some(capacity) = unsafe { capacity_symbol.get(raw_env, raw_val) }? {
         if capacity == 0 {
             // The marker exists but has been zeroed, so this view was already adopted and
             // its memory has since been freed by the callee. Reading it would be a
@@ -539,7 +556,8 @@ pub unsafe fn js_uint8array_to_rust_buffer(
                 "RustBuffer argument was already consumed by a previous FFI call".to_string(),
             ));
         }
-        capacity_symbol.set(raw_env, raw_val, 0)?;
+        // SAFETY: raw_env is valid and raw_val is a JS object (a TypedArray), per this function's contract.
+        unsafe { capacity_symbol.set(raw_env, raw_val, 0) }?;
         return Ok(RustBufferC {
             capacity,
             len: length as u64,
@@ -548,7 +566,9 @@ pub unsafe fn js_uint8array_to_rust_buffer(
     }
 
     // No marker: an ordinary V8-backed array from JS, which is not ours to give away.
-    rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr)
+    // SAFETY: data_ptr/length came from read_typedarray_data above;
+    // rb_from_bytes_ptr is a valid rustbuffer_from_bytes per this function's contract.
+    unsafe { rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr) }
 }
 
 /// Free a [`RustBufferC`] via the provided free function pointer.
@@ -573,12 +593,12 @@ pub unsafe fn free_rustbuffer(rb: RustBufferC, free_ptr: *const c_void) {
         // The transmute reinterprets the raw `*const c_void` as a function
         // pointer of the correct type. The non-null check above guarantees we
         // are not transmuting a null pointer.
-        let free_fn: RustBufferFreeFn = std::mem::transmute(free_ptr);
+        let free_fn: RustBufferFreeFn = unsafe { std::mem::transmute(free_ptr) };
         let mut status = RustCallStatusC::default();
         // SAFETY: rb is a valid RustBufferC that was allocated by the same
         // library's rustbuffer_alloc or rustbuffer_from_bytes (precondition).
         // We pass a stack-allocated RustCallStatusC for the function to write
         // its status into; its address is valid for the duration of the call.
-        free_fn(rb, &mut status as *mut _);
+        unsafe { free_fn(rb, &mut status as *mut _) };
     }
 }

@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-// Proves the JSI player builds one trampoline per callback type, not one per
+// Proves a player bridge builds one trampoline per callback type, not one per
 // call.
 //
 // A trampoline is permanently leaked by design — the library may invoke the
@@ -17,10 +17,12 @@
 // and nothing else observable moves: the continuation is a module-level const,
 // so the leak pins the same JS function object every time and neither the
 // Hermes heap nor any allocator count changes. `$uniffiTrampolineCount` is a
-// diagnostic the player exposes for exactly this reason.
+// diagnostic both player bridges expose for exactly this reason, counting
+// builds at core's single build point.
 //
 // To run:
 //   cargo test -p uniffi-fixture-futures -- jsi2::test_trampoline_cache
+//   cargo test -p uniffi-fixture-futures -- napi::test_trampoline_cache
 import { alwaysReady } from "@/generated/futures";
 import nativeModule from "@/generated/futures-ffi";
 import { asyncTest } from "@/asserts";

@@ -16,49 +16,34 @@ extern "C" {
 
 typedef struct UbrnJsiModule UbrnJsiModule;
 
-// Type tags. Values MUST match c_api.rs::ffi_type_from_tag and core::FfiTypeDesc.
-typedef enum {
-  UBRN_TY_VOID = 0,
-  UBRN_TY_U8 = 1,  UBRN_TY_I8 = 2,
-  UBRN_TY_U16 = 3, UBRN_TY_I16 = 4,
-  UBRN_TY_U32 = 5, UBRN_TY_I32 = 6,
-  UBRN_TY_U64 = 7, UBRN_TY_I64 = 8,
-  UBRN_TY_F32 = 9, UBRN_TY_F64 = 10,
-  UBRN_TY_HANDLE = 11,
-  UBRN_TY_RUSTBUFFER = 12, // fully supported (args and return values)
-  UBRN_TY_CALLBACK = 13,   // named; the name is in the parallel *_type_names array
-  UBRN_TY_STRUCT = 14,     // named; the name is in the parallel *_type_names array
-  UBRN_TY_REFERENCE = 15,  // pointer to a named struct (vtable); name in the parallel
-                           // *_type_names array; maps to Reference(Struct(name))
-  UBRN_TY_RUSTCALLSTATUS = 16, // inline RustCallStatus struct ({i8, u64, u64, ptr});
-                               // appears only as a struct field (e.g. inside
-                               // ForeignFutureResult<T>); maps to FfiTypeDesc::RustCallStatus
-} UbrnFfiType;
-
 typedef struct {
   const char* name;        // raw FFI symbol, e.g. "uniffi_arithmetical_fn_func_add"
-  const uint8_t* arg_tags; // array of UbrnFfiType, length n_args
+  // Player tag names, length n_args, e.g. "UInt8" / "Callback". NUL-terminated,
+  // valid for the ubrn_jsi_register call.
+  const char* const* arg_tag_names;
   size_t n_args;
-  // Parallel to arg_tags (length n_args): the type name for Callback/Struct tags,
-  // NULL for scalar args. The whole array may be NULL (all names absent).
-  // Appended AFTER n_args; mirrored at the same offset in c_api.rs.
+  // Parallel to arg_tag_names (length n_args): the type name for Callback,
+  // Struct and Reference tags, NULL for scalars. The whole array may be NULL.
   const char* const* arg_type_names;
-  uint8_t ret_tag;         // UbrnFfiType; scalar/RustBuffer only — named types (Callback/Struct) are not supported as returns
+  const char* ret_tag_name;     // player tag name; scalar/RustBuffer only
   uint8_t has_rust_call_status; // 0 or 1
 } UbrnFunctionSpec;
 
 // One method signature of a callback interface that JS must implement.
 typedef struct {
   const char* name;
-  const uint8_t* arg_tags;                 // array of UbrnFfiType, length n_args
-  const char* const* arg_type_names;       // parallel to arg_tags; name for Callback/Struct tags, NULL for scalars (NULL whole-array allowed)
+  // Player tag names, length n_args. NUL-terminated, valid for the
+  // ubrn_jsi_register call.
+  const char* const* arg_tag_names;
+  const char* const* arg_type_names;       // parallel to arg_tag_names; name for Callback/Struct/Reference tags, NULL for scalars (NULL whole-array allowed)
   size_t n_args;
-  uint8_t ret_tag;                         // scalar/RustBuffer for direct returns; for an
-                                           // out_return callback this MAY be Struct (the struct
-                                           // is written through the out_return pointer)
+  const char* ret_tag_name;                // player tag name; scalar/RustBuffer for direct
+                                           // returns; for an out_return callback this MAY be
+                                           // "Struct" (the struct is written through the
+                                           // out_return pointer)
   uint8_t has_rust_call_status;            // 0 or 1
   uint8_t out_return;                      // 0 or 1
-  // The return type's name for a Struct (tag 14) return, else NULL. Carries the
+  // The return type's name for a "Struct" return, else NULL. Carries the
   // struct name so the callback's `ret` parses to Struct(name) (core ignores it
   // for out_return). Appended AFTER out_return; mirrored in c_api.rs.
   const char* ret_type_name;
@@ -67,8 +52,8 @@ typedef struct {
 // One field of a vtable struct.
 typedef struct {
   const char* field_name;
-  uint8_t type_tag;                        // typically UBRN_TY_CALLBACK
-  const char* type_name;                   // callback name for UBRN_TY_CALLBACK fields, else NULL
+  const char* type_tag_name;  // player tag name; typically "Callback"
+  const char* type_name;      // callback name for Callback fields, else NULL
 } UbrnStructField;
 
 // A vtable struct definition (e.g. a callback interface's vtable layout).
@@ -119,6 +104,16 @@ void ubrn_jsi_rustbuffer_free(UbrnJsiModule* m, UbrnRustBuffer buf);
 
 void ubrn_jsi_free(UbrnJsiModule* m);
 
+// Stop this module serving its frontend: set the unloading flag and invoke the
+// abort hook registered at construction. Idempotent, and tolerates a NULL handle.
+// Frees nothing, drains nothing and does not close the library — the module stays
+// valid to call, but every trampoline it handed out now returns without calling
+// into the frontend, zeroing whatever return bytes it has. An out_return callback
+// has none, so Rust reads back FfiDefault::ffi_default() with call_status.code
+// still 0. No new trampoline or vtable can be built.
+// Mirrors core::Module::disarm.
+void ubrn_jsi_disarm(UbrnJsiModule* m);
+
 // --- Callback support (Rust <-> JS) -----------------------------------------
 
 typedef void (*UbrnOnJsThreadFn)(const uint8_t* args, uint8_t* ret, const void* user_data);
@@ -131,6 +126,24 @@ typedef bool (*UbrnIsJsThreadFn)(const void* user_data);
 const void* ubrn_jsi_make_trampoline(UbrnJsiModule* m, const char* callback_name,
                                      UbrnOnJsThreadFn on_js_thread, UbrnDispatchFn dispatch,
                                      UbrnIsJsThreadFn is_js_thread, const void* user_data);
+
+// The trampoline already built for (callback_name, identity), or NULL if none.
+// `identity` is a caller-minted number naming one JS function. Core owns the reuse map,
+// the caller owns the naming, since JS identity is not something core can observe — so
+// keeping identities distinct is the caller's job, and across every module it registers
+// rather than one: a JS function reaching two modules carries one number into both.
+// Also NULL on error (null module, null/not-UTF-8 name) — a miss and an error mean the
+// same thing to a caller: build one.
+// Mirrors core::Module::trampoline_for.
+const void* ubrn_jsi_trampoline_for(UbrnJsiModule* m, const char* callback_name,
+                                    uint64_t identity);
+
+// Record fn_ptr as the trampoline for (callback_name, identity), so a later call with
+// the same pair reuses it instead of building — and leaking — another. A null fn_ptr is
+// recorded as-is; it would read back as a miss, costing reuse, not correctness.
+// Mirrors core::Module::remember_trampoline.
+void ubrn_jsi_remember_trampoline(UbrnJsiModule* m, const char* callback_name,
+                                  uint64_t identity, const void* fn_ptr);
 
 // Build a vtable byte blob from ordered (callback_name, fn_ptr) pairs. Returns NULL on error.
 const void* ubrn_jsi_build_vtable(UbrnJsiModule* m, const char* struct_name,
@@ -145,12 +158,29 @@ int ubrn_jsi_call_callback_ptr(UbrnJsiModule* m, const char* callback_name, cons
 // Query the C struct layout (computed via libffi inside core) for a registered struct.
 // Writes the total struct size to *out_total_size and, for up to `cap` fields, the
 // per-field byte offset/size into out_offsets[i]/out_sizes[i]. Returns the struct's
-// real field count (>= cap means out_offsets/out_sizes were truncated; call again with
+// real field count (> cap means out_offsets/out_sizes were truncated; call again with
 // a larger cap), or -1 on error (null module, unknown struct, null name).
 // Mirrors core::Module::struct_field_offsets.
 int ubrn_jsi_struct_field_offsets(UbrnJsiModule* m, const char* struct_name,
                                   size_t* out_total_size, size_t* out_offsets,
                                   size_t* out_sizes, size_t cap);
+
+// Byte size and alignment of one flat argument slot for a player tag name.
+// Either out-param may be NULL. Pure function of the tag name, resolved at
+// registration. Returns false for a name with no slot geometry.
+bool ubrn_jsi_scalar_slot_size_align(const char* tag_name, size_t* out_size, size_t* out_align);
+
+// Byte offsets and sizes of a callback's argument slots, in CIF order
+// [declared args, out-return ptr?, RustCallStatus ptr?] — the layout core's
+// trampoline packs. Writes the whole buffer's byte length to *out_total_size
+// and, for up to `cap` slots, the per-slot offset/size into
+// out_offsets[i]/out_sizes[i]. Returns the callback's real slot count (> cap
+// means out_offsets/out_sizes were truncated; call again with a larger cap),
+// or -1 on error (null module, unknown callback, null name).
+// Mirrors core::Module::callback_arg_layout.
+int ubrn_jsi_callback_arg_layout(UbrnJsiModule* m, const char* callback_name,
+                                 size_t* out_total_size, size_t* out_offsets,
+                                 size_t* out_sizes, size_t cap);
 
 #ifdef __cplusplus
 } // extern "C"

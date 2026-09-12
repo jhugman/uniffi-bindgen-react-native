@@ -127,11 +127,14 @@ fn marshal_field_to_bytes(
             slot::write_i32(slot, n.get_double()? as i32);
         }
         FfiTypeDesc::UInt64 | FfiTypeDesc::Handle => {
+            // SAFETY: `env` is the active env for this callback; `js_val` is the
+            // field value just read from the JS object above.
             let bigint = unsafe { napi::JsBigInt::from_raw(env.raw(), js_val.raw())? };
             let (v, _) = bigint.get_u64()?;
             slot::write_u64(slot, v);
         }
         FfiTypeDesc::Int64 => {
+            // SAFETY: as above.
             let bigint = unsafe { napi::JsBigInt::from_raw(env.raw(), js_val.raw())? };
             let (v, _) = bigint.get_i64()?;
             slot::write_i64(slot, v);
@@ -145,6 +148,9 @@ fn marshal_field_to_bytes(
             slot::write_f64(slot, n.get_double()?);
         }
         FfiTypeDesc::RustBuffer => {
+            // SAFETY: `env` is the active env for this callback, `js_val` is the field
+            // value just read from the JS object, and `rb_from_bytes_ptr` was resolved
+            // at registration time — satisfying `js_uint8array_to_rust_buffer`'s contract.
             let rb = unsafe {
                 napi_utils::js_uint8array_to_rust_buffer(
                     env.raw(),
@@ -186,6 +192,9 @@ fn marshal_field_to_bytes(
             let has_error_buf: bool = status_obj.has_named_property("errorBuf")?;
             if has_error_buf && code != 0 {
                 let err_val: JsUnknown = status_obj.get_named_property("errorBuf")?;
+                // SAFETY: as above — `env` is the active env, `err_val` is the
+                // property value just read, and `rb_from_bytes_ptr` was resolved
+                // at registration time.
                 let rb = unsafe {
                     napi_utils::js_uint8array_to_rust_buffer(
                         env.raw(),
@@ -210,6 +219,8 @@ fn marshal_field_to_bytes(
         }
         FfiTypeDesc::Callback(cb_name) => {
             // Callback-typed struct field: create a trampoline and write the fn pointer.
+            // SAFETY: `env` is the active env for this callback; `js_val` is the field
+            // value just read from the JS object above.
             let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), js_val.raw())? };
             let user_data = crate::callback::create_callback_user_data(
                 env,
@@ -292,11 +303,14 @@ fn marshal_arg_to_bytes(
             Ok((n.get_double()? as i32).to_ne_bytes().to_vec())
         }
         FfiTypeDesc::UInt64 | FfiTypeDesc::Handle => {
+            // SAFETY: `env` is the active env for this callback; `js_val` is the
+            // argument value read from the current call frame above.
             let bigint = unsafe { napi::JsBigInt::from_raw(env.raw(), js_val.raw())? };
             let (v, _) = bigint.get_u64()?;
             Ok(v.to_ne_bytes().to_vec())
         }
         FfiTypeDesc::Int64 => {
+            // SAFETY: as above.
             let bigint = unsafe { napi::JsBigInt::from_raw(env.raw(), js_val.raw())? };
             let (v, _) = bigint.get_i64()?;
             Ok(v.to_ne_bytes().to_vec())
@@ -311,6 +325,9 @@ fn marshal_arg_to_bytes(
         }
         FfiTypeDesc::RustBuffer => {
             let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
+            // SAFETY: `env` is the active env for this callback, `js_val` is the
+            // argument value read above, and `rb_from_bytes_ptr` comes from the
+            // loaded module — satisfying `js_uint8array_to_rust_buffer`'s contract.
             let rb = unsafe {
                 napi_utils::js_uint8array_to_rust_buffer(
                     env.raw(),
@@ -320,6 +337,9 @@ fn marshal_arg_to_bytes(
                 )?
             };
             // Transmute RustBufferC to its raw bytes.
+            // SAFETY: `RustBufferC` is `#[repr(C)]` and the destination array is sized
+            // exactly `size_of::<RustBufferC>()`, so this only reinterprets its bytes;
+            // any padding bytes remain valid as arbitrary `u8`s.
             let rb_bytes: [u8; std::mem::size_of::<RustBufferC>()] =
                 unsafe { std::mem::transmute(rb) };
             Ok(rb_bytes.to_vec())
@@ -334,6 +354,8 @@ fn marshal_arg_to_bytes(
         | FfiTypeDesc::Reference(_)
         | FfiTypeDesc::MutReference(_) => {
             // Pointer-sized: read as u64 bigint
+            // SAFETY: `env` is the active env for this callback; `js_val` is the
+            // argument value read from the current call frame above.
             let bigint = unsafe { napi::JsBigInt::from_raw(env.raw(), js_val.raw())? };
             let (v, _) = bigint.get_u64()?;
             Ok(v.to_ne_bytes().to_vec())

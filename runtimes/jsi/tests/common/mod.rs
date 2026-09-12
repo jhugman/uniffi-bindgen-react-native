@@ -13,14 +13,16 @@ use uniffi_runtime_jsi::{
     UbrnStructField, UbrnStructSpec,
 };
 
-/// Type tag for a u32 scalar; mirrors `UBRN_TY_U32` in `runtimes/jsi/include/ubrn_jsi.h`.
-pub const UBRN_TY_U32: u8 = 5;
+/// Player tag name for a u32 scalar; the spec structs carry names, not numbers.
+pub const TAG_UINT32: &str = "UInt32";
 
-/// Type tags mirrored from `runtimes/jsi/include/ubrn_jsi.h`, used by the callback
-/// roundtrip tests.
-pub const UBRN_TY_VOID: u8 = 0;
-pub const UBRN_TY_I32: u8 = 6;
-pub const UBRN_TY_CALLBACK: u8 = 13;
+/// Player tag names from the wire vocabulary in
+/// `runtimes/jsi/include/ubrn_jsi.h`, used by the callback roundtrip tests.
+pub const TAG_VOID: &str = "Void";
+pub const TAG_INT32: &str = "Int32";
+pub const TAG_STRUCT: &str = "Struct";
+pub const TAG_HANDLE: &str = "Handle";
+pub const TAG_CALLBACK: &str = "Callback";
 
 /// Build the `hello-world` fixture cdylib and return its path.
 ///
@@ -67,13 +69,14 @@ pub fn register_hello_world() -> *mut UbrnJsiModule {
     let free = CString::new("ffi_hello_world_rustbuffer_free").unwrap();
     let from_bytes = CString::new("ffi_hello_world_rustbuffer_from_bytes").unwrap();
     let add = CString::new("uniffi_hello_world_fn_func_add").unwrap();
-    let tags = [UBRN_TY_U32, UBRN_TY_U32];
+    let u32_tag = CString::new(TAG_UINT32).unwrap();
+    let tag_names = [u32_tag.as_ptr(), u32_tag.as_ptr()];
     let fn_spec = UbrnFunctionSpec {
         name: add.as_ptr(),
-        arg_tags: tags.as_ptr(),
+        arg_tag_names: tag_names.as_ptr(),
         n_args: 2,
         arg_type_names: std::ptr::null(),
-        ret_tag: UBRN_TY_U32,
+        ret_tag_name: u32_tag.as_ptr(),
         has_rust_call_status: 1,
     };
     let spec = UbrnModuleSpec {
@@ -104,12 +107,17 @@ pub struct CallbacksFixture {
     pub module: *mut UbrnJsiModule,
     pub cb_name: CString,
     pub struct_name: CString,
+    /// A second callback whose declared args include a by-value struct — the
+    /// shape of the generated `ForeignFutureComplete*` completers. Core builds
+    /// a CIF for it but gives it no flat arg layout.
+    pub struct_arg_cb_name: CString,
 }
 
-/// Register the `uniffi-fixture-callbacks` fixture with ONE callback method
-/// (`TestCallbackMethod`: `fn(i32) -> void` with a RustCallStatus out-param) and
-/// ONE vtable struct (`TestVTable`, one Callback field of that method) plus the
-/// three rustbuffer symbols.
+/// Register the `uniffi-fixture-callbacks` fixture with TWO callback methods —
+/// `TestCallbackMethod` (`fn(i32) -> void` with a RustCallStatus out-param) and
+/// `TestCallbackWithStructArg` (`fn(handle, TestVTable) -> void`, a struct
+/// passed BY VALUE) — and ONE vtable struct (`TestVTable`, one Callback field
+/// of the first method) plus the three rustbuffer symbols.
 ///
 /// Mirrors [`register_hello_world`] but for the callback/struct parse path. The
 /// returned module must be freed with [`ubrn_jsi_free`]; the returned CStrings
@@ -126,15 +134,18 @@ pub fn register_callbacks_fixture() -> CallbacksFixture {
     let free = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_free").unwrap();
     let from_bytes = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_from_bytes").unwrap();
 
+    let void_tag = CString::new(TAG_VOID).unwrap();
+
     // A callback method: fn(i32) -> void, with a RustCallStatus out-param.
     let cb_name = CString::new("TestCallbackMethod").unwrap();
-    let cb_arg_tags: [u8; 1] = [UBRN_TY_I32];
+    let i32_tag = CString::new(TAG_INT32).unwrap();
+    let cb_arg_tag_names = [i32_tag.as_ptr()];
     let cb_spec = UbrnCallbackSpec {
         name: cb_name.as_ptr(),
-        arg_tags: cb_arg_tags.as_ptr(),
+        arg_tag_names: cb_arg_tag_names.as_ptr(),
         arg_type_names: std::ptr::null(),
         n_args: 1,
-        ret_tag: UBRN_TY_VOID,
+        ret_tag_name: void_tag.as_ptr(),
         has_rust_call_status: 1,
         out_return: 0,
         ret_type_name: std::ptr::null(),
@@ -143,9 +154,10 @@ pub fn register_callbacks_fixture() -> CallbacksFixture {
     // A vtable struct with one field of the callback type above.
     let field_name = CString::new("method").unwrap();
     let field_type_name = CString::new("TestCallbackMethod").unwrap();
+    let callback_tag = CString::new(TAG_CALLBACK).unwrap();
     let struct_fields: [UbrnStructField; 1] = [UbrnStructField {
         field_name: field_name.as_ptr(),
-        type_tag: UBRN_TY_CALLBACK,
+        type_tag_name: callback_tag.as_ptr(),
         type_name: field_type_name.as_ptr(),
     }];
     let struct_name = CString::new("TestVTable").unwrap();
@@ -155,14 +167,36 @@ pub fn register_callbacks_fixture() -> CallbacksFixture {
         n_fields: 1,
     };
 
+    // A completer-shaped callback: one of its declared args is the struct
+    // BY VALUE. Core builds a CIF for it (libffi knows the struct's layout) but
+    // refuses it a flat arg layout — and, for the same reason, a trampoline.
+    let struct_arg_cb_name = CString::new("TestCallbackWithStructArg").unwrap();
+    let handle_tag = CString::new(TAG_HANDLE).unwrap();
+    let struct_tag = CString::new(TAG_STRUCT).unwrap();
+    let struct_arg_cb_tag_names = [handle_tag.as_ptr(), struct_tag.as_ptr()];
+    let struct_arg_cb_names: [*const std::os::raw::c_char; 2] =
+        [std::ptr::null(), struct_name.as_ptr()];
+    let struct_arg_cb_spec = UbrnCallbackSpec {
+        name: struct_arg_cb_name.as_ptr(),
+        arg_tag_names: struct_arg_cb_tag_names.as_ptr(),
+        arg_type_names: struct_arg_cb_names.as_ptr(),
+        n_args: 2,
+        ret_tag_name: void_tag.as_ptr(),
+        has_rust_call_status: 0,
+        out_return: 0,
+        ret_type_name: std::ptr::null(),
+    };
+
+    let cb_specs: [UbrnCallbackSpec; 2] = [cb_spec, struct_arg_cb_spec];
+
     let spec = UbrnModuleSpec {
         rustbuffer_alloc: alloc.as_ptr(),
         rustbuffer_free: free.as_ptr(),
         rustbuffer_from_bytes: from_bytes.as_ptr(),
         functions: std::ptr::null(),
         n_functions: 0,
-        callbacks: &cb_spec,
-        n_callbacks: 1,
+        callbacks: cb_specs.as_ptr(),
+        n_callbacks: cb_specs.len(),
         structs: &struct_spec,
         n_structs: 1,
     };
@@ -177,5 +211,6 @@ pub fn register_callbacks_fixture() -> CallbacksFixture {
         module,
         cb_name,
         struct_name,
+        struct_arg_cb_name,
     }
 }
