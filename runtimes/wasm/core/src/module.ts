@@ -5,20 +5,17 @@
  */
 import { Memory } from "./memory.js";
 import { Scratch } from "./scratch.js";
-import {
-  compileStructLayout,
-  type FieldDesc,
-  type StructLayout,
-} from "./marshal.js";
+import { compileStructLayout, type StructLayout } from "./marshal.js";
 import {
   specializeFunction,
   getCapacityHint,
   canUseFunctionConstructor,
   type DispatchContext,
-  type FunctionDef,
 } from "./call.js";
 import { CallbackTable, type CallbackDef } from "./callback.js";
 import { FutureRegistry } from "./future.js";
+import { type ModuleDefinitions } from "@ubjs/core";
+export type { ModuleDefinitions };
 
 export type WasmSource =
   | WebAssembly.Module
@@ -27,17 +24,6 @@ export type WasmSource =
   | Response
   | URL
   | string;
-
-export interface ModuleDefinitions {
-  symbols: {
-    rustbuffer_alloc: string;
-    rustbuffer_free: string;
-    rustbuffer_from_bytes: string;
-  };
-  functions: Record<string, FunctionDef>;
-  callbacks: Record<string, CallbackDef>;
-  structs: Record<string, FieldDesc[]>;
-}
 
 export type NativeModuleInterface = Record<string, (...args: any[]) => any>;
 
