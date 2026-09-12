@@ -7,19 +7,23 @@ mod metadata;
 mod paths;
 pub mod typescript;
 
+pub mod channel;
 pub mod jsi;
 pub mod napi;
 pub mod ts;
 pub mod wasm;
 pub mod wasm2;
 
-/// Test flavor: JSI (Hermes native), WASM (Node.js), Napi (Node.js N-API), or Wasm2 (Player-based WASM).
+/// Test flavor: JSI (Hermes native), WASM (Node.js), Napi (Node.js N-API),
+/// Wasm2 (Player-based WASM), or Channel (Wasm2 player behind a
+/// `@ubjs/message-channel` receiver, driven over an in-process sync port).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
     Wasm,
     Napi,
     Wasm2,
+    Channel,
 }
 
 impl Flavor {
@@ -29,6 +33,7 @@ impl Flavor {
             Flavor::Wasm => "wasm",
             Flavor::Napi => "napi",
             Flavor::Wasm2 => "wasm2",
+            Flavor::Channel => "channel",
         }
     }
 }
@@ -194,7 +199,7 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
     if flavor == Flavor::Napi {
         runtime_paths.push(format!(r#""@ubjs/node": ["{rel_root}/runtimes/napi/lib"]"#));
     }
-    if flavor == Flavor::Wasm2 {
+    if flavor == Flavor::Wasm2 || flavor == Flavor::Channel {
         // `paths` bypasses the package `exports` map, so the bare specifier
         // the generated index imports needs pointing at the node build.
         runtime_paths.push(format!(
@@ -208,6 +213,14 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
         ));
         runtime_paths.push(format!(
             r#""@ubjs/wasm/node": ["{rel_root}/runtimes/wasm/node/src/index"]"#
+        ));
+    }
+    if flavor == Flavor::Channel {
+        runtime_paths.push(format!(
+            r#""@ubjs/message-channel": ["{rel_root}/channels/messagechannel/src/index"]"#
+        ));
+        runtime_paths.push(format!(
+            r#""@ubjs/message-channel/testing": ["{rel_root}/channels/messagechannel/src/testing"]"#
         ));
     }
     runtime_paths.join(",\n      ")
