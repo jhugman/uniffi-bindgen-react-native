@@ -227,8 +227,7 @@ The schema has no single source. Each consumer declares it in its own language, 
 
 | Path | Language | Role |
 | ---- | -------- | ---- |
-| `runtimes/wasm/core/src/ffi-type.ts` | TypeScript | `FfiTypeDesc` and the `FfiType` factory |
-| `runtimes/wasm/core/src/{module,call,callback,marshal}.ts` | TypeScript | `ModuleDefinitions`, `FunctionDef`, `CallbackDef`, `FieldDesc` |
+| `typescript/src/ffi-definitions.ts` | TypeScript | `FfiTypeDesc`, the `FfiType` factory, `ModuleDefinitions`, `FunctionDef`, `CallbackDef`, `FieldDesc`; `@ubjs/wasm/core` re-exports them |
 | `runtimes/napi/lib.js` | JavaScript | the `FfiType` factory, no types |
 | `runtimes/core/src/ffi_type.rs`, `spec.rs` | Rust | `FfiTypeDesc`, `ModuleSpec` and the three `*Def` structs |
 | `runtimes/napi/src/register/spec_from_js.rs` | Rust | the parser from the JavaScript object to `ModuleSpec` |
@@ -236,5 +235,5 @@ The schema has no single source. Each consumer declares it in its own language, 
 | `crates/ubrn_bindgen/tests/player_template_snapshots.rs`, `wasm2_codegen.rs` | Rust | snapshots that pin the emitted shape |
 
 ```admonish warning
-Adding a tag means changing all of them: the two factories, the TypeScript union, the Rust enum, the `napi` parser, the `wasm2` `planArg` and lift switches, the bindgen mapping, and the snapshots. Nothing checks that the set is the same in every place except the fixture tests, which only exercise tags UniFFI emits.
+Adding a tag means changing all of them: the two factories, the TypeScript union in `@ubjs/core`, the Rust enum, the `napi` parser, the `wasm2` `planArg` and lift switches, the bindgen mapping, and the snapshots. Nothing checks that the set is the same in every place except the fixture tests, which only exercise tags UniFFI emits.
 ```

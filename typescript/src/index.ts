@@ -13,6 +13,7 @@ export * from "./cursor.ts";
 export * from "./enums.ts";
 export * from "./errors.ts";
 export * from "./ffi-converters.ts";
+export * from "./ffi-definitions.ts";
 export * from "./ffi-types.ts";
 export * from "./handle-map.ts";
 export * from "./objects.ts";
