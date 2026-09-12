@@ -30,13 +30,16 @@ fn generate_all_emits_an_assets_only_library() -> Result<()> {
         run_cli("ubrn generate jsi2 all --config ubrn.config.yaml libarithmetical.dylib")?;
 
         assert_files(&[
-            // The entrypoint: player first, then the guard, then the modules.
+            // The entrypoint: player first, then the guard, then the generated
+            // index, which owns initialization.
             File::new("src/index.tsx")
                 .contains("import \"@ubjs/react-native\";")
                 .contains("@ubjs/react-native must be a direct dependency of the app; add it and re-run pod install")
-                .contains("export * from './generated/arithmetic';")
-                .contains("import * as arithmetic from './generated/arithmetic';")
-                .contains("arithmetic.default.initialize();"),
+                .contains("export * from './generated';")
+                .contains("export { default } from './generated';"),
+            File::new("src/generated/index.ts")
+                .contains("arithmetic.default.initialize();")
+                .contains("export async function uniffiInitAsync()"),
             // The bindings name the library, not a path.
             File::new("src/generated/arithmetic-ffi.ts").contains("{ name: \"arithmetical\" }"),
             File::new("src/generated/arithmetic.ts"),
