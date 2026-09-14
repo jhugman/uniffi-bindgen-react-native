@@ -62,6 +62,11 @@ pub(super) impl FfiType {
             | Self::RustCallStatus
             | Self::RustBuffer(_)
             | Self::VoidPointer => ci.cpp_namespace_includes(),
+            // `Bridging<ForeignBytes>` is hand-written in `ForeignBytes.h`, in the
+            // `uniffi_jsi` namespace; the generated namespace only declares the
+            // template. Note that the plain C++ struct `ForeignBytes` stays in the
+            // global namespace: `ffi_type_name()` is what renders it, not this.
+            Self::ForeignBytes => ci.cpp_namespace_includes(),
             Self::Callback(name) => format!(
                 "{}::cb::{}",
                 ci.cpp_namespace(),
