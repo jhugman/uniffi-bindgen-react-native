@@ -162,7 +162,11 @@ impl BindingsArgs {
         // mappings), so build the initial root with the same loader the native
         // generators use. `run_typescript_pipeline` publishes each crate's config
         // as `[bindings.react-native]`, the table the 0.32 pipeline reads.
-        let metadata = loader.load_metadata(&source_path)?;
+        //
+        // The metadata comes from `load_metadata`, not the loader's own method: a
+        // wasm2 build passes a `.wasm` file, whose metadata has to be extracted
+        // from the module rather than from an object file.
+        let metadata = load_metadata(&loader, &source_path)?;
         let initial_root = loader.load_pipeline_initial_root(&source_path, metadata)?;
         let explicit_discr_enums = collect_explicit_discr_enums(&initial_root);
         let general_root = run_typescript_pipeline(initial_root)?;
