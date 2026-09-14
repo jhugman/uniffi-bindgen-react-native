@@ -64,8 +64,14 @@ jobs:
         with:
           node-version: 24
 
+      # Pinned, not `stable`. rustc 1.98.0 passes `--fix-cortex-a53-843419`
+      # to the linker for aarch64 targets, and the zig linker shim that
+      # @napi-rs/cli 2.x generates rejects it, so both aarch64 Linux builds
+      # fail and the publish job never runs. 1.97.1 does not pass the flag.
+      # Unpin once @napi-rs/cli is upgraded to a version that goes through
+      # cargo-zigbuild, which filters the flag.
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.97.1
         with:
           targets: ${{ matrix.target }}
 

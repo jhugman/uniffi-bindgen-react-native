@@ -33,6 +33,8 @@ pub enum AbiFlavor {
     Napi,
     #[cfg(feature = "wasm")]
     Wasm,
+    #[cfg(feature = "wasm")]
+    Wasm2,
 }
 
 impl AbiFlavor {
@@ -42,6 +44,8 @@ impl AbiFlavor {
             Self::Napi => "", // No native entrypoint needed
             #[cfg(feature = "wasm")]
             Self::Wasm => "src/lib.rs",
+            #[cfg(feature = "wasm")]
+            Self::Wasm2 => "",
         }
     }
 
@@ -57,18 +61,39 @@ impl AbiFlavor {
     /// Whether the runtime uses a player (dlopen + register) rather than
     /// compiled-in bindings.
     pub fn supports_player(&self) -> bool {
-        matches!(self, Self::Napi)
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Napi | Self::Wasm2)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            matches!(self, Self::Napi)
+        }
     }
 
     /// Whether FFI function names on the native module use the `ubrn_` prefix.
     /// JSI and WASM both use this prefix; the Napi player uses raw symbol names.
     pub fn supports_ubrn_prefix(&self) -> bool {
-        !matches!(self, Self::Napi)
+        #[cfg(feature = "wasm")]
+        {
+            !matches!(self, Self::Napi | Self::Wasm2)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            !matches!(self, Self::Napi)
+        }
     }
 
     /// Whether the runtime uses a plain `{ code: 0 }` object for RustCallStatus.
     pub fn supports_plain_call_status(&self) -> bool {
-        matches!(self, Self::Jsi | Self::Napi)
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Jsi | Self::Napi | Self::Wasm2)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            matches!(self, Self::Jsi | Self::Napi)
+        }
     }
 
     pub fn supports_text_encoder(&self) -> bool {
@@ -76,7 +101,14 @@ impl AbiFlavor {
     }
 
     pub fn supports_rust_backtrace(&self) -> bool {
-        !matches!(self, Self::Jsi | Self::Napi)
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Wasm | Self::Wasm2)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            false
+        }
     }
 
     pub fn supports_finalization_registry(&self) -> bool {
@@ -90,5 +122,37 @@ impl AbiFlavor {
     /// flavors (Wasm) defer all initialization into `uniffiInitAsync`.
     pub fn supports_sync_initialization(&self) -> bool {
         matches!(self, Self::Jsi | Self::Napi)
+    }
+
+    /// Whether the bindgen emits an `index.ts` beside the per-module wrappers.
+    ///
+    /// It is the single import surface for a crate with several namespaces.
+    /// jsi and wasm get an entrypoint from `ubrn_cli` instead — a turbo module
+    /// and `index.web.ts` respectively — so a second index here would be
+    /// redundant for them.
+    pub fn supports_index_ts_at_generation(&self) -> bool {
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Napi | Self::Wasm2)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            matches!(self, Self::Napi)
+        }
+    }
+
+    /// Wasm2 specifically — the per-module wrapper stays environment-neutral,
+    /// exporting `PLAYER_DEFINITIONS` / `setNativeModule` and leaving the
+    /// opening of the `.wasm` to a generated entrypoint, so it bundles for
+    /// node, browsers and React Native alike.
+    pub fn is_wasm2(&self) -> bool {
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Wasm2)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            false
+        }
     }
 }

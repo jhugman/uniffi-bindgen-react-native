@@ -14,6 +14,8 @@ use ubrn_bindgen::{AbiFlavor, BindingsArgs, ModuleMetadata, SwitchArgs};
 
 #[cfg(feature = "wasm")]
 use crate::wasm;
+#[cfg(feature = "wasm")]
+use crate::wasm2;
 use crate::{
     codegen::{files, get_template_config, render_files},
     config::ProjectConfig,
@@ -58,6 +60,11 @@ pub(crate) enum GenerateCmd {
     #[cfg(feature = "wasm")]
     #[clap(aliases = ["web"])]
     Wasm(wasm::CmdArg),
+
+    /// Commands to generate a Wasm2 (player-based) crate.
+    #[cfg(feature = "wasm")]
+    #[clap(aliases = ["web2"])]
+    Wasm2(wasm2::CmdArg),
 }
 
 impl GenerateCmd {
@@ -87,6 +94,11 @@ impl GenerateCmd {
             #[cfg(feature = "wasm")]
             Self::Wasm(wasm) => {
                 wasm.run()?;
+                Ok(())
+            }
+            #[cfg(feature = "wasm")]
+            Self::Wasm2(w) => {
+                w.run()?;
                 Ok(())
             }
         }
@@ -194,6 +206,8 @@ impl GenerateAllCommand {
         Ok(match self.platform {
             #[cfg(feature = "wasm")]
             Some(Platform::Wasm) => wasm::bindings(project, switches, lib_file)?,
+            #[cfg(feature = "wasm")]
+            Some(Platform::Wasm2) => wasm2::bindings(project, switches, lib_file)?,
             _ => jsi::bindings(project, switches, lib_file)?,
         })
     }

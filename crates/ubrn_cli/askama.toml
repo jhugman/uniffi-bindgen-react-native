@@ -5,6 +5,7 @@ dirs = [
     "templates/jsi/android",
     "templates/jsi/ios",
     "templates/wasm",
+    "templates/wasm2",
 ]
 default_syntax = "none"
 

@@ -9,6 +9,8 @@ mod react_native;
 mod switches;
 #[cfg(feature = "wasm")]
 mod wasm;
+#[cfg(feature = "wasm")]
+mod wasm_metadata;
 
 pub use self::{
     bindings::{generate_entrypoint, metadata::ModuleMetadata},
@@ -26,3 +28,6 @@ pub mod __player_template_test {
         render_minimal_for_test, LibResolution, TripleStyle,
     };
 }
+
+#[doc(hidden)]
+pub use self::bindings::render_player_lowlevel_for_test;

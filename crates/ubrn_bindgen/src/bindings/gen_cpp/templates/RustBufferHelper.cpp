@@ -30,18 +30,58 @@ template <> struct Bridging<RustBuffer> {
   static RustBuffer fromJs(jsi::Runtime &rt, std::shared_ptr<CallInvoker>,
                            const jsi::Value &value) {
     try {
+      auto obj = value.asObject(rt);
+
+      // Adoption vs copy. Two kinds of view arrive here:
+      //
+      //   * Library-owned views from `rustbuffer_alloc`. Codegen allocates one,
+      //     fills it in place, and ships it as an argument — and never frees a
+      //     lowered argument, while the view's backing `CMutableBuffer` is
+      //     non-owning (its destructor leaves `data` alone). Such a view carries
+      //     a capacity hint (stamped by `rustbuffer_alloc` in the wrapper). We
+      //     *adopt* it: hand the existing allocation to the callee, which frees
+      //     it. Copying instead would orphan the allocation and leak one whole
+      //     payload per call.
+      //   * Ordinary JS-owned arrays, which carry no hint. These are *copied*
+      //     into a fresh library allocation — they are not ours to give away.
+      //
+      // On adoption we reset the hint to 0 so a later `rustbuffer_free(view)` is
+      // a no-op rather than a double free.
+      if (obj.hasProperty(rt, uniffi_jsi::kUbrnRustCapacity)) {
+        auto capacity = static_cast<uint64_t>(
+            obj.getProperty(rt, uniffi_jsi::kUbrnRustCapacity).asNumber());
+        if (capacity == 0) {
+          // Hint present but zeroed: the view was already adopted by a previous
+          // call and its memory has been freed. Reading it would be a
+          // use-after-free, so refuse rather than hand over a dangling pointer.
+          throw jsi::JSError(
+              rt,
+              "RustBuffer argument was already consumed by a previous FFI call");
+        }
+        auto arrayBuffer =
+            obj.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
+        auto byteOffset =
+            static_cast<size_t>(obj.getProperty(rt, "byteOffset").asNumber());
+        auto byteLength =
+            static_cast<size_t>(obj.getProperty(rt, "byteLength").asNumber());
+        obj.setProperty(rt, uniffi_jsi::kUbrnRustCapacity, jsi::Value(0));
+        return RustBuffer{
+            .capacity = capacity,
+            .len = static_cast<uint64_t>(byteLength),
+            .data = arrayBuffer.data(rt) + byteOffset,
+        };
+      }
+
       auto buffer = uniffi_jsi::Bridging<jsi::ArrayBuffer>::value_to_arraybuffer(rt, value);
       auto bytes = ForeignBytes{
           .len = static_cast<int32_t>(buffer.length(rt)),
           .data = buffer.data(rt),
       };
 
-      // This buffer is constructed from foreign bytes. Rust scaffolding copies
-      // the bytes, to make the RustBuffer.
+      // No hint: an ordinary JS-owned array. Rust scaffolding copies the bytes
+      // to make the RustBuffer; the copy is destroyed when the callee
+      // deserializes its arguments.
       auto buf = rustbuffer_from_bytes(bytes);
-      // Once it leaves this function, the buffer is immediately passed back
-      // into Rust, where it's used to deserialize into the Rust versions of the
-      // arguments. At that point, the copy is destroyed.
       return buf;
     } catch (const std::logic_error &e) {
       throw jsi::JSError(rt, e.what());

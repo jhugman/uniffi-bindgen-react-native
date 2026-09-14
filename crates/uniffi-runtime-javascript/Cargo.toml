@@ -1,9 +1,9 @@
 [package]
 name = "uniffi-runtime-javascript"
-version = "0.31.0-3"
+version = "0.31.0-5"
 edition = "2021"
 authors = ["James Hugman <james@hugman.tv>"]
-description = "Javascript runtime for UniFFI-generated bindings"
+description = "wasm-bindgen runtime for UniFFI-generated Javascript bindings crates"
 license = "MPL-2.0"
 repository = "https://github.com/jhugman/uniffi-bindgen-react-native"
 readme = "README.md"
@@ -11,7 +11,7 @@ keywords = ["ffi", "code-generation", "javascript", "wasm"]
 categories = ["api-bindings", "development-tools::ffi"]
 
 [dependencies]
-uniffi_core = { version = "=0.32.0", default-features = false }
+uniffi_core = { version = "=0.32", default-features = false }
 wasm-bindgen = { version = "0.2.97", optional = true }
 
 [features]

@@ -30,9 +30,9 @@ The crate is split into features, one per Javascript runtime:
 
 - `wasm32`: uses `wasm-bindgen`.
 
-Future features may be:
-
-- `napi`: which uses `napi-rs` to provide node bindings.
+There is no feature here for the runtimes that call a `cdylib` directly. Those
+load your compiled library and call the C ABI uniffi already exports, so
+nothing needs to be linked into your crate.
 
 ## Generating `uniffi` based bindings for other Javascript Runtimes without this crate
 

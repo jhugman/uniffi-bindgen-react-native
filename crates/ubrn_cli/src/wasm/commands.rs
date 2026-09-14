@@ -5,10 +5,10 @@
  */
 use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use ubrn_common::{run_cmd, CrateMetadata};
+use ubrn_common::{run_cmd, wasm_bindgen_cmd, wasm_bindgen_context, CrateMetadata};
 
 use super::{
     config::{Target, WasmTarget},
@@ -157,7 +157,7 @@ impl WebBuildArgs {
         wasm_bindgen_extras: &ExtraArgs,
         out_dir: &Utf8Path,
     ) -> Result<()> {
-        let mut cmd = Command::new("wasm-bindgen");
+        let mut cmd = wasm_bindgen_cmd();
         cmd.arg("--target")
             .arg(target.to_string())
             .arg("--omit-default-module-path")
@@ -167,7 +167,7 @@ impl WebBuildArgs {
             .arg(out_dir)
             .args(wasm_bindgen_extras.clone())
             .arg(library_path);
-        run_cmd(&mut cmd)?;
-        Ok(())
+
+        run_cmd(&mut cmd).with_context(|| wasm_bindgen_context(library_path))
     }
 }

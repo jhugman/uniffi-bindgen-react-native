@@ -87,7 +87,8 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
         .join(format!("{wasm_lib_stem}.wasm"));
     let wasm_bindgen_dir = ts_dir.join("wasm-bindgen");
     std::fs::create_dir_all(&wasm_bindgen_dir).expect("failed to create wasm-bindgen dir");
-    run_wasm_bindgen(&wasm_file, &wasm_bindgen_dir);
+    ubrn_common::run_wasm_bindgen(&wasm_file, &wasm_bindgen_dir, "index")
+        .unwrap_or_else(|e| panic!("wasm-bindgen on {wasm_file}: {e:#}"));
 
     // Step 7: Write fixture tsconfig for @generated/* resolution, then run tsx.
     // The guard ensures cleanup even if run_tsx panics.
@@ -158,7 +159,19 @@ fn generate_lib_rs(src_dir: &Utf8Path, library_name: &str) {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let lib_rs = format!("#[allow(unused_imports)]\nuse {lib_ident};\n\n{mod_decls}\n");
+    // Wire `console_error_panic_hook` (an optional default feature on the
+    // wrapper-crate template) at module init so wasm panics surface as
+    // readable `console.error` traces instead of a bare `RuntimeError:
+    // unreachable`. Without this every Rust panic in the Wasm flavor is a
+    // silent debugging dead-end.
+    let lib_rs = format!(
+        "#[allow(unused_imports)]\nuse {lib_ident};\n\n\
+         #[wasm_bindgen::prelude::wasm_bindgen(start)]\n\
+         pub fn __ubrn_init() {{\n    \
+             console_error_panic_hook::set_once();\n\
+         }}\n\n\
+         {mod_decls}\n"
+    );
 
     let lib_rs_path = src_dir.join("lib.rs");
     std::fs::write(&lib_rs_path, lib_rs).expect("failed to write lib.rs");
@@ -201,20 +214,5 @@ fn compile_wasm32(cargo_toml: &Utf8Path, target_dir: &Utf8Path) {
             .arg("wasm32-unknown-unknown")
             .arg("--manifest-path")
             .arg(cargo_toml.as_str()),
-    );
-}
-
-/// Run `wasm-bindgen` to produce JS glue from the WASM binary.
-fn run_wasm_bindgen(wasm_file: &Utf8Path, out_dir: &Utf8Path) {
-    run_cmd_quietly(
-        Command::new("wasm-bindgen")
-            .arg("--target")
-            .arg("bundler")
-            .arg("--omit-default-module-path")
-            .arg("--out-name")
-            .arg("index")
-            .arg("--out-dir")
-            .arg(out_dir.as_str())
-            .arg(wasm_file.as_str()),
     );
 }

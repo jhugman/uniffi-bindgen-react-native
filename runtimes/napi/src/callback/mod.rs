@@ -13,7 +13,8 @@
 //! - [`dispatch_to_js_thread`]: runs off the JS thread, copies the arg buffer,
 //!   sends it to the JS thread via a ThreadsafeFunction, and blocks on a
 //!   sync_channel for the return value.
-//! - [`is_js_thread`]: returns whether the current thread is the JS main thread.
+//! - [`is_js_thread`]: returns whether the current thread is the one that registered the
+//!   callback, and so may touch its napi values directly.
 //!
 //! Each callback closure is associated with a [`CallbackUserData`] struct that is
 //! leaked to a stable address and passed as `user_data: *const c_void` through the
@@ -37,10 +38,12 @@
 use std::ffi::c_void;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
+use std::thread::ThreadId;
 
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::{Env, NapiRaw, NapiValue};
 
+pub(crate) mod cache;
 mod marshal;
 pub(crate) mod vtable;
 
@@ -74,9 +77,15 @@ struct RustCallStatusForVTable {
 /// invocation and passes it through to `on_js_thread`, `dispatch_to_js_thread`,
 /// and `is_js_thread`.
 struct CallbackUserData {
-    /// Raw napi environment handle. Only valid on the main thread.
+    /// The JS thread this callback was registered on: the only thread whose napi values
+    /// (`raw_env`, `fn_ref`) may be touched directly, and the one `tsfn` dispatches to.
+    owner_thread: ThreadId,
+    /// State of the environment this callback belongs to, held here so an invocation can check for
+    /// shutdown without taking a lock.
+    env_state: Arc<crate::EnvState>,
+    /// Raw napi environment handle. Only valid on `owner_thread`.
     raw_env: napi::sys::napi_env,
-    /// GC-preventing reference to the JS callback function. Only valid on the main thread.
+    /// GC-preventing reference to the JS callback function. Only valid on `owner_thread`.
     fn_ref: napi::sys::napi_ref,
     /// Precomputed layout for the arg byte buffer produced by core's trampoline.
     arg_layout: ArgLayout,
@@ -91,18 +100,27 @@ struct CallbackUserData {
     out_return: bool,
     /// Precomputed size of the return value in bytes (0 for void or out_return).
     ret_size: usize,
-    /// Thread-safe function for dispatching to the main thread.
+    /// Thread-safe function for dispatching to `owner_thread`.
     tsfn: Mutex<Option<ThreadsafeFunction<DispatchPayload, ErrorStrategy::Fatal>>>,
     /// Reference to the Module, needed for fn_pointer wrapping (Callback-typed args).
     module: Arc<Module>,
+    /// Per-registration state, so marshalling a `RustBuffer` on the callback path can
+    /// reach the ownership marker and therefore *adopt* a library-owned buffer rather
+    /// than copy it. Copying orphaned the original: generated callback code lowers its
+    /// return value through `rustbuffer_alloc`, and nothing frees a lowered value, so
+    /// each invocation leaked one whole serialized payload.
+    registration: Arc<crate::register::Registration>,
 }
 
 // SAFETY: `CallbackUserData` is shared across threads. This is sound because:
-// - `raw_env` and `fn_ref` are only dereferenced on the main thread (the
-//   same-thread path checks `is_main_thread()` before touching them).
+// - `raw_env` and `fn_ref` are only dereferenced on `owner_thread` (the
+//   same-thread path checks `is_js_thread()` before touching them).
 // - `tsfn` is designed for cross-thread use and protected by a Mutex.
 // - `arg_types`, `ret_type`, `arg_layout`, `ret_size` are immutable after construction.
 // - `module` is an `Arc<Module>` which is Send+Sync.
+// - `registration` holds napi Symbols that, like `raw_env`/`fn_ref`, are only touched on
+//   `owner_thread` — marshalling always runs there, on the same-thread path or after the
+//   `tsfn` dispatch.
 unsafe impl Send for CallbackUserData {}
 unsafe impl Sync for CallbackUserData {}
 
@@ -137,7 +155,7 @@ unsafe impl Send for DispatchPayload {}
 ///
 /// # Safety
 ///
-/// - Must be called on the main Node.js thread.
+/// - Must be called on the JS thread that registered this callback.
 /// - `args` must point to a valid byte buffer laid out according to the
 ///   `CallbackUserData::arg_layout`.
 /// - `ret` must point to a buffer of at least `ret_size` bytes (as computed by
@@ -148,7 +166,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
     // SAFETY: `user_data` was created via `Box::into_raw` and leaked.
     let ud = unsafe { &*(user_data as *const CallbackUserData) };
 
-    if crate::is_shutting_down() {
+    if ud.env_state.is_shutting_down() {
         // Zero out the return buffer so the caller gets a deterministic value.
         if !ret.is_null() {
             let ret_size = ud.ret_size;
@@ -159,7 +177,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
         return;
     }
 
-    // SAFETY: We are on the main thread, so raw_env is valid.
+    // SAFETY: We are on the owning thread, so raw_env is valid.
     let env = unsafe { Env::from_raw(ud.raw_env) };
 
     // Resolve the JS function from the persistent reference.
@@ -192,7 +210,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
         // SAFETY: `args` points to a buffer of `arg_layout.total_size` bytes.
         // `slot.offset` and `slot.size` are within bounds.
         let arg_bytes = unsafe { std::slice::from_raw_parts(args.add(slot.offset), slot.size) };
-        let js_val = match read_arg_bytes_to_js(&env, desc, arg_bytes, &ud.module) {
+        let js_val = match read_arg_bytes_to_js(&env, desc, arg_bytes, &ud.module, &ud.registration)
+        {
             Ok(v) => v,
             Err(_e) => {
                 #[cfg(debug_assertions)]
@@ -266,6 +285,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
                             out_return_ptr,
                             &ud.ret_type,
                             &ud.module,
+                            &ud.registration,
                         );
                     }
                 }
@@ -279,6 +299,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
                         js_ret,
                         out_return_ptr as *mut u8,
                         &ud.module,
+                        &ud.registration,
                     );
                 }
             }
@@ -322,6 +343,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
                             js_ret,
                             ret_bytes,
                             &ud.module,
+                            &ud.registration,
                         );
                     }
                 }
@@ -335,7 +357,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
 ///
 /// # Safety
 ///
-/// - Must NOT be called on the main thread (the blocking recv would deadlock).
+/// - Must NOT be called on `owner_thread`: that thread is the only one that can drain its own
+///   event loop to produce the reply, so the blocking recv would deadlock.
 /// - `on_js_thread_fn` must be a valid function pointer.
 /// - `args`, `ret`, and `user_data` follow the same contracts as `on_js_thread`.
 pub extern "C" fn dispatch_to_js_thread(
@@ -347,7 +370,7 @@ pub extern "C" fn dispatch_to_js_thread(
     // SAFETY: `user_data` was created via `Box::into_raw` and leaked.
     let ud = unsafe { &*(user_data as *const CallbackUserData) };
 
-    if crate::is_shutting_down() {
+    if ud.env_state.is_shutting_down() {
         return;
     }
 
@@ -404,14 +427,20 @@ pub extern "C" fn dispatch_to_js_thread(
     }
 }
 
-/// Returns whether the current thread is the main JS thread.
+/// Returns whether the current thread is the JS thread that registered this callback.
+///
+/// Per callback, not per process. Each JS thread (a Node worker, say) owns napi values only for
+/// itself, so a single process-wide answer is wrong for every thread but one: it sends a JS thread
+/// down the cross-thread path, where it blocks on a reply only it could have produced.
 ///
 /// # Safety
 ///
-/// `user_data` is unused by this implementation (the check is global), but must
-/// be a valid pointer per the core trampoline protocol.
-pub extern "C" fn is_js_thread(_user_data: *const c_void) -> bool {
-    crate::is_main_thread()
+/// `user_data` must be a valid `*const CallbackUserData` obtained from `Box::into_raw`, per the
+/// core trampoline protocol.
+pub extern "C" fn is_js_thread(user_data: *const c_void) -> bool {
+    // SAFETY: `user_data` was created via `Box::into_raw` and leaked.
+    let ud = unsafe { &*(user_data as *const CallbackUserData) };
+    ud.owner_thread == std::thread::current().id()
 }
 
 // ---------------------------------------------------------------------------
@@ -432,6 +461,7 @@ pub fn create_callback_user_data(
     js_fn: napi::JsFunction,
     callback_name: &str,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> napi::Result<*const c_void> {
     let def = module
         .spec_callbacks()
@@ -472,6 +502,8 @@ pub fn create_callback_user_data(
 
     // Allocate the userdata and leak it to a stable address.
     let userdata = Box::new(CallbackUserData {
+        owner_thread: std::thread::current().id(),
+        env_state: crate::env_state(env.raw()),
         raw_env: env.raw(),
         fn_ref,
         arg_layout,
@@ -482,6 +514,7 @@ pub fn create_callback_user_data(
         ret_size,
         tsfn: Mutex::new(None),
         module: Arc::clone(module),
+        registration: Arc::clone(registration),
     });
     let userdata_ptr = Box::into_raw(userdata);
 
@@ -512,14 +545,15 @@ pub fn create_callback_user_data(
     let mut tsfn = tsfn;
 
     // Register the raw TSFN handle so the env cleanup hook can abort it at shutdown.
-    crate::register_tsfn(tsfn.raw());
+    // SAFETY: `userdata_ptr` is valid and uniquely owned here.
+    unsafe { (*userdata_ptr).env_state.register_tsfn(tsfn.raw()) };
 
     // Unref the TSFN so it does not prevent the Node.js event loop from exiting.
     tsfn.unref(env)?;
 
     // Store the TSFN in the userdata.
-    // SAFETY: `userdata_ptr` is valid and uniquely owned. We are still on the main
-    // thread; no concurrent access is possible yet.
+    // SAFETY: `userdata_ptr` is valid and uniquely owned. We are still on the
+    // registering thread; no concurrent access is possible yet.
     unsafe {
         let tsfn_slot = &mut (*userdata_ptr).tsfn;
         *tsfn_slot.get_mut().expect("mutex not poisoned") = Some(tsfn);
@@ -544,6 +578,7 @@ fn read_arg_bytes_to_js(
     desc: &FfiTypeDesc,
     arg_bytes: &[u8],
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> napi::Result<napi::JsUnknown> {
     let rb_free_ptr = module.rb_ops().free_ptr;
     match desc {
@@ -591,7 +626,13 @@ fn read_arg_bytes_to_js(
         FfiTypeDesc::Callback(cb_name) => {
             // Read the function pointer from bytes and wrap it as a callable JS function.
             let fn_ptr = slot::read_pointer(arg_bytes) as *const c_void;
-            let js_fn = self::marshal::create_fn_pointer_wrapper(env, fn_ptr, cb_name, module)?;
+            let js_fn = self::marshal::create_fn_pointer_wrapper(
+                env,
+                fn_ptr,
+                cb_name,
+                module,
+                registration,
+            )?;
             Ok(js_fn.into_unknown())
         }
         FfiTypeDesc::VoidPointer | FfiTypeDesc::Reference(_) | FfiTypeDesc::MutReference(_) => {
@@ -616,6 +657,7 @@ unsafe fn write_js_return_to_bytes(
     js_val: napi::JsUnknown,
     ret_bytes: &mut [u8],
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) -> napi::Result<()> {
     let raw_env = env.raw();
     let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
@@ -677,7 +719,12 @@ unsafe fn write_js_return_to_bytes(
             // Read Uint8Array -> rustbuffer_from_bytes -> write RustBufferC bytes.
             // Truncating copy: caller may pass a `ret_bytes` smaller than RustBufferC
             // when the return slot is a different shape; preserve historical behavior.
-            let rb = napi_utils::js_uint8array_to_rust_buffer(raw_env, js_val, rb_from_bytes_ptr)?;
+            let rb = napi_utils::js_uint8array_to_rust_buffer(
+                raw_env,
+                js_val,
+                rb_from_bytes_ptr,
+                &registration.capacity_symbol,
+            )?;
             let rb_bytes = slot::rust_buffer_to_bytes(&rb);
             let copy_len = rb_bytes.len().min(ret_bytes.len());
             ret_bytes[..copy_len].copy_from_slice(&rb_bytes[..copy_len]);
@@ -705,6 +752,7 @@ unsafe fn write_js_value_to_pointer(
     js_val: napi::JsUnknown,
     dest: *mut u8,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) {
     // For Struct types, use fn_pointer::marshal_js_struct_to_bytes which handles
     // the full C struct layout (slot_size_align doesn't support Struct types).
@@ -717,6 +765,7 @@ unsafe fn write_js_value_to_pointer(
                 struct_name,
                 module,
                 rb_from_bytes_ptr,
+                registration,
             ) {
                 std::ptr::copy_nonoverlapping(bytes.as_ptr(), dest, bytes.len());
             }
@@ -734,7 +783,7 @@ unsafe fn write_js_value_to_pointer(
     // Max non-struct size is RustBufferC (24 bytes: {u64, u64, *mut u8}).
     let mut buf = [0u8; std::mem::size_of::<RustBufferC>()];
     debug_assert!(size <= buf.len());
-    if write_js_return_to_bytes(env, desc, js_val, &mut buf[..size], module).is_ok() {
+    if write_js_return_to_bytes(env, desc, js_val, &mut buf[..size], module, registration).is_ok() {
         std::ptr::copy_nonoverlapping(buf.as_ptr(), dest, size);
     }
 }
@@ -755,6 +804,7 @@ unsafe fn write_uniffi_result(
     out_return_ptr: *mut c_void,
     ret_type: &FfiTypeDesc,
     module: &Arc<Module>,
+    registration: &Arc<crate::register::Registration>,
 ) {
     let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
 
@@ -800,6 +850,7 @@ unsafe fn write_uniffi_result(
                     pointee,
                     out_return_ptr as *mut u8,
                     module,
+                    registration,
                 );
             }
         }

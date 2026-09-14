@@ -186,7 +186,7 @@ The `defaultFeatures` flag pairs with the `features` array: it is used to build 
 
 The boolean `workspace` controls if the wasm crate is part of [an existing Rust workspace](https://doc.rust-lang.org/cargo/reference/workspaces.html). The default value assumes that the target crate doesn't know anything about the wasm-crate, so the wasm-crate is in its own workspace. If the target crate is in a workspace, and that can be changed, then this setting can be changed to `true`. Tip: [`members` can contain globs](https://doc.rust-lang.org/cargo/reference/workspaces.html#:~:text=the%20members%20list%20also%20supports%20globs) to point to crates that don't yet exist.
 
-`runtimeVersion` is the version of [`uniffi-runtime-javascript` crate](https://crates.io/crates/uniffi-runtime-javascript). By default this is the exact current version of uniffi-bindgen-react-native, so currently `=0.31.0-3`.
+`runtimeVersion` is the version of [`uniffi-runtime-javascript` crate](https://crates.io/crates/uniffi-runtime-javascript). By default this is the exact current version of uniffi-bindgen-react-native, so currently `=0.31.0-5`.
 
 `cargoExtras` is a list of extra arguments passed directly to the `cargo build` command when building for `wasm32-unknown-unknown`.
 
@@ -202,6 +202,39 @@ The boolean `workspace` controls if the wasm crate is part of [an existing Rust 
 Uniffi is unable to process WASM files directly, so has to use a `lib.a` file built for the build environment.
 
 Any `uniffi::export` or `uniffi` derive macros should not be toggled on and off based on the target architecture. If you want wasm specific uniffi bindings, you should use a `feature` instead, and add it to the `features` list in this file.
+```
+
+## `wasm2`
+
+This configures the build steps for the [`wasm2` flavor](wasm2/overview.md), which runs your crate as a WebAssembly module without a generated wasm-bindgen shim crate. It is a much shorter section than [`web`](#web), because `wasm2` generates no Rust crate and no project entrypoint — only the Typescript and the `.wasm` beside it.
+
+This section can be omitted entirely. These are its members, with their defaults:
+
+```yaml
+wasm2:
+    features: []
+    defaultFeatures: true
+    targets:
+    - wasm32-unknown-unknown
+    cargoExtras: []
+    rustflags: []
+    ts: <SAME AS bindings/ts>
+```
+
+`ts` is the directory where the Typescript bindings are generated, and where the built `.wasm` is staged beside them. This overrides the [`bindings`/`ts`](#bindings) directory, which lets one project generate JSI bindings into one directory and `wasm2` bindings into another. It is also spelled `typescript` or `tsBindings`.
+
+The `features` array and the `defaultFeatures` flag are used to build your crate for `wasm32-unknown-unknown`, as `--features` and `--no-default-features`. Unlike the `web` section, there is no second crate for them to be copied into.
+
+`targets` is a list of targets to build for. `wasm32-unknown-unknown` is the only supported value.
+
+`cargoExtras` is a list of extra arguments passed directly to the `cargo build` command.
+
+`rustflags` is a list of flags set as `RUSTFLAGS` for that build. It is an escape hatch for your own flags: the growable, exported function table the player needs is added to the built module afterwards, so you do not have to ask the linker for it.
+
+The whole section is also spelled `web2`.
+
+```admonish note
+Unlike the `web` flavor, `wasm2` reads UniFFI metadata out of the `.wasm` itself, so there is no second native build and no `lib.a`. That also means `uniffi::export` and the `uniffi` derive macros may be toggled by target architecture here — though a `feature` is still the clearer way to do it.
 ```
 
 ## `turboModule`

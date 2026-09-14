@@ -25,6 +25,10 @@ uniffi = { workspace = true, features = ["tokio", "cli"] }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.24.1", features = ["time", "sync"] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
+
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
 

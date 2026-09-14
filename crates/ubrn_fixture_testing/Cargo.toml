@@ -10,3 +10,4 @@ cargo_metadata = { workspace = true }
 dunce = "1.0.5"
 heck = { workspace = true }
 pathdiff = { workspace = true }
+ubrn_common = { path = "../ubrn_common", features = ["wasm"] }

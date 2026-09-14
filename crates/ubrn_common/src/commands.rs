@@ -48,6 +48,27 @@ pub fn run_cmd(cmd: &mut Command) -> Result<()> {
     Ok(())
 }
 
+/// Run work in-process that stands in for an external command.
+///
+/// Recording mode intercepts subprocesses at [`run_cmd`]; work we do
+/// through a library instead of shelling out would otherwise slip past it
+/// and touch the filesystem. `descriptor` is the equivalent command line:
+/// it is what gets recorded, so callers of either flavour look the same to
+/// tests.
+pub fn run_in_process<F>(descriptor: &Command, work: F) -> Result<()>
+where
+    F: FnOnce() -> Result<()>,
+{
+    if is_recording_enabled() {
+        record_command(descriptor);
+        eprintln!("Recording in-process command: {descriptor:?}");
+        return Ok(());
+    }
+
+    eprintln!("Running in-process {descriptor:?}");
+    work()
+}
+
 /// Run the given command, and only output if there is an error.
 pub fn run_cmd_quietly(cmd: &mut Command) -> Result<()> {
     // If we're in recording mode, just record the command and return success
@@ -76,7 +97,7 @@ mod tests {
 
     use crate::{
         clear_recorded_commands, disable_command_recording, enable_command_recording,
-        get_recorded_commands, run_cmd,
+        get_recorded_commands, run_cmd, run_in_process,
     };
 
     fn assert_command_run_with_args(program: &str, args: &[&str]) -> bool {
@@ -128,5 +149,53 @@ mod tests {
 
         // Cleanup
         disable_command_recording();
+    }
+
+    #[test]
+    fn test_in_process_recording() {
+        enable_command_recording();
+        clear_recorded_commands();
+
+        let mut descriptor = Command::new("wasm-bindgen");
+        descriptor.args(["--target", "web"]);
+
+        let mut ran = false;
+        run_in_process(&descriptor, || {
+            ran = true;
+            Ok(())
+        })
+        .expect("Should succeed in recording mode");
+
+        // Recording stands in for the work: the closure must not run.
+        assert!(!ran);
+        let commands = get_recorded_commands();
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].program, "wasm-bindgen");
+        assert_eq!(commands[0].args, vec!["--target", "web"]);
+
+        disable_command_recording();
+    }
+
+    #[test]
+    fn test_in_process_runs_the_work() {
+        // Recording is off by default, so the work happens for real and
+        // nothing is recorded.
+        clear_recorded_commands();
+
+        let mut ran = false;
+        run_in_process(&Command::new("wasm-bindgen"), || {
+            ran = true;
+            Ok(())
+        })
+        .expect("Should run the work");
+
+        assert!(ran);
+        assert!(get_recorded_commands().is_empty());
+
+        // Errors from the work propagate to the caller.
+        let err = run_in_process(&Command::new("wasm-bindgen"), || {
+            anyhow::bail!("no such wasm file")
+        });
+        assert_eq!(err.unwrap_err().to_string(), "no such wasm file");
     }
 }

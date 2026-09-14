@@ -32,12 +32,24 @@ use uniffi_runtime_core::ffi_c_types::{
 };
 
 /// A per-registration JS Symbol used as a hidden property key for stashing the
-/// underlying RustBuffer capacity on a lift-handoff `Uint8Array`. The view's
-/// `byteLength` is set to `len` so converters that decode the whole view
-/// (strings, raw byte arrays) see only the message bytes — but the global
-/// allocator needs `capacity` to free correctly when `capacity > len`. The
-/// symbol is created once when the module registers and lives as long as the
-/// JS-side module facade.
+/// underlying RustBuffer capacity on a `Uint8Array` that views library-owned memory.
+///
+/// Set on both kinds of library-owned view:
+///
+/// - **lift-handoff views** (a buffer Rust returned). The view's `byteLength` is `len` so
+///   converters that decode the whole view see only the message bytes, but the allocator
+///   needs `capacity` to free correctly when `capacity > len`.
+/// - **`rustbuffer_alloc` views**. Here `capacity == byteLength`, so the hint is redundant for
+///   freeing — but its *presence* is what marks the view as library-owned, which lets the
+///   argument-lowering path adopt the allocation instead of copying it.
+///
+/// Therefore the invariant is: **a hint is present if and only if the library owns the
+/// backing memory.** An ordinary V8-backed `Uint8Array` never carries one. A hint of `0`
+/// means the view was library-owned but has since been adopted by a callee, so the memory is
+/// gone and the view must not be used again.
+///
+/// The symbol is created once when the module registers and lives as long as the JS-side
+/// module facade.
 ///
 /// Mirrors wasm2's `CAPACITY_HINT` symbol in `runtimes/wasm/core/src/call.ts`.
 pub struct CapacitySymbol {
@@ -143,17 +155,49 @@ impl CapacitySymbol {
                 "Failed to create BigInt for capacity hint".to_string(),
             ));
         }
-        let status = napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val);
+        // Own property, not inherited: the marker only ever lives on instances, and a
+        // prototype-chain hit would send us down the `napi_set_property` branch, silently
+        // creating an enumerable own property that shadows it.
+        let mut has = false;
+        let status = napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has);
         if status != napi::sys::Status::napi_ok {
             return Err(napi::Error::from_reason(
-                "Failed to set capacity-hint property".to_string(),
+                "Failed to inspect RustBuffer ownership metadata",
+            ));
+        }
+
+        let status = if has {
+            // Already defined non-enumerable below; a plain set keeps that descriptor.
+            napi::sys::napi_set_property(raw_env, obj, sym_val, cap_val)
+        } else {
+            // `writable` only, so the marker is non-enumerable. That is load-bearing:
+            // lift now marks every handed-off view, and
+            // `assert.deepStrictEqual(view, new Uint8Array([...]))` compares enumerable
+            // own symbol properties — an enumerable marker would break every caller that
+            // compares a returned buffer against a plain Uint8Array.
+            let descriptor = napi::sys::napi_property_descriptor {
+                utf8name: std::ptr::null(),
+                name: sym_val,
+                method: None,
+                getter: None,
+                setter: None,
+                value: cap_val,
+                attributes: napi::sys::PropertyAttributes::writable,
+                data: std::ptr::null_mut(),
+            };
+            napi::sys::napi_define_properties(raw_env, obj, 1, &descriptor)
+        };
+        if status != napi::sys::Status::napi_ok {
+            return Err(napi::Error::from_reason(
+                "Failed to set RustBuffer ownership metadata",
             ));
         }
         Ok(())
     }
 
-    /// Read the capacity hint from `obj`. Returns `None` if no hint is set
-    /// (e.g., views from `rustbuffer_alloc(n)` where `byteLength == capacity`).
+    /// Read the capacity hint from `obj`. Returns `None` when no hint is set, which means
+    /// the memory is not the library's — an ordinary V8-backed `Uint8Array`. `Some(0)` means
+    /// a library-owned view whose allocation has already been adopted by a callee.
     ///
     /// # Safety
     ///
@@ -162,26 +206,37 @@ impl CapacitySymbol {
         &self,
         raw_env: napi::sys::napi_env,
         obj: napi::sys::napi_value,
-    ) -> Option<u64> {
-        let sym_val = self.value(raw_env).ok()?;
+    ) -> napi::Result<Option<u64>> {
+        let sym_val = self.value(raw_env)?;
         let mut has = false;
-        let status = napi::sys::napi_has_property(raw_env, obj, sym_val, &mut has);
-        if status != napi::sys::Status::napi_ok || !has {
-            return None;
+        let status = napi::sys::napi_has_own_property(raw_env, obj, sym_val, &mut has);
+        if status != napi::sys::Status::napi_ok {
+            return Err(napi::Error::from_reason(
+                "Failed to inspect RustBuffer ownership metadata",
+            ));
         }
+        if !has {
+            return Ok(None);
+        }
+
         let mut cap_val: napi::sys::napi_value = std::ptr::null_mut();
         let status = napi::sys::napi_get_property(raw_env, obj, sym_val, &mut cap_val);
         if status != napi::sys::Status::napi_ok || cap_val.is_null() {
-            return None;
+            return Err(napi::Error::from_reason(
+                "Failed to read RustBuffer ownership metadata",
+            ));
         }
+
         let mut value: u64 = 0;
         let mut lossless = false;
         let status =
             napi::sys::napi_get_value_bigint_uint64(raw_env, cap_val, &mut value, &mut lossless);
-        if status != napi::sys::Status::napi_ok {
-            return None;
+        if status != napi::sys::Status::napi_ok || !lossless {
+            return Err(napi::Error::from_reason(
+                "Invalid RustBuffer ownership metadata",
+            ));
         }
-        Some(value)
+        Ok(Some(value))
     }
 }
 
@@ -429,8 +484,29 @@ pub unsafe fn create_external_uint8array(
     Ok(typedarray)
 }
 
-/// Convert a JS `Uint8Array` to a [`RustBufferC`] by reading its data and calling
-/// [`rustbuffer_from_raw_bytes`].
+/// Convert a JS `Uint8Array` argument to a [`RustBufferC`] the callee can consume.
+///
+/// Two kinds of view arrive here, and they must be handled differently:
+///
+/// - **Library-owned views**, produced by `rustbuffer_alloc`. Codegen allocates one of these,
+///   fills it in place, and passes it straight through as the argument. It carries a capacity
+///   hint (see [`CapacitySymbol`]), and nothing else will ever free it: codegen frees returned
+///   buffers but never lowered arguments, and the view has a no-op finalizer. These are
+///   **adopted** — we hand the existing allocation to the callee, which frees it. Copying such
+///   a view instead would orphan the original and leak one whole payload per call.
+/// - **V8-owned arrays**, i.e. any ordinary `Uint8Array` from JS. These are not ours to give
+///   away, so they are **copied** into a fresh library allocation via `rustbuffer_from_bytes`.
+///
+/// The capacity marker is the discriminator: the runtime knows a buffer's capacity precisely
+/// when the library allocated it. On adoption the marker is reset to `0`, which makes any later
+/// `rustbuffer_free(view)` a no-op rather than a double free, since `free_rustbuffer` skips
+/// zero-capacity buffers.
+///
+/// The symbol is a required parameter, deliberately. It used to be an `Option`, and a caller
+/// with no symbol in scope could pass `None` to force the copy path — memory-safe in itself,
+/// but it silently orphaned every library-owned view that reached it, because nothing else
+/// frees a lowered argument. Requiring the symbol makes that a compile error instead of a
+/// leak, so a marshalling path added later cannot opt out by accident.
 ///
 /// # Safety
 ///
@@ -441,10 +517,37 @@ pub unsafe fn js_uint8array_to_rust_buffer(
     raw_env: napi::sys::napi_env,
     js_val: JsUnknown,
     rb_from_bytes_ptr: *const c_void,
+    capacity_symbol: &CapacitySymbol,
 ) -> napi::Result<RustBufferC> {
-    let (data_ptr, length) = read_typedarray_data(raw_env, js_val.raw()).ok_or_else(|| {
+    let raw_val = js_val.raw();
+    let (data_ptr, length) = read_typedarray_data(raw_env, raw_val).ok_or_else(|| {
         napi::Error::from_reason("Expected a Uint8Array argument for RustBuffer".to_string())
     })?;
+
+    // An empty view owns no allocation, so there is nothing to adopt. `rustbuffer_alloc(0)`
+    // never sets a hint, and the copy path yields the correct empty `RustBufferC`.
+    if length == 0 {
+        return rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr);
+    }
+
+    if let Some(capacity) = capacity_symbol.get(raw_env, raw_val)? {
+        if capacity == 0 {
+            // The marker exists but has been zeroed, so this view was already adopted and
+            // its memory has since been freed by the callee. Reading it would be a
+            // use-after-free, so refuse rather than hand the callee a dangling pointer.
+            return Err(napi::Error::from_reason(
+                "RustBuffer argument was already consumed by a previous FFI call".to_string(),
+            ));
+        }
+        capacity_symbol.set(raw_env, raw_val, 0)?;
+        return Ok(RustBufferC {
+            capacity,
+            len: length as u64,
+            data: data_ptr as *mut u8,
+        });
+    }
+
+    // No marker: an ordinary V8-backed array from JS, which is not ours to give away.
     rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr)
 }
 

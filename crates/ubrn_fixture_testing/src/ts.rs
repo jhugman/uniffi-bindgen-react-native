@@ -40,6 +40,10 @@ pub fn run_test(test_script: &str, flavor: Flavor, target_tmpdir: &str) {
             paths::assert_napi_bootstrap();
             crate::run_tsx(test_script);
         }
+        Flavor::Wasm2 => {
+            paths::assert_wasm_bootstrap();
+            crate::run_tsx(test_script);
+        }
     }
 }
 

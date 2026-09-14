@@ -23,6 +23,24 @@ use crate::napi_utils::CapacitySymbol;
 use uniffi_runtime_core::ffi_c_types::RustBufferC;
 use uniffi_runtime_core::{FfiTypeDesc, Module};
 
+/// State created once per `register()` call and shared by every function closure the
+/// resulting facade exposes.
+///
+/// Both members are per-registration JS Symbols, and both are keyed to the `napi_env`
+/// that `register()` ran on — which is what makes their contents safe to reuse across
+/// calls. Bundling them keeps the dispatch signature manageable as more per-registration
+/// state accrues.
+pub(crate) struct Registration {
+    /// Hidden capacity-hint key on lift-handoff `Uint8Array` views. A handed-off view's
+    /// `byteLength` is `rb.len`, but Rust may have allocated `rb.capacity > rb.len`, so
+    /// the capacity is stashed here for `rustbuffer_free(view)` to read back.
+    pub(crate) capacity_symbol: CapacitySymbol,
+    /// Hidden keys caching a built callback trampoline on the JS function it was built
+    /// for. Without this, dispatch rebuilds one per call — a permanent ~3 KB leak, and
+    /// the async poll loop passes its continuation on every poll. See `callback::cache`.
+    pub(crate) trampolines: crate::callback::cache::TrampolineCache,
+}
+
 /// Build a JS object whose methods call into the native library described by `definitions`.
 pub fn register(
     env: Env,
@@ -38,17 +56,15 @@ pub fn register(
     let functions: JsObject = definitions.get_named_property("functions")?;
     let mut result = env.create_object()?;
 
-    // Per-registration Symbol used as a hidden capacity-hint key on lift-
-    // handoff `Uint8Array` views. The view-handoff path returns a view whose
-    // `byteLength` is `rb.len`, but Rust may have allocated
-    // `rb.capacity > rb.len`. We stash `capacity` on the view via this
-    // symbol; `rustbuffer_free(view)` reads it back when releasing the
-    // allocation.
-    //
-    // SAFETY: env is the active napi env supplied by node for this register
-    // call. The `Arc<CapacitySymbol>` keeps the Symbol alive across the
-    // module facade's lifetime (closures captured below outlive the call).
-    let capacity_symbol = Arc::new(unsafe { CapacitySymbol::new(env.raw())? });
+    // SAFETY: env is the active napi env supplied by node for this register call. The
+    // `Arc<Registration>` keeps both Symbols alive across the module facade's lifetime
+    // (the closures captured below outlive this call).
+    let registration = Arc::new(Registration {
+        capacity_symbol: unsafe { CapacitySymbol::new(env.raw())? },
+        trampolines: unsafe {
+            crate::callback::cache::TrampolineCache::new(env.raw(), module.spec_callbacks().keys())?
+        },
+    });
 
     let names = functions.get_property_names()?;
     let len = names.get_array_length()?;
@@ -68,7 +84,7 @@ pub fn register(
         })?;
         let arg_types: Rc<Vec<FfiTypeDesc>> = Rc::new(func_def.args.clone());
         let has_rust_call_status = func_def.has_rust_call_status;
-        let cap_sym_for_call = Arc::clone(&capacity_symbol);
+        let reg_for_call = Arc::clone(&registration);
 
         let js_func = env.create_function_from_closure(&name, move |ctx| {
             call_ffi_function(
@@ -78,7 +94,7 @@ pub fn register(
                 &module_ref,
                 &arg_types,
                 has_rust_call_status,
-                &cap_sym_for_call,
+                &reg_for_call,
             )
         })?;
 
@@ -90,6 +106,7 @@ pub fn register(
     // library's `rustbuffer_free`. Together they let JS allocate buffers that the
     // codegen-emitted lowering path can fill in place and ship to Rust without copying.
     let alloc_module = Arc::clone(&module);
+    let reg_for_alloc = Arc::clone(&registration);
     let alloc_fn = env.create_function_from_closure("rustbuffer_alloc", move |ctx| {
         let size_arg: i32 = ctx.get(0)?;
         if size_arg < 0 {
@@ -107,16 +124,38 @@ pub fn register(
             napi::Error::from_reason("RustBuffer capacity exceeds addressable memory".to_string())
         })?;
         // SAFETY: rb.data points to a valid allocation of `len` bytes that the Rust
-        // library owns; codegen will hand the view back via `rustbuffer_free` before
-        // shipping the (ptr, len, cap) tuple to FFI, so no finalizer is required.
+        // library owns; the view is released either by `rustbuffer_free(view)` or by being
+        // adopted when passed as an FFI argument, so no finalizer is required.
+        //
+        // CONTRACT: adoption frees the backing allocation but cannot detach this view, so the
+        // `Uint8Array` is left dangling over freed memory. A view must be treated as consumed
+        // once it has been passed as an FFI argument: reading it afterwards is a use-after-free,
+        // and passing it a second time fails with an "already consumed" error. Generated lowering
+        // code drops the view immediately, so this only bites hand-written callers.
         let typedarray =
             unsafe { napi_utils::create_external_uint8array(ctx.env.raw(), rb.data, len)? };
+        // Stamp the capacity so the runtime can recognise this view as library-owned. Two
+        // consumers rely on it: `rustbuffer_free` frees against the true capacity, and the
+        // argument-lowering path adopts the allocation instead of copying it. Without the
+        // stamp, a lowered argument gets copied and this allocation is orphaned.
+        //
+        // Unconditional, including `rustbuffer_alloc(0)` where the capacity is 0: an
+        // absent marker means "not the library's, refuse to free", so a zero-capacity
+        // view is marked 0 — "ours, nothing to free" — rather than left bare.
+        //
+        // SAFETY: `ctx.env` is the active env for this callback, and `typedarray` is the
+        // view created just above.
+        unsafe {
+            reg_for_alloc
+                .capacity_symbol
+                .set(ctx.env.raw(), typedarray, rb.capacity)?
+        };
         unsafe { JsUnknown::from_raw(ctx.env.raw(), typedarray) }
     })?;
     result.set_named_property("rustbuffer_alloc", alloc_fn)?;
 
     let free_module = Arc::clone(&module);
-    let cap_sym_for_free = Arc::clone(&capacity_symbol);
+    let reg_for_free = Arc::clone(&registration);
     let free_fn = env.create_function_from_closure("rustbuffer_free", move |ctx| {
         let js_val: JsUnknown = ctx.get(0)?;
         let raw_env = ctx.env.raw();
@@ -131,32 +170,41 @@ pub fn register(
                     "rustbuffer_free expected a Uint8Array argument".to_string(),
                 )
             })?;
-        // Empty views never carry a capacity hint (view-handoff short-
-        // circuits empty buffers, and `rustbuffer_alloc(0)` is itself a
-        // no-op). Bail out before the napi_ref + napi_has_property dance.
-        if length == 0 {
+        let _ = length;
+        // The marker is authoritative. Three cases:
+        //   (a) marker > 0 — library-owned. `rustbuffer_alloc(n)` views carry `n`;
+        //       lift-handoff views carry the true capacity, which may exceed
+        //       `byteLength` (that is `rb.len`). Free against the marker.
+        //   (b) marker == 0 — the view was already adopted as an FFI argument, so the
+        //       callee has freed the memory. Must be a no-op, not a double free.
+        //   (c) no marker — the bytes are not the library's. Reject.
+        //
+        // Rejecting (c) rather than ignoring it keeps a caller's mistake visible. Guessing
+        // the capacity from `byteLength` instead would pass V8-owned memory to Rust's
+        // allocator.
+        //
+        // SAFETY: raw_env / raw_val are valid for the current callback scope, and
+        // `raw_val` is the typed array the caller passed.
+        let capacity =
+            unsafe { reg_for_free.capacity_symbol.get(raw_env, raw_val)? }.ok_or_else(|| {
+                napi::Error::from_reason("rustbuffer_free received an unowned Uint8Array")
+            })?;
+        if capacity == 0 {
             return ctx.env.get_undefined().map(|u| u.into_unknown());
         }
-        // Capacity recovery. Two view origins to handle:
-        //   (a) `rustbuffer_alloc(n)` views: capacity == byteLength == n, no
-        //       hint set. Use byteLength.
-        //   (b) Lift-handoff views: byteLength == rb.len, capacity may be
-        //       larger and was stashed on the view at handoff time. Read
-        //       the stashed value via `CapacitySymbol::get`. When
-        //       `capacity == len` at handoff time we skip the property write,
-        //       so absence of a hint here is also a valid "use byteLength"
-        //       signal.
-        // SAFETY: raw_env / raw_val are valid for the current callback scope.
-        let capacity = unsafe { cap_sym_for_free.get(raw_env, raw_val) }.unwrap_or(length as u64);
+
+        // Mark the view released before handing its allocation back, so repeated
+        // cleanup is a no-op rather than a double free.
+        //
+        // SAFETY: as above — `raw_env` and `raw_val` are valid for this callback scope.
+        unsafe { reg_for_free.capacity_symbol.set(raw_env, raw_val, 0)? };
         let rb = RustBufferC {
             capacity,
             len: 0,
             data: data_ptr as *mut u8,
         };
-        // SAFETY: free_ptr was resolved at registration time. rb mirrors the
-        // buffer produced by the matching `rustbuffer_alloc` call OR a
-        // lift-handoff view whose `(data_ptr, capacity)` match the original
-        // RustBuffer that Rust returned across the FFI.
+        // SAFETY: free_ptr was resolved at registration time, and the marker ties this
+        // exact pointer and capacity to a buffer the library allocated.
         unsafe { napi_utils::free_rustbuffer(rb, free_module.rb_ops().free_ptr) };
         ctx.env.get_undefined().map(|u| u.into_unknown())
     })?;

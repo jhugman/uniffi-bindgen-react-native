@@ -19,8 +19,9 @@ impl PlayerFfiModule {
     pub(crate) fn from_general(
         namespace: &general::Namespace,
         config: &TsConfig,
+        flavor: &crate::AbiFlavor,
         crate_name: String,
-        lib_resolution: LibResolution,
+        lib_resolution: Option<LibResolution>,
     ) -> Self {
         let has_async = namespace_has_async(namespace);
 
@@ -35,6 +36,7 @@ impl PlayerFfiModule {
 
         Self {
             strict_type_checking: config.strict_type_checking,
+            flavor: flavor.clone(),
             crate_name,
             lib_resolution,
             symbols,

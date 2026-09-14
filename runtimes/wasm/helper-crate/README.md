@@ -18,13 +18,27 @@ panic hook that forwards Rust panics to a JS function the player installs in
 crate-type = ["lib", "cdylib"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-uniffi-runtime-wasm = "0.31.0-3"
+uniffi-runtime-wasm = "0.31.0-5"
 
 [dependencies]
 uniffi_core = { version = "0.31", features = ["wasm-unstable-single-threaded"] }
 ```
 
-`ubrn build wasm2` checks all three of these and explains what is missing.
+The dependency on its own is not enough. Nothing in your crate calls into this
+one, so rustc drops the unused rlib and its `#[no_mangle]` exports never reach
+the cdylib. Reference it for its side effects in your `lib.rs`:
+
+```rust
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
+```
+
+Without that line the build succeeds and the module loads, but the player
+fails at `uniffiInitAsync` with `required export "__ubrn_alloc" not found in
+wasm module`.
+
+`ubrn build wasm2` checks the manifest for all three of these and explains what
+is missing. It does not yet check that the exports survived linking.
 
 The JavaScript half ships separately, as [`@ubjs/wasm`][npm] on npm.
 

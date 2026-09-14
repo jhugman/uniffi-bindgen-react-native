@@ -1,6 +1,6 @@
 [package]
 name = "uniffi-bindgen-react-native"
-version = "0.31.0-3"
+version = "0.31.0-5"
 edition = "2021"
 
 [lib]
@@ -15,7 +15,8 @@ path = "src/main.rs"
 
 [features]
 default = ["wasm"]
-wasm = []
+# Gates the wasm/wasm2 code paths, and the walrus tree with them.
+wasm = ["ubrn_bindgen/wasm", "ubrn_common/wasm"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -32,7 +33,7 @@ serde-toml-merge = "=0.3.9"
 textwrap = "0.16.1"
 toml = { workspace = true, features = ["display"] }
 topological-sort = "0.2.2"
-ubrn_bindgen = { path = "../ubrn_bindgen", features = ["wasm"] }
+ubrn_bindgen = { path = "../ubrn_bindgen" }
 ubrn_common = { path = "../ubrn_common" }
 uniffi_bindgen = { workspace = true }
 uniffi_meta = { workspace = true }

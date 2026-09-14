@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
+
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

@@ -17,6 +17,8 @@ ubrn_testing = { path = "../../crates/ubrn_testing" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build", "wasm-unstable-single-threaded"] }

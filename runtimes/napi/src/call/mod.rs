@@ -51,12 +51,17 @@ pub(crate) fn call_ffi_function(
     module: &Arc<Module>,
     arg_types: &[FfiTypeDesc],
     has_rust_call_status: bool,
-    capacity_symbol: &CapacitySymbol,
+    registration: &Arc<crate::register::Registration>,
 ) -> Result<JsUnknown> {
     let declared_arg_count = arg_types.len();
 
     let mut call = module.prepare_call(fn_name).map_err(core_err)?;
 
+    // NOTE: arguments are lowered in order, and lowering a library-owned `RustBuffer` adopts its
+    // allocation (the callee frees it). If a *later* argument fails to lower we return early
+    // without invoking the callee, so any already-adopted buffer in this call is orphaned. This
+    // only happens on a misuse/error path — e.g. passing the same alloc'd view twice, which trips
+    // the "already consumed" guard — never on the happy path, which always reaches the call.
     for (i, desc) in arg_types.iter().enumerate() {
         let js_val: JsUnknown = ctx.get(i)?;
         let slot = call.arg_slot(i).map_err(core_err)?;
@@ -67,6 +72,7 @@ pub(crate) fn call_ffi_function(
                         env.raw(),
                         js_val,
                         module.rb_ops().from_bytes_ptr,
+                        &registration.capacity_symbol,
                     )?
                 };
                 slot::write_rust_buffer(slot, rust_buffer);
@@ -76,21 +82,68 @@ pub(crate) fn call_ffi_function(
                     unreachable!("guard ensures inner is Struct");
                 };
                 let js_obj = unsafe { JsObject::from_raw(env.raw(), js_val.raw())? };
-                let struct_ptr = vtable::build_vtable_struct(env, module, struct_name, &js_obj)?;
+                let struct_ptr =
+                    vtable::build_vtable_struct(env, module, struct_name, &js_obj, registration)?;
                 slot::write_pointer(slot, struct_ptr);
             }
             FfiTypeDesc::Callback(cb_name) => {
-                let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), js_val.raw())? };
-                let user_data = callback::create_callback_user_data(env, js_fn, cb_name, module)?;
-                let fn_ptr = module
-                    .make_callback_trampoline(
-                        cb_name,
-                        callback::on_js_thread,
-                        callback::dispatch_to_js_thread,
-                        callback::is_js_thread,
-                        user_data,
-                    )
-                    .map_err(core_err)?;
+                // Reuse this function's trampoline if it already has one. Building one is
+                // permanently leaked by design — the library may invoke the pointer from any
+                // thread later — so the intended bound is one per callback type, and building
+                // one per call turns that into unbounded growth.
+                //
+                // Keying on the function object is what makes reuse correct: the Symbols
+                // belong to this `register()` call and so to this env, and a trampoline holds
+                // no per-call state, since callbacks receive their handle as an ordinary
+                // argument.
+                //
+                // A hit costs only the lookup — nothing below runs until a miss.
+                //
+                // SAFETY: `js_val` is a value from the current callback scope, so `raw()`
+                // yields a `napi_value` valid for that scope without transferring ownership.
+                let raw_fn_val = unsafe { js_val.raw() };
+                // SAFETY: `env` is the active env for this call and `raw_fn_val` is the value
+                // read above; a lookup miss is reported as `Ok(None)`, so a JS function
+                // carrying no marker is simply built below rather than misread.
+                let cached = unsafe {
+                    registration
+                        .trampolines
+                        .get(env.raw(), raw_fn_val, cb_name)?
+                };
+                let fn_ptr = match cached {
+                    Some(fn_ptr) => fn_ptr,
+                    None => {
+                        // SAFETY: `raw_fn_val` is a `napi_value` from this callback scope.
+                        // `from_raw` errors rather than aborting if it is not a function, and
+                        // the declared arg type is `Callback`, so a non-function here is a
+                        // caller error surfaced as a JS exception.
+                        let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), raw_fn_val)? };
+                        let user_data = callback::create_callback_user_data(
+                            env,
+                            js_fn,
+                            cb_name,
+                            module,
+                            registration,
+                        )?;
+                        let fn_ptr = module
+                            .make_callback_trampoline(
+                                cb_name,
+                                callback::on_js_thread,
+                                callback::dispatch_to_js_thread,
+                                callback::is_js_thread,
+                                user_data,
+                            )
+                            .map_err(core_err)?;
+                        // SAFETY: as for the lookup above — same env, same value. The
+                        // pointer stored is the trampoline just built for `cb_name`.
+                        unsafe {
+                            registration
+                                .trampolines
+                                .set(env.raw(), raw_fn_val, cb_name, fn_ptr)?
+                        };
+                        fn_ptr
+                    }
+                };
                 slot::write_pointer(slot, fn_ptr);
             }
             _ => {
@@ -172,9 +225,12 @@ pub(crate) fn call_ffi_function(
     }
 
     match &call_ret {
-        CallReturn::RustBuffer(rb) => {
-            rust_buffer_to_js_uint8array_handoff(env, *rb, capacity_symbol)
-        }
+        CallReturn::RustBuffer(rb) => rust_buffer_to_js_uint8array_handoff(
+            env,
+            *rb,
+            module.rb_ops().free_ptr,
+            &registration.capacity_symbol,
+        ),
         _ => marshal::read_return_to_js(env, &call_ret),
     }
 }
@@ -197,23 +253,44 @@ pub(crate) fn call_ffi_function(
 fn rust_buffer_to_js_uint8array_handoff(
     env: &napi::Env,
     rb: RustBufferC,
+    rb_free_ptr: *const c_void,
     capacity_symbol: &CapacitySymbol,
 ) -> Result<JsUnknown> {
     let raw_env = env.raw();
+    // Until this function hands `rb` to JS, it is the buffer's sole owner: every early
+    // return has to release it or the allocation is unreachable.
+    //
+    // SAFETY (each `free_rustbuffer` below): `rb_free_ptr` was resolved by dlsym at
+    // registration time, and `rb` is the buffer the callee just returned, which no other
+    // owner holds.
     let len = match usize::try_from(rb.len) {
         Ok(n) => n,
         Err(_) => {
+            unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
             return Err(napi::Error::from_reason(
                 "RustBuffer len exceeds addressable memory",
             ));
         }
     };
 
-    // Empty RustBuffer (capacity == 0 or null data): no allocation to alias,
-    // and no capacity hint needed — the runtime's `rustbuffer_free` short-
-    // circuits on empty views without a hint.
-    if rb.capacity == 0 || rb.data.is_null() {
-        let typedarray = unsafe { napi_utils::create_uint8array(raw_env, std::ptr::null(), 0)? };
+    // Nothing to alias, so any spare capacity has to be released here: a zero-length
+    // typed array cannot carry the data pointer forward, leaving `rustbuffer_free`
+    // nothing to work from.
+    if rb.len == 0 || rb.capacity == 0 || rb.data.is_null() {
+        // SAFETY: `raw_env` is valid for this callback scope; a null `data` with length 0
+        // allocates an empty buffer without reading anything.
+        let typedarray =
+            match unsafe { napi_utils::create_uint8array(raw_env, std::ptr::null(), 0) } {
+                Ok(typedarray) => typedarray,
+                Err(error) => {
+                    unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+                    return Err(error);
+                }
+            };
+        unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+        // SAFETY: `raw_env` is valid for this callback scope, and `typedarray` is the
+        // object created just above.
+        unsafe { capacity_symbol.set(raw_env, typedarray, 0)? };
         return Ok(unsafe { JsUnknown::from_raw(raw_env, typedarray)? });
     }
 
@@ -221,14 +298,25 @@ fn rust_buffer_to_js_uint8array_handoff(
     // bytes. We expose it to JS without a finalizer; the codegen-emitted
     // try/finally calls `rustbuffer_free(view)` which will hand the (ptr,
     // capacity) tuple back to the library's `rustbuffer_free`.
-    let typedarray = unsafe { napi_utils::create_external_uint8array(raw_env, rb.data, len)? };
+    let typedarray = match unsafe { napi_utils::create_external_uint8array(raw_env, rb.data, len) }
+    {
+        Ok(typedarray) => typedarray,
+        Err(error) => {
+            unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+            return Err(error);
+        }
+    };
 
-    // If `capacity > len`, the view's `byteLength` (== len) under-reports the
-    // allocation size. Stash the true capacity so `rustbuffer_free(view)` can
-    // free against the original `Layout`. When `capacity == len`, the runtime
-    // can recover capacity from `byteLength`, so we skip the property write.
-    if rb.capacity != rb.len {
-        unsafe { capacity_symbol.set(raw_env, typedarray, rb.capacity)? };
+    // Mark every handed-off view, including when `capacity == byteLength`: an absent
+    // marker means "not the library's, do not free", so an unmarked view leaks. The value
+    // is the true capacity, which may exceed `byteLength` — that is `rb.len`, so
+    // converters decoding the whole view see only the message bytes.
+    //
+    // SAFETY: `raw_env` is valid for this callback scope, and `typedarray` is the view
+    // created just above.
+    if let Err(error) = unsafe { capacity_symbol.set(raw_env, typedarray, rb.capacity) } {
+        unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
+        return Err(error);
     }
 
     Ok(unsafe { JsUnknown::from_raw(raw_env, typedarray)? })

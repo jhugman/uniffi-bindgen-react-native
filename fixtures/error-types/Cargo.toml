@@ -14,6 +14,10 @@ uniffi = { workspace = true, features = ["wasm-unstable-single-threaded"] }
 anyhow = "1"
 thiserror = "1.0"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
+
 [build-dependencies]
 uniffi = { workspace = true, features = ["build", "wasm-unstable-single-threaded"] }
 

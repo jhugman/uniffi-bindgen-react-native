@@ -11,13 +11,15 @@ pub mod jsi;
 pub mod napi;
 pub mod ts;
 pub mod wasm;
+pub mod wasm2;
 
-/// Test flavor: JSI (Hermes native), WASM (Node.js), or Napi (Node.js N-API).
+/// Test flavor: JSI (Hermes native), WASM (Node.js), Napi (Node.js N-API), or Wasm2 (Player-based WASM).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
     Wasm,
     Napi,
+    Wasm2,
 }
 
 impl Flavor {
@@ -26,6 +28,7 @@ impl Flavor {
             Flavor::Jsi => "jsi",
             Flavor::Wasm => "wasm",
             Flavor::Napi => "napi",
+            Flavor::Wasm2 => "wasm2",
         }
     }
 }
@@ -191,6 +194,22 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
     if flavor == Flavor::Napi {
         runtime_paths.push(format!(r#""@ubjs/node": ["{rel_root}/runtimes/napi/lib"]"#));
     }
+    if flavor == Flavor::Wasm2 {
+        // `paths` bypasses the package `exports` map, so the bare specifier
+        // the generated index imports needs pointing at the node build.
+        runtime_paths.push(format!(
+            r#""@ubjs/wasm": ["{rel_root}/runtimes/wasm/node/src/index"]"#
+        ));
+        runtime_paths.push(format!(
+            r#""@ubjs/wasm/core": ["{rel_root}/runtimes/wasm/core/src/index"]"#
+        ));
+        runtime_paths.push(format!(
+            r#""@ubjs/wasm/browser": ["{rel_root}/runtimes/wasm/browser/src/index"]"#
+        ));
+        runtime_paths.push(format!(
+            r#""@ubjs/wasm/node": ["{rel_root}/runtimes/wasm/node/src/index"]"#
+        ));
+    }
     runtime_paths.join(",\n      ")
 }
 
@@ -200,6 +219,21 @@ pub(crate) fn run_tsx(test_script: &camino::Utf8Path) {
     run_cmd(
         command(&tsx)
             .arg("--experimental-wasm-modules")
+            .arg(test_script.as_str()),
+    );
+}
+
+/// As [`run_tsx`], but evaluates `preload` first. Node runs `--import` modules
+/// to completion — including their top-level `await` — before the entry
+/// module, which is what lets the preload finish opening the wasm before the
+/// test script imports anything that needs it.
+pub(crate) fn run_tsx_with_preload(test_script: &camino::Utf8Path, preload: &camino::Utf8Path) {
+    let tsx = paths::node_modules_bin().join("tsx");
+    run_cmd(
+        command(&tsx)
+            .arg("--experimental-wasm-modules")
+            .arg("--import")
+            .arg(format!("file://{preload}"))
             .arg(test_script.as_str()),
     );
 }

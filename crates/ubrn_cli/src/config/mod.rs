@@ -44,6 +44,10 @@ pub(crate) struct ProjectConfig {
     #[serde(default, alias = "web")]
     pub(crate) wasm: crate::wasm::WasmConfig,
 
+    #[cfg(feature = "wasm")]
+    #[serde(default, alias = "web2")]
+    pub(crate) wasm2: crate::wasm2::Wasm2Config,
+
     #[serde(default)]
     pub(crate) bindings: BindingsConfig,
 
@@ -192,8 +196,18 @@ impl ProjectConfig {
         &self.exclude_files
     }
 
+    #[cfg(feature = "wasm")]
     pub(crate) fn wasm_bindings_ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
         self.wasm
+            .ts_bindings
+            .as_deref()
+            .map(|ts| project_root.join(ts))
+            .unwrap_or_else(|| self.bindings.ts_path(project_root))
+    }
+
+    #[cfg(feature = "wasm")]
+    pub(crate) fn wasm2_bindings_ts_path(&self, project_root: &Utf8Path) -> Utf8PathBuf {
+        self.wasm2
             .ts_bindings
             .as_deref()
             .map(|ts| project_root.join(ts))

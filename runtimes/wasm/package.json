@@ -1,6 +1,6 @@
 {
   "name": "@ubjs/wasm",
-  "version": "0.31.0-3",
+  "version": "0.31.0-5",
   "description": "WebAssembly player runtime for uniffi-bindgen-react-native generated bindings.",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {
@@ -35,11 +35,11 @@
     "test": "node --test --import tsx './core/tests/*.test.ts'"
   },
   "peerDependencies": {
-    "@ubjs/core": "^0.31.0-3"
+    "@ubjs/core": "^0.31.0-5"
   },
   "devDependencies": {
     "@ubjs/core": "file:../../typescript",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "tsx": "^4",
     "typescript": "^5"
   },

@@ -148,6 +148,8 @@ pub(crate) mod files {
     use super::{RenderedFile, TemplateConfig};
     #[cfg(feature = "wasm")]
     use crate::wasm;
+    #[cfg(feature = "wasm")]
+    use crate::wasm2;
     use crate::{jsi, Platform};
 
     pub(crate) fn get_files_for(
@@ -168,6 +170,10 @@ pub(crate) mod files {
             Platform::Wasm => {
                 files.extend(wasm::get_files(config.clone()));
             }
+            #[cfg(feature = "wasm")]
+            Platform::Wasm2 => {
+                files.extend(wasm2::get_files(config.clone()));
+            }
         }
         files
     }
@@ -177,6 +183,8 @@ pub(crate) mod files {
         files.extend(jsi::get_files(config.clone()));
         #[cfg(feature = "wasm")]
         files.extend(wasm::get_files(config.clone()));
+        #[cfg(feature = "wasm")]
+        files.extend(wasm2::get_files(config.clone()));
         files
     }
 }
@@ -229,6 +237,8 @@ mod tests {
 
             #[cfg(feature = "wasm")]
             let wasm = crate::wasm::WasmConfig::default();
+            #[cfg(feature = "wasm")]
+            let wasm2 = crate::wasm2::Wasm2Config::default();
 
             Self {
                 name: name.to_string(),
@@ -239,6 +249,8 @@ mod tests {
                 ios,
                 #[cfg(feature = "wasm")]
                 wasm,
+                #[cfg(feature = "wasm")]
+                wasm2,
                 bindings,
                 tm,
                 exclude_files: Default::default(),

@@ -14,6 +14,10 @@ async-std = "1.12.0"
 thiserror = "1.0"
 uniffi = { workspace = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
+
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
 

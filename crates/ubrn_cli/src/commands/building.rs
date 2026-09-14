@@ -12,6 +12,8 @@ use ubrn_common::CrateMetadata;
 
 #[cfg(feature = "wasm")]
 use crate::wasm::WebBuildArgs;
+#[cfg(feature = "wasm")]
+use crate::wasm2::Wasm2BuildArgs;
 use crate::{
     commands::generate::GenerateAllCommand, config::ProjectConfig, jsi::android::AndroidBuildArgs,
     jsi::ios::IosBuildArgs, Platform,
@@ -33,6 +35,10 @@ pub(crate) enum BuildCmd {
     #[cfg(feature = "wasm")]
     #[clap(aliases = ["wasm"])]
     Web(WebBuildArgs),
+    /// Build the crate for the Wasm2 (player-based) runtime
+    #[cfg(feature = "wasm")]
+    #[clap(aliases = ["web2"])]
+    Wasm2(Wasm2BuildArgs),
 }
 
 impl BuildArgs {
@@ -66,6 +72,8 @@ impl BuildCmd {
             Self::Ios(a) => a.build()?,
             #[cfg(feature = "wasm")]
             Self::Web(a) => a.build()?,
+            #[cfg(feature = "wasm")]
+            Self::Wasm2(a) => a.build()?,
         };
 
         files.sort(); // Sort so that we reproducibly pick the same file below
@@ -82,6 +90,8 @@ impl BuildCmd {
             Self::Ios(a) => a.project_config(),
             #[cfg(feature = "wasm")]
             Self::Web(a) => a.project_config(),
+            #[cfg(feature = "wasm")]
+            Self::Wasm2(a) => a.project_config(),
         }
     }
 
@@ -91,15 +101,23 @@ impl BuildCmd {
             Self::Ios(a) => a.common_args.and_generate,
             #[cfg(feature = "wasm")]
             Self::Web(a) => !a.no_generate,
+            #[cfg(feature = "wasm")]
+            Self::Wasm2(a) => !a.no_generate,
         }
     }
 
     #[cfg(feature = "wasm")]
     pub(crate) fn then_build(&self) -> Result<()> {
-        if let Self::Web(a) = self {
-            if !a.no_wasm_pack {
-                a.then_build()?
+        match self {
+            Self::Web(a) => {
+                if !a.no_wasm_pack {
+                    a.then_build()?
+                }
             }
+            // Wasm2 built its wasm in `build()` — this stages it next to the
+            // TypeScript that `generate` has just written.
+            Self::Wasm2(a) => a.then_build()?,
+            _ => {}
         }
         Ok(())
     }
@@ -115,6 +133,8 @@ impl BuildCmd {
             Self::Ios(a) => a.native_bindings,
             #[cfg(feature = "wasm")]
             Self::Web(_) => false, // Web does not support native bindings
+            #[cfg(feature = "wasm")]
+            Self::Wasm2(_) => false, // Wasm2 does not support native bindings
         }
     }
 }
@@ -157,6 +177,8 @@ impl From<&BuildCmd> for Platform {
             BuildCmd::Ios(..) => Self::Ios,
             #[cfg(feature = "wasm")]
             BuildCmd::Web(..) => Self::Wasm,
+            #[cfg(feature = "wasm")]
+            BuildCmd::Wasm2(..) => Self::Wasm2,
         }
     }
 }
