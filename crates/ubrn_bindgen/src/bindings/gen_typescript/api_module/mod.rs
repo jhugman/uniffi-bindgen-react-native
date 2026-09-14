@@ -663,6 +663,12 @@ fn validate_borrowed_callable(callable: &TsCallable, callback: bool) -> anyhow::
     Ok(())
 }
 
+/// Reject borrowed-bytes arguments in callables the native generators cannot
+/// support: Rust-async calls and callback-interface methods.
+///
+/// Invoked from `TsApiModule::from_general`, which `BindingsArgs::run` calls
+/// before the native generators so both the C++ and the TypeScript flavours fail
+/// before any code is emitted.
 fn validate_borrowed_bytes(
     definitions: &[TsTypeDefinition],
     functions: &[TsFunction],

@@ -156,6 +156,26 @@ impl BindingsArgs {
         let source_path = path_or_shim(&self.source.source)?;
         let loader = self.create_loader(manifest_path)?;
 
+        // TypeScript generation via pipeline.
+        //
+        // Every namespace gets its own crate's `uniffi.toml` (e.g. custom type
+        // mappings), so build the initial root with the same loader the native
+        // generators use. `run_typescript_pipeline` publishes each crate's config
+        // as `[bindings.react-native]`, the table the 0.32 pipeline reads.
+        let metadata = loader.load_metadata(&source_path)?;
+        let initial_root = loader.load_pipeline_initial_root(&source_path, metadata)?;
+        let explicit_discr_enums = collect_explicit_discr_enums(&initial_root);
+        let general_root = run_typescript_pipeline(initial_root)?;
+
+        // Build the api modules — which is also where the pipeline's validation
+        // lives — before any native code is written. The native generators cannot
+        // express everything the pipeline accepts (borrowed-bytes arguments are only
+        // safe on synchronous Rust calls, see `validate_borrowed_bytes`), and the JSI
+        // C++ generator runs first, so an unsupported binding must be rejected here
+        // rather than after C++ has been emitted. The files themselves are still
+        // written, below, after native generation.
+        let api_modules = build_api_modules(&general_root, &switches, &explicit_discr_enums)?;
+
         // C++/Rust generation via ComponentInterface
         match &switches.flavor {
             AbiFlavor::Jsi => {
@@ -182,25 +202,15 @@ impl BindingsArgs {
             AbiFlavor::Wasm2 => { /* No native shim for Wasm2 */ }
         }
 
-        // TypeScript generation via pipeline.
-        //
-        // Every namespace gets its own crate's `uniffi.toml` (e.g. custom type
-        // mappings), so build the initial root with the same loader the native
-        // generators use. `run_typescript_pipeline` publishes each crate's config
-        // as `[bindings.react-native]`, the table the 0.32 pipeline reads.
-        let metadata = loader.load_metadata(&source_path)?;
-        let initial_root = loader.load_pipeline_initial_root(&source_path, metadata)?;
-        let explicit_discr_enums = collect_explicit_discr_enums(&initial_root);
-        let general_root = run_typescript_pipeline(initial_root)?;
-
+        // Now write the TypeScript that the pipeline root describes: the low-level
+        // module first, then the api modules built above.
         generate_ffi_from_pipeline(
             &general_root,
             &switches,
             &ts_dir,
             self.lib_resolution.clone(),
         )?;
-        let modules =
-            generate_api_from_pipeline(&general_root, &switches, &ts_dir, &explicit_discr_enums)?;
+        let modules = write_api_modules(api_modules, &ts_dir)?;
         if switches.flavor.supports_index_ts_at_generation() {
             generate_index_from_modules(&modules, &general_root, &switches, &ts_dir, &source_path)?;
         }
@@ -461,12 +471,20 @@ fn collect_explicit_discr_enums(root: &initial::Root) -> ExplicitDiscrEnums {
         .collect()
 }
 
-fn generate_api_from_pipeline(
+/// An api module built but not yet written to disk.
+type BuiltApiModules = Vec<(ModuleMetadata, gen_typescript::api_module::TsApiModule)>;
+
+/// Build the api module for every namespace.
+///
+/// Building is also validating: `TsApiModule::from_general` rejects bindings the
+/// native generators cannot express safely (borrowed-bytes arguments in async or
+/// callback calls, `forceAsync` over synchronous methods). Callers run this before
+/// the native generators so such a binding fails before any code is emitted.
+fn build_api_modules(
     general_root: &general::Root,
     switches: &SwitchArgs,
-    ts_dir: &Utf8Path,
     explicit_discr_enums: &ExplicitDiscrEnums,
-) -> Result<Vec<ModuleMetadata>> {
+) -> Result<BuiltApiModules> {
     let empty = HashSet::new();
     let mut modules = Vec::new();
     for (name, namespace) in &general_root.namespaces {
@@ -486,12 +504,20 @@ fn generate_api_from_pipeline(
             ffi_exports,
             explicit_discr_enums,
         )?;
+        modules.push((module, api_module));
+    }
+    Ok(modules)
+}
+
+fn write_api_modules(modules: BuiltApiModules, ts_dir: &Utf8Path) -> Result<Vec<ModuleMetadata>> {
+    let mut written = Vec::new();
+    for (module, api_module) in modules {
         let code = gen_typescript::generate_api_code_from_ir(api_module)?;
         let path = ts_dir.join(module.ts_filename());
         ubrn_common::write_file(path, code)?;
-        modules.push(module);
+        written.push(module);
     }
-    Ok(modules)
+    Ok(written)
 }
 
 fn generate_index_from_modules(
