@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Args;
-use serde::Deserialize;
+
 use ubrn_common::{mk_dir, path_or_shim, CrateMetadata, Utf8PathBufExt as _};
 use uniffi_bindgen::{
     cargo_metadata::CrateConfigSupplier,
@@ -111,7 +111,7 @@ pub struct SourceArgs {
     pub(crate) config: Option<Utf8PathBuf>,
 
     /// Treat the input file as a library, extracting any Uniffi definitions from that.
-    #[clap(long = "library", conflicts_with_all = ["config", "lib_file"])]
+    #[clap(long = "library", conflicts_with = "lib_file")]
     pub(crate) library_mode: bool,
 
     /// A UDL file or library file
@@ -182,15 +182,16 @@ impl BindingsArgs {
             AbiFlavor::Wasm2 => { /* No native shim for Wasm2 */ }
         }
 
-        // TypeScript generation via pipeline
-        // The pipeline needs per-crate configs (not the --config override) so that
-        // each namespace gets its own crate's uniffi.toml (e.g. custom type mappings).
-        // TODO check this is the desired behavior in uniffi-rs 0.31.x.
-        let pipeline_loader = self.create_pipeline_loader(manifest_path)?;
-        let metadata = load_metadata(&pipeline_loader, &source_path)?;
-        let initial_root = pipeline_loader.load_pipeline_initial_root(&source_path, metadata)?;
+        // TypeScript generation via pipeline.
+        //
+        // Every namespace gets its own crate's `uniffi.toml` (e.g. custom type
+        // mappings), so build the initial root with the same loader the native
+        // generators use. `run_typescript_pipeline` publishes each crate's config
+        // as `[bindings.react-native]`, the table the 0.32 pipeline reads.
+        let metadata = loader.load_metadata(&source_path)?;
+        let initial_root = loader.load_pipeline_initial_root(&source_path, metadata)?;
         let explicit_discr_enums = collect_explicit_discr_enums(&initial_root);
-        let general_root = general::pipeline("react-native").execute(initial_root)?;
+        let general_root = run_typescript_pipeline(initial_root)?;
 
         generate_ffi_from_pipeline(
             &general_root,
@@ -211,33 +212,13 @@ impl BindingsArgs {
 
     fn create_loader(&self, manifest_path: Option<&Utf8PathBuf>) -> Result<BindgenLoader> {
         let mut bindgen_paths = BindgenPaths::default();
-        if let Some(config_path) = &self.source.config {
-            bindgen_paths.add_layer(ConfigOverrideLayer {
-                path: config_path.clone(),
-            });
-        }
+        let global_config = load_global_config(&mut bindgen_paths, self.source.config.as_deref())?;
         let cwd = Utf8PathBuf::from("Cargo.toml");
         let manifest_path = manifest_path.unwrap_or(&cwd);
         let cargo_metadata = CrateMetadata::cargo_metadata(manifest_path)?;
         let config_supplier = CrateConfigSupplier::from(cargo_metadata);
         bindgen_paths.add_layer(config_supplier);
-        Ok(BindgenLoader::new(bindgen_paths, GlobalConfig::default()))
-    }
-
-    /// Create a loader for the pipeline that uses only per-crate configs.
-    ///
-    /// The `--config` override applies a single TOML to ALL crates, which breaks
-    /// multi-crate scenarios where each dependency has its own `uniffi.toml`
-    /// (e.g. custom type mappings). The pipeline needs each namespace to get its
-    /// own crate's config.
-    fn create_pipeline_loader(&self, manifest_path: Option<&Utf8PathBuf>) -> Result<BindgenLoader> {
-        let mut bindgen_paths = BindgenPaths::default();
-        let cwd = Utf8PathBuf::from("Cargo.toml");
-        let manifest_path = manifest_path.unwrap_or(&cwd);
-        let cargo_metadata = CrateMetadata::cargo_metadata(manifest_path)?;
-        let config_supplier = CrateConfigSupplier::from(cargo_metadata);
-        bindgen_paths.add_layer(config_supplier);
-        Ok(BindgenLoader::new(bindgen_paths, GlobalConfig::default()))
+        Ok(BindgenLoader::new(bindgen_paths, global_config))
     }
 }
 
@@ -253,6 +234,205 @@ impl BindgenPathsLayer for ConfigOverrideLayer {
         Some(self.path.clone())
     }
 }
+
+fn load_global_config(paths: &mut BindgenPaths, path: Option<&Utf8Path>) -> Result<GlobalConfig> {
+    let Some(path) = path else {
+        return Ok(GlobalConfig::default());
+    };
+    let raw: toml::Table = toml::from_str(&std::fs::read_to_string(path)?)?;
+    if ["crate-roots", "defaults", "crates"]
+        .iter()
+        .any(|key| raw.contains_key(*key))
+    {
+        let (config, roots) = GlobalConfig::from_file(path)?;
+        if let Some(roots) = roots {
+            paths.add_layer(roots);
+        }
+        Ok(config)
+    } else {
+        paths.add_layer(ConfigOverrideLayer {
+            path: path.to_owned(),
+        });
+        Ok(GlobalConfig::default())
+    }
+}
+
+fn run_typescript_pipeline(mut root: initial::Root) -> Result<general::Root> {
+    for namespace in root.namespaces.values_mut() {
+        let mut config: toml::Table =
+            toml::from_str(namespace.config_toml.as_deref().unwrap_or_default())?;
+        let bindings = gen_typescript::Config::bindings_table(&config)?;
+        config
+            .entry("bindings")
+            .or_insert_with(|| toml::Value::Table(toml::Table::new()))
+            .as_table_mut()
+            .unwrap()
+            .insert("react-native".into(), toml::Value::Table(bindings));
+        namespace.config_toml = Some(toml::to_string(&config)?);
+    }
+    let mut context = general::Context::new("react-native");
+    context.update_from_root(&root)?;
+    let root = general::pipeline("react-native").execute(root)?;
+    initial::MapNode::map_node(root, &BoxRenameFix(context.rename_tables))
+}
+
+struct BoxRenameFix(HashMap<String, toml::Table>);
+
+impl BoxRenameFix {
+    fn fix_type(&self, ty: &mut general::Type, inside_box: bool) {
+        use general::Type;
+        match ty {
+            Type::Box { inner_type } => self.fix_type(inner_type, true),
+            Type::Optional { inner_type }
+            | Type::Sequence { inner_type }
+            | Type::Set { inner_type } => self.fix_type(inner_type, inside_box),
+            Type::Map {
+                key_type,
+                value_type,
+            } => {
+                self.fix_type(key_type, inside_box);
+                self.fix_type(value_type, inside_box);
+            }
+            Type::Record {
+                namespace,
+                name,
+                orig_name,
+            }
+            | Type::Enum {
+                namespace,
+                name,
+                orig_name,
+            }
+            | Type::Interface {
+                namespace,
+                name,
+                orig_name,
+                ..
+            }
+            | Type::CallbackInterface {
+                namespace,
+                name,
+                orig_name,
+            }
+            | Type::Custom {
+                namespace,
+                name,
+                orig_name,
+                ..
+            } if inside_box => {
+                if let Some(renamed) = self
+                    .0
+                    .get(namespace)
+                    .and_then(|table| table.get(orig_name))
+                    .and_then(toml::Value::as_str)
+                {
+                    *name = renamed.to_owned();
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl initial::MapNode<general::TypeNode, BoxRenameFix> for general::TypeNode {
+    fn map_node(mut self, context: &BoxRenameFix) -> Result<Self> {
+        context.fix_type(&mut self.ty, false);
+        Ok(self)
+    }
+}
+
+impl initial::MapNode<general::BuiltinTypes, BoxRenameFix> for general::BuiltinTypes {
+    fn map_node(self, context: &BoxRenameFix) -> Result<Self> {
+        Ok(Self {
+            u8: initial::MapNode::map_node(self.u8, context)?,
+            i8: initial::MapNode::map_node(self.i8, context)?,
+            u16: initial::MapNode::map_node(self.u16, context)?,
+            i16: initial::MapNode::map_node(self.i16, context)?,
+            u32: initial::MapNode::map_node(self.u32, context)?,
+            i32: initial::MapNode::map_node(self.i32, context)?,
+            u64: initial::MapNode::map_node(self.u64, context)?,
+            i64: initial::MapNode::map_node(self.i64, context)?,
+            f32: initial::MapNode::map_node(self.f32, context)?,
+            f64: initial::MapNode::map_node(self.f64, context)?,
+            string: initial::MapNode::map_node(self.string, context)?,
+        })
+    }
+}
+
+impl initial::MapNode<general::Argument, BoxRenameFix> for general::Argument {
+    fn map_node(self, context: &BoxRenameFix) -> Result<Self> {
+        Ok(Self {
+            name: self.name,
+            orig_name: self.orig_name,
+            ty: initial::MapNode::map_node(self.ty, context)?,
+            by_ref: self.by_ref,
+            optional: self.optional,
+            default: initial::MapNode::map_node(self.default, context)?,
+        })
+    }
+}
+
+macro_rules! map_box_rename_children {
+    ($($ty:ident),* $(,)?) => {
+        $(impl initial::MapNode<general::$ty, BoxRenameFix> for general::$ty {
+            fn map_node(self, context: &BoxRenameFix) -> Result<Self> {
+                self.uniffi_auto_map_node(context)
+            }
+        })*
+    };
+}
+
+map_box_rename_children!(
+    Root,
+    Namespace,
+    Function,
+    TypeDefinition,
+    Constructor,
+    Method,
+    Callable,
+    CallableKind,
+    ReturnType,
+    ThrowsType,
+    AsyncData,
+    DefaultValue,
+    Literal,
+    Record,
+    FieldsKind,
+    Field,
+    Enum,
+    Variant,
+    Interface,
+    CallbackInterface,
+    VTable,
+    VTableMethod,
+    ObjectTraitImpl,
+    CustomType,
+    BoxedType,
+    OptionalType,
+    SequenceType,
+    MapType,
+    SetType,
+    ExternalType,
+    FfiDefinition,
+    RustFfiFunctionName,
+    FfiStructName,
+    FfiFunctionTypeName,
+    FfiFunction,
+    FfiFunctionKind,
+    FfiFunctionType,
+    FfiReturnType,
+    FfiStruct,
+    FfiField,
+    FfiArgument,
+    FfiType,
+    HandleKind,
+    Checksum,
+    UniffiTraitMethods,
+    ObjectImpl,
+    EnumShape,
+    Radix,
+    TraitKind,
+);
 
 /// Namespace name -> orig_names of enums that declared an explicit `#[repr(...)]`
 /// discriminant type in the Rust source.
@@ -351,21 +531,7 @@ fn generate_index_from_modules(
 }
 
 fn extract_ts_config(namespace: &general::Namespace) -> Result<gen_typescript::Config> {
-    #[derive(Default, Deserialize)]
-    struct BindingsSection {
-        #[serde(default, alias = "javascript", alias = "js", alias = "ts")]
-        typescript: gen_typescript::Config,
-    }
-    #[derive(Default, Deserialize)]
-    struct ConfigRoot {
-        #[serde(default)]
-        bindings: BindingsSection,
-    }
-    let Some(ref config_toml) = namespace.config_toml else {
-        return Ok(Default::default());
-    };
-    let root: ConfigRoot = toml::from_str(config_toml)?;
-    Ok(root.bindings.typescript)
+    gen_typescript::Config::from_root(namespace.config_toml.as_deref())
 }
 
 fn generate_ffi_from_pipeline(
