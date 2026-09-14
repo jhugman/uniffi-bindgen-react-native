@@ -12,6 +12,11 @@ import theModule, {
   Formatter,
   Greeter,
   Settings,
+  SetDefaults,
+  echoSet,
+  echoSetDefaults,
+  makeSet,
+  setContains,
   TestCase,
   echoBareArg,
   echoBareDefaults,
@@ -34,6 +39,69 @@ import "@/polyfills";
 // Initialize the module so that callback-interface vtables are registered
 // with Rust before any callback-bearing function is called.
 theModule.initialize();
+
+test("HashSet arguments and returns use Set membership", (t) => {
+  const fromRust = makeSet();
+  t.assertTrue(fromRust instanceof Set);
+  t.assertEqual(2, fromRust.size);
+  t.assertTrue(fromRust.has("rust"));
+  t.assertTrue(fromRust.has("bindings"));
+  const input = new Set(["second", "first", "second", "", "日本語"]);
+  const output = echoSet(input);
+  t.assertTrue(output instanceof Set);
+  t.assertEqual(input.size, output.size);
+  for (const value of input) {
+    t.assertTrue(output.has(value));
+  }
+  t.assertTrue(setContains(input, "日本語"));
+  t.assertFalse(setContains(input, "missing"));
+  t.assertEqual(4, input.size);
+});
+
+test("HashSet argument empty default and explicit empty Set", (t) => {
+  for (const output of [echoSet(), echoSet(new Set())]) {
+    t.assertTrue(output instanceof Set);
+    t.assertEqual(0, output.size);
+  }
+  t.assertFalse(setContains(new Set(), "missing"));
+});
+
+test("HashSet record fields roundtrip independently of iteration order", (t) => {
+  const input = SetDefaults.create({
+    names: new Set(["b", "a"]),
+    numbers: new Set([0, -1, 2147483647, -2147483648]),
+  });
+  const output = echoSetDefaults(input);
+  t.assertTrue(output.names instanceof Set);
+  t.assertTrue(output.numbers instanceof Set);
+  t.assertEqual(input.names.size, output.names.size);
+  t.assertEqual(input.numbers.size, output.numbers.size);
+  for (const value of input.names) {
+    t.assertTrue(output.names.has(value));
+  }
+  for (const value of input.numbers) {
+    t.assertTrue(output.numbers.has(value));
+  }
+});
+
+test("HashSet record defaults are empty and independently allocated", (t) => {
+  const first = SetDefaults.create({});
+  const second = SetDefaults.create({});
+  t.assertTrue(first.names instanceof Set);
+  t.assertTrue(first.numbers instanceof Set);
+  t.assertEqual(0, first.names.size);
+  t.assertEqual(0, first.numbers.size);
+  first.names.add("changed");
+  first.numbers.add(7);
+  t.assertEqual(0, second.names.size);
+  t.assertEqual(0, second.numbers.size);
+  for (const output of [echoSetDefaults(second), echoSetDefaults()]) {
+    t.assertTrue(output.names instanceof Set);
+    t.assertTrue(output.numbers instanceof Set);
+    t.assertEqual(0, output.names.size);
+    t.assertEqual(0, output.numbers.size);
+  }
+});
 
 test("function arg default: i32", (t) => {
   t.assertEqual(42, echoI32());

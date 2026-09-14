@@ -352,6 +352,56 @@ pub unsafe fn read_typedarray_data(
     Some((data as *const u8, length))
 }
 
+pub unsafe fn borrow_foreign_bytes(
+    raw_env: napi::sys::napi_env,
+    raw_val: napi::sys::napi_value,
+) -> napi::Result<ForeignBytesC> {
+    let mut kind = 0;
+    let mut len = 0;
+    let mut data = std::ptr::null_mut();
+    let mut buffer = std::ptr::null_mut();
+    let mut offset = 0;
+    let status = napi::sys::napi_get_typedarray_info(
+        raw_env,
+        raw_val,
+        &mut kind,
+        &mut len,
+        &mut data,
+        &mut buffer,
+        &mut offset,
+    );
+    if status != napi::sys::Status::napi_ok || kind != napi::sys::TypedarrayType::uint8_array {
+        return Err(napi::Error::from_reason(
+            "ForeignBytes requires a Uint8Array",
+        ));
+    }
+    let len = i32::try_from(len)
+        .map_err(|_| napi::Error::from_reason("ForeignBytes length exceeds i32::MAX"))?;
+    let mut is_arraybuffer = false;
+    if napi::sys::napi_is_arraybuffer(raw_env, buffer, &mut is_arraybuffer)
+        != napi::sys::Status::napi_ok
+        || !is_arraybuffer
+    {
+        return Err(napi::Error::from_reason(
+            "ForeignBytes requires a non-shared ArrayBuffer",
+        ));
+    }
+    let mut detached = false;
+    if napi::sys::napi_is_detached_arraybuffer(raw_env, buffer, &mut detached)
+        != napi::sys::Status::napi_ok
+        || detached
+        || (len > 0 && data.is_null())
+    {
+        return Err(napi::Error::from_reason(
+            "ForeignBytes buffer is detached or invalid",
+        ));
+    }
+    Ok(ForeignBytesC {
+        len,
+        data: data.cast(),
+    })
+}
+
 /// Allocate a [`RustBufferC`] by copying raw bytes through `rustbuffer_from_bytes`.
 ///
 /// This is the shared core of all "bytes -> RustBuffer" conversions in the crate.

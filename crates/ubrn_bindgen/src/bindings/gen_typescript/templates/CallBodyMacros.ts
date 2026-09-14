@@ -76,7 +76,7 @@ console.debug(`-- {{ ffi_name }}`);
    by `rustbuffer_alloc`, so there is no JS-side intermediate copy. -#}
 {%- macro arg_list_lowered(callable) %}
     {%- for arg in callable.arguments %}
-        {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc),
+        {% if arg.is_borrowed_bytes %}{{ arg.ffi_converter }}.lowerBorrowed({{ arg.name }}){% else %}{{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% endif %},
     {%- endfor %}
 {%- endmacro -%}
 
@@ -252,7 +252,7 @@ console.debug(`-- {{ ffi_name }}`);
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments.is_empty() %},{% endif %}
                     {%- endif %}
                     {%- for arg in callable.arguments -%}
-                    {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% if !loop.last %},{% endif %}
+                    {% if arg.is_borrowed_bytes %}{{ arg.ffi_converter }}.lowerBorrowed({{ arg.name }}){% else %}{{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% endif %}{% if !loop.last %},{% endif %}
                     {%- endfor %}
                 );
             },

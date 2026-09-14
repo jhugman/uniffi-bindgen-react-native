@@ -180,4 +180,36 @@ pub fn get_nested_record(n: NestedRecord) -> NestedRecord {
     n
 }
 
+pub struct ABoxedOuid(pub Box<Ouid>);
+uniffi::custom_newtype!(ABoxedOuid, Box<Ouid>);
+
+pub struct ASetUsingStringWrapper(pub std::collections::HashSet<StringWrapper>);
+uniffi::custom_newtype!(
+    ASetUsingStringWrapper,
+    std::collections::HashSet<StringWrapper>
+);
+
+#[derive(uniffi::Record)]
+pub struct WrapperOrdering {
+    pub boxed: Box<ANestedOuid>,
+    pub custom_box: ABoxedOuid,
+    pub optional_boxes: Vec<Option<Box<ABoxedOuid>>>,
+    pub names: ASetUsingStringWrapper,
+}
+
+#[uniffi::export]
+pub fn echo_boxed_ouid(value: Box<ANestedOuid>) -> Box<ANestedOuid> {
+    value
+}
+
+#[uniffi::export]
+pub fn echo_custom_box(value: ABoxedOuid) -> ABoxedOuid {
+    value
+}
+
+#[uniffi::export]
+pub fn echo_wrapper_ordering(value: WrapperOrdering) -> WrapperOrdering {
+    value
+}
+
 uniffi::include_scaffolding!("custom_types");

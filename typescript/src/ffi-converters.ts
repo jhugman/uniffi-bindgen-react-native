@@ -352,6 +352,9 @@ export class FfiConverterMap<K, V> extends AbstractFfiConverterByteArray<
 
 export const FfiConverterArrayBuffer = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<ArrayBuffer> {
+    lowerBorrowed(value: ArrayBuffer): Uint8Array {
+      return new Uint8Array(value);
+    }
     readFromCursor(c: Cursor): ArrayBuffer {
       const length = c.readI32();
       return c.readArrayBuffer(length);
@@ -369,6 +372,9 @@ export const FfiConverterArrayBuffer = (() => {
 
 export const FfiConverterUint8Array = (() => {
   class FFIConverter extends AbstractFfiConverterByteArray<Uint8Array> {
+    lowerBorrowed(value: Uint8Array): Uint8Array {
+      return value;
+    }
     readFromCursor(c: Cursor): Uint8Array {
       const length = c.readI32();
       return c.readBytes(length);

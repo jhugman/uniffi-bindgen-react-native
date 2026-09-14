@@ -54,7 +54,6 @@ pub(crate) fn call_ffi_function(
     registration: &Arc<crate::register::Registration>,
 ) -> Result<JsUnknown> {
     let declared_arg_count = arg_types.len();
-
     let mut call = module.prepare_call(fn_name).map_err(core_err)?;
 
     // NOTE: arguments are lowered in order, and lowering a library-owned `RustBuffer` adopts its
@@ -66,6 +65,7 @@ pub(crate) fn call_ffi_function(
         let js_val: JsUnknown = ctx.get(i)?;
         let slot = call.arg_slot(i).map_err(core_err)?;
         match desc {
+            FfiTypeDesc::ForeignBytes => {}
             FfiTypeDesc::RustBuffer => {
                 let rust_buffer = unsafe {
                     napi_utils::js_uint8array_to_rust_buffer(
@@ -165,6 +165,15 @@ pub(crate) fn call_ffi_function(
         let status_ptr = &mut rust_call_status as *mut RustCallStatusC;
         if let Some(rcs_slot) = call.rust_call_status_slot() {
             slot::write_pointer(rcs_slot, status_ptr as *const c_void);
+        }
+    }
+
+    for (i, desc) in arg_types.iter().enumerate() {
+        if matches!(desc, FfiTypeDesc::ForeignBytes) {
+            let value: JsUnknown = ctx.get(i)?;
+            let bytes = unsafe { napi_utils::borrow_foreign_bytes(env.raw(), value.raw())? };
+            slot::write_foreign_bytes(call.arg_slot(i).map_err(core_err)?, bytes)
+                .map_err(core_err)?;
         }
     }
 

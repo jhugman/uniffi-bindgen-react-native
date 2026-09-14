@@ -20,7 +20,7 @@
 
 use std::ffi::c_void;
 
-use crate::ffi_c_types::RustBufferC;
+use crate::ffi_c_types::{ForeignBytesC, RustBufferC};
 
 macro_rules! scalar_slot {
     ($write:ident, $read:ident, $t:ty) => {
@@ -91,9 +91,90 @@ pub fn read_rust_buffer(slot: &[u8]) -> RustBufferC {
     unsafe { std::ptr::read_unaligned(slot.as_ptr() as *const RustBufferC) }
 }
 
+pub fn write_foreign_bytes(slot: &mut [u8], bytes: ForeignBytesC) -> crate::Result<()> {
+    if bytes.len < 0 || (bytes.len > 0 && bytes.data.is_null()) {
+        return Err(crate::Error::Other(
+            "Invalid ForeignBytes length or data pointer".into(),
+        ));
+    }
+    let size = std::mem::size_of::<ForeignBytesC>();
+    if slot.len() < size {
+        return Err(crate::Error::Other(
+            "ForeignBytes argument slot is too small".into(),
+        ));
+    }
+    slot[..size].fill(0);
+    write_i32(slot, bytes.len);
+    write_pointer(
+        &mut slot[std::mem::offset_of!(ForeignBytesC, data)..],
+        bytes.data.cast(),
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn foreign_bytes_borrows_offset_pointer() {
+        let backing = [9u8, 1, 2, 3, 8];
+        let view = &backing[1..4];
+        let mut bytes = [0xff; std::mem::size_of::<ForeignBytesC>()];
+        write_foreign_bytes(
+            &mut bytes,
+            ForeignBytesC {
+                len: view.len() as i32,
+                data: view.as_ptr(),
+            },
+        )
+        .unwrap();
+        assert_eq!(read_i32(&bytes), 3);
+        let pointer_offset = std::mem::offset_of!(ForeignBytesC, data);
+        assert_eq!(
+            read_pointer(&bytes[pointer_offset..]),
+            view.as_ptr() as usize
+        );
+        assert!(bytes[4..pointer_offset].iter().all(|byte| *byte == 0));
+        assert_eq!(backing, [9, 1, 2, 3, 8]);
+    }
+
+    #[test]
+    fn foreign_bytes_validates_slots() {
+        let mut slot = [0; std::mem::size_of::<ForeignBytesC>()];
+        assert!(write_foreign_bytes(
+            &mut slot,
+            ForeignBytesC {
+                len: -1,
+                data: std::ptr::null(),
+            }
+        )
+        .is_err());
+        assert!(write_foreign_bytes(
+            &mut slot,
+            ForeignBytesC {
+                len: 1,
+                data: std::ptr::null(),
+            }
+        )
+        .is_err());
+        assert!(write_foreign_bytes(
+            &mut slot,
+            ForeignBytesC {
+                len: 0,
+                data: std::ptr::null(),
+            }
+        )
+        .is_ok());
+        assert!(write_foreign_bytes(
+            &mut [],
+            ForeignBytesC {
+                len: 0,
+                data: std::ptr::null(),
+            }
+        )
+        .is_err());
+    }
 
     #[test]
     fn round_trip_scalars() {

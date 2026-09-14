@@ -407,6 +407,8 @@ impl TsApiModule {
                         general::Type::Map { .. }
                             | general::Type::Sequence { .. }
                             | general::Type::Optional { .. }
+                            | general::Type::Box { .. }
+                            | general::Type::Set { .. }
                     ) {
                         deferred_wrappers.push(td);
                     } else {
@@ -584,6 +586,7 @@ impl TsApiModule {
         module.exported_converters = acc.exported_converters;
 
         validate_force_async(&module.type_definitions)?;
+        validate_borrowed_bytes(&module.type_definitions, &module.functions)?;
 
         Ok(module)
     }
@@ -648,6 +651,67 @@ fn force_async_error_block(kind: &str, name: &str, methods: &[TsCallable]) -> Op
     ))
 }
 
+fn validate_borrowed_callable(callable: &TsCallable, callback: bool) -> anyhow::Result<()> {
+    if callable.arguments.iter().any(|arg| arg.is_borrowed_bytes)
+        && (callback || callable.is_ffi_async())
+    {
+        anyhow::bail!(
+            "Borrowed bytes in `{}` are only supported for synchronous Rust calls, not Rust-async or callback methods; use owned Vec<u8> instead",
+            callable.name
+        );
+    }
+    Ok(())
+}
+
+fn validate_borrowed_bytes(
+    definitions: &[TsTypeDefinition],
+    functions: &[TsFunction],
+) -> anyhow::Result<()> {
+    let mut callables: Vec<(&TsCallable, bool)> = functions.iter().map(|f| (f, false)).collect();
+    for definition in definitions {
+        let (constructors, methods, traits, callback) = match definition {
+            TsTypeDefinition::Object(o) => {
+                callables.extend(o.primary_constructor.iter().map(|c| (c, false)));
+                (
+                    &o.alternate_constructors,
+                    &o.methods,
+                    &o.uniffi_traits,
+                    o.has_callback_interface,
+                )
+            }
+            TsTypeDefinition::Record(r) => (&r.constructors, &r.methods, &r.uniffi_traits, false),
+            TsTypeDefinition::FlatEnum(e)
+            | TsTypeDefinition::FlatError(e)
+            | TsTypeDefinition::TaggedEnum(e) => {
+                (&e.constructors, &e.methods, &e.uniffi_traits, false)
+            }
+            TsTypeDefinition::CallbackInterface(cbi) => {
+                callables.extend(cbi.methods.iter().map(|m| (m, true)));
+                continue;
+            }
+            _ => continue,
+        };
+        callables.extend(constructors.iter().map(|c| (c, false)));
+        callables.extend(methods.iter().map(|m| (m, callback)));
+        for uniffi_trait in traits {
+            match uniffi_trait {
+                TsUniffiTrait::Display { method }
+                | TsUniffiTrait::Debug { method }
+                | TsUniffiTrait::Hash { method }
+                | TsUniffiTrait::Ord { cmp: method } => callables.push((method, callback)),
+                TsUniffiTrait::Eq { eq, ne } => {
+                    callables.push((eq, callback));
+                    callables.push((ne, callback));
+                }
+            }
+        }
+    }
+    for (callable, callback) in callables {
+        validate_borrowed_callable(callable, callback)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod force_async_validation_tests {
     use super::*;
@@ -690,6 +754,27 @@ mod force_async_validation_tests {
             },
             force_async,
         })
+    }
+
+    #[test]
+    fn borrowed_bytes_require_synchronous_outbound_calls() {
+        let mut function = callable("consume", false);
+        function.arguments.push(TsArg {
+            name: "bytes".into(),
+            ts_type: "Uint8Array".into(),
+            ffi_converter: "FfiConverterUint8Array".into(),
+            is_borrowed_bytes: true,
+            default_value: None,
+        });
+        assert!(validate_borrowed_bytes(&[], &[function.clone()]).is_ok());
+        function.force_async = true;
+        assert!(validate_borrowed_bytes(&[], &[function.clone()]).is_ok());
+        let callback = callback_interface("Consumer", false, vec![function.clone()]);
+        assert!(validate_borrowed_bytes(&[callback], &[]).is_err());
+        function.ffi_async = callable("consume", true).ffi_async;
+        assert!(validate_borrowed_bytes(&[], &[function.clone()]).is_err());
+        function.arguments[0].is_borrowed_bytes = false;
+        assert!(validate_borrowed_bytes(&[], &[function]).is_ok());
     }
 
     #[test]

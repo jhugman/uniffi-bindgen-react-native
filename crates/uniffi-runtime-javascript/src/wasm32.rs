@@ -8,7 +8,7 @@ pub use wasm_bindgen::prelude::*;
 
 pub mod uniffi {
     pub use uniffi_core::{
-        RustBuffer, RustCallStatus, RustCallStatusCode, UniffiForeignPointerCell,
+        ForeignBytes, RustBuffer, RustCallStatus, RustCallStatusCode, UniffiForeignPointerCell,
     };
     pub type VoidPointer = *const std::ffi::c_void;
 }
@@ -60,6 +60,12 @@ impl IntoJs<VoidPointer> for uniffi::VoidPointer {
 }
 
 pub type ForeignBytes = Vec<u8>;
+impl IntoRust<&ForeignBytes> for uniffi::ForeignBytes {
+    fn into_rust(v: &ForeignBytes) -> Self {
+        let len = i32::try_from(v.len()).expect("ForeignBytes length exceeds i32::MAX");
+        unsafe { Self::from_raw_parts(v.as_ptr(), len) }
+    }
+}
 impl IntoRust<ForeignBytes> for uniffi::RustBuffer {
     fn into_rust(v: ForeignBytes) -> Self {
         Self::from_vec(v)
@@ -68,6 +74,27 @@ impl IntoRust<ForeignBytes> for uniffi::RustBuffer {
 impl IntoJs<ForeignBytes> for uniffi::RustBuffer {
     fn into_js(self) -> ForeignBytes {
         self.destroy_into_vec()
+    }
+}
+
+#[cfg(test)]
+mod borrowed_bytes_tests {
+    use super::*;
+
+    #[test]
+    fn foreign_bytes_borrow_live_storage() {
+        let bytes = vec![10, 20, 30];
+        let borrowed = uniffi::ForeignBytes::into_rust(&bytes);
+        assert_eq!(borrowed.as_slice(), bytes.as_slice());
+        assert_eq!(borrowed.as_slice().as_ptr(), bytes.as_ptr());
+        assert_eq!(bytes.len(), 3);
+    }
+
+    #[test]
+    fn foreign_bytes_allow_empty_storage() {
+        let bytes = Vec::new();
+        let borrowed = uniffi::ForeignBytes::into_rust(&bytes);
+        assert!(borrowed.as_slice().is_empty());
     }
 }
 

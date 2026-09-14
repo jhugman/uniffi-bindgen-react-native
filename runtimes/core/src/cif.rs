@@ -43,10 +43,7 @@ pub fn ffi_type_for(desc: &FfiTypeDesc, struct_defs: &HashMap<String, StructDef>
             Type::u64(),
             Type::pointer(),
         ])),
-        FfiTypeDesc::ForeignBytes => Err(Error::UnsupportedType(
-            "ForeignBytes has no CIF representation; it is not used in UniFFI function signatures"
-                .into(),
-        )),
+        FfiTypeDesc::ForeignBytes => Ok(Type::structure(vec![Type::i32(), Type::pointer()])),
         FfiTypeDesc::Struct(name) => {
             let def = struct_defs
                 .get(name)
@@ -58,5 +55,50 @@ pub fn ffi_type_for(desc: &FfiTypeDesc, struct_defs: &HashMap<String, StructDef>
                 .collect::<Result<Vec<_>>>()?;
             Ok(Type::structure(field_types))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ffi_c_types::ForeignBytesC, slot};
+    use libffi::middle::{arg, Cif, CodePtr};
+
+    extern "C" fn inspect(bytes: ForeignBytesC, expected: *const u8) -> i32 {
+        assert_eq!(bytes.data, expected);
+        // SAFETY: the test passes `data[1..3]` as the pointer and length.
+        let slice = unsafe { std::slice::from_raw_parts(bytes.data, bytes.len as usize) };
+        assert_eq!(slice, &[2, 3]);
+        bytes.len
+    }
+
+    #[test]
+    fn foreign_bytes_by_value_abi() {
+        let data = [1, 2, 3, 4];
+        let expected = data[1..3].as_ptr();
+        let mut bytes = [0; std::mem::size_of::<ForeignBytesC>()];
+        slot::write_foreign_bytes(
+            &mut bytes,
+            ForeignBytesC {
+                len: 2,
+                data: expected,
+            },
+        )
+        .unwrap();
+        let cif = Cif::new(
+            [
+                ffi_type_for(&FfiTypeDesc::ForeignBytes, &HashMap::new()).unwrap(),
+                Type::pointer(),
+            ],
+            Type::i32(),
+        );
+        // SAFETY: the CIF matches `inspect`, and both arguments remain live for the call.
+        let len: i32 = unsafe {
+            cif.call(
+                CodePtr::from_ptr(inspect as *const _),
+                &[arg(&bytes), arg(&expected)],
+            )
+        };
+        assert_eq!(len, 2);
     }
 }

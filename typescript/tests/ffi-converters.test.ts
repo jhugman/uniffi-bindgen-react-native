@@ -7,6 +7,7 @@ import { Cursor } from "../src/cursor";
 import {
   FfiConverter,
   FfiConverterArray,
+  FfiConverterArrayBuffer,
   AbstractFfiConverterByteArray,
   FfiConverterBool,
   FfiConverterBox,
@@ -52,6 +53,34 @@ function testConverter<T>(
   const output = converter.lift(lowered);
   t.assertEqual(input, output, "Round trip failed");
 }
+
+test("borrowed bytes preserve offset views without serialization", (t) => {
+  const backing = new Uint8Array([99, 10, 20, 88]);
+  const view = backing.subarray(1, 3);
+  const lowered = FfiConverterUint8Array.lowerBorrowed(view);
+  t.assertTrue(lowered === view);
+  t.assertTrue(lowered.buffer === backing.buffer);
+  t.assertEqual(lowered.byteOffset, 1);
+  t.assertEqual(lowered.byteLength, 2);
+  t.assertEqual(Array.from(lowered), [10, 20]);
+  const empty = backing.subarray(2, 2);
+  t.assertTrue(FfiConverterUint8Array.lowerBorrowed(empty) === empty);
+  const owned = FfiConverterUint8Array.lower(view, testAlloc);
+  t.assertEqual(owned.byteLength, 6);
+  t.assertEqual(Array.from(FfiConverterUint8Array.lift(owned)), [10, 20]);
+});
+
+test("borrowed ArrayBuffer uses a view of the original storage", (t) => {
+  const backing = new Uint8Array([10, 20]).buffer;
+  const lowered = FfiConverterArrayBuffer.lowerBorrowed(backing);
+  t.assertTrue(lowered.buffer === backing);
+  t.assertEqual(Array.from(lowered), [10, 20]);
+  t.assertEqual(lowered.byteLength, 2);
+  t.assertEqual(
+    FfiConverterArrayBuffer.lowerBorrowed(new ArrayBuffer(0)).byteLength,
+    0,
+  );
+});
 
 test("1 byte converter", (t) => {
   const converter = new TestConverter(FfiConverterInt8);

@@ -13,6 +13,11 @@
 // `FfiConverterArrayBuffer` cursor path instead.
 
 import {
+  BorrowedBytes,
+  borrowedBytesChecksum,
+  concatBorrowedBytes,
+  copyBorrowedBytes,
+  mixOwnedAndBorrowedBytes,
   identityBytes,
   identityBytesForcedRead,
   wellKnownBytes,
@@ -85,6 +90,81 @@ test("ArrayBuffer roundtrip of different sizes", (t) => {
     console.log(
       `ArrayBuffer roundtrip: ${bytes(byteLength)} in ${end - start} ms`,
     );
+  }
+});
+
+test("borrowed bytes consume empty and content inputs", (t) => {
+  for (const value of [new Uint8Array(), new Uint8Array([0, 1, 128, 255])]) {
+    t.assertEqual(
+      value.length === 0 ? 0 : 384,
+      borrowedBytesChecksum(value.buffer),
+    );
+    t.assertEqual(
+      value,
+      new Uint8Array(copyBorrowedBytes(value.buffer)),
+      undefined,
+      byteArrayEquals,
+    );
+  }
+});
+
+test("multiple borrowed and mixed owned byte arguments retain order", (t) => {
+  const first = new Uint8Array([1, 2]);
+  const middle = new Uint8Array([128]);
+  const last = new Uint8Array([3, 255]);
+  const empty = new Uint8Array();
+  t.assertEqual(
+    new Uint8Array([1, 2, 3, 255]),
+    new Uint8Array(concatBorrowedBytes(first.buffer, last.buffer)),
+    undefined,
+    byteArrayEquals,
+  );
+  t.assertEqual(
+    new Uint8Array([1, 2, 128, 3, 255]),
+    new Uint8Array(
+      mixOwnedAndBorrowedBytes(first.buffer, middle.buffer, last.buffer),
+    ),
+    undefined,
+    byteArrayEquals,
+  );
+  t.assertEqual(0, concatBorrowedBytes(empty.buffer, empty.buffer).byteLength);
+  t.assertEqual(
+    last,
+    new Uint8Array(
+      mixOwnedAndBorrowedBytes(empty.buffer, empty.buffer, last.buffer),
+    ),
+    undefined,
+    byteArrayEquals,
+  );
+});
+
+test("borrowed constructor copies input and method consumes bytes", (t) => {
+  const prefix = new Uint8Array([1, 2]);
+  const suffix = new Uint8Array([3, 255]);
+  const empty = new Uint8Array();
+  const consumer = new BorrowedBytes(prefix.buffer);
+  try {
+    prefix.fill(99);
+    t.assertEqual(
+      new Uint8Array([1, 2, 3, 255]),
+      new Uint8Array(consumer.append(suffix.buffer)),
+      undefined,
+      byteArrayEquals,
+    );
+    t.assertEqual(
+      new Uint8Array([1, 2]),
+      new Uint8Array(consumer.append(empty.buffer)),
+      undefined,
+      byteArrayEquals,
+    );
+  } finally {
+    consumer.uniffiDestroy();
+  }
+  const emptyConsumer = new BorrowedBytes(empty.buffer);
+  try {
+    t.assertEqual(0, emptyConsumer.append(empty.buffer).byteLength);
+  } finally {
+    emptyConsumer.uniffiDestroy();
   }
 });
 

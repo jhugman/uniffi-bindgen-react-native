@@ -21,6 +21,92 @@ function openLib() {
   return UniffiNativeModule.open(LIB_PATH);
 }
 
+function foreignBytesModule() {
+  return openLib().register({
+    symbols: SYMBOLS,
+    structs: {},
+    callbacks: {},
+    functions: {
+      uniffi_test_rustbuffer_from_bytes: {
+        args: [FfiType.ForeignBytes],
+        ret: FfiType.RustBuffer,
+        hasRustCallStatus: true,
+      },
+    },
+  });
+}
+
+test("ForeignBytes: raw subviews preserve offset and length", () => {
+  const nm = foreignBytesModule();
+  const backing = new Uint8Array([99, 10, 20, 30, 88]);
+  for (const view of [
+    backing.subarray(1, 4),
+    backing.subarray(3, 3),
+    new Uint8Array(),
+  ]) {
+    const status = { code: 0 };
+    const result = nm.uniffi_test_rustbuffer_from_bytes(view, status);
+    assert.deepStrictEqual(result, new Uint8Array(view));
+    assert.strictEqual(status.code, 0);
+    nm.rustbuffer_free(result);
+  }
+  assert.deepStrictEqual(backing, new Uint8Array([99, 10, 20, 30, 88]));
+});
+
+test("ForeignBytes: rejects non-Uint8Array and shared views", () => {
+  const nm = foreignBytesModule();
+  for (const value of [
+    new Int8Array(2),
+    new Uint8ClampedArray(2),
+    new Uint16Array(2),
+    new DataView(new ArrayBuffer(2)),
+    new ArrayBuffer(2),
+    {},
+    new Uint8Array(new SharedArrayBuffer(2)),
+  ]) {
+    assert.throws(
+      () => nm.uniffi_test_rustbuffer_from_bytes(value, { code: 0 }),
+      /ForeignBytes/,
+    );
+  }
+});
+
+test("ForeignBytes: rejects detached views, including detachment during status conversion", () => {
+  const nm = foreignBytesModule();
+  const view = new Uint8Array([1, 2, 3]);
+  const status = {
+    get code() {
+      structuredClone(view.buffer, { transfer: [view.buffer] });
+      return 0;
+    },
+  };
+  assert.throws(
+    () => nm.uniffi_test_rustbuffer_from_bytes(view, status),
+    /detached/,
+  );
+  assert.throws(
+    () => nm.uniffi_test_rustbuffer_from_bytes(view, { code: 0 }),
+    /detached/,
+  );
+});
+
+test("ForeignBytes: extracts bytes after JS-visible status conversion", () => {
+  const nm = foreignBytesModule();
+  const view = new Uint8Array([1, 2, 3]);
+  const status = {
+    get code() {
+      view[1] = 42;
+      return 0;
+    },
+    set code(value) {
+      assert.strictEqual(value, 0);
+    },
+  };
+  const result = nm.uniffi_test_rustbuffer_from_bytes(view, status);
+  assert.deepStrictEqual(result, new Uint8Array([1, 42, 3]));
+  nm.rustbuffer_free(result);
+});
+
 test("RustBuffer echo: pass Uint8Array, get same bytes back", () => {
   const lib = openLib();
   const nm = lib.register({

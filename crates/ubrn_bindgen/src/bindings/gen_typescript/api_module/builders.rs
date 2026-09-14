@@ -96,7 +96,7 @@ pub(super) fn build_string_helper(flavor: &AbiFlavor) -> TsStringHelper {
 ///
 /// If no such instructions are present in the configuration, falls back to the builtin converter.
 pub(super) fn build_custom_type(config: &Config, custom: &general::CustomType) -> TsCustomType {
-    let type_name = custom.name.clone();
+    let type_name = type_label_for(config, &custom.self_type.ty);
     let ffi_converter_name = ffi_converter_name_for(config, &custom.self_type);
     let builtin_type_name = type_label_for(config, &custom.builtin.ty);
     let builtin_ffi_converter = ffi_converter_name_for(config, &custom.builtin);
@@ -104,7 +104,7 @@ pub(super) fn build_custom_type(config: &Config, custom: &general::CustomType) -
 
     let custom_config = config
         .custom_types
-        .get(&custom.name)
+        .get(&custom.orig_name)
         .map(|cfg| TsCustomConfig {
             concrete_type_name: cfg.type_name.clone(),
             imports: cfg.imports.clone(),
@@ -443,6 +443,7 @@ pub(super) fn build_arg(config: &Config, arg: &general::Argument) -> TsArg {
         name: arg_name(&arg.name),
         ts_type,
         ffi_converter: ffi_converter_name_for(config, &arg.ty),
+        is_borrowed_bytes: arg.is_borrowed_bytes(),
         default_value: arg
             .default
             .as_ref()

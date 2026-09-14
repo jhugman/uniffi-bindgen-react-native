@@ -25,7 +25,7 @@ use std::mem::{align_of, size_of};
 
 use libffi::low::CodePtr;
 
-use crate::ffi_c_types::RustBufferC;
+use crate::ffi_c_types::{ForeignBytesC, RustBufferC};
 use crate::module::ResolvedFunction;
 use crate::{Error, FfiTypeDesc, Result};
 
@@ -60,13 +60,14 @@ pub fn slot_size_align(desc: &FfiTypeDesc) -> Result<(usize, usize)> {
         FfiTypeDesc::Float32 => Ok((size_of::<f32>(), align_of::<f32>())),
         FfiTypeDesc::Float64 => Ok((size_of::<f64>(), align_of::<f64>())),
         FfiTypeDesc::RustBuffer => Ok((size_of::<RustBufferC>(), align_of::<RustBufferC>())),
+        FfiTypeDesc::ForeignBytes => Ok((size_of::<ForeignBytesC>(), align_of::<ForeignBytesC>())),
         FfiTypeDesc::VoidPointer
         | FfiTypeDesc::Reference(_)
         | FfiTypeDesc::MutReference(_)
         | FfiTypeDesc::Callback(_) => Ok((size_of::<*const c_void>(), align_of::<*const c_void>())),
         FfiTypeDesc::RustCallStatus => Ok((size_of::<*mut c_void>(), align_of::<*mut c_void>())),
         FfiTypeDesc::Void => Ok((0, 1)),
-        FfiTypeDesc::Struct(_) | FfiTypeDesc::ForeignBytes => Err(Error::UnsupportedType(format!(
+        FfiTypeDesc::Struct(_) => Err(Error::UnsupportedType(format!(
             "{desc:?} is not allowed as an arg slot (structs go through a pointer arg)"
         ))),
     }
@@ -204,6 +205,11 @@ impl Module {
     /// Copy JS-owned bytes into a new Rust-allocated `RustBufferC`.
     pub fn rustbuffer_from_bytes(&self, data: *const u8, len: usize) -> Result<RustBufferC> {
         use crate::ffi_c_types::{ForeignBytesC, RustBufferFromBytesFn, RustCallStatusC};
+        let len = i32::try_from(len)
+            .map_err(|_| Error::Other("ForeignBytes length exceeds i32::MAX".into()))?;
+        if len > 0 && data.is_null() {
+            return Err(Error::Other("ForeignBytes data pointer is null".into()));
+        }
         if !self.lifecycle.try_begin_call() {
             return Err(Error::Unloading);
         }
@@ -212,10 +218,7 @@ impl Module {
         let result = unsafe {
             let func: RustBufferFromBytesFn = std::mem::transmute(self.rb_ops.from_bytes_ptr);
             let mut status = RustCallStatusC::default();
-            let foreign = ForeignBytesC {
-                len: len as i32,
-                data,
-            };
+            let foreign = ForeignBytesC { len, data };
             let rb = func(foreign, &mut status);
             if status.code != 0 {
                 self.lifecycle.end_call();
@@ -308,6 +311,26 @@ mod tests {
         assert_eq!(lay.arg_slots[1].size, 8);
         assert_eq!(lay.total_size, 16);
         assert!(lay.rust_call_status_slot.is_none());
+    }
+
+    #[test]
+    fn layout_foreign_bytes() {
+        let layout = ArgLayout::compute(
+            &[
+                FfiTypeDesc::UInt8,
+                FfiTypeDesc::ForeignBytes,
+                FfiTypeDesc::Int32,
+            ],
+            true,
+        )
+        .unwrap();
+        assert_eq!(layout.arg_slots[1].offset, align_of::<ForeignBytesC>());
+        assert_eq!(layout.arg_slots[1].size, size_of::<ForeignBytesC>());
+        assert_eq!(
+            layout.arg_slots[2].offset,
+            align_of::<ForeignBytesC>() + size_of::<ForeignBytesC>()
+        );
+        assert!(layout.rust_call_status_slot.is_some());
     }
 
     #[test]

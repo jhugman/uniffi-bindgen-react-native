@@ -33,6 +33,10 @@ pub(crate) struct TsConfig {
     /// thread.
     #[serde(default)]
     pub(crate) force_async: ForceAsync,
+    #[serde(default)]
+    pub(crate) rename: HashMap<String, String>,
+    #[serde(default)]
+    pub(crate) exclude: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -54,6 +58,31 @@ impl LogLevel {
 }
 
 impl TsConfig {
+    pub(crate) fn bindings_table(root: &toml::Table) -> anyhow::Result<toml::Table> {
+        let Some(bindings) = root.get("bindings") else {
+            return Ok(toml::Table::new());
+        };
+        let bindings = bindings
+            .as_table()
+            .ok_or_else(|| anyhow::anyhow!("bindings must be a table"))?;
+        let mut merged = toml::Table::new();
+        for key in ["ts", "js", "javascript", "typescript", "react-native"] {
+            if let Some(value) = bindings.get(key) {
+                let table = value
+                    .as_table()
+                    .ok_or_else(|| anyhow::anyhow!("bindings.{key} must be a table"))?;
+                uniffi_bindgen::merge_toml(&mut merged, table.clone())?;
+            }
+        }
+        let _: Self = toml::Value::Table(merged.clone()).try_into()?;
+        Ok(merged)
+    }
+
+    pub(crate) fn from_root(config_toml: Option<&str>) -> anyhow::Result<Self> {
+        let root = toml::from_str(config_toml.unwrap_or_default())?;
+        Ok(toml::Value::Table(Self::bindings_table(&root)?).try_into()?)
+    }
+
     pub(crate) fn is_verbose(&self) -> bool {
         self.log_level.is_verbose()
     }

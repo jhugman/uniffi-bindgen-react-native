@@ -124,4 +124,45 @@ pub fn consume_produced_bytes(producer: std::sync::Arc<dyn BytesProducer>, size:
     bytes.len() as u32
 }
 
+// --- Borrowed-bytes (`[ByRef] bytes`) arguments -------------------------------
+
+#[uniffi::export]
+pub fn borrowed_bytes_checksum(bytes: &[u8]) -> u32 {
+    bytes.iter().map(|byte| u32::from(*byte)).sum()
+}
+
+#[uniffi::export]
+pub fn copy_borrowed_bytes(bytes: &[u8]) -> Vec<u8> {
+    bytes.to_vec()
+}
+
+#[uniffi::export]
+pub fn concat_borrowed_bytes(first: &[u8], second: &[u8]) -> Vec<u8> {
+    [first, second].concat()
+}
+
+#[uniffi::export]
+pub fn mix_owned_and_borrowed_bytes(first: &[u8], owned: Vec<u8>, last: &[u8]) -> Vec<u8> {
+    [first, owned.as_slice(), last].concat()
+}
+
+#[derive(uniffi::Object)]
+pub struct BorrowedBytes {
+    prefix: Vec<u8>,
+}
+
+#[uniffi::export]
+impl BorrowedBytes {
+    #[uniffi::constructor]
+    pub fn new(prefix: &[u8]) -> Self {
+        Self {
+            prefix: prefix.to_vec(),
+        }
+    }
+
+    pub fn append(&self, bytes: &[u8]) -> Vec<u8> {
+        [self.prefix.as_slice(), bytes].concat()
+    }
+}
+
 uniffi::setup_scaffolding!();
