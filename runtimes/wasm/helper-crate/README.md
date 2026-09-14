@@ -21,7 +21,7 @@ crate-type = ["lib", "cdylib"]
 uniffi-runtime-wasm = "0.31.0-5"
 
 [dependencies]
-uniffi_core = { version = "0.31", features = ["wasm-unstable-single-threaded"] }
+uniffi_core = { version = "0.32", features = ["wasm-unstable-single-threaded"] }
 ```
 
 The dependency on its own is not enough. Nothing in your crate calls into this

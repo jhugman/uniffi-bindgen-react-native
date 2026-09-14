@@ -169,7 +169,7 @@ fn check_wasm_ready(crate_: &CrateMetadata) -> Result<()> {
              for wasm32.\n\
              Enable it for the wasm32 target:\n\
              \n    [target.'cfg(target_arch = \"wasm32\")'.dependencies]\n    \
-             {UNIFFI_CORE} = {{ version = \"0.31\", features = [\"{SINGLE_THREADED}\"] }}\n"
+             {UNIFFI_CORE} = {{ version = \"0.32\", features = [\"{SINGLE_THREADED}\"] }}\n"
         );
     }
     Ok(())
