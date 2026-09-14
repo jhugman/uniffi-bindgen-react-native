@@ -161,8 +161,7 @@ impl BindingsArgs {
             AbiFlavor::Jsi => {
                 let metadata = load_metadata(&loader, &source_path)?;
                 let cis = loader.load_cis(metadata)?;
-                let mut components =
-                    loader.load_components(cis, |ci, toml| parse_cpp_config(ci, toml))?;
+                let mut components = loader.load_components(cis, parse_cpp_config)?;
                 for c in components.iter_mut() {
                     c.ci.derive_ffi_funcs()?;
                 }
@@ -173,8 +172,7 @@ impl BindingsArgs {
             AbiFlavor::Wasm => {
                 let metadata = load_metadata(&loader, &source_path)?;
                 let cis = loader.load_cis(metadata)?;
-                let mut components =
-                    loader.load_components(cis, |ci, toml| parse_rust_config(ci, toml))?;
+                let mut components = loader.load_components(cis, parse_rust_config)?;
                 for c in components.iter_mut() {
                     c.ci.derive_ffi_funcs()?;
                 }
