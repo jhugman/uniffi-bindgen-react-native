@@ -81,6 +81,9 @@ interface ArgPlan extends ScratchSlot {
     base: number,
     jsArg: any,
   ) => number | bigint | PreparedArg;
+  // `prepare` grows wasm memory via `ctx.alloc`, detaching views other args
+  // captured earlier in the call. The dispatcher prepares these last.
+  allocates?: boolean;
 }
 
 interface RetSlot extends ScratchSlot {
@@ -174,58 +177,51 @@ function planArg(t: FfiTypeDesc): ArgPlan {
         },
       };
     case "ForeignBytes":
-      // `&[u8]` arguments. Codegen lowers these via
-      // `converter.lowerBorrowed(value)`, which hands us the caller's JS-owned
-      // `Uint8Array` — a `subarray` stays a view, so only its
-      // `byteOffset .. byteOffset + byteLength` window is meaningful, which
-      // `Memory.writeBytes` honours. Rust's `ForeignBytes` is
-      // `{ len: i32, data: *const u8 }`; wasm32 passes the 8-byte struct by
-      // pointer (unlike the native players' libffi, which passes it by value),
-      // so write it into the reserved slot and pass the slot's address.
-      //
-      // Unlike `RustBuffer`, Rust only *borrows* the payload for the duration
-      // of the call and never frees it. The copy is therefore live wasm memory
-      // we own, and `cleanup` releases it afterwards.
+      // `&[u8]` arg: `{ len: i32, data: *const u8 }`, passed by pointer on
+      // wasm32 (the native players pass it by value). Codegen hands us the
+      // caller's `Uint8Array`; a `subarray` window is honoured by
+      // `Memory.writeBytes`.
       return {
         ...argSlot(t),
+        allocates: true,
         prepare: (ctx, base, v: Uint8Array) => {
-          // Codegen hands us a `Uint8Array`; anything else would silently copy
-          // nothing (or throw a bare `TypeError` from `set`) *after* an
-          // allocation. `instanceof` matches the check `module.ts` already uses
-          // for byte sources.
+          // Codegen lowers every `&[u8]` to a `Uint8Array`.
           if (!(v instanceof Uint8Array)) {
             throw new Error(
               `planArg(ForeignBytes): expected a Uint8Array, got ${Object.prototype.toString.call(v)}`,
             );
           }
           const len = v.byteLength;
-          // A detached view reports length 0, so without this it would decay
-          // into a `(len 0, null)` argument and the caller's bytes would
-          // vanish. Prefer the precise `ArrayBuffer.prototype.detached` signal;
-          // fall back to `writeRustBufferPayload`'s heuristic (a live buffer
-          // cannot be shorter than one of its views).
           const buf = v.buffer as ArrayBuffer & { detached?: boolean };
-          if (buf.detached === true || (len > 0 && buf.byteLength === 0)) {
+          if (buf.detached === true) {
             throw new Error(
               "planArg(ForeignBytes): source view is detached — cannot copy " +
                 "it into wasm memory. The view must not be held across any " +
                 "operation that can grow wasm memory.",
             );
           }
-          // Zero-length is legal and must reach Rust as `(len = 0, data =
-          // null)`: `ForeignBytes::as_slice` asserts a null pointer only pairs
-          // with len 0, and a non-null pointer with len 0 is still fine, but
-          // avoiding the alloc keeps it free of side effects.
+          // Zero-length must reach Rust as `(len 0, null)`.
           let dataPtr = 0;
+          let cleanup: (() => void) | undefined;
           if (len > 0) {
-            dataPtr = ctx.alloc(len, 1);
-            ctx.memory.writeBytes(dataPtr, v);
+            if (v.buffer === ctx.memory.buffer()) {
+              // Already a view into wasm memory: borrow it. Mirrors
+              // `writeRustBufferPayload`.
+              dataPtr = v.byteOffset;
+            } else {
+              dataPtr = ctx.alloc(len, 1);
+              const allocated = dataPtr;
+              cleanup = () => ctx.free(allocated, len, 1);
+              try {
+                ctx.memory.writeBytes(dataPtr, v);
+              } catch (e) {
+                // A throw here never reaches the dispatcher's cleanup list.
+                cleanup();
+                throw e;
+              }
+            }
           }
           writeForeignBytes(ctx.memory, base, { len, dataPtr });
-          // Capture this call's `dataPtr`/`len` (not the scratch slot) so a
-          // re-entrant call cannot make this cleanup free its storage.
-          const cleanup =
-            dataPtr !== 0 ? () => ctx.free(dataPtr, len, 1) : undefined;
           return { word: base, cleanup };
         },
       };
@@ -256,6 +252,7 @@ function planArg(t: FfiTypeDesc): ArgPlan {
       const structName = t.inner.name;
       return {
         ...argSlot(t),
+        allocates: true,
         prepare: (ctx, _base, value: Record<string, unknown>) => {
           const layout = ctx.structs.get(structName);
           if (!layout) {
@@ -450,19 +447,36 @@ function buildInterpretedDispatcher(
       if (def.hasRustCallStatus)
         writeRustCallStatusZero(ctx.memory, base + statusOff);
 
+      // Prepare allocating args (those that can grow wasm memory and detach
+      // views) last, so every other arg captures what it needs first.
+      const preparedArgs: Array<number | bigint | PreparedArg> = [];
+      for (const allocates of [false, true]) {
+        for (let i = 0; i < argPlans.length; i++) {
+          if (Boolean(argPlans[i].allocates) !== allocates) continue;
+          const argBase = argOffsets[i] >= 0 ? base + argOffsets[i] : 0;
+          const prepared = argPlans[i].prepare(ctx, argBase, userArgs[i]);
+          preparedArgs[i] = prepared;
+          // Collect cleanups as we go: a later `prepare` may throw.
+          if (
+            typeof prepared === "object" &&
+            prepared !== null &&
+            prepared.cleanup
+          ) {
+            cleanups.push(prepared.cleanup);
+          }
+        }
+      }
+
       const wasmArgs: any[] = [];
       if (retPlan.hasSret) wasmArgs.push(base + sretOff);
       for (let i = 0; i < argPlans.length; i++) {
-        const p = argPlans[i];
-        const argBase = argOffsets[i] >= 0 ? base + argOffsets[i] : 0;
-        const prepared = p.prepare(ctx, argBase, userArgs[i]);
+        const prepared = preparedArgs[i];
         // Objects are `PreparedArg`; numbers and bigints are scalar words.
-        if (typeof prepared === "object" && prepared !== null) {
-          wasmArgs.push(prepared.word);
-          if (prepared.cleanup) cleanups.push(prepared.cleanup);
-        } else {
-          wasmArgs.push(prepared);
-        }
+        wasmArgs.push(
+          typeof prepared === "object" && prepared !== null
+            ? prepared.word
+            : prepared,
+        );
       }
       if (def.hasRustCallStatus) wasmArgs.push(base + statusOff);
 
@@ -489,9 +503,8 @@ function buildInterpretedDispatcher(
       }
       return retPlan.finish(ctx, base + sretOff, scalarRet);
     } finally {
-      // Release transient wasm storage the callee only borrowed
-      // (`ForeignBytes`), on the error path too. Each closure captures its own
-      // call's allocation, so re-entrant calls never free each other's.
+      // Releases transient wasm storage (`ForeignBytes` payloads), error path
+      // included.
       for (const cleanup of cleanups) cleanup();
     }
   };
@@ -523,14 +536,11 @@ function isSimpleRetType(t: FfiTypeDesc): boolean {
 }
 
 /**
- * Tags that the JIT dispatcher knows how to emit inline as arg types.
- * Restricted to scalars and `RustBuffer` — excludes `Void` (return-only).
- * `ForeignBytes` is deliberately absent: lowering it copies the bytes and
- * frees them after the call, and the JIT body has no post-call hook for that.
- * Omitting it here makes `buildJitDispatcher` return `undefined` so
- * `specializeFunction` takes the interpreted path, which does the cleanup.
- * Anything outside this set returns `undefined` from `buildJitDispatcher`,
- * causing `specializeFunction` to fall back to the interpreted path.
+ * Tags the JIT dispatcher can emit inline as an arg type: scalars and
+ * `RustBuffer` only. Anything else — notably `ForeignBytes`, which needs
+ * post-call cleanup the JIT body has no hook for — makes
+ * `buildJitDispatcher` return `undefined`, so `specializeFunction` falls back
+ * to the interpreted path.
  */
 function isSimpleArgType(t: FfiTypeDesc): boolean {
   switch (t.tag) {

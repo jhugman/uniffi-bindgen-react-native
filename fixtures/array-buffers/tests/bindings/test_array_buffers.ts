@@ -39,6 +39,36 @@ test("well known array returned", (t) => {
   );
 });
 
+test("owned bytes survive a growing borrowed argument", (t) => {
+  // Lowering an owned `Vec<u8>` arg runs before dispatch and produces a view
+  // aliasing wasm memory. A borrowed arg's `prepare` allocates wasm memory, so
+  // a large one grows memory and detaches that owned view mid-dispatch.
+  const owned = new Uint8Array([3, 4, 5, 6]);
+  const small = new Uint8Array([1, 2]);
+  t.assertEqual(
+    new Uint8Array([1, 2, 3, 4, 5, 6, 1, 2]),
+    new Uint8Array(
+      mixOwnedAndBorrowedBytes(small.buffer, owned.buffer, small.buffer),
+    ),
+    undefined,
+    byteArrayEquals,
+  );
+
+  // Large enough to force a `WebAssembly.Memory.grow` while the owned view is
+  // still live. Run before the multi-MB roundtrips below so memory is small.
+  const big = new Uint8Array(4 << 20).fill(7);
+  const result = new Uint8Array(
+    mixOwnedAndBorrowedBytes(big.buffer, owned.buffer, small.buffer),
+  );
+  t.assertEqual(
+    big.byteLength + owned.byteLength + small.byteLength,
+    result.byteLength,
+  );
+  t.assertEqual(7, result[0]);
+  t.assertEqual(3, result[big.byteLength]);
+  t.assertEqual(1, result[big.byteLength + owned.byteLength]);
+});
+
 test("array roundtrip using lift/lower", (t) => {
   function rt(ab: ArrayBuffer) {
     const result = identityBytes(ab);
