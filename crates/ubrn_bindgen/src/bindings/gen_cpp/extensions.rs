@@ -42,6 +42,12 @@ pub(super) impl FfiFunction {
     fn is_callback_init(&self) -> bool {
         self.name().contains("_callback_vtable_")
     }
+
+    fn has_foreign_bytes_args(&self) -> bool {
+        self.arguments()
+            .iter()
+            .any(|arg| matches!(arg.type_(), FfiType::ForeignBytes))
+    }
 }
 
 #[ext(name = CppFfiTypeExt)]
@@ -80,12 +86,22 @@ pub(super) impl FfiType {
             _ => ci.cpp_namespace(),
         }
     }
+
+    fn is_foreign_bytes(&self) -> bool {
+        matches!(self, Self::ForeignBytes)
+    }
 }
 
 #[ext(name = CppFfiCallbackFunctionExt)]
 pub(super) impl FfiCallbackFunction {
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
         FfiType::Callback(self.name().to_string()).cpp_namespace(ci)
+    }
+
+    fn has_foreign_bytes_args(&self) -> bool {
+        self.arguments()
+            .iter()
+            .any(|arg| matches!(arg.type_(), FfiType::ForeignBytes))
     }
 
     fn is_future_callback(&self) -> bool {

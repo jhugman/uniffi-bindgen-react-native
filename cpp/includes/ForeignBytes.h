@@ -10,6 +10,7 @@
 #include <cmath>
 #include <jsi/jsi.h>
 #include <limits>
+#include <utility>
 
 struct ForeignBytes {
   int32_t len;
@@ -20,32 +21,33 @@ namespace uniffi_jsi {
 using namespace facebook;
 using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
-/// A `ForeignBytes` that borrows a JS `Uint8Array`'s buffer.
+/// A `ForeignBytes` that borrows a JS `Uint8Array`'s storage.
 ///
-/// The pointer it yields is only valid for the duration of the call it is
-/// built for: the buffer is not rooted, so nothing may store the
-/// `ForeignBytes` (or a copy of its `data`) beyond the FFI call itself. It is
-/// safe as an argument because the conversion happens inside the call
-/// expression, with no JS running in between.
+/// Valid only until the next JS execution on the runtime; must not be stored.
 class BorrowedForeignBytes {
 public:
-  BorrowedForeignBytes(jsi::Runtime &rt, jsi::ArrayBuffer buffer, size_t offset,
-                       int32_t length)
-      : rt_(rt), buffer_(std::move(buffer)), offset_(offset), length_(length) {}
+  BorrowedForeignBytes(int32_t length, size_t offset, jsi::ArrayBuffer buffer)
+      : length_{length}, offset_{offset}, buffer_{std::move(buffer)} {}
 
-  operator ForeignBytes() const {
-    auto data = buffer_.data(rt_);
+  /// Read the storage pointer. Runs no JS; throws if `buffer_` was detached.
+  void capture(jsi::Runtime &rt) {
+    auto *data = buffer_.data(rt);
     if (length_ > 0 && data == nullptr) {
-      throw jsi::JSError(rt_, "ForeignBytes buffer is detached");
+      throw jsi::JSError(rt, "ForeignBytes buffer is detached");
     }
-    return {length_, data == nullptr ? nullptr : data + offset_};
+    bytes_ = ForeignBytes{
+        length_,
+        data == nullptr ? nullptr : data + offset_,
+    };
   }
 
+  operator ForeignBytes() const { return bytes_; }
+
 private:
-  jsi::Runtime &rt_;
-  jsi::ArrayBuffer buffer_;
-  size_t offset_;
   int32_t length_;
+  size_t offset_;
+  jsi::ArrayBuffer buffer_;
+  ForeignBytes bytes_{0, nullptr};
 };
 
 template <> struct Bridging<ForeignBytes> {
@@ -68,6 +70,14 @@ template <> struct Bridging<ForeignBytes> {
         length > std::numeric_limits<int32_t>::max()) {
       throw jsi::JSError(rt, "Invalid ForeignBytes offset or length");
     }
+    // A capacity hint present and zeroed marks a view whose allocation was
+    // adopted and freed by a previous call; borrowing it would be a
+    // use-after-free. Borrowing does not reset the hint.
+    if (object.hasProperty(rt, kUbrnRustCapacity) &&
+        object.getProperty(rt, kUbrnRustCapacity).asNumber() == 0) {
+      throw jsi::JSError(
+          rt, "ForeignBytes argument was already consumed by a previous FFI call");
+    }
     if (!bufferObject.isArrayBuffer(rt)) {
       throw jsi::JSError(rt, "ForeignBytes requires a non-shared ArrayBuffer");
     }
@@ -77,9 +87,9 @@ template <> struct Bridging<ForeignBytes> {
         length > static_cast<double>(size) - offset) {
       throw jsi::JSError(rt, "ForeignBytes view is outside its ArrayBuffer");
     }
-    return BorrowedForeignBytes(rt, std::move(buffer),
+    return BorrowedForeignBytes(static_cast<int32_t>(length),
                                 static_cast<size_t>(offset),
-                                static_cast<int32_t>(length));
+                                std::move(buffer));
   }
 };
 } // namespace uniffi_jsi

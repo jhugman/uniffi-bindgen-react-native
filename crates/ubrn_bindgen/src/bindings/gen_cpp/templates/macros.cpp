@@ -37,6 +37,33 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
         {%- endif %}
 
         {#- Now call into Rust #}
+        {%- if func.has_foreign_bytes_args() %}
+        {#- Phase 1 converts every argument (JS may run; borrowed ones only hold
+            their ArrayBuffer). Phase 2 captures borrowed pointers with no JS in
+            between, so a getter cannot detach a buffer before the call. #}
+        {%-   for arg in func.arguments() %}
+        auto arg{{ loop.index0 }} = {% call arg_from_js(arg, loop.index0) %};
+        {%-   endfor %}
+        {%-   for arg in func.arguments() %}
+        {%-     if arg.type_().is_foreign_bytes() %}
+        arg{{ loop.index0 }}.capture(rt);
+        {%-     endif %}
+        {%-   endfor %}
+        {% if func.return_type().is_some() -%}
+        auto value = {# space #}
+        {%- endif %}
+        {{- func_name }}(
+            {%- for arg in func.arguments() %}
+            arg{{ loop.index0 }}
+            {%-   if !loop.last %}, {# space #}
+            {%-   endif %}
+            {%- endfor %}
+            {%- if func.has_rust_call_status_arg() %}
+            {%-   if !func.arguments().is_empty() %}, {# space #}
+            {%   endif %}&status
+            {%- endif %}
+        );
+        {%- else %}
         {% if func.return_type().is_some() -%}
         auto value = {# space #}
         {%- endif %}
@@ -51,6 +78,7 @@ jsi::Value {{ module_name }}::{% call cpp_func_name(func) %}(jsi::Runtime& rt, c
             {%   endif %}&status
             {%- endif %}
         );
+        {%- endif %}
 
         {#- Now copy the call status into JS. #}
         {%- if func.has_rust_call_status_arg() %}
