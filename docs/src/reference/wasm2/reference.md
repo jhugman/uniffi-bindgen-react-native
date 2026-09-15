@@ -39,11 +39,11 @@ cargo install wasm-bindgen-cli --version 0.2.127  # whatever your lock says
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-uniffi = "0.31"
+uniffi = "0.32"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-uniffi-runtime-wasm = "0.31.0-3"
-uniffi_core = { version = "0.31", features = ["wasm-unstable-single-threaded"] }
+uniffi-runtime-wasm = "0.31.0-5"
+uniffi_core = { version = "0.32", features = ["wasm-unstable-single-threaded"] }
 ```
 
 Each line earns its place. `cdylib` is what produces a WebAssembly module at all. `uniffi-runtime-wasm` supplies `__ubrn_alloc`, `__ubrn_free` and a panic hook, all of which the player calls and none of which JavaScript can provide. `wasm-unstable-single-threaded` drops UniFFI's `Send + Sync` requirement on exported objects, which wasm32 cannot satisfy; spelling the feature on `uniffi` rather than `uniffi_core` works too, since `uniffi` re-exports it.
