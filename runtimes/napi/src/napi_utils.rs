@@ -352,9 +352,21 @@ pub unsafe fn read_typedarray_data(
     Some((data as *const u8, length))
 }
 
+/// Borrow a `Uint8Array`'s storage as a [`ForeignBytesC`] without copying.
+///
+/// Unlike [`js_uint8array_to_rust_buffer`], this leaves the capacity marker
+/// untouched — borrowing does not consume the view. A non-empty view carrying a
+/// marker of `0` was already adopted and freed, so it is rejected.
+///
+/// # Safety
+///
+/// - `raw_env` must be a valid `napi_env` for the current callback scope.
+/// - `raw_val` must be a `napi_value` from that scope.
+/// - `capacity_symbol` must belong to the env that created `raw_val`.
 pub unsafe fn borrow_foreign_bytes(
     raw_env: napi::sys::napi_env,
     raw_val: napi::sys::napi_value,
+    capacity_symbol: &CapacitySymbol,
 ) -> napi::Result<ForeignBytesC> {
     let mut kind = 0;
     let mut len = 0;
@@ -386,20 +398,46 @@ pub unsafe fn borrow_foreign_bytes(
             "ForeignBytes requires a non-shared ArrayBuffer",
         ));
     }
-    let mut detached = false;
-    if napi::sys::napi_is_detached_arraybuffer(raw_env, buffer, &mut detached)
-        != napi::sys::Status::napi_ok
-        || detached
-        || (len > 0 && data.is_null())
-    {
-        return Err(napi::Error::from_reason(
-            "ForeignBytes buffer is detached or invalid",
-        ));
+    let capacity = capacity_symbol.get(raw_env, raw_val)?;
+    if len > 0 {
+        // A zeroed marker means the allocation was adopted and freed by a previous
+        // call; borrowing it would hand Rust a dangling pointer.
+        if capacity == Some(0) {
+            return Err(napi::Error::from_reason(
+                "ForeignBytes argument was already consumed by a previous FFI call",
+            ));
+        }
+        let mut detached = false;
+        if napi::sys::napi_is_detached_arraybuffer(raw_env, buffer, &mut detached)
+            != napi::sys::Status::napi_ok
+            || detached
+            || data.is_null()
+        {
+            return Err(napi::Error::from_reason(
+                "ForeignBytes buffer is detached or invalid",
+            ));
+        }
+    } else if capacity.is_none() {
+        // Empty views own no allocation, so the marker is never consulted for them:
+        // `rustbuffer_alloc(0)` stamps `0` by design (mirrors the owned path, which
+        // bails at `length == 0`). Node reports an empty external backing store as
+        // detached, so only a markerless empty view can be a genuine detachment.
+        let mut detached = false;
+        if napi::sys::napi_is_detached_arraybuffer(raw_env, buffer, &mut detached)
+            != napi::sys::Status::napi_ok
+            || detached
+        {
+            return Err(napi::Error::from_reason(
+                "ForeignBytes buffer is detached or invalid",
+            ));
+        }
     }
-    Ok(ForeignBytesC {
-        len,
-        data: data.cast(),
-    })
+    let data = if len > 0 {
+        data.cast()
+    } else {
+        std::ptr::null()
+    };
+    Ok(ForeignBytesC { len, data })
 }
 
 /// Allocate a [`RustBufferC`] by copying raw bytes through `rustbuffer_from_bytes`.
