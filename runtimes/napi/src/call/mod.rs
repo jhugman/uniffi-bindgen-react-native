@@ -168,6 +168,11 @@ pub(crate) fn call_ffi_function(
         }
     }
 
+    // Borrowed bytes are lowered after the status object has been read, and that
+    // ordering is load-bearing: reading `code` is the only JavaScript that runs
+    // while arguments are being converted, so a getter that detaches the buffer
+    // (see `runtimes/napi/tests/rust_buffer.test.mjs`) cannot invalidate a
+    // pointer we already took.
     for (i, desc) in arg_types.iter().enumerate() {
         if matches!(desc, FfiTypeDesc::ForeignBytes) {
             let value: JsUnknown = ctx.get(i)?;

@@ -470,7 +470,9 @@ pub(super) fn build_callable(
     let return_type = callable.return_type.ty.as_ref().map(|tn| {
         let ts_type = type_label_for(config, &tn.ty);
         let ffi_type = ffi_type_to_ts_name(&tn.ffi_type);
-        let is_rust_buffer = ffi_type == "Uint8Array";
+        // Match the FFI type rather than the rendered name: `ForeignBytes`
+        // arguments also render as `Uint8Array`, but they are never returned.
+        let is_rust_buffer = matches!(tn.ffi_type, general::FfiType::RustBuffer(_));
         TsReturnType {
             ts_type,
             ffi_converter: ffi_converter_name_for(config, tn),

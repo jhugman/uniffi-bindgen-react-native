@@ -20,6 +20,13 @@ namespace uniffi_jsi {
 using namespace facebook;
 using CallInvoker = uniffi_runtime::UniffiCallInvoker;
 
+/// A `ForeignBytes` that borrows a JS `Uint8Array`'s buffer.
+///
+/// The pointer it yields is only valid for the duration of the call it is
+/// built for: the buffer is not rooted, so nothing may store the
+/// `ForeignBytes` (or a copy of its `data`) beyond the FFI call itself. It is
+/// safe as an argument because the conversion happens inside the call
+/// expression, with no JS running in between.
 class BorrowedForeignBytes {
 public:
   BorrowedForeignBytes(jsi::Runtime &rt, jsi::ArrayBuffer buffer, size_t offset,
@@ -49,7 +56,8 @@ template <> struct Bridging<ForeignBytes> {
     auto arrayBufferCtor = rt.global().getPropertyAsObject(rt, "ArrayBuffer");
     auto isView = arrayBufferCtor.getPropertyAsFunction(rt, "isView");
     auto uint8Ctor = rt.global().getPropertyAsFunction(rt, "Uint8Array");
-    if (!isView.call(rt, value).getBool() || !object.instanceOf(rt, uint8Ctor)) {
+    if (!isView.call(rt, value).getBool() ||
+        !object.instanceOf(rt, uint8Ctor)) {
       throw jsi::JSError(rt, "ForeignBytes requires a Uint8Array");
     }
     auto bufferObject = object.getPropertyAsObject(rt, "buffer");
