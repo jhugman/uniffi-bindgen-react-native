@@ -75,7 +75,8 @@ impl TsFfiModule {
 
         for type_def in &namespace.type_definitions {
             if let general::TypeDefinition::Interface(interface) = type_def {
-                functions.push(Self::synthetic_bless_pointer(&interface.name));
+                // Native exports this symbol under the pre-rename CI name.
+                functions.push(Self::synthetic_bless_pointer(&interface.orig_name));
             }
         }
 

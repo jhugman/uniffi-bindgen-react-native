@@ -14,10 +14,7 @@
 //!
 //! Both must reach the namespace config that `run_typescript_pipeline`
 //! republishes as `[bindings.react-native]`, so a `[bindings.typescript]`
-//! `rename`/`exclude` takes effect in the generated TypeScript. The
-//! `rename_reaches_type_inside_box` case additionally pins `BoxRenameFix`:
-//! uniffi's rename pass has no `Type::Box` arm, so without the post-pass a
-//! renamed `Box<T>` would still spell the old name inside the Box.
+//! `rename`/`exclude` takes effect in the generated TypeScript.
 //!
 //! Unlike the fixture harness, this drives the compiled CLI directly and
 //! asserts on generated text, so it needs no Node/napi runtime and no
@@ -25,6 +22,7 @@
 
 use std::fs;
 use std::process::Command;
+use std::sync::OnceLock;
 
 use camino::{Utf8Path, Utf8PathBuf};
 
@@ -65,6 +63,13 @@ fn build_fixture(pkg: &str) {
         .status()
         .expect("failed to launch cargo");
     assert!(status.success(), "cargo build -p {pkg} --lib failed");
+}
+
+/// Build the fixture cdylib once per test binary; the tests would otherwise
+/// spawn `cargo build` repeatedly and serialise on cargo's build lock.
+fn ensure_fixture_built() {
+    static BUILT: OnceLock<()> = OnceLock::new();
+    BUILT.get_or_init(|| build_fixture(ENUM_TYPES_PKG));
 }
 
 /// A scratch directory under the target tmpdir, keyed by test name.
@@ -115,26 +120,46 @@ fn generate_napi(config: &Utf8Path, out: &Utf8Path) -> String {
     fs::read_to_string(out.join("enum_types.ts")).expect("read generated enum_types.ts")
 }
 
-fn is_ident_byte(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_'
+/// Run `... generate jsi bindings` (the only flavour that emits the native
+/// `bless_pointer` call), returning `(api ts, ffi ts, cpp)`.
+fn generate_jsi(
+    config: &Utf8Path,
+    ts_dir: &Utf8Path,
+    cpp_dir: &Utf8Path,
+) -> (String, String, String) {
+    let lib = shared_lib_path(ENUM_TYPES_LIB);
+    let status = Command::new(env!("CARGO_BIN_EXE_uniffi-bindgen-react-native"))
+        .current_dir(repo_root())
+        .arg("generate")
+        .arg("jsi")
+        .arg("bindings")
+        .arg("--ts-dir")
+        .arg(ts_dir)
+        .arg("--cpp-dir")
+        .arg(cpp_dir)
+        .arg("--lib-file")
+        .arg(&lib)
+        .arg("--config")
+        .arg(config)
+        .arg(&lib)
+        .status()
+        .expect("failed to launch uniffi-bindgen-react-native");
+    assert!(status.success(), "generate jsi bindings failed");
+
+    (
+        fs::read_to_string(ts_dir.join("enum_types.ts")).expect("read generated enum_types.ts"),
+        fs::read_to_string(ts_dir.join("enum_types-ffi.ts"))
+            .expect("read generated enum_types-ffi.ts"),
+        fs::read_to_string(cpp_dir.join("enum_types.cpp")).expect("read generated enum_types.cpp"),
+    )
 }
 
 /// Whether `haystack` contains `needle` as a whole identifier, so that a
 /// renamed `RenamedIntList` does not count as a bare `IntList`.
 fn contains_ident(haystack: &str, needle: &str) -> bool {
-    let bytes = haystack.as_bytes();
-    let mut from = 0;
-    while let Some(rel) = haystack[from..].find(needle) {
-        let start = from + rel;
-        let end = start + needle.len();
-        let before_ok = start == 0 || !is_ident_byte(bytes[start - 1]);
-        let after_ok = end == bytes.len() || !is_ident_byte(bytes[end]);
-        if before_ok && after_ok {
-            return true;
-        }
-        from = start + 1;
-    }
-    false
+    haystack
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .any(|word| word == needle)
 }
 
 /// A 0.32 global config file: `[crates.<namespace>]` must be merged into that
@@ -142,7 +167,7 @@ fn contains_ident(haystack: &str, needle: &str) -> bool {
 /// file carries `crate-roots`/`defaults`/`crates`.
 #[test]
 fn global_config_crates_table_reaches_namespace() {
-    build_fixture(ENUM_TYPES_PKG);
+    ensure_fixture_built();
     let scratch = Scratch::new("crates-table");
     let config = scratch.file(
         "global.toml",
@@ -176,7 +201,7 @@ exclude = ["AnimalLargeUInt"]
 /// A global config with only `[defaults]` applies to every crate.
 #[test]
 fn global_config_defaults_reach_namespace() {
-    build_fixture(ENUM_TYPES_PKG);
+    ensure_fixture_built();
     let scratch = Scratch::new("defaults");
     let config = scratch.file(
         "global.toml",
@@ -201,7 +226,7 @@ rename = { "AnimalNoReprInt" = "DefaultsRenamedAnimal" }
 /// it overrides *every* crate's config.
 #[test]
 fn flat_config_is_per_crate_override() {
-    build_fixture(ENUM_TYPES_PKG);
+    ensure_fixture_built();
     let scratch = Scratch::new("flat");
     let config = scratch.file(
         "flat.toml",
@@ -231,7 +256,7 @@ exclude = ["AnimalLargeUInt"]
 /// (`Type.method`), not just top-level names.
 #[test]
 fn rename_reaches_record_field_and_method() {
-    build_fixture(ENUM_TYPES_PKG);
+    ensure_fixture_built();
     let scratch = Scratch::new("field-method-rename");
     let config = scratch.file(
         "global.toml",
@@ -252,13 +277,12 @@ rename = { "AnimalRecord.value" = "renamedValue", "AnimalObject.record" = "renam
     );
 }
 
-/// `IntList::Cons` holds `Box<IntList>`: the recursive Box reference has to be
-/// renamed too, not only the `IntList` definition. `BoxRenameFix` exists for
-/// exactly this; without it `RenamedIntList`'s `Cons` variant would still be
-/// typed as the now-nonexistent `IntList`.
+/// `IntList::Cons` holds `Box<IntList>`: the Box reference has to be renamed
+/// too, not only the `IntList` definition, or `RenamedIntList`'s `Cons` variant
+/// would still be typed as the now-nonexistent `IntList`.
 #[test]
 fn rename_reaches_type_inside_box() {
-    build_fixture(ENUM_TYPES_PKG);
+    ensure_fixture_built();
     let scratch = Scratch::new("box-rename");
     let config = scratch.file(
         "global.toml",
@@ -281,4 +305,30 @@ rename = { "IntList" = "RenamedIntList" }
         contains_ident(&ts, "RenamedIntList"),
         "the renamed enum definition/uses are missing"
     );
+}
+
+/// The native `bless_pointer` symbol is built from the ComponentInterface's
+/// pre-rename name, so the TypeScript and C++ sides must spell it identically
+/// even when the configured rename changes the user-facing type name.
+#[test]
+fn renamed_object_keeps_original_bless_pointer_symbol() {
+    ensure_fixture_built();
+    let scratch = Scratch::new("bless-rename");
+    let config = scratch.file(
+        "global.toml",
+        r#"
+[defaults.bindings.typescript]
+rename = { "AnimalObject" = "RenamedAnimal" }
+"#,
+    );
+    let (api_ts, ffi_ts, cpp) =
+        generate_jsi(&config, &scratch.subdir("ts"), &scratch.subdir("cpp"));
+
+    let original = "uniffi_internal_fn_method_animalobject_ffi__bless_pointer";
+    let renamed = "uniffi_internal_fn_method_renamedanimal_ffi__bless_pointer";
+    for (what, out) in [("api ts", &api_ts), ("ffi ts", &ffi_ts), ("cpp", &cpp)] {
+        assert!(out.contains(original), "{what} is missing {original}");
+        assert!(!out.contains(renamed), "{what} still spells {renamed}");
+    }
+    assert!(api_ts.contains("RenamedAnimal"), "rename did not reach TS");
 }

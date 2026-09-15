@@ -179,6 +179,9 @@ pub(crate) struct TsArg {
     pub ts_type: String,
     pub ffi_converter: String,
     pub is_borrowed_bytes: bool,
+    /// True when the argument's Rust type contains a callback interface, so
+    /// invoking the callable can re-enter JS while the argument is live.
+    pub is_callback_interface: bool,
     pub default_value: Option<String>,
 }
 
