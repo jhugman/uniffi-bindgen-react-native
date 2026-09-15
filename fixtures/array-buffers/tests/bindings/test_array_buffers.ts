@@ -4,8 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 // To run:
-//   cargo test -p uniffi-fixture-array-buffers -- jsi
-//   cargo test -p uniffi-fixture-array-buffers -- wasm
+//   cargo test -p uniffi-fixture-array-buffers -- jsi      (needs Hermes)
+//   cargo test -p uniffi-fixture-array-buffers -- napi
+//   cargo test -p uniffi-fixture-array-buffers -- wasm     (needs wasm-bindgen)
+//   cargo test -p uniffi-fixture-array-buffers -- wasm2    (needs wasm-bindgen)
 //
 // Sibling to `strict-byte-arrays`'s test suite: that fixture forces `Vec<u8>`
 // to be emitted as `Uint8Array`; this fixture leaves the default config in

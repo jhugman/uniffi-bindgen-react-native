@@ -2047,6 +2047,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]

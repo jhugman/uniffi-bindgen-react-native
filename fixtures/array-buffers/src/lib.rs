@@ -10,6 +10,11 @@
 // `ArrayBuffer` that most fixtures (and the FfiConverterArrayBuffer cursor
 // path) use.
 
+// The wasm2 player calls `__ubrn_alloc`/`__ubrn_free`, which live in
+// `uniffi-runtime-wasm`; naming it here keeps its exports in the module.
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
+
 #[uniffi::export]
 /// This makes the byte array in rust, and the test in JS will compare it there.
 ///
