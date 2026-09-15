@@ -171,13 +171,7 @@ impl BindingsArgs {
         let explicit_discr_enums = collect_explicit_discr_enums(&initial_root);
         let general_root = run_typescript_pipeline(initial_root)?;
 
-        // Build the api modules — which is also where the pipeline's validation
-        // lives — before any native code is written. The native generators cannot
-        // express everything the pipeline accepts (borrowed-bytes arguments are only
-        // safe on synchronous Rust calls, see `validate_borrowed_bytes`), and the JSI
-        // C++ generator runs first, so an unsupported binding must be rejected here
-        // rather than after C++ has been emitted. The files themselves are still
-        // written, below, after native generation.
+        // Build (and thereby validate) the api modules before native generation.
         let api_modules = build_api_modules(&general_root, &switches, &explicit_discr_enums)?;
 
         // C++/Rust generation via ComponentInterface
@@ -481,9 +475,10 @@ type BuiltApiModules = Vec<(ModuleMetadata, gen_typescript::api_module::TsApiMod
 /// Build the api module for every namespace.
 ///
 /// Building is also validating: `TsApiModule::from_general` rejects bindings the
-/// native generators cannot express safely (borrowed-bytes arguments in async or
-/// callback calls, `forceAsync` over synchronous methods). Callers run this before
-/// the native generators so such a binding fails before any code is emitted.
+/// native generators cannot express safely (borrowed-bytes arguments in async
+/// calls or calls that can re-enter JS, `forceAsync` over synchronous methods).
+/// Callers run this before the native generators so such a binding fails before
+/// any code is emitted.
 fn build_api_modules(
     general_root: &general::Root,
     switches: &SwitchArgs,

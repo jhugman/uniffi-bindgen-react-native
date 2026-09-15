@@ -413,20 +413,9 @@ inner: { {%- for field in variant.fields %}{% call field_decl(field) %}{%- if !l
 {%- endmacro %}
 
 {#-
-  Declare the public shape of a single tagged-enum variant.
-
-  The variant interfaces have to live at module scope (rather than inside the
-  enum's IIFE) so that the enum's own type alias can be written as a union of
-  them. Deriving that alias from the generated classes instead — i.e. an
-  `InstanceType` of the variant constructors — makes a self-referential enum
-  fail to compile: the alias would depend on the classes, which depend on the
-  alias.
-
-  The interface mirrors the variant class's *instance* shape (symbol, tag,
-  payload and trait methods) rather than just the discriminated-union payload,
-  so that a value narrowed to one variant is still assignable to that variant's
-  class. Error variants additionally intersect `UniffiError`, since their
-  classes extend it.
+  Must live at module scope: deriving the enum's type alias from the variant
+  classes (e.g. an `InstanceType` of them) makes a self-referential enum fail to
+  compile, because the alias would depend on the classes and vice versa.
 -#}
 {%- macro tagged_enum_variant_interface(e, variant, type_name) %}
 {%- if e.is_error %}

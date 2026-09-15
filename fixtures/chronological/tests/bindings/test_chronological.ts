@@ -180,7 +180,7 @@ test("rename and exclude from [bindings.typescript]", (t) => {
   t.assertTrue(areEqual(start, start));
   t.assertFalse(areEqual(start, later));
   // `get_pre_epoch_timestamp` was excluded: no renamed or original export.
-  const exports = chronological as unknown as Record<string, unknown>;
-  t.assertEqual(undefined, exports.getPreEpochTimestamp);
-  t.assertEqual(undefined, exports.equal);
+  const moduleExports = chronological as unknown as Record<string, unknown>;
+  t.assertEqual(undefined, moduleExports.getPreEpochTimestamp);
+  t.assertEqual(undefined, moduleExports.equal);
 });

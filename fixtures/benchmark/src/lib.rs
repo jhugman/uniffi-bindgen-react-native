@@ -143,11 +143,9 @@ pub fn take_large_record(r: LargeRecord) {
 // Recursive enum — depth-controlled binary tree
 // ---------------------------------------------------------------------------
 
-/// Modelled with `Vec<Tree>` rather than `Box<Self>`, which uniffi 0.32 supports
-/// (see `fixtures/enum-types`): the benchmark measures the cost of marshaling a
-/// tree of records, so a heap-backed container keeps the model comparable across
-/// uniffi versions. `build_tree` always produces exactly two children, mimicking
-/// a binary tree.
+/// A depth-controlled binary tree: `build_tree` always gives each `Node`
+/// exactly two children. Modelled with `Vec<Tree>`; the benchmark measures the
+/// cost of marshaling a tree of records.
 #[derive(uniffi::Enum)]
 pub enum Tree {
     Leaf,

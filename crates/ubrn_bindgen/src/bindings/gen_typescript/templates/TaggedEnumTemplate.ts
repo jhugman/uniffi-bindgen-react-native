@@ -14,11 +14,6 @@ export enum {{ type_name__Tags }} {
 {%- if let Some(ds) = e.docstring %}
 {{ ds }}
 {%- endif %}
-// Interfaces for each variant. Declared at module scope (rather than inside
-// the enum object) so the public type alias below can be written as a union of
-// them. Deriving it from the generated variant classes instead — via
-// `InstanceType<typeof ...>` — would make a self-referential enum fail to
-// compile: the alias would depend on the classes, and the classes on the alias.
 {%- for variant in e.variants %}
 {% call cb::tagged_enum_variant_interface(e, variant, type_name) %}
 {%- endfor %}
