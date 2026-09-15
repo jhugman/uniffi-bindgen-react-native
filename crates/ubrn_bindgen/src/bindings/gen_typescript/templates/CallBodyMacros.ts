@@ -411,3 +411,54 @@ inner: { {%- for field in variant.fields %}{% call field_decl(field) %}{%- if !l
 {%- macro variant_new_args(variant) %}
 {%- if !variant.has_nameless_fields %}inner{%- else %}{%- for field in variant.fields %}v{{ loop.index0 }}{%- if !loop.last %}, {% endif %}{%- endfor %}{%- endif %}
 {%- endmacro %}
+
+{#-
+  Declare the public shape of a single tagged-enum variant.
+
+  The variant interfaces have to live at module scope (rather than inside the
+  enum's IIFE) so that the enum's own type alias can be written as a union of
+  them. Deriving that alias from the generated classes instead — i.e. an
+  `InstanceType` of the variant constructors — makes a self-referential enum
+  fail to compile: the alias would depend on the classes, which depend on the
+  alias.
+
+  The interface mirrors the variant class's *instance* shape (symbol, tag,
+  payload and trait methods) rather than just the discriminated-union payload,
+  so that a value narrowed to one variant is still assignable to that variant's
+  class. Error variants additionally intersect `UniffiError`, since their
+  classes extend it.
+-#}
+{%- macro tagged_enum_variant_interface(e, variant, type_name) %}
+{%- if e.is_error %}
+type {{ type_name }}_{{ variant.name }}_interface = UniffiError & {
+{%- else %}
+type {{ type_name }}_{{ variant.name }}_interface = {
+{%- endif %}
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol]: "{{ type_name }}";
+    tag: {{ type_name }}_Tags.{{ variant.name }};
+    {%- if !variant.fields.is_empty() %}
+    inner: {% call variant_inner_type(variant) %};
+    {%- endif %}
+{%- for ut in e.uniffi_traits %}
+    {%- match ut %}
+    {%- when TsUniffiTrait::Display { method } %}
+    {% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call return_type(method) %};
+    {%- when TsUniffiTrait::Debug { method } %}
+    toDebugString(): {% call return_type(method) %};
+    {%- if !e.has_display_trait() %}
+    {% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call return_type(method) %};
+    {%- endif %}
+    {%- when TsUniffiTrait::Eq { eq, ne } %}
+    equals(other: {{ type_name }}): {% call return_type(eq) %};
+    {%- when TsUniffiTrait::Hash { method } %}
+    hashCode(): {% call return_type(method) %};
+    {%- when TsUniffiTrait::Ord { cmp } %}
+    compareTo(other: {{ type_name }}): {% call return_type(cmp) %};
+    {%- endmatch %}
+{%- endfor %}
+};
+{%- endmacro %}

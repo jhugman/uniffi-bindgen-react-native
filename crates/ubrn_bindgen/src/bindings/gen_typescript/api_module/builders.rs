@@ -173,7 +173,7 @@ fn render_default_value(config: &Config, dv: &general::DefaultValue) -> String {
     }
 }
 
-fn render_type_default(_config: &Config, ty: &general::Type) -> String {
+fn render_type_default(config: &Config, ty: &general::Type) -> String {
     // Per the uniffi-rs default-values docs, the bare `default` keyword maps
     // each type to its natural zero-value: 0 for numerics, false, empty
     // string/bytes/sequence/map, None for Option, all-defaults for Record,
@@ -195,8 +195,15 @@ fn render_type_default(_config: &Config, ty: &general::Type) -> String {
         general::Type::Bytes => "new Uint8Array()".into(),
         general::Type::Optional { .. } => "undefined".into(),
         general::Type::Sequence { .. } => "[]".into(),
-        general::Type::Map { .. } => "new Map()".into(),
-        general::Type::Custom { builtin, .. } => render_type_default(_config, builtin),
+        general::Type::Map {
+            key_type,
+            value_type,
+        } => format!(
+            "new Map<{}, {}>()",
+            type_label_for(config, key_type),
+            type_label_for(config, value_type)
+        ),
+        general::Type::Custom { builtin, .. } => render_type_default(config, builtin),
         general::Type::Record { name, .. } => {
             let name = rewrite_js_builtins(&name.to_upper_camel_case());
             format!("{name}.create({{}})")
@@ -221,8 +228,14 @@ fn render_type_default(_config: &Config, ty: &general::Type) -> String {
         | general::Type::CallbackInterface { .. }
         | general::Type::Timestamp
         | general::Type::Duration => "undefined".into(),
-        general::Type::Box { inner_type } => render_type_default(_config, inner_type),
-        general::Type::Set { .. } => "new Set()".into(),
+        general::Type::Box { inner_type } => render_type_default(config, inner_type),
+        // The container's type arguments are required here: a bare `new Set()`
+        // infers `Set<unknown>`, which is not assignable to the field's
+        // declared `Set<T>` (e.g. via `uniffiCreateRecord`'s `Partial<T>`
+        // constraint).
+        general::Type::Set { inner_type } => {
+            format!("new Set<{}>()", type_label_for(config, inner_type))
+        }
     }
 }
 
