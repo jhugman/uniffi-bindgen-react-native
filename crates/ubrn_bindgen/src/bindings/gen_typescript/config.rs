@@ -34,8 +34,11 @@ pub(crate) struct TsConfig {
     #[serde(default)]
     pub(crate) force_async: ForceAsync,
     #[serde(default)]
+    /// Consumed by the 0.32 pipeline's rename pass, which reads it from this
+    /// namespace's config; the generator itself does not rewrite names.
     pub(crate) rename: HashMap<String, String>,
     #[serde(default)]
+    /// Consumed by the 0.32 pipeline's exclude pass, as above.
     pub(crate) exclude: Vec<String>,
 }
 
