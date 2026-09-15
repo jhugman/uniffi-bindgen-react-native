@@ -3,7 +3,7 @@ The `uniffi.toml` file is a toml file used to customize [the generation of C++ a
 To include the file when invoking `ubrn`, specify the path in the
 [corresponding key of the config](../reference/config-yaml.md#bindings).
 
-As of time of writing, `[bindings.typescript]` supports `logLevel`, `consoleImport`, `customTypes`, `strictObjectTypes`, `strictTypeChecking`, `strictByteArrays`, `forceAsync`, `rename` and `exclude`; `[bindings.kotlin]` supports `cdylib_name` and `package_name`. Each is described below. `rename` and `exclude` are applied by the uniffi pipeline — which reads them from the same table — rather than by this generator, and a config file given to `ubrn` with `--config` may also be a 0.32 [global config file](https://mozilla.github.io/uniffi-rs/next/bindings.html#global-configuration).
+As of time of writing, `[bindings.typescript]` supports `logLevel`, `consoleImport`, `customTypes`, `strictObjectTypes`, `strictTypeChecking`, `strictByteArrays`, `forceAsync`, `rename` and `exclude`; `[bindings.kotlin]` supports `cdylib_name` and `package_name`. All but `rename` and `exclude` are described below; those two are applied by the uniffi 0.32 pipeline — which reads them from the same table — rather than by this generator, and a config file given to `ubrn` with `--config` may also be a 0.32 [global config file](https://mozilla.github.io/uniffi-rs/next/configuration.html).
 
 ### Opting out of Interface generation
 

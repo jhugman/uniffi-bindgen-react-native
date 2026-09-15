@@ -74,8 +74,8 @@ Three things, one of which is easy to miss.
 -  "browser": "src/index.web.ts",
 +  "browser": "src/generated/index.ts",
    "dependencies": {
-     "@ubjs/core": "^0.31.0-3",
-+    "@ubjs/wasm": "^0.31.0-3"
+     "@ubjs/core": "^0.31.0-5",
++    "@ubjs/wasm": "^0.31.0-5"
    }
 ```
 
