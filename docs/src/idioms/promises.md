@@ -30,6 +30,8 @@ You can see this in action in the [`futures-example` example](https://github.com
 
 Rust that is not `async` can still be given a `Promise` surface in Typescript, with the [`forceAsync` option](../reference/uniffi-toml.md#forcing-an-async-surface) in `uniffi.toml`. The call itself stays synchronous; only the signature changes. It is a migration aid — a way to get call sites into the shape that calling Rust off the main thread requires, without changing what the code does today.
 
+When the Rust really is off the main thread, [`asyncDelivery`](../reference/uniffi-toml.md#calling-the-player-asynchronously) makes the calls underneath asynchronous too.
+
 ## Passing Promises across the FFI
 
 There is no support for passing a `Promise` or `Future` as an argument or error, in either direction.
