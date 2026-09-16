@@ -66,7 +66,8 @@ const liftString = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
         /*cancelFunc:*/ (rustFuture) => calls.push(`cancel ${rustFuture}`),
         /*completeFunc:*/ async (rustFuture, status) => {
           calls.push(`complete ${rustFuture}`);
-          status.code = 0;
+          // A cancelled Rust future completes with CALL_CANCELLED.
+          status.code = 3;
           return 1;
         },
         /*freeFunc:*/ (rustFuture) => calls.push(`free ${rustFuture}`),
@@ -75,9 +76,13 @@ const liftString = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
         { signal: abortController.signal },
       );
       // rustFutureFunc is still awaiting its own promise here, so the abort
-      // listener must already be armed or this cancellation is silently lost.
+      // arrives before the listener exists; the `signal.aborted` check catches it.
       abortController.abort();
-      await promise;
+      // Hermes does not give errors the right prototype chain, so match by name.
+      await t.assertThrowsAsync(
+        (e) => e.name === "AbortError",
+        () => promise,
+      );
       t.assertTrue(
         calls.includes("cancel 3"),
         () => `expected a cancel call, got: ${calls.join(",")}`,
