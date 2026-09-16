@@ -21,6 +21,7 @@ pub fn render_minimal_for_test(
     use nodes::{PlayerFfiModule, PlayerSymbols};
     let module = PlayerFfiModule {
         strict_type_checking: false,
+        async_delivery: false,
         crate_name: crate_name.to_string(),
         lib_resolution: Some(lib_resolution),
         host_source,
