@@ -148,7 +148,7 @@ console.debug(`-- {{ ffi_name }}`);
    instead to avoid allocating a fresh closure object at every call
    site invocation (V8-friendlier). -#}
 
-{#- Call body for value-receiver method: sync only (trait methods are never async). -#}
+{#- Call body for value-receiver method: never ffi-async, so there is no async branch to pick. -#}
 {%- macro call_body_value(callable) %}
 {%- match callable.return_type -%}
 {%-     when Some with (return_type) %}

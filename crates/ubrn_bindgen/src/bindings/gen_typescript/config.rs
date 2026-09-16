@@ -68,8 +68,8 @@ impl TsConfig {
     }
 
     /// Fold the command line into the config: `--async` sets `asyncDelivery`,
-    /// and `asyncDelivery` needs a player flavor and forces every surface
-    /// async.
+    /// and `asyncDelivery` needs a flavor that awaits its player at load, and
+    /// forces every surface async.
     pub(crate) fn apply_switches(&mut self, switches: &SwitchArgs) -> anyhow::Result<()> {
         if switches.async_delivery {
             self.async_delivery = true;
@@ -79,7 +79,7 @@ impl TsConfig {
         }
         if !switches.flavor.supports_async_delivery() {
             anyhow::bail!(
-                "asyncDelivery needs a player; the `{}` flavor has none",
+                "asyncDelivery needs a flavor that awaits a player at load; `{}` does not",
                 switches.flavor.as_str()
             );
         }
@@ -248,6 +248,27 @@ mod config_tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("jsi"), "{err}");
+    }
+
+    #[test]
+    fn async_delivery_rejects_napi_despite_its_player() {
+        // Napi's index initializes at module load, where nothing can await.
+        let mut cfg: TsConfig = toml::from_str("asyncDelivery = true").unwrap();
+        let err = cfg
+            .apply_switches(&switches(AbiFlavor::Napi, false))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("napi"), "{err}");
+    }
+
+    #[test]
+    fn cli_async_switch_is_rejected_on_napi_too() {
+        let mut cfg: TsConfig = toml::from_str("").unwrap();
+        let err = cfg
+            .apply_switches(&switches(AbiFlavor::Napi, true))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("napi"), "{err}");
     }
 
     #[test]

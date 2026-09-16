@@ -290,8 +290,9 @@ fn generate_index_from_modules(
     // One namespace is enough: awaiting a sync namespace's void `initialize()` is harmless.
     let mut async_delivery = false;
     for namespace in general_root.namespaces.values() {
-        strict_type_checking &= extract_ts_config(namespace)?.strict_type_checking;
-        async_delivery |= ts_config_for(namespace, switches)?.async_delivery;
+        let config = ts_config_for(namespace, switches)?;
+        strict_type_checking &= config.strict_type_checking;
+        async_delivery |= config.async_delivery;
     }
     let code = gen_typescript::generate_index_code(
         modules.to_vec(),
