@@ -46,11 +46,13 @@ export type AsyncPlayer<D extends ModuleDefinitions> = {
   ) => Promise<JsValueOf<D["functions"][K]["ret"]>>;
 };
 
-export interface SenderControl {
+// A type alias, not an interface: only an alias gets an implicit index
+// signature, which a Sender needs to satisfy setNativeModule's Record.
+export type SenderControl = {
   close(): void;
   rustbuffer_alloc(n: number): Uint8Array;
   rustbuffer_free(view: Uint8Array): void;
-}
+};
 
 export type Sender<D extends ModuleDefinitions> = AsyncPlayer<D> &
   SenderControl;
