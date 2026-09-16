@@ -18,4 +18,7 @@ export interface ChannelPort {
   removeEventListener(type: "message", listener: (ev: any) => void): void;
   start?(): void;
   close?(): void;
+  /** Node's MessagePort: hold the event loop open. Absent on browser ports. */
+  ref?(): void;
+  unref?(): void;
 }
