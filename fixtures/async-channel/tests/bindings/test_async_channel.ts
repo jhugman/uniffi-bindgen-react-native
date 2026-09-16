@@ -69,8 +69,9 @@ const mk = async (n: number): Promise<Counter> =>
       t.assertEqual(await total(ledger), 40n);
       a.uniffiDestroy();
       b.uniffiDestroy();
-      for (const c of ledger.counters) c.uniffiDestroy();
-      ledger.primary!.uniffiDestroy();
+      // The record's fields are CounterLike, which has no destructor.
+      for (const c of ledger.counters) (c as Counter).uniffiDestroy();
+      (ledger.primary as Counter).uniffiDestroy();
       t.end();
     },
   );
@@ -93,7 +94,7 @@ const mk = async (n: number): Promise<Counter> =>
     t.end();
   });
 
-  await asyncTest("a large buffer crosses by transfer, intact", async (t) => {
+  await asyncTest("a large buffer round-trips intact", async (t) => {
     const n = 300 * 1024;
     const bytes = new Uint8Array(n);
     for (let i = 0; i < n; i++) bytes[i] = i % 251;
