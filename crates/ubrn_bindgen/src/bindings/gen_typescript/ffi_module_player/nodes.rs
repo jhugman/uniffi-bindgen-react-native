@@ -91,6 +91,9 @@ impl PlayerHostSource {
 pub(crate) struct PlayerFfiModule {
     /// Whether to suppress `@ts-nocheck` for strict type checking.
     pub strict_type_checking: bool,
+    /// Whether the player answers over a port, so the interface's functions
+    /// return `Promise<T>` instead of `T`.
+    pub async_delivery: bool,
     /// The crate name. For napi, passed to `resolveLibPath` so error messages
     /// name it. For wasm2, used to build the URL for the side-by-side `.wasm`
     /// file.
@@ -163,10 +166,11 @@ impl PlayerFfiModule {
     /// given flavor. Used by codegen snapshot tests to exercise the template
     /// branches without needing to materialize a full `general::Namespace`.
     #[doc(hidden)]
-    pub fn empty_for_test(flavor: crate::AbiFlavor) -> Self {
+    pub fn empty_for_test(flavor: crate::AbiFlavor, async_delivery: bool) -> Self {
         let host_source = PlayerHostSource::for_flavor(&flavor);
         Self {
             strict_type_checking: true,
+            async_delivery,
             crate_name: "ubrn_test_crate".into(),
             lib_resolution: None,
             host_source,
