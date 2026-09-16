@@ -158,17 +158,36 @@ const {{ obj.obj_factory }}: UniffiObjectFactory<{{ obj.protocol_name }}> = (() 
 
     clonePointer(obj_: {{ obj.protocol_name }}): UniffiHandle {
         const pointer = this.pointer(obj_);
+        {%- if module.delivery_async %}
+        // uniffi's clone returns the handle it was given and the port delivers
+        // in order, so the increment lands before the call that consumes it.
+        nativeModule().{{ obj.ffi_clone }}(pointer, uniffiCaller.createCallStatus()).then(
+            (h: UniffiHandle) => {
+                if (h !== pointer) console.error("{{ obj.impl_class_name }}: clone returned a different handle");
+            },
+            (e: unknown) => console.error("{{ obj.impl_class_name }}: clone failed", e),
+        );
+        return pointer;
+        {%- else %}
         return uniffiCaller.rustCall(
             /*caller:*/ (callStatus) => nativeModule().{{ obj.ffi_clone }}(pointer, callStatus),
             /*liftString:*/ FfiConverterString.lift
         );
+        {%- endif %}
     },
 
     freePointer(pointer: UniffiHandle): void {
+        {%- if module.delivery_async %}
+        nativeModule().{{ obj.ffi_free }}(pointer, uniffiCaller.createCallStatus()).then(
+            undefined,
+            (e: unknown) => console.error("{{ obj.impl_class_name }}: free failed", e),
+        );
+        {%- else %}
         uniffiCaller.rustCall(
             /*caller:*/ (callStatus) => nativeModule().{{ obj.ffi_free }}(pointer, callStatus),
             /*liftString:*/ FfiConverterString.lift
         );
+        {%- endif %}
     },
 
     isConcreteType(obj_: any): obj_ is {{ obj.protocol_name }} {

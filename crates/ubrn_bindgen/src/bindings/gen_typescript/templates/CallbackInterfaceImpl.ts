@@ -144,7 +144,8 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
         }
     },
     register: () => {
-        {%- call cb::native_method_handle(vtable.ffi_init_fn) %}(
+        {#- Under async delivery the init call is the player's promise, which the async initializer awaits. -#}
+        {%- if module.delivery_async %}return {% endif %}{%- call cb::native_method_handle(vtable.ffi_init_fn) %}(
             {{ trait_impl }}.vtable
         );
     },

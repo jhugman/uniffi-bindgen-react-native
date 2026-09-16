@@ -9,23 +9,23 @@
  *
  * It also initializes the machinery to enable Rust to talk back to Javascript.
  */
-function uniffiEnsureInitialized() {
+{% if module.delivery_async %}async {% endif %}function uniffiEnsureInitialized() {
     // Get the bindings contract version from our ComponentInterface
     const bindingsContractVersion = {{ init.bindings_contract_version }};
     // Get the scaffolding contract version by calling the into the dylib
-    const scaffoldingContractVersion = nativeModule().{{ init.ffi_contract_version_fn }}();
+    const scaffoldingContractVersion = {% if module.delivery_async %}await {% endif %}nativeModule().{{ init.ffi_contract_version_fn }}();
     if (bindingsContractVersion !== scaffoldingContractVersion) {
         throw new UniffiInternalError.ContractVersionMismatch(scaffoldingContractVersion, bindingsContractVersion);
     }
 
     {%- for checksum in init.checksums %}
-    if (nativeModule().{{ checksum.ffi_fn_name }}() !== {{ checksum.expected_value }}) {
+    if ({% if module.delivery_async %}await {% endif %}nativeModule().{{ checksum.ffi_fn_name }}() !== {{ checksum.expected_value }}) {
         throw new UniffiInternalError.ApiChecksumMismatch("{{ checksum.raw_name }}");
     }
     {%- endfor %}
 
     {% for func in init.initialization_fns -%}
-    {{ func }}();
+    {% if module.delivery_async %}await {% endif %}{{ func }}();
     {% endfor -%}
 }
 {%- endmacro %}
