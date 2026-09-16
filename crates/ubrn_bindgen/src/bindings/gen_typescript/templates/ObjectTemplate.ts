@@ -161,11 +161,12 @@ const {{ obj.obj_factory }}: UniffiObjectFactory<{{ obj.protocol_name }}> = (() 
         {%- if module.async_delivery %}
         // uniffi's clone returns the handle it was given and the port delivers
         // in order, so the increment lands before the call that consumes it.
-        nativeModule().{{ obj.ffi_clone }}(pointer, uniffiCaller.createCallStatus()).then(
+        uniffiIgnoreVoidResult(
+            nativeModule().{{ obj.ffi_clone }}(pointer, uniffiCaller.createCallStatus()),
+            "{{ obj.impl_class_name }}: clone",
             (h: UniffiHandle) => {
                 if (h !== pointer) console.error("{{ obj.impl_class_name }}: clone returned a different handle");
             },
-            (e: unknown) => console.error("{{ obj.impl_class_name }}: clone failed", e),
         );
         return pointer;
         {%- else %}
@@ -178,10 +179,7 @@ const {{ obj.obj_factory }}: UniffiObjectFactory<{{ obj.protocol_name }}> = (() 
 
     freePointer(pointer: UniffiHandle): void {
         {%- if module.async_delivery %}
-        nativeModule().{{ obj.ffi_free }}(pointer, uniffiCaller.createCallStatus()).then(
-            undefined,
-            (e: unknown) => console.error("{{ obj.impl_class_name }}: free failed", e),
-        );
+        uniffiIgnoreVoidResult(nativeModule().{{ obj.ffi_free }}(pointer, uniffiCaller.createCallStatus()), "{{ obj.impl_class_name }}: free");
         {%- else %}
         uniffiCaller.rustCall(
             /*caller:*/ (callStatus) => nativeModule().{{ obj.ffi_free }}(pointer, callStatus),
