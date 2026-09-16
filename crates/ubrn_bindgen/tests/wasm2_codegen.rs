@@ -112,8 +112,12 @@ fn napi_player_ffi_still_uses_native_module_open() {
 fn wasm2_player_ffi_promises_returns_under_async_delivery() {
     let rendered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, true)
         .expect("rendering wasm2 player wrapper-ffi.ts should succeed");
-    // The interface is empty in the minimal module, so check the alloc pair
-    // stays synchronous and the header names the mode.
+    assert!(
+        rendered.contains("ubrn_uniffi_test_fn_func_add(lhs: number): Promise<number>;"),
+        "expected the interface's functions to return promises:\n{rendered}"
+    );
+    // The rustbuffer pair is answered by the runtime, not the player, so it
+    // stays synchronous.
     assert!(
         rendered.contains("rustbuffer_alloc(n: number): Uint8Array;"),
         "alloc stays synchronous under async delivery:\n{rendered}"
@@ -122,6 +126,15 @@ fn wasm2_player_ffi_promises_returns_under_async_delivery() {
         rendered.contains("every function below returns a Promise"),
         "expected the async-delivery note:\n{rendered}"
     );
+
     let sync = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, false).unwrap();
+    assert!(
+        sync.contains("ubrn_uniffi_test_fn_func_add(lhs: number): number;"),
+        "without async delivery the same function returns plainly:\n{sync}"
+    );
+    assert!(
+        !sync.contains("Promise<"),
+        "nothing in the sync interface returns a promise:\n{sync}"
+    );
     assert!(!sync.contains("returns a Promise"));
 }
