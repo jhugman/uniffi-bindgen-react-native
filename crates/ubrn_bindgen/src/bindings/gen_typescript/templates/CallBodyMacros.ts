@@ -80,17 +80,23 @@ console.debug(`-- {{ ffi_name }}`);
     {%- endfor %}
 {%- endmacro -%}
 
-{#- Sync FFI call with pointer receiver. -#}
-{%- macro to_ffi_pointer_call(callable, obj_factory) -%}
+{#- Opens the rust-call wrapper: the async twin awaits a player that
+   answers over a port; otherwise the sync one. Closed by the caller. -#}
+{%- macro rust_call_open(callable) -%}
     {%- match callable.throws -%}
     {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
+        {% if module.delivery_async %}await uniffiCaller.rustCallWithErrorAsync({% else %}uniffiCaller.rustCallWithError({% endif %}
             /*liftError:*/ {{ e.lift_error_fn }},
             /*caller:*/ (callStatus) => {
     {%- else -%}
-        uniffiCaller.rustCall(
+        {% if module.delivery_async %}await uniffiCaller.rustCallAsync({% else %}uniffiCaller.rustCall({% endif %}
             /*caller:*/ (callStatus) => {
     {%- endmatch %}
+{%- endmacro -%}
+
+{#- Sync FFI call with pointer receiver. -#}
+{%- macro to_ffi_pointer_call(callable, obj_factory) -%}
+    {%- call rust_call_open(callable) %}
             {%- if callable.return_type.is_some() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
@@ -104,15 +110,7 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- Sync FFI call with no receiver (top-level function or constructor). -#}
 {%- macro to_ffi_call(callable) -%}
-    {%- match callable.throws -%}
-    {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
-            /*liftError:*/ {{ e.lift_error_fn }},
-            /*caller:*/ (callStatus) => {
-    {%- else -%}
-        uniffiCaller.rustCall(
-            /*caller:*/ (callStatus) => {
-    {%- endmatch %}
+    {%- call rust_call_open(callable) %}
             {%- if callable.return_type.is_some() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
@@ -127,15 +125,7 @@ console.debug(`-- {{ ffi_name }}`);
 {%- macro to_ffi_value_call(callable) -%}
     {%- match callable.value_receiver_ffi_converter() -%}
     {%- when Some with (ffi_converter) -%}
-    {%- match callable.throws -%}
-    {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
-            /*liftError:*/ {{ e.lift_error_fn }},
-            /*caller:*/ (callStatus) => {
-    {%- else -%}
-        uniffiCaller.rustCall(
-            /*caller:*/ (callStatus) => {
-    {%- endmatch %}
+    {%- call rust_call_open(callable) %}
             {%- if callable.return_type.is_some() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
