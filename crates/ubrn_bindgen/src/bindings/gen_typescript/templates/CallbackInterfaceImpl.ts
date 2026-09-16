@@ -2,7 +2,7 @@
 {%- macro callback_interface_impl(vtable, ffi_converter_name, trait_impl) %}
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
-const {{ trait_impl }}: { vtable: any; register: () => void; } = {
+const {{ trait_impl }}: { vtable: any; register: () => {% if module.async_delivery %}Promise<void>{% else %}void{% endif %}; } = {
     // Create the VTable using a series of closures.
     // ts automatically converts these into C callback functions.
     vtable: {
