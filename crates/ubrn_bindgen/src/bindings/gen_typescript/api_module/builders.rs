@@ -476,6 +476,7 @@ pub(super) fn build_callable(
         ffi_async,
         receiver,
         force_async,
+        async_delivery: config.async_delivery,
     }
 }
 

@@ -97,7 +97,7 @@ console.debug(`-- {{ ffi_name }}`);
 {#- Sync FFI call with pointer receiver. -#}
 {%- macro to_ffi_pointer_call(callable, obj_factory) -%}
     {%- call rust_call_open(callable) %}
-            {%- if callable.return_type.is_some() %}
+            {%- if callable.returns_from_ffi_call() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {{ obj_factory }}.clonePointer(this),
@@ -111,7 +111,7 @@ console.debug(`-- {{ ffi_name }}`);
 {#- Sync FFI call with no receiver (top-level function or constructor). -#}
 {%- macro to_ffi_call(callable) -%}
     {%- call rust_call_open(callable) %}
-            {%- if callable.return_type.is_some() %}
+            {%- if callable.returns_from_ffi_call() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {%- call arg_list_lowered(callable) %}
@@ -126,7 +126,7 @@ console.debug(`-- {{ ffi_name }}`);
     {%- match callable.value_receiver_ffi_converter() -%}
     {%- when Some with (ffi_converter) -%}
     {%- call rust_call_open(callable) %}
-            {%- if callable.return_type.is_some() %}
+            {%- if callable.returns_from_ffi_call() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {{ ffi_converter }}.lower(self_, nativeModule().rustbuffer_alloc),
