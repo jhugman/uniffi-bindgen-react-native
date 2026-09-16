@@ -81,7 +81,9 @@ console.debug(`-- {{ ffi_name }}`);
 {%- endmacro -%}
 
 {#- Opens the rust-call wrapper: the async twin awaits a player that
-   answers over a port; otherwise the sync one. Closed by the caller. -#}
+   answers over a port; otherwise the sync one. Closed by the caller.
+   Under async delivery a void call returns too: its status is only
+   filled when the reply lands. -#}
 {%- macro rust_call_open(callable) -%}
     {%- match callable.throws -%}
     {%- when Some with (e) -%}
