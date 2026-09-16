@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use heck::ToSnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
@@ -59,18 +60,6 @@ fn sanitize_name(path: &str) -> String {
     stem.chars()
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
         .collect()
-}
-
-/// `AsyncWasm` → `async_wasm`; single-word flavors just lowercase.
-fn flavor_mod_name(ident: &str) -> String {
-    let mut out = String::with_capacity(ident.len() + 2);
-    for (i, c) in ident.chars().enumerate() {
-        if c.is_ascii_uppercase() && i > 0 {
-            out.push('_');
-        }
-        out.push(c.to_ascii_lowercase());
-    }
-    out
 }
 
 /// Generate `#[test]` functions for fixture tests, grouped by flavor module.
@@ -138,7 +127,7 @@ fn build_foreign_language_testcases_impl(input: TokenStream2) -> syn::Result<Tok
         let sanitized = sanitize_name(&path_str);
 
         for flavor in &entry.flavors {
-            let flavor_mod = flavor_mod_name(&flavor.to_string());
+            let flavor_mod = flavor.to_string().to_snake_case();
             let test_name = format_ident!("{sanitized}");
             let runner_mod = format_ident!("{}", flavor_mod);
 
@@ -190,7 +179,7 @@ fn build_typescript_testcases_impl(input: TokenStream2) -> syn::Result<TokenStre
         let path_str = path.to_str().unwrap_or_default();
 
         for flavor in &entry.flavors {
-            let flavor_mod = flavor_mod_name(&flavor.to_string());
+            let flavor_mod = flavor.to_string().to_snake_case();
             let test_name = format_ident!("{sanitized}");
             let flavor_variant = format_ident!("{}", flavor);
 
@@ -210,17 +199,4 @@ fn build_typescript_testcases_impl(input: TokenStream2) -> syn::Result<TokenStre
     }
 
     Ok(emit_flavor_modules(flavor_tests))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn flavor_module_names_are_snake_case() {
-        assert_eq!(flavor_mod_name("Jsi"), "jsi");
-        assert_eq!(flavor_mod_name("Wasm2"), "wasm2");
-        assert_eq!(flavor_mod_name("Channel"), "channel");
-        assert_eq!(flavor_mod_name("AsyncWasm"), "async_wasm");
-    }
 }
