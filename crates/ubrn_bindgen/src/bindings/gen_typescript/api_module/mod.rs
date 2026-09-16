@@ -453,6 +453,16 @@ impl TsApiModule {
             acc.collect_type_definition(td);
         }
 
+        // Only an object's async clone/free branches drop a player's promise.
+        if self.async_delivery
+            && self
+                .type_definitions
+                .iter()
+                .any(|td| matches!(td, TsTypeDefinition::Object(_)))
+        {
+            acc.add_infra_value("uniffiIgnoreVoidResult");
+        }
+
         for func in &self.functions {
             acc.collect_callable(func);
         }
