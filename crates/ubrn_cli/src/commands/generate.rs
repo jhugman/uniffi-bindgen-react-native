@@ -173,7 +173,10 @@ impl GenerateAllCommand {
 
     fn switches(&self) -> SwitchArgs {
         let flavor = self.platform.as_ref().map_or(AbiFlavor::Jsi, |p| p.into());
-        SwitchArgs { flavor }
+        SwitchArgs {
+            flavor,
+            async_delivery: false,
+        }
     }
 
     pub(crate) fn run(&self) -> Result<()> {
