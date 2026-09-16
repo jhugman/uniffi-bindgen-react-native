@@ -244,7 +244,7 @@ fn generate_api_from_pipeline(
 ) -> Result<Vec<ModuleMetadata>> {
     let mut modules = Vec::new();
     for (name, namespace) in &general_root.namespaces {
-        let config = extract_ts_config(namespace)?;
+        let config = ts_config_for(namespace, switches)?;
         let module = ModuleMetadata::new(name);
         let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
             namespace,
@@ -302,6 +302,16 @@ fn generate_index_from_modules(
     Ok(())
 }
 
+/// The per-namespace TypeScript config with the command line folded in.
+fn ts_config_for(
+    namespace: &general::Namespace,
+    switches: &SwitchArgs,
+) -> Result<gen_typescript::Config> {
+    let mut config = extract_ts_config(namespace)?;
+    config.apply_switches(switches)?;
+    Ok(config)
+}
+
 fn extract_ts_config(namespace: &general::Namespace) -> Result<gen_typescript::Config> {
     #[derive(Default, Deserialize)]
     struct BindingsSection {
@@ -330,7 +340,7 @@ fn generate_ffi_from_pipeline(
         let module = ModuleMetadata::new(name);
         let path = ts_dir.join(module.ts_ffi_filename());
 
-        let config = extract_ts_config(namespace)?;
+        let config = ts_config_for(namespace, switches)?;
         let code = match &switches.flavor {
             AbiFlavor::Napi | AbiFlavor::Jsi2 => {
                 let lib_resolution = lib_resolution.clone().ok_or_else(|| {
