@@ -75,22 +75,13 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   }
 
   // A player over a port answers with a promise; a local one with the handle.
-  // Either way, awaiting yields control back to the caller before we know the
-  // handle, so a signal aborted synchronously right after this call would be
-  // missed by a listener added only once the handle comes back. Catch that
-  // gap with a listener that just remembers the abort happened.
-  let abortedDuringSetup = false;
-  const earlyAbortFunc = () => {
-    abortedDuringSetup = true;
-  };
-  asyncOpts?.signal.addEventListener("abort", earlyAbortFunc);
   const rustFuture = await rustFutureFunc();
-  asyncOpts?.signal.removeEventListener("abort", earlyAbortFunc);
 
+  // The await above yields control back to the caller before this listener
+  // exists, so a signal aborted synchronously right after the call is caught
+  // via the flag check below instead of relying on the listener firing.
   const abortFunc = createAbortFunction(rustFuture, cancelFunc);
-  if (abortedDuringSetup) {
-    abortFunc();
-  } else {
+  if (!asyncOpts?.signal.aborted) {
     asyncOpts?.signal.addEventListener("abort", abortFunc);
   }
 
@@ -110,6 +101,12 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
+    // Cancel here (inside the try) rather than above, so a throwing
+    // cancelFunc still frees the future via the `finally` below.
+    if (asyncOpts?.signal.aborted) {
+      abortFunc();
+    }
+
     let pollResult: number | undefined;
     do {
       // Calling pollFunc with a callback that resolves the promise that pollRust
