@@ -1,0 +1,28 @@
+[package]
+name = "uniffi-fixture-async-channel"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "uniffi_async_channel"
+
+[dependencies]
+async-trait = "0.1"
+thiserror = "1.0"
+ubrn_testing = { path = "../../crates/ubrn_testing" }
+uniffi = { workspace = true, features = ["tokio"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.24.1", features = ["time", "sync"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
+
+[dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen-tests"] }
