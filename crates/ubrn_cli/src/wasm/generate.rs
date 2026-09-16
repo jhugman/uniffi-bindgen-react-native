@@ -63,7 +63,7 @@ impl From<&BindingsArgs> for ubrn_bindgen::BindingsArgs {
         ubrn_bindgen::BindingsArgs::new(
             SwitchArgs {
                 flavor: ubrn_bindgen::AbiFlavor::Wasm,
-                async_delivery: false,
+                ..Default::default()
             },
             value.source.clone(),
             value.output.clone(),
