@@ -670,6 +670,7 @@ mod force_async_validation_tests {
             }),
             receiver: None,
             force_async: false,
+            async_delivery: false,
         }
     }
 
