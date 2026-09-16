@@ -209,24 +209,55 @@ fn marshal_field_to_bytes(
             // else: zero-initialized slot is already correct for success status
         }
         FfiTypeDesc::Callback(cb_name) => {
-            // Callback-typed struct field: create a trampoline and write the fn pointer.
-            let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), js_val.raw())? };
-            let user_data = crate::callback::create_callback_user_data(
-                env,
-                js_fn,
-                cb_name,
-                module,
-                registration,
-            )?;
-            let fn_ptr = module
-                .make_callback_trampoline(
-                    cb_name,
-                    crate::callback::on_js_thread,
-                    crate::callback::dispatch_to_js_thread,
-                    crate::callback::is_js_thread,
-                    user_data,
-                )
-                .map_err(crate::core_err)?;
+            // Callback-typed struct field: reuse the trampoline already built for this
+            // (callback name, JS function), exactly as the argument path in `crate::call`
+            // does. A trampoline is permanently leaked by design, so building one per call
+            // leaks a `CallbackUserData`, a pinned `napi_ref`, a `ThreadsafeFunction` and its
+            // libuv handle, and a libffi closure on every struct field that carries a
+            // callback.
+            //
+            // SAFETY: `js_val` is a value from the current callback scope, so `raw()` yields a
+            // `napi_value` valid for that scope without transferring ownership.
+            let raw_fn_val = unsafe { js_val.raw() };
+            // SAFETY: `env` is the active env for this call and `raw_fn_val` the value above;
+            // a miss is reported as `Ok(None)`, so an unmarked function is simply built below.
+            let cached = unsafe {
+                registration
+                    .trampolines
+                    .get(env.raw(), raw_fn_val, cb_name)?
+            };
+            let fn_ptr = match cached {
+                Some(fn_ptr) => fn_ptr,
+                None => {
+                    // SAFETY: `raw_fn_val` is a `napi_value` from this callback scope, and the
+                    // declared field type is `Callback`, so a non-function is a caller error
+                    // surfaced as a JS exception rather than an abort.
+                    let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), raw_fn_val)? };
+                    let user_data = crate::callback::create_callback_user_data(
+                        env,
+                        js_fn,
+                        cb_name,
+                        module,
+                        registration,
+                    )?;
+                    let fn_ptr = module
+                        .make_callback_trampoline(
+                            cb_name,
+                            crate::callback::on_js_thread,
+                            crate::callback::dispatch_to_js_thread,
+                            crate::callback::is_js_thread,
+                            user_data,
+                        )
+                        .map_err(crate::core_err)?;
+                    // SAFETY: as for the lookup above, same env and same value.
+                    unsafe {
+                        registration
+                            .trampolines
+                            .set(env.raw(), raw_fn_val, cb_name, fn_ptr)?
+                    };
+                    fn_ptr
+                }
+            };
             slot::write_pointer(slot, fn_ptr);
         }
         other => {
