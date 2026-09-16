@@ -43,7 +43,7 @@ pub(crate) struct TsApiModule {
     pub is_verbose: bool,
     pub supports_rust_backtrace: bool,
     /// Every call reaches the player over a port, so the generated bodies await it.
-    pub delivery_async: bool,
+    pub async_delivery: bool,
     pub console_import: Option<String>,
     pub file_imports: Vec<TsFileImport>,
     pub converter_imports: Vec<TsConverterImport>,
@@ -517,7 +517,7 @@ impl TsApiModule {
             is_debug: config.is_debug(),
             is_verbose: config.is_verbose(),
             supports_rust_backtrace,
-            delivery_async: config.async_delivery,
+            async_delivery: config.async_delivery,
             console_import: config.console_import.clone(),
             file_imports: Vec::new(),
             converter_imports: Vec::new(),
