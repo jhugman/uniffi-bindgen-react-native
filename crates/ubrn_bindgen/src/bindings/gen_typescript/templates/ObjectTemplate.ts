@@ -158,7 +158,7 @@ const {{ obj.obj_factory }}: UniffiObjectFactory<{{ obj.protocol_name }}> = (() 
 
     clonePointer(obj_: {{ obj.protocol_name }}): UniffiHandle {
         const pointer = this.pointer(obj_);
-        {%- if module.delivery_async %}
+        {%- if module.async_delivery %}
         // uniffi's clone returns the handle it was given and the port delivers
         // in order, so the increment lands before the call that consumes it.
         nativeModule().{{ obj.ffi_clone }}(pointer, uniffiCaller.createCallStatus()).then(
@@ -177,7 +177,7 @@ const {{ obj.obj_factory }}: UniffiObjectFactory<{{ obj.protocol_name }}> = (() 
     },
 
     freePointer(pointer: UniffiHandle): void {
-        {%- if module.delivery_async %}
+        {%- if module.async_delivery %}
         nativeModule().{{ obj.ffi_free }}(pointer, uniffiCaller.createCallStatus()).then(
             undefined,
             (e: unknown) => console.error("{{ obj.impl_class_name }}: free failed", e),
