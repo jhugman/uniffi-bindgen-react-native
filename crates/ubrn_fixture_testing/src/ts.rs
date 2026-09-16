@@ -46,9 +46,11 @@ pub fn run_test(test_script: &str, flavor: Flavor, target_tmpdir: &str) {
             paths::assert_wasm_bootstrap();
             crate::run_tsx(test_script);
         }
-        // Channel needs a fixture crate to build for wasm32; no framework
-        // test currently lists it.
-        Flavor::Channel => unimplemented!("Channel flavor is fixture-only, see channel::run_test"),
+        // Both channel flavors need a fixture crate to build for wasm32; no
+        // framework test currently lists either.
+        Flavor::Channel | Flavor::AsyncWasm => {
+            unimplemented!("{flavor_name} flavor is fixture-only, see its run_test")
+        }
     }
 }
 

@@ -12,7 +12,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 
 pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     let _lock = crate::lock_fixture();
-    let p = crate::wasm2::prepare(crate_name, target_tmpdir, "channel");
+    let p = crate::wasm2::prepare(crate_name, target_tmpdir, "channel", &[]);
     let test_script = Utf8Path::new(test_script);
     let bootstrap = write_node_bootstrap(&p.ts_dir, &p.lib_stem);
     let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
