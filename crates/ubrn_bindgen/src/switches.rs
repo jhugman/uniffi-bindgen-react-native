@@ -152,10 +152,11 @@ impl AbiFlavor {
         }
     }
 
-    /// Whether the generated code can `await` the player. Only a player
-    /// can be put behind a message port; compiled-in bindings cannot.
+    /// Whether the generated code can `await` the player. Only a player can be
+    /// put behind a message port; compiled-in bindings cannot. Napi has a
+    /// player but its index initializes at module load, where nothing can await.
     pub fn supports_async_delivery(&self) -> bool {
-        self.supports_player()
+        self.supports_player() && !self.supports_sync_initialization()
     }
 
     /// The `--flavor` spelling, for error messages.
