@@ -97,6 +97,23 @@ Rust calls into these types through a vtable, and each slot is sync or async acc
 
 The [`force-async`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async) and [`force-async-list`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async-list) fixtures exercise both forms.
 
+### Calling the player asynchronously
+
+`asyncDelivery` generates call bodies that `await` the player. It is for a player that answers over a message port — the wasm2 player in a worker, behind `@ubjs/worker` — where a synchronous call cannot exist.
+
+```toml
+[bindings.typescript]
+asyncDelivery = true
+```
+
+It implies `forceAsync = true`: every function, method and constructor returns a `Promise`, and `initialize()` does too. A `forceAsync` list alongside it is an error. `wasm2` is the only flavor that accepts it today; `jsi`, `wasm` and `napi` reject it.
+
+The same switch is `--async` on the command line, which overrides the file. That is how a project generates sync and async bindings from one `uniffi.toml`.
+
+```admonish info
+Two things stay synchronous on the calling side: allocating a buffer for arguments (the sender owns it) and cloning an object handle for an argument. uniffi's clone returns the handle it was given, and a message port delivers in order, so the clone is posted and the handle used at once.
+```
+
 ### Logging the FFI
 
 The generated Typescript code can optionally be created to generate logging.
