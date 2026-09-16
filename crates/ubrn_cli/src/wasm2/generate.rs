@@ -66,6 +66,11 @@ struct BindingsArgs {
     /// The directory in which to put the generated Typescript.
     #[clap(long)]
     pub(crate) ts_dir: Utf8PathBuf,
+
+    /// Generate call bodies that `await` the player. Same as
+    /// `asyncDelivery = true` in `uniffi.toml`, and overrides it.
+    #[clap(long = "async")]
+    pub(crate) async_delivery: bool,
 }
 
 impl From<&BindingsArgs> for ubrn_bindgen::BindingsArgs {
@@ -73,6 +78,7 @@ impl From<&BindingsArgs> for ubrn_bindgen::BindingsArgs {
         ubrn_bindgen::BindingsArgs::new(
             SwitchArgs {
                 flavor: ubrn_bindgen::AbiFlavor::Wasm2,
+                async_delivery: value.async_delivery,
             },
             value.source.clone(),
             // `OutputArgs` still wants a native-output directory and creates

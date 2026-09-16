@@ -190,6 +190,7 @@ impl From<&BindingsArgs> for ubrn_bindgen::BindingsArgs {
         ubrn_bindgen::BindingsArgs::new(
             SwitchArgs {
                 flavor: AbiFlavor::Jsi2,
+                ..Default::default()
             },
             value.source.clone(),
             OutputArgs::new(&value.ts_dir, &value.ts_dir, value.no_format),
