@@ -1846,6 +1846,7 @@ name = "ubrn_macros"
 version = "0.1.0"
 dependencies = [
  "glob",
+ "heck",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
