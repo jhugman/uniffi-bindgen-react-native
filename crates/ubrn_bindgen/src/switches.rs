@@ -155,6 +155,11 @@ impl AbiFlavor {
     /// Whether the generated code can `await` the player. Only a player can be
     /// put behind a message port; compiled-in bindings cannot. Napi has a
     /// player but its index initializes at module load, where nothing can await.
+    ///
+    /// A future flavor joining must first fix the two branches that still call
+    /// the player synchronously: `StringHelperTemplate.ts` without
+    /// `TextEncoder`, and `ObjectTemplate.ts`'s `bless` without a
+    /// `FinalizationRegistry`. Wasm2 takes neither.
     pub fn supports_async_delivery(&self) -> bool {
         self.supports_player() && !self.supports_sync_initialization()
     }
