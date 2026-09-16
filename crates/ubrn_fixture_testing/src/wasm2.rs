@@ -26,9 +26,17 @@ pub(crate) struct Prepared {
 /// generates bindings from that same `.wasm` — `ubrn_bindgen` reads uniffi
 /// metadata out of its `UNIFFI_META_*` globals, so no native build is needed.
 ///
-/// `flavor_dir` names the `generated/<flavor_dir>` subdirectory, so Wasm2 and
-/// Channel keep separate generated trees despite sharing this code path.
-pub(crate) fn prepare(crate_name: &str, target_tmpdir: &str, flavor_dir: &str) -> Prepared {
+/// `flavor_dir` names the `generated/<flavor_dir>` subdirectory, so the
+/// player-based flavors keep separate generated trees despite sharing this
+/// code path.
+/// `extra_bindgen_args` reaches the `generate wasm2 bindings` command, so a
+/// flavor can ask for `--async` bindings off the same build.
+pub(crate) fn prepare(
+    crate_name: &str,
+    target_tmpdir: &str,
+    flavor_dir: &str,
+    extra_bindgen_args: &[&str],
+) -> Prepared {
     // Step 0: Check bootstrap
     paths::assert_wasm_bootstrap();
 
@@ -49,7 +57,7 @@ pub(crate) fn prepare(crate_name: &str, target_tmpdir: &str, flavor_dir: &str) -
     let _ = std::fs::remove_dir_all(&generated);
     let ts_dir = generated.join("ts");
     std::fs::create_dir_all(&ts_dir).expect("failed to create ts dir");
-    generate_bindings(&wasm_file, &ts_dir);
+    generate_bindings(&wasm_file, &ts_dir, extra_bindgen_args);
 
     // Step 3: Stage the wasm next to the TS bindings, with DCE — fixture
     // artifacts are ours, so over-stripping fails a test rather than a user.
@@ -67,7 +75,7 @@ pub(crate) fn prepare(crate_name: &str, target_tmpdir: &str, flavor_dir: &str) -
 pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // Serialize with other flavors for this fixture (they share generated/).
     let _lock = crate::lock_fixture();
-    let p = prepare(crate_name, target_tmpdir, "wasm2");
+    let p = prepare(crate_name, target_tmpdir, "wasm2", &[]);
     let test_script = Utf8Path::new(test_script);
 
     // Stand in for the entrypoint a real project would use. Test scripts are
@@ -100,21 +108,21 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
 }
 
 /// Generate bindings via the CLI, using the `wasm2` subcommand.
-fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path) {
-    run_cmd_quietly(
-        Command::new("cargo")
-            .arg("run")
-            .arg("-p")
-            .arg("uniffi-bindgen-react-native")
-            .arg("--")
-            .arg("generate")
-            .arg("wasm2")
-            .arg("bindings")
-            .arg("--library")
-            .arg("--ts-dir")
-            .arg(ts_dir.as_str())
-            .arg(cdylib_path.as_str()),
-    );
+fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path, extra_args: &[&str]) {
+    let mut cmd = Command::new("cargo");
+    cmd.arg("run")
+        .arg("-p")
+        .arg("uniffi-bindgen-react-native")
+        .arg("--")
+        .arg("generate")
+        .arg("wasm2")
+        .arg("bindings");
+    cmd.args(extra_args);
+    cmd.arg("--library")
+        .arg("--ts-dir")
+        .arg(ts_dir.as_str())
+        .arg(cdylib_path.as_str());
+    run_cmd_quietly(&mut cmd);
 }
 
 /// `cargo build --lib -p <crate_name> --target wasm32-unknown-unknown`.
