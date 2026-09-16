@@ -287,8 +287,11 @@ fn generate_index_from_modules(
     let has_wasm_bindgen_glue = false;
     // Only when every namespace opts in; the index re-exports all of them.
     let mut strict_type_checking = !general_root.namespaces.is_empty();
+    // One namespace is enough: awaiting a sync namespace's void `initialize()` is harmless.
+    let mut async_delivery = false;
     for namespace in general_root.namespaces.values() {
         strict_type_checking &= extract_ts_config(namespace)?.strict_type_checking;
+        async_delivery |= ts_config_for(namespace, switches)?.async_delivery;
     }
     let code = gen_typescript::generate_index_code(
         modules.to_vec(),
@@ -296,6 +299,7 @@ fn generate_index_from_modules(
         wasm_stem,
         has_wasm_bindgen_glue,
         strict_type_checking,
+        async_delivery,
     )?;
     let path = ts_dir.join("index.ts");
     ubrn_common::write_file(path, code)?;

@@ -66,7 +66,7 @@ export function uniffiInitAsync(source: WasmSource): Promise<void> {
       }{% endif %});
       {%- for m in modules %}
       setNativeModule_{{ m.ts() }}(wasmModule.registerSync(PLAYER_DEFINITIONS_{{ m.ts() }}));
-      {{ m.ts() }}.default.initialize();
+      {% if async_delivery %}await {% endif %}{{ m.ts() }}.default.initialize();
       {%- endfor %}
     })();
   }
