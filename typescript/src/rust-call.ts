@@ -58,6 +58,35 @@ export class UniffiRustCaller<Status extends UniffiRustCallStatus> {
     uniffiCheckCallStatus(callStatus, liftString, errorHandler);
     return returnedVal;
   }
+
+  // The async twins exist for players that answer over a message port: the
+  // status object is filled in when the reply lands, so it is checked after
+  // the caller's promise resolves rather than after it returns.
+  rustCallAsync<T>(
+    caller: AsyncRustCallFn<Status, T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): Promise<T> {
+    return this.makeRustCallAsync(caller, liftString);
+  }
+
+  rustCallWithErrorAsync<T>(
+    errorHandler: UniffiErrorHandler,
+    caller: AsyncRustCallFn<Status, T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): Promise<T> {
+    return this.makeRustCallAsync(caller, liftString, errorHandler);
+  }
+
+  async makeRustCallAsync<T>(
+    caller: AsyncRustCallFn<Status, T>,
+    liftString: StringLifter,
+    errorHandler?: UniffiErrorHandler,
+  ): Promise<T> {
+    const callStatus = this.statusConstructor();
+    const returnedVal = await caller(callStatus);
+    uniffiCheckCallStatus(callStatus, liftString, errorHandler);
+    return returnedVal;
+  }
 }
 
 function uniffiCreateCallStatus(): UniffiRustCallStatus {
@@ -66,6 +95,7 @@ function uniffiCreateCallStatus(): UniffiRustCallStatus {
 
 export type UniffiErrorHandler = (buffer: UniffiByteArray) => Error;
 type RustCallFn<S, T> = (status: S) => T;
+type AsyncRustCallFn<S, T> = (status: S) => T | Promise<T>;
 
 function uniffiCheckCallStatus(
   callStatus: UniffiRustCallStatus,
