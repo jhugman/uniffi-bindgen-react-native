@@ -175,7 +175,7 @@ impl GenerateAllCommand {
         let flavor = self.platform.as_ref().map_or(AbiFlavor::Jsi, |p| p.into());
         SwitchArgs {
             flavor,
-            async_delivery: false,
+            ..Default::default()
         }
     }
 
