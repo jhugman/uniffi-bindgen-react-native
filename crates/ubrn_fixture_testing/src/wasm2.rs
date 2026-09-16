@@ -8,7 +8,7 @@ use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
 
-use crate::{metadata, paths, run_cmd_quietly};
+use crate::{metadata, paths, run_cmd_quietly, Flavor};
 
 /// The outputs of [`prepare`]: everything a flavor needs to write its own
 /// bootstrap and hand off to `run_tsx_with_preload`.
@@ -26,17 +26,10 @@ pub(crate) struct Prepared {
 /// generates bindings from that same `.wasm` — `ubrn_bindgen` reads uniffi
 /// metadata out of its `UNIFFI_META_*` globals, so no native build is needed.
 ///
-/// `flavor_dir` names the `generated/<flavor_dir>` subdirectory, so the
+/// The flavor names its own `generated/<flavor>` subdirectory, so the
 /// player-based flavors keep separate generated trees despite sharing this
-/// code path.
-/// `extra_bindgen_args` reaches the `generate wasm2 bindings` command, so a
-/// flavor can ask for `--async` bindings off the same build.
-pub(crate) fn prepare(
-    crate_name: &str,
-    target_tmpdir: &str,
-    flavor_dir: &str,
-    extra_bindgen_args: &[&str],
-) -> Prepared {
+/// code path, and supplies the bindgen switches it needs.
+pub(crate) fn prepare(crate_name: &str, target_tmpdir: &str, flavor: Flavor) -> Prepared {
     // Step 0: Check bootstrap
     paths::assert_wasm_bootstrap();
 
@@ -53,11 +46,11 @@ pub(crate) fn prepare(
     // Step 2: Generate TS bindings from the *unstaged* wasm. Staging strips
     // the `UNIFFI_META_*` exports and may rewrite the module, so metadata has
     // to come off the raw cargo output.
-    let generated = fixture_dir.join("generated").join(flavor_dir);
+    let generated = fixture_dir.join("generated").join(flavor.as_str());
     let _ = std::fs::remove_dir_all(&generated);
     let ts_dir = generated.join("ts");
     std::fs::create_dir_all(&ts_dir).expect("failed to create ts dir");
-    generate_bindings(&wasm_file, &ts_dir, extra_bindgen_args);
+    generate_bindings(&wasm_file, &ts_dir, flavor.bindgen_args());
 
     // Step 3: Stage the wasm next to the TS bindings, with DCE — fixture
     // artifacts are ours, so over-stripping fails a test rather than a user.
@@ -75,7 +68,7 @@ pub(crate) fn prepare(
 pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // Serialize with other flavors for this fixture (they share generated/).
     let _lock = crate::lock_fixture();
-    let p = prepare(crate_name, target_tmpdir, "wasm2", &[]);
+    let p = prepare(crate_name, target_tmpdir, Flavor::Wasm2);
     let test_script = Utf8Path::new(test_script);
 
     // Stand in for the entrypoint a real project would use. Test scripts are
@@ -83,10 +76,8 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // never call `uniffiInitAsync`.
     let bootstrap = write_node_bootstrap(&p.ts_dir, &p.lib_stem);
 
-    let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
-        &p.fixture_dir,
-        crate::Flavor::Wasm2,
-    ));
+    let _tsconfig_guard =
+        crate::CleanupFile::new(crate::write_fixture_tsconfig(&p.fixture_dir, Flavor::Wasm2));
     crate::run_tsx_with_preload(test_script, &bootstrap);
 }
 
@@ -104,6 +95,63 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
         ),
     )
     .unwrap_or_else(|e| panic!("write {path}: {e}"));
+    path
+}
+
+/// Write the bootstrap a port-backed flavor preloads, and return its path.
+///
+/// Everything up to the opened wasm is the same for every such flavor: the
+/// namespaces are whichever `*-ffi.ts` were generated, and the glue module
+/// only exists when wasm-bindgen wrote one. `transport_imports` and
+/// `wire_namespace` are the flavor's own: its imports, and the block that
+/// puts its transport between `registerSync` and `setNativeModule`.
+///
+/// Mirrors the init sequence in the generated index template
+/// (`gen_typescript/templates/index.ts`: openWasm, resolveModule,
+/// registerSync, setNativeModule, `default.initialize()`); keep the two in
+/// step.
+pub(crate) fn write_player_bootstrap(
+    ts_dir: &Utf8Path,
+    lib_stem: &str,
+    file_name: &str,
+    transport_imports: &str,
+    wire_namespace: impl Fn(&str) -> String,
+) -> Utf8PathBuf {
+    let mut namespaces: Vec<String> = std::fs::read_dir(ts_dir)
+        .expect("read ts dir")
+        .filter_map(|e| e.ok())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter_map(|name| name.strip_suffix("-ffi.ts").map(str::to_owned))
+        .collect();
+    namespaces.sort();
+    assert!(!namespaces.is_empty(), "no *-ffi.ts generated in {ts_dir}");
+
+    let glue = ts_dir.join(format!("{lib_stem}_bg.js")).exists();
+    let mut src = String::new();
+    src.push_str("import { openWasm } from \"@ubjs/wasm\";\n");
+    src.push_str(transport_imports);
+    if glue {
+        src.push_str(&format!("import * as glue from \"./{lib_stem}_bg.js\";\n"));
+    }
+    for ns in &namespaces {
+        src.push_str(&format!(
+            "import {{ PLAYER_DEFINITIONS as defs_{ns}, setNativeModule as set_{ns} }} from \"./{ns}-ffi.js\";\n\
+             import * as mod_{ns} from \"./{ns}.js\";\n"
+        ));
+    }
+    src.push_str(&format!(
+        "const wasm = await openWasm(new URL(\"./{lib_stem}.wasm\", import.meta.url){});\n",
+        if glue {
+            format!(", {{ resolveModule: async (n) => n.endsWith(\"{lib_stem}_bg.js\") ? glue : undefined }}")
+        } else {
+            String::new()
+        }
+    ));
+    for ns in &namespaces {
+        src.push_str(&wire_namespace(ns));
+    }
+    let path = ts_dir.join(file_name);
+    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
     path
 }
 
