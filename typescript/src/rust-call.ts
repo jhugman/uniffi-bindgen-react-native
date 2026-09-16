@@ -19,6 +19,24 @@ export type UniffiRustCallStatus = {
   code: number;
   errorBuf?: UniffiByteArray;
 };
+
+/**
+ * Drop the result of a call nothing is waiting on.
+ *
+ * A player over a port answers even a void call with a promise; a closed
+ * channel rejects it, and nothing else would hear it.
+ */
+export function uniffiIgnoreVoidResult(
+  result: unknown,
+  what: string,
+  onFulfilled?: (value: any) => void,
+): void {
+  if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+    (result as Promise<any>).then(onFulfilled, (e: unknown) =>
+      console.error(`${what} failed`, e),
+    );
+  }
+}
 export class UniffiRustCaller<Status extends UniffiRustCallStatus> {
   constructor(private statusConstructor: () => Status) {}
 
