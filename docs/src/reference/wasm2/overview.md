@@ -29,8 +29,8 @@ Three lines in `Cargo.toml`, and one in `lib.rs`.
 crate-type = ["lib", "cdylib"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-uniffi-runtime-wasm = "0.31.0-3"
-uniffi_core = { version = "0.31", features = ["wasm-unstable-single-threaded"] }
+uniffi-runtime-wasm = "0.31.0-5"
+uniffi_core = { version = "0.32", features = ["wasm-unstable-single-threaded"] }
 ```
 
 ```rust

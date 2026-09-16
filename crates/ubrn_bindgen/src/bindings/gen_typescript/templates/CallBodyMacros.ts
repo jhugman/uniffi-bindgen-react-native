@@ -76,7 +76,7 @@ console.debug(`-- {{ ffi_name }}`);
    by `rustbuffer_alloc`, so there is no JS-side intermediate copy. -#}
 {%- macro arg_list_lowered(callable) %}
     {%- for arg in callable.arguments %}
-        {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc),
+        {% if arg.is_borrowed_bytes %}{{ arg.ffi_converter }}.lowerBorrowed({{ arg.name }}){% else %}{{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% endif %},
     {%- endfor %}
 {%- endmacro -%}
 
@@ -252,7 +252,7 @@ console.debug(`-- {{ ffi_name }}`);
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments.is_empty() %},{% endif %}
                     {%- endif %}
                     {%- for arg in callable.arguments -%}
-                    {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% if !loop.last %},{% endif %}
+                    {% if arg.is_borrowed_bytes %}{{ arg.ffi_converter }}.lowerBorrowed({{ arg.name }}){% else %}{{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% endif %}{% if !loop.last %},{% endif %}
                     {%- endfor %}
                 );
             },
@@ -410,4 +410,44 @@ inner: { {%- for field in variant.fields %}{% call field_decl(field) %}{%- if !l
 {#- Variant static new() forwarding args. -#}
 {%- macro variant_new_args(variant) %}
 {%- if !variant.has_nameless_fields %}inner{%- else %}{%- for field in variant.fields %}v{{ loop.index0 }}{%- if !loop.last %}, {% endif %}{%- endfor %}{%- endif %}
+{%- endmacro %}
+
+{#-
+  Must live at module scope: deriving the enum's type alias from the variant
+  classes (e.g. an `InstanceType` of them) makes a self-referential enum fail to
+  compile, because the alias would depend on the classes and vice versa.
+-#}
+{%- macro tagged_enum_variant_interface(e, variant, type_name) %}
+{%- if e.is_error %}
+type {{ type_name }}_{{ variant.name }}_interface = UniffiError & {
+{%- else %}
+type {{ type_name }}_{{ variant.name }}_interface = {
+{%- endif %}
+    /**
+     * @private
+     * This field is private and should not be used, use `tag` instead.
+     */
+    readonly [uniffiTypeNameSymbol]: "{{ type_name }}";
+    tag: {{ type_name }}_Tags.{{ variant.name }};
+    {%- if !variant.fields.is_empty() %}
+    inner: {% call variant_inner_type(variant) %};
+    {%- endif %}
+{%- for ut in e.uniffi_traits %}
+    {%- match ut %}
+    {%- when TsUniffiTrait::Display { method } %}
+    {% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call return_type(method) %};
+    {%- when TsUniffiTrait::Debug { method } %}
+    toDebugString(): {% call return_type(method) %};
+    {%- if !e.has_display_trait() %}
+    {% if method.renders_async() %}asyncToString{% else %}toString{% endif %}(): {% call return_type(method) %};
+    {%- endif %}
+    {%- when TsUniffiTrait::Eq { eq, ne } %}
+    equals(other: {{ type_name }}): {% call return_type(eq) %};
+    {%- when TsUniffiTrait::Hash { method } %}
+    hashCode(): {% call return_type(method) %};
+    {%- when TsUniffiTrait::Ord { cmp } %}
+    compareTo(other: {{ type_name }}): {% call return_type(cmp) %};
+    {%- endmatch %}
+{%- endfor %}
+};
 {%- endmacro %}

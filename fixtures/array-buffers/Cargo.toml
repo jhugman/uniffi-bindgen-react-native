@@ -1,0 +1,27 @@
+[package]
+name = "uniffi-fixture-array-buffers"
+edition = "2021"
+version = "0.22.0"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+name = "uniffi_array_buffers"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+uniffi = { workspace = true }
+
+# `wasm-unstable-single-threaded` relaxes uniffi's `Send + Sync` requirement
+# for wasm32.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uniffi-runtime-wasm = { workspace = true }
+uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+ubrn_macros = { workspace = true }
+ubrn_fixture_testing = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen-tests"] }

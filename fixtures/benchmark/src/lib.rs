@@ -143,10 +143,9 @@ pub fn take_large_record(r: LargeRecord) {
 // Recursive enum — depth-controlled binary tree
 // ---------------------------------------------------------------------------
 
-/// uniffi 0.31's `#[derive(uniffi::Enum)]` does not implement `Lift`/`Lower`
-/// for `Box<Self>`, so we model the recursion via `Vec<Tree>` — heap-backed
-/// and equivalent for marshaling-cost measurement. `build_tree` always
-/// produces exactly two children, mimicking a binary tree.
+/// A depth-controlled binary tree: `build_tree` always gives each `Node`
+/// exactly two children. Modelled with `Vec<Tree>`; the benchmark measures the
+/// cost of marshaling a tree of records.
 #[derive(uniffi::Enum)]
 pub enum Tree {
     Leaf,

@@ -10,6 +10,7 @@ import { FfiType } from "../src/ffi-type.js";
 import {
   buildJitDispatcher,
   canUseFunctionConstructor,
+  specializeFunction,
   type DispatchContext,
   type FunctionDef,
 } from "../src/call.js";
@@ -321,4 +322,574 @@ test("registerSync({disableJit:true}) still produces a working dispatcher", asyn
   const result = nm.uniffi_test_add(5, 6, status);
   assert.strictEqual(result, 11);
   assert.strictEqual(status.code, 0);
+});
+
+interface ForeignBytesHarness {
+  ctx: DispatchContext;
+  allocs: Array<[number, number]>;
+  frees: Array<[number, number, number]>;
+  // Shared, ordered log of what happened during a dispatch, so a test can
+  // assert that the callee read the payload *before* cleanup freed it.
+  events: string[];
+  // Reserve arena base + size, so tests can assert the struct lands in scratch.
+  arenaBase: number;
+  arenaSize: number;
+  // First pointer the bump allocator hands out. Tests assert against this
+  // rather than a literal so they survive a change of starting address.
+  heapBase: number;
+}
+
+/**
+ * A `DispatchContext` backed by a real `WebAssembly.Memory` and a bump
+ * allocator that records every alloc/free, starting well past the scratch
+ * region so payloads never collide with the reserved slot.
+ */
+function foreignBytesHarness(): ForeignBytesHarness {
+  const wasmMem = new WebAssembly.Memory({ initial: 1 });
+  const memory = new Memory(wasmMem);
+  const allocs: Array<[number, number]> = [];
+  const frees: Array<[number, number, number]> = [];
+  const events: string[] = [];
+  const heapBase = 8192;
+  let cursor = heapBase;
+  const arenaBase = 256;
+  const arenaSize = 1024;
+  const scratch = new Scratch(
+    arenaBase,
+    arenaSize,
+    () => 0,
+    () => {},
+  );
+  const ctx: DispatchContext = {
+    memory,
+    scratch,
+    structs: new Map(),
+    callbackDefs: new Map(),
+    alloc: (size, align) => {
+      allocs.push([size, align]);
+      const end = cursor + size;
+      const have = memory.buffer().byteLength;
+      // A request past the current memory grows it, detaching any view into
+      // the old buffer — the same hazard the real allocator has.
+      if (end > have) wasmMem.grow(Math.ceil((end - have) / 0x10000));
+      const p = cursor;
+      cursor += size;
+      return p;
+    },
+    free: (ptr, size, align) => {
+      frees.push([ptr, size, align]);
+      events.push(`free:${ptr}:${size}`);
+    },
+    installCallback: () => {
+      throw new Error("not used");
+    },
+    useJit: false, // exercise the interpreted `planArg` path
+  };
+  return { ctx, allocs, frees, events, arenaBase, arenaSize, heapBase };
+}
+
+const FOREIGN_BYTES_DEF: FunctionDef = {
+  args: [FfiType.ForeignBytes],
+  ret: FfiType.UInt32,
+  hasRustCallStatus: true,
+};
+
+test("ForeignBytes arg: subarray window is copied, then freed after the call", () => {
+  const h = foreignBytesHarness();
+  const memory = h.ctx.memory;
+  const backing = new Uint8Array([201, 202, 1, 2, 203]);
+  const view = backing.subarray(2, 4); // [1, 2]
+
+  let structPtr = -1;
+  let dataPtr = -1;
+  let observedLen = -1;
+  let observedBytes: number[] = [];
+  const exportFn = (...args: any[]) => {
+    structPtr = args[0];
+    observedLen = memory.readI32(args[0]);
+    dataPtr = memory.readU32(args[0] + 4);
+    observedBytes = [];
+    for (let i = 0; i < observedLen; i++) {
+      observedBytes.push(memory.readU8(dataPtr + i));
+    }
+    h.events.push(`read:${observedBytes.join(",")}`);
+    const statusPtr = args[args.length - 1];
+    memory.writeU8(statusPtr, 0);
+    return observedLen;
+  };
+
+  const dispatch = specializeFunction(
+    h.ctx,
+    exportFn,
+    FOREIGN_BYTES_DEF,
+    "fb_subarray",
+  );
+  const status = { code: 0xff };
+  const result = dispatch(view, status);
+
+  assert.strictEqual(
+    observedLen,
+    2,
+    "len is the view byteLength, not the backing length",
+  );
+  assert.deepStrictEqual(
+    observedBytes,
+    [1, 2],
+    "only the subarray window is copied",
+  );
+  assert.strictEqual(result, 2);
+  assert.strictEqual(status.code, 0);
+  assert.ok(
+    structPtr >= h.arenaBase && structPtr < h.arenaBase + h.arenaSize,
+    "ForeignBytes struct is written into the reserved scratch region",
+  );
+  assert.deepStrictEqual(
+    h.allocs,
+    [[2, 1]],
+    "allocated exactly the payload bytes",
+  );
+  // The allocation is released only after the call has read the bytes. Both
+  // are recorded in one ordered log, so the ordering is directly observed.
+  assert.deepStrictEqual(
+    h.events,
+    [`read:1,2`, `free:${dataPtr}:2`],
+    "callee reads the payload before cleanup frees it",
+  );
+  assert.deepStrictEqual(
+    h.frees,
+    [[dataPtr, 2, 1]],
+    "payload freed after the call, with the exact (ptr, len)",
+  );
+});
+
+test("ForeignBytes arg: empty buffer arrives as (len 0, null) with no alloc/free", () => {
+  const h = foreignBytesHarness();
+  const memory = h.ctx.memory;
+
+  let observedLen = -1;
+  let observedDataPtr = -1;
+  const exportFn = (...args: any[]) => {
+    observedLen = memory.readI32(args[0]);
+    observedDataPtr = memory.readU32(args[0] + 4);
+    const statusPtr = args[args.length - 1];
+    memory.writeU8(statusPtr, 0);
+    return 0;
+  };
+
+  const dispatch = specializeFunction(
+    h.ctx,
+    exportFn,
+    FOREIGN_BYTES_DEF,
+    "fb_empty",
+  );
+  const status = { code: 0 };
+  dispatch(new Uint8Array(0), status);
+
+  assert.strictEqual(observedLen, 0, "zero-length buffer reports len 0");
+  assert.strictEqual(
+    observedDataPtr,
+    0,
+    "zero-length buffer passes a null pointer",
+  );
+  assert.deepStrictEqual(h.allocs, [], "no payload allocation for empty input");
+  assert.deepStrictEqual(h.frees, [], "nothing to free for empty input");
+});
+
+test("ForeignBytes arg: multiple args each copy and free independently", () => {
+  const h = foreignBytesHarness();
+  const memory = h.ctx.memory;
+
+  const seen: Array<[number, number[]]> = [];
+  const payloadPtrs: number[] = [];
+  const exportFn = (...args: any[]) => {
+    // Two ForeignBytes args, then the status pointer.
+    for (let a = 0; a < 2; a++) {
+      const len = memory.readI32(args[a]);
+      const dataPtr = memory.readU32(args[a] + 4);
+      payloadPtrs.push(dataPtr);
+      const bytes: number[] = [];
+      for (let i = 0; i < len; i++) bytes.push(memory.readU8(dataPtr + i));
+      seen.push([len, bytes]);
+    }
+    const statusPtr = args[args.length - 1];
+    memory.writeU8(statusPtr, 0);
+    return 0;
+  };
+
+  const def: FunctionDef = {
+    args: [FfiType.ForeignBytes, FfiType.ForeignBytes],
+    ret: FfiType.UInt32,
+    hasRustCallStatus: true,
+  };
+  const dispatch = specializeFunction(h.ctx, exportFn, def, "fb_two");
+  dispatch(new Uint8Array([7, 8]), new Uint8Array([9]), { code: 0 });
+
+  assert.deepStrictEqual(seen, [
+    [2, [7, 8]],
+    [1, [9]],
+  ]);
+  assert.deepStrictEqual(h.allocs, [
+    [2, 1],
+    [1, 1],
+  ]);
+  // Exact (ptr, len) pairs, so a cleanup that freed the wrong pointer or the
+  // wrong length would fail here rather than merely keeping the count at 2.
+  assert.deepStrictEqual(h.frees, [
+    [payloadPtrs[0], 2, 1],
+    [payloadPtrs[1], 1, 1],
+  ]);
+});
+
+test("ForeignBytes arg: payload is freed even when the callee reports an error", () => {
+  const h = foreignBytesHarness();
+  const memory = h.ctx.memory;
+
+  let observedLen = -1;
+  let observedDataPtr = -1;
+  const exportFn = (...args: any[]) => {
+    observedLen = memory.readI32(args[0]);
+    observedDataPtr = memory.readU32(args[0] + 4);
+    const statusPtr = args[args.length - 1];
+    // code 1 → the dispatcher takes the error path and skips `reg.finish`.
+    memory.writeU8(statusPtr, 1);
+    return 0;
+  };
+
+  const dispatch = specializeFunction(
+    h.ctx,
+    exportFn,
+    FOREIGN_BYTES_DEF,
+    "fb_error",
+  );
+  const status = { code: 0, errorBuf: undefined as any };
+  assert.strictEqual(dispatch(new Uint8Array([1, 2, 3]), status), undefined);
+  assert.strictEqual(status.code, 1);
+  assert.strictEqual(observedLen, 3, "callee saw the payload length");
+  assert.deepStrictEqual(h.allocs, [[3, 1]]);
+  assert.deepStrictEqual(
+    h.frees,
+    [[observedDataPtr, 3, 1]],
+    "borrowed payload freed on the error path with the exact (ptr, len)",
+  );
+});
+
+test("buildJitDispatcher declines ForeignBytes args so the interpreted path frees", () => {
+  const h = foreignBytesHarness();
+  h.ctx.useJit = true;
+  const jit = buildJitDispatcher(h.ctx, () => 0, FOREIGN_BYTES_DEF, "fb_jit");
+  assert.strictEqual(
+    jit,
+    undefined,
+    "ForeignBytes must fall back to the interpreted dispatcher",
+  );
+
+  // ...and `specializeFunction` therefore still produces a working dispatcher,
+  // with the borrowed payload freed.
+  const memory = h.ctx.memory;
+  const exportFn = (...args: any[]) => {
+    const statusPtr = args[args.length - 1];
+    memory.writeU8(statusPtr, 0);
+    return memory.readI32(args[0]);
+  };
+  const dispatch = specializeFunction(
+    h.ctx,
+    exportFn,
+    FOREIGN_BYTES_DEF,
+    "fb_jit_fallback",
+  );
+  const status = { code: 0xff };
+  assert.strictEqual(dispatch(new Uint8Array([1, 2, 3]), status), 3);
+  assert.deepStrictEqual(
+    h.frees,
+    [[h.heapBase, 3, 1]],
+    "payload freed via the interpreted path, with the exact (ptr, len)",
+  );
+});
+
+test("ForeignBytes arg: re-entrant call frees each payload exactly once", () => {
+  const h = foreignBytesHarness();
+  const memory = h.ctx.memory;
+  const outer = new Uint8Array([1, 2]);
+  const inner = new Uint8Array([3, 4, 5]);
+
+  let inInnerCall = false;
+  const dispatchRef: { fn?: (...a: any[]) => any } = {};
+  const exportFn = (...args: any[]) => {
+    const statusPtr = args[args.length - 1];
+    if (!inInnerCall) {
+      inInnerCall = true;
+      // Re-enter the same export while the outer call is in flight. The inner
+      // dispatch reuses the shared reserved scratch slot, overwriting the
+      // outer call's ForeignBytes struct.
+      dispatchRef.fn!(inner, { code: 0 });
+      inInnerCall = false;
+    }
+    memory.writeU8(statusPtr, 0);
+    return 0;
+  };
+
+  const dispatch = specializeFunction(
+    h.ctx,
+    exportFn,
+    FOREIGN_BYTES_DEF,
+    "fb_reentrant",
+  );
+  dispatchRef.fn = dispatch;
+  dispatch(outer, { code: 0 });
+
+  // Outer payload first (len 2), inner next (len 3). Each must be freed
+  // exactly once, and the outer cleanup must free the outer allocation.
+  assert.deepStrictEqual(h.allocs, [
+    [2, 1],
+    [3, 1],
+  ]);
+  assert.deepStrictEqual(
+    h.frees,
+    [
+      [h.heapBase + 2, 3, 1],
+      [h.heapBase, 2, 1],
+    ],
+    "inner then outer payload, each freed exactly once",
+  );
+});
+
+test("ForeignBytes arg: non-Uint8Array source throws before allocating", () => {
+  const h = foreignBytesHarness();
+  const dispatch = specializeFunction(
+    h.ctx,
+    () => {
+      throw new Error("callee must not be reached");
+    },
+    FOREIGN_BYTES_DEF,
+    "fb_bad_type",
+  );
+
+  // Reject a plain ArrayBuffer up front: unguarded it throws a bare
+  // `TypedArray.set` TypeError from `Memory.writeBytes` after allocating.
+  assert.throws(
+    () => dispatch(new ArrayBuffer(4) as unknown as Uint8Array, { code: 0 }),
+    /expected a Uint8Array/,
+  );
+  assert.deepStrictEqual(h.allocs, [], "guard ran before any allocation");
+});
+
+test("ForeignBytes arg: detached source throws before allocating", () => {
+  const h = foreignBytesHarness();
+  const backing = new ArrayBuffer(4);
+  const view = new Uint8Array(backing);
+  // Detach the backing buffer. The view now reports length 0, which without a
+  // guard would quietly reach Rust as an empty ForeignBytes.
+  structuredClone(view, { transfer: [backing] });
+
+  const dispatch = specializeFunction(
+    h.ctx,
+    () => {
+      throw new Error("callee must not be reached");
+    },
+    FOREIGN_BYTES_DEF,
+    "fb_detached",
+  );
+  assert.throws(() => dispatch(view, { code: 0 }), /source view is detached/);
+  assert.deepStrictEqual(h.allocs, [], "guard ran before any allocation");
+});
+
+test("ForeignBytes arg: earlier payload is freed when a later prepare throws", () => {
+  const h = foreignBytesHarness();
+  const def: FunctionDef = {
+    args: [FfiType.ForeignBytes, FfiType.ForeignBytes],
+    ret: FfiType.UInt32,
+    hasRustCallStatus: true,
+  };
+  const dispatch = specializeFunction(
+    h.ctx,
+    () => {
+      throw new Error("callee must not be reached");
+    },
+    def,
+    "fb_second_throws",
+  );
+
+  // The second arg is invalid, so its `prepare` throws *after* the first arg
+  // already allocated. The `try` must have started before the prepare loop so
+  // the first payload is still released.
+  assert.throws(
+    () =>
+      dispatch(new Uint8Array([1, 2]), new ArrayBuffer(4) as any, {
+        code: 0,
+      }),
+    /expected a Uint8Array/,
+  );
+  assert.deepStrictEqual(h.allocs, [[2, 1]]);
+  assert.deepStrictEqual(
+    h.frees,
+    [[h.heapBase, 2, 1]],
+    "first payload freed even though a later prepare threw",
+  );
+});
+
+test("ForeignBytes arg: source aliasing wasm memory is borrowed, not copied", () => {
+  const h = foreignBytesHarness();
+  const memory = h.ctx.memory;
+  const payloadPtr = 4096;
+  memory.writeBytes(payloadPtr, new Uint8Array([5, 6, 7]));
+  const aliased = new Uint8Array(memory.buffer(), payloadPtr, 3);
+
+  let observedLen = -1;
+  let observedDataPtr = -1;
+  const observedBytes: number[] = [];
+  const exportFn = (...args: any[]) => {
+    observedLen = memory.readI32(args[0]);
+    observedDataPtr = memory.readU32(args[0] + 4);
+    for (let i = 0; i < observedLen; i++) {
+      observedBytes.push(memory.readU8(observedDataPtr + i));
+    }
+    memory.writeU8(args[args.length - 1], 0);
+    return 0;
+  };
+  const dispatch = specializeFunction(
+    h.ctx,
+    exportFn,
+    FOREIGN_BYTES_DEF,
+    "fb_aliased",
+  );
+  dispatch(aliased, { code: 0 });
+
+  assert.strictEqual(observedLen, 3);
+  assert.strictEqual(
+    observedDataPtr,
+    payloadPtr,
+    "the wasm-aliased view is passed through in place",
+  );
+  assert.deepStrictEqual(observedBytes, [5, 6, 7]);
+  assert.deepStrictEqual(
+    h.allocs,
+    [],
+    "no copy allocation for a wasm-aliased source",
+  );
+  assert.deepStrictEqual(
+    h.frees,
+    [],
+    "nothing to free for a wasm-aliased source",
+  );
+});
+
+test("ForeignBytes arg: allocation is freed when the copy throws", () => {
+  const h = foreignBytesHarness();
+  (h.ctx.memory as any).writeBytes = () => {
+    throw new Error("copy failed");
+  };
+
+  const dispatch = specializeFunction(
+    h.ctx,
+    () => {
+      throw new Error("callee must not be reached");
+    },
+    FOREIGN_BYTES_DEF,
+    "fb_copy_throws",
+  );
+  assert.throws(
+    () => dispatch(new Uint8Array([1, 2, 3]), { code: 0 }),
+    /copy failed/,
+  );
+  assert.deepStrictEqual(h.allocs, [[3, 1]], "allocation happened");
+  assert.deepStrictEqual(
+    h.frees,
+    [[h.heapBase, 3, 1]],
+    "the failed copy's allocation is still freed",
+  );
+});
+
+test("owned RustBuffer arg survives a growing borrowed arg", () => {
+  const h = foreignBytesHarness();
+  const memory = h.ctx.memory;
+
+  // Stand-in for codegen's `lower(owned, rustbuffer_alloc)`: a view aliasing
+  // wasm memory, created before dispatch. The allocator hands out `heapBase`,
+  // inside wasm memory's first page, so this write itself grows nothing; the
+  // borrowed arg below then forces a grow that detaches every view into that
+  // page.
+  const ownedBytes = new Uint8Array([3, 4, 5, 6]);
+  const ownedPtr = h.ctx.alloc(ownedBytes.byteLength, 1);
+  const ownedView = new Uint8Array(
+    memory.buffer(),
+    ownedPtr,
+    ownedBytes.byteLength,
+  );
+  ownedView.set(ownedBytes);
+
+  const def: FunctionDef = {
+    args: [FfiType.ForeignBytes, FfiType.RustBuffer],
+    ret: FfiType.UInt32,
+    hasRustCallStatus: true,
+  };
+
+  let observedOwned: number[] = [];
+  const exportFn = (...args: any[]) => {
+    // arg0 is the ForeignBytes struct; arg1 is the RustBuffer struct.
+    const rbStruct = args[1];
+    const rbLen = Number(memory.readU64(rbStruct + 8));
+    const dataPtr = memory.readU32(rbStruct + 16);
+    observedOwned = [];
+    for (let i = 0; i < rbLen; i++) {
+      observedOwned.push(memory.readU8(dataPtr + i));
+    }
+    memory.writeU8(args[args.length - 1], 0);
+    return 0;
+  };
+
+  const dispatch = specializeFunction(h.ctx, exportFn, def, "grow_borrowed");
+
+  // > the 64 KiB initial memory, so copying it grows memory and detaches every
+  // view into the old buffer — including `ownedView`.
+  const big = new Uint8Array(1 << 20).fill(9);
+  dispatch(big, ownedView, { code: 0 });
+
+  assert.deepStrictEqual(
+    observedOwned,
+    [3, 4, 5, 6],
+    "owned arg's descriptor was captured before the borrowed arg grew memory",
+  );
+  assert.strictEqual(
+    ownedView.buffer.byteLength,
+    0,
+    "the borrowed copy really grew wasm memory and detached the owned view",
+  );
+});
+
+test("interpreted dispatcher passes bigint (UInt64) scalar args through", () => {
+  // Regression guard: `prepare` returns a bare word for scalars, so the
+  // dispatcher must not assume every word is a `number` — i64/handle args
+  // arrive as `bigint`.
+  const wasmMem = new WebAssembly.Memory({ initial: 1 });
+  const memory = new Memory(wasmMem);
+  const scratch = new Scratch(
+    256,
+    1024,
+    () => 0,
+    () => {},
+  );
+  const ctx: DispatchContext = {
+    memory,
+    scratch,
+    structs: new Map(),
+    callbackDefs: new Map(),
+    alloc: () => 0,
+    free: () => {},
+    installCallback: () => 0,
+    useJit: false,
+  };
+  const seen: any[] = [];
+  const exportFn = (...args: any[]) => {
+    seen.push(args[0]);
+    memory.writeU8(args[args.length - 1], 0);
+    return 0;
+  };
+  const def: FunctionDef = {
+    args: [FfiType.UInt64],
+    ret: FfiType.UInt32,
+    hasRustCallStatus: true,
+  };
+  const dispatch = specializeFunction(ctx, exportFn, def, "u64_arg");
+  dispatch(123n, { code: 0 });
+  assert.deepStrictEqual(seen, [123n]);
 });

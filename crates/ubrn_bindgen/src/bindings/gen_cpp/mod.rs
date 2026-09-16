@@ -87,3 +87,6 @@ pub fn generate_entrypoint(
 struct EntrypointCpp<'a> {
     modules: &'a Vec<ModuleMetadata>,
 }
+
+#[cfg(test)]
+mod tests;

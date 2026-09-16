@@ -175,4 +175,35 @@ pub fn echo_bare_obj_arg(value: std::sync::Arc<ZeroArgObj>) -> std::sync::Arc<Ze
     value
 }
 
+#[derive(uniffi::Record)]
+pub struct SetDefaults {
+    #[uniffi(default)]
+    pub names: std::collections::HashSet<String>,
+    #[uniffi(default)]
+    pub numbers: std::collections::HashSet<i32>,
+}
+
+#[uniffi::export(default(value))]
+pub fn echo_set(value: std::collections::HashSet<String>) -> std::collections::HashSet<String> {
+    value
+}
+
+#[uniffi::export]
+pub fn make_set() -> std::collections::HashSet<String> {
+    ["rust", "bindings", "rust"]
+        .into_iter()
+        .map(String::from)
+        .collect()
+}
+
+#[uniffi::export]
+pub fn set_contains(value: std::collections::HashSet<String>, needle: String) -> bool {
+    value.contains(&needle)
+}
+
+#[uniffi::export(default(value))]
+pub fn echo_set_defaults(value: SetDefaults) -> SetDefaults {
+    value
+}
+
 uniffi::setup_scaffolding!();

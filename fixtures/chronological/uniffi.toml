@@ -1,2 +1,9 @@
 [bindings.typescript]
 strictTypeChecking = true
+# `rename`/`exclude` live under [bindings.typescript] (the documented key);
+# the generator republishes this table as [bindings.react-native], which is
+# the key the uniffi 0.32 pipeline actually reads. This fixture keeps an
+# unrenamed neighbour (`optional`) so the test can show the table is merged
+# rather than replacing the default behaviour.
+rename = { "equal" = "are_equal" }
+exclude = ["get_pre_epoch_timestamp"]

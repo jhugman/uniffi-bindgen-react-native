@@ -11,6 +11,10 @@ import { test } from "@/asserts";
 
 import module1 from "@/generated/custom_types";
 import module2, {
+  echoBoxedOuid,
+  echoCustomBox,
+  echoWrapperOrdering,
+  WrapperOrdering,
   getGuid,
   getNestedOuid,
   getOuid,
@@ -66,6 +70,40 @@ module5.initialize();
 
 // import imported_types_lib
 // import Foundation
+
+test("boxed custom types and custom boxed types retain their values", (t) => {
+  t.assertEqual("boxed-nested", echoBoxedOuid("boxed-nested"));
+  t.assertEqual("custom-boxed", echoCustomBox("custom-boxed"));
+});
+
+test("custom wrapper dependencies initialize before boxed and set containers", (t) => {
+  const input = WrapperOrdering.create({
+    boxed: "nested-ouid",
+    customBox: "boxed-ouid",
+    optionalBoxes: ["first", undefined, "last"],
+    names: new Set(["second", "first", "second"]),
+  });
+  const output = echoWrapperOrdering(input);
+  t.assertEqual(input.boxed, output.boxed);
+  t.assertEqual(input.customBox, output.customBox);
+  t.assertEqual(input.optionalBoxes, output.optionalBoxes);
+  t.assertTrue(output.names instanceof Set);
+  t.assertEqual(2, output.names.size);
+  t.assertTrue(output.names.has("first"));
+  t.assertTrue(output.names.has("second"));
+  const empty = echoWrapperOrdering(
+    WrapperOrdering.create({
+      boxed: "",
+      customBox: "",
+      optionalBoxes: [],
+      names: new Set(),
+    }),
+  );
+  t.assertEqual("", empty.boxed);
+  t.assertEqual("", empty.customBox);
+  t.assertEqual([], empty.optionalBoxes);
+  t.assertEqual(0, empty.names.size);
+});
 
 test("combinedType from lib", (t) => {
   const ct: CombinedType = getCombinedType(undefined);

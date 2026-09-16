@@ -322,7 +322,7 @@ For more/better documentation, please see the linked docs.
 ```
 
 ```admonish warning
-Because this mirrors other `uniffi-bindgen`s, the `--config` option here is asking for a [`uniffi.toml`](uniffi-toml) file.
+Because this mirrors other `uniffi-bindgen`s, the `--config` option here is asking for a [`uniffi.toml`](uniffi-toml) file, or for a 0.32 global config file if it has a `[crate-roots]`, `[defaults]` or `[crates]` table.
 ```
 
 This command will generate two typescript files and two C++ files per Uniffi namespace. These are: `namespace.ts`, `namespace-ffi.ts`, `namespace.h`, `namespace.cpp`, substituting `namespace` for names derived from the Rust crate.

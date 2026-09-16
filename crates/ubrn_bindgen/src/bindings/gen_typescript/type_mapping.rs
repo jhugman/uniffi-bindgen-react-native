@@ -18,12 +18,39 @@ pub(crate) fn ffi_type_to_ts(ffi_type: &general::FfiType) -> String {
         general::FfiType::Handle(_) => "bigint".into(),
         general::FfiType::RustBuffer(_) => "Uint8Array".into(),
         general::FfiType::RustCallStatus => "UniffiRustCallStatus".into(),
-        general::FfiType::ForeignBytes => "ForeignBytes".into(),
+        general::FfiType::ForeignBytes => "Uint8Array".into(),
         general::FfiType::Function(name) => format!("Uniffi{}", name.0.to_upper_camel_case()),
         general::FfiType::Struct(name) => format!("Uniffi{}", name.0.to_upper_camel_case()),
         general::FfiType::Reference(inner) | general::FfiType::MutReference(inner) => {
             ffi_type_to_ts(inner)
         }
         general::FfiType::VoidPointer => "/*pointer*/ bigint".into(),
+    }
+}
+
+#[cfg(test)]
+mod ffi_type_to_ts_tests {
+    use super::*;
+
+    /// Borrowed bytes (`&[u8]` / `[ByRef] bytes`) reach the native module as a
+    /// `Uint8Array` (see `FfiConverterArrayBuffer.lowerBorrowed`). `ForeignBytes`
+    /// is a Rust/C++ type that has no TypeScript definition, so it must never be
+    /// emitted into generated TypeScript signatures.
+    #[test]
+    fn foreign_bytes_maps_to_uint8array() {
+        assert_eq!(
+            ffi_type_to_ts(&general::FfiType::ForeignBytes),
+            "Uint8Array"
+        );
+    }
+
+    #[test]
+    fn references_are_transparent() {
+        assert_eq!(
+            ffi_type_to_ts(&general::FfiType::Reference(Box::new(
+                general::FfiType::ForeignBytes
+            ))),
+            "Uint8Array"
+        );
     }
 }

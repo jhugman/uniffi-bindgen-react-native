@@ -16,7 +16,11 @@ import {
   diff,
   ChronologicalError,
   optional,
+  areEqual,
 } from "@/generated/chronological";
+// Namespace import so the test can look up symbols that config removed
+// (`exclude`) or renamed without the compiler rejecting the import itself.
+import * as chronological from "@/generated/chronological";
 import { xasyncTest, test, Asserts, xtest } from "@/asserts";
 
 type Duration = number;
@@ -164,4 +168,19 @@ test("Test optional values work", (t) => {
   t.assertTrue(optional(Instant.MAX, Duration.ofSeconds(0)));
   t.assertFalse(optional(undefined, Duration.ofSeconds(0)));
   t.assertFalse(optional(Instant.MAX, undefined));
+});
+
+// Exercises the [bindings.typescript] `rename` and `exclude` keys: the
+// generator republishes that table as [bindings.react-native] for the uniffi
+// 0.32 pipeline, which is what makes these names take effect at all.
+test("rename and exclude from [bindings.typescript]", (t) => {
+  const start = Instant.ofEpochSecond(1000);
+  const later = Instant.ofEpochSecond(1001);
+  // `equal` was renamed to `are_equal`; the generated export is `areEqual`.
+  t.assertTrue(areEqual(start, start));
+  t.assertFalse(areEqual(start, later));
+  // `get_pre_epoch_timestamp` was excluded: no renamed or original export.
+  const moduleExports = chronological as unknown as Record<string, unknown>;
+  t.assertEqual(undefined, moduleExports.getPreEpochTimestamp);
+  t.assertEqual(undefined, moduleExports.equal);
 });

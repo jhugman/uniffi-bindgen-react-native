@@ -30,6 +30,11 @@ import {
   OptionalFields,
   OptionalFields_Tags,
   identityOptionalFields,
+  IntList,
+  IntList_Tags,
+  identityIntList,
+  makeIntList,
+  intListSum,
 } from "@/generated/enum_types";
 
 test("Enum discriminant", (t) => {
@@ -288,3 +293,51 @@ function testPatternMatching2(variant: AnimalNamedAssociatedType) {
     }
   }
 }
+
+// `IntList` is a recursive enum: `Cons` holds a `Box<IntList>` pointing back
+// to the same type. This is the feature added in uniffi 0.32 (automatic FFI
+// support for `Box<T>`, plus recursive-type cycle detection) — these tests
+// exercise it end-to-end through the generated bindings, not just the
+// FfiConverterBox unit test in ffi-converters.test.ts.
+function intListToArray(list: IntList): number[] {
+  const out: number[] = [];
+  let current = list;
+  while (current.tag === IntList_Tags.Cons) {
+    const [head, tail] = current.inner;
+    out.push(head);
+    current = tail;
+  }
+  return out;
+}
+
+test("Recursive enum: constructing a Box-linked chain by hand", (t) => {
+  const list = IntList.Cons.new(
+    1,
+    IntList.Cons.new(2, IntList.Cons.new(3, IntList.Nil.new())),
+  );
+  t.assertEqual(list.tag, IntList_Tags.Cons);
+  t.assertEqual(intListToArray(list), [1, 2, 3]);
+  t.assertEqual(intListSum(list), 6);
+});
+
+test("Recursive enum: built and summed on the Rust side", (t) => {
+  t.assertEqual(intListSum(makeIntList([1, 2, 3, 4, 5])), 15);
+  t.assertEqual(intListSum(makeIntList([])), 0);
+  t.assertTrue(IntList.Nil.instanceOf(makeIntList([])));
+});
+
+test("Recursive enum: roundtrips through Rust unchanged", (t) => {
+  const list = makeIntList([10, 20, 30]);
+  const roundTripped = identityIntList(list);
+  t.assertEqual(intListToArray(roundTripped), [10, 20, 30]);
+  t.assertEqual(roundTripped, list);
+});
+
+test("Recursive enum: a longer chain crosses the FFI without stack issues", (t) => {
+  const n = 500;
+  const values = Array.from({ length: n }, (_, i) => i + 1);
+  const list = makeIntList(values);
+  const expectedSum = (n * (n + 1)) / 2;
+  t.assertEqual(intListSum(list), expectedSum);
+  t.assertEqual(intListSum(identityIntList(list)), expectedSum);
+});

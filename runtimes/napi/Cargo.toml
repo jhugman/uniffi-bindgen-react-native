@@ -7,7 +7,10 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = { version = "2.16", default-features = false, features = ["napi6"] }
+# Node-API 7 for `napi_is_detached_arraybuffer`: a `&[u8]` argument whose buffer
+# is detached during argument conversion must be reported as such instead of
+# reaching Rust as an empty slice.
+napi = { version = "2.16", default-features = false, features = ["napi7"] }
 napi-derive = "2.16"
 uniffi-runtime-core = { path = "../core" }
 

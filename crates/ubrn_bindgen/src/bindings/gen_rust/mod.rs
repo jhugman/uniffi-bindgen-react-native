@@ -670,7 +670,11 @@ impl<'a> ComponentTemplate<'a> {
 
     fn convert_to_rust(&self, ident: Ident, type_: &FfiType) -> TokenStream {
         let rust_type = self.ffi_type_rust(type_);
-        quote! { #rust_type::into_rust(#ident), }
+        if matches!(type_, FfiType::ForeignBytes) {
+            quote! { #rust_type::into_rust(&#ident), }
+        } else {
+            quote! { #rust_type::into_rust(#ident), }
+        }
     }
 
     fn convert_to_js(&self, ident: Ident) -> TokenStream {
@@ -782,7 +786,7 @@ impl<'a> ComponentTemplate<'a> {
             FfiType::Float32 => quote! { f32 },
             FfiType::Float64 => quote! { f64 },
             FfiType::Handle => quote! { u64 },
-            FfiType::ForeignBytes => quote! { #uniffi::RustBuffer },
+            FfiType::ForeignBytes => quote! { #uniffi::ForeignBytes },
             FfiType::RustBuffer(_) => quote! { #uniffi::RustBuffer },
             FfiType::RustCallStatus => quote! { #uniffi::RustCallStatus },
             FfiType::VoidPointer => quote! { #uniffi::VoidPointer },
@@ -912,6 +916,29 @@ mod unit_tests {
         assert_eq!(
             string.trim(),
             "fn happy_path_func (status_ : & mut u :: RustCallStatus) -> i8 ;"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn foreign_bytes_borrow_backing_vector() -> Result<()> {
+        let mut subject = subject();
+        let input = func(
+            "consume_bytes",
+            vec![arg("bytes", FfiType::ForeignBytes)].into_iter(),
+            return_(FfiType::Int32),
+        );
+        let declaration = subject.ffi_function_decl_c_abi(&input).to_string();
+        assert!(declaration.contains("bytes : u :: ForeignBytes"));
+        let output = formatted(subject.ffi_function(&input), true)?;
+        assert!(output.contains("bytes: js::ForeignBytes"));
+        assert!(output.contains("u::ForeignBytes::into_rust(&bytes)"));
+        assert!(!output.contains("RustBuffer::into_rust"));
+        assert_eq!(
+            subject
+                .convert_to_rust(ident("owned"), &FfiType::RustBuffer(None))
+                .to_string(),
+            quote! { u::RustBuffer::into_rust(owned), }.to_string()
         );
         Ok(())
     }

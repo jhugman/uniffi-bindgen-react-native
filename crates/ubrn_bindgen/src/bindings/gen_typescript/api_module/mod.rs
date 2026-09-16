@@ -15,7 +15,7 @@ mod docstring;
 mod nodes;
 mod type_helpers;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use heck::ToUpperCamelCase;
 use uniffi_bindgen::pipeline::general;
@@ -354,6 +354,7 @@ impl TsApiModule {
         config: &Config,
         namespace: &general::Namespace,
         flavor: &AbiFlavor,
+        explicit_discr_enums: &HashSet<String>,
     ) -> Vec<TsTypeDefinition> {
         let mut defs = Vec::new();
 
@@ -381,6 +382,13 @@ impl TsApiModule {
                         defs.push(TsTypeDefinition::StringHelper(build_string_helper(flavor)));
                     }
                 }
+                general::TypeDefinition::Box(boxed) => {
+                    deferred_wrappers
+                        .push(TsTypeDefinition::SimpleWrapper(build_box(config, boxed)));
+                }
+                general::TypeDefinition::Set(set) => {
+                    deferred_wrappers.push(TsTypeDefinition::SimpleWrapper(build_set(config, set)));
+                }
                 general::TypeDefinition::Optional(opt) => {
                     deferred_wrappers
                         .push(TsTypeDefinition::SimpleWrapper(build_optional(config, opt)));
@@ -399,6 +407,8 @@ impl TsApiModule {
                         general::Type::Map { .. }
                             | general::Type::Sequence { .. }
                             | general::Type::Optional { .. }
+                            | general::Type::Box { .. }
+                            | general::Type::Set { .. }
                     ) {
                         deferred_wrappers.push(td);
                     } else {
@@ -409,7 +419,14 @@ impl TsApiModule {
                     defs.push(TsTypeDefinition::External(build_external_type(config, ext)));
                 }
                 general::TypeDefinition::Enum(e) => {
-                    let ts_enum = build_enum(config, e, flavor);
+                    let has_explicit_discr = explicit_discr_enums.contains(&e.orig_name);
+                    let ts_enum = build_enum(
+                        config,
+                        e,
+                        flavor,
+                        has_explicit_discr,
+                        &namespace.type_definitions,
+                    );
                     if ts_enum.is_flat && ts_enum.is_error {
                         defs.push(TsTypeDefinition::FlatError(ts_enum));
                     } else if ts_enum.is_flat {
@@ -419,7 +436,12 @@ impl TsApiModule {
                     }
                 }
                 general::TypeDefinition::Record(r) => {
-                    defs.push(TsTypeDefinition::Record(build_record(config, r, flavor)));
+                    defs.push(TsTypeDefinition::Record(build_record(
+                        config,
+                        r,
+                        flavor,
+                        &namespace.type_definitions,
+                    )));
                 }
                 general::TypeDefinition::Interface(i) => {
                     defs.push(TsTypeDefinition::Object(Box::new(build_object(
@@ -428,11 +450,18 @@ impl TsApiModule {
                         flavor,
                         &ffi_fn_types,
                         config.strict_object_types,
+                        &namespace.type_definitions,
                     ))));
                 }
                 general::TypeDefinition::CallbackInterface(cbi) => {
                     defs.push(TsTypeDefinition::CallbackInterface(
-                        build_callback_interface(config, cbi, &ffi_fn_types, flavor),
+                        build_callback_interface(
+                            config,
+                            cbi,
+                            &ffi_fn_types,
+                            flavor,
+                            &namespace.type_definitions,
+                        ),
                     ));
                 }
             }
@@ -492,11 +521,13 @@ impl TsApiModule {
         namespace: &general::Namespace,
         flavor: AbiFlavor,
         ffi_exported_definitions: Vec<ffi_module::FfiExportedName>,
+        explicit_discr_enums: &HashSet<String>,
     ) -> anyhow::Result<Self> {
         let module_name = namespace.name.clone();
         let namespace_docstring = namespace.docstring.as_deref().map(format_docstring);
         let supports_rust_backtrace = flavor.supports_rust_backtrace();
-        let type_definitions = Self::build_type_definitions(config, namespace, &flavor);
+        let type_definitions =
+            Self::build_type_definitions(config, namespace, &flavor, explicit_discr_enums);
         let functions = build_functions(config, namespace, &flavor);
         let initialization = build_initialization(namespace, &flavor);
 
@@ -573,6 +604,7 @@ impl TsApiModule {
         module.exported_converters = acc.exported_converters;
 
         validate_force_async(&module.type_definitions)?;
+        validate_borrowed_bytes(&module.type_definitions, &module.functions)?;
 
         Ok(module)
     }
@@ -637,8 +669,90 @@ fn force_async_error_block(kind: &str, name: &str, methods: &[TsCallable]) -> Op
     ))
 }
 
+fn validate_borrowed_callable(callable: &TsCallable, callback: bool) -> anyhow::Result<()> {
+    if !callable.arguments.iter().any(|arg| arg.is_borrowed_bytes) {
+        return Ok(());
+    }
+    let takes_callback = callable
+        .arguments
+        .iter()
+        .any(|arg| arg.is_callback_interface);
+    if callback {
+        anyhow::bail!(
+            "Borrowed bytes in `{}` are not supported for callback-interface methods; use owned Vec<u8> instead",
+            callable.name
+        );
+    }
+    if callable.is_ffi_async() {
+        anyhow::bail!(
+            "Borrowed bytes in `{}` are not supported for Rust-async calls; use owned Vec<u8> instead",
+            callable.name
+        );
+    }
+    if takes_callback {
+        anyhow::bail!(
+            "Borrowed bytes in `{}` are not supported because it also takes a callback interface, \
+             so Rust may re-enter JS during the call while the bytes are borrowed and JS could mutate or detach them; \
+             use owned Vec<u8> instead",
+            callable.name
+        );
+    }
+    Ok(())
+}
+
+/// Reject borrowed-bytes arguments only where the borrow can be honoured: a
+/// synchronous Rust call that cannot re-enter JS before it returns.
+fn validate_borrowed_bytes(
+    definitions: &[TsTypeDefinition],
+    functions: &[TsFunction],
+) -> anyhow::Result<()> {
+    let mut callables: Vec<(&TsCallable, bool)> = functions.iter().map(|f| (f, false)).collect();
+    for definition in definitions {
+        let (constructors, methods, traits, callback) = match definition {
+            TsTypeDefinition::Object(o) => {
+                callables.extend(o.primary_constructor.iter().map(|c| (c, false)));
+                (
+                    &o.alternate_constructors,
+                    &o.methods,
+                    &o.uniffi_traits,
+                    o.has_callback_interface,
+                )
+            }
+            TsTypeDefinition::Record(r) => (&r.constructors, &r.methods, &r.uniffi_traits, false),
+            TsTypeDefinition::FlatEnum(e)
+            | TsTypeDefinition::FlatError(e)
+            | TsTypeDefinition::TaggedEnum(e) => {
+                (&e.constructors, &e.methods, &e.uniffi_traits, false)
+            }
+            TsTypeDefinition::CallbackInterface(cbi) => {
+                callables.extend(cbi.methods.iter().map(|m| (m, true)));
+                continue;
+            }
+            _ => continue,
+        };
+        callables.extend(constructors.iter().map(|c| (c, false)));
+        callables.extend(methods.iter().map(|m| (m, callback)));
+        for uniffi_trait in traits {
+            match uniffi_trait {
+                TsUniffiTrait::Display { method }
+                | TsUniffiTrait::Debug { method }
+                | TsUniffiTrait::Hash { method }
+                | TsUniffiTrait::Ord { cmp: method } => callables.push((method, callback)),
+                TsUniffiTrait::Eq { eq, ne } => {
+                    callables.push((eq, callback));
+                    callables.push((ne, callback));
+                }
+            }
+        }
+    }
+    for (callable, callback) in callables {
+        validate_borrowed_callable(callable, callback)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
-mod force_async_validation_tests {
+mod validation_tests {
     use super::*;
 
     fn callable(name: &str, ffi_async: bool) -> TsCallable {
@@ -679,6 +793,82 @@ mod force_async_validation_tests {
             },
             force_async,
         })
+    }
+
+    fn borrowed_bytes(name: &str) -> TsCallable {
+        let mut function = callable(name, false);
+        function.arguments.push(TsArg {
+            name: "bytes".into(),
+            ts_type: "Uint8Array".into(),
+            ffi_converter: "FfiConverterUint8Array".into(),
+            is_borrowed_bytes: true,
+            is_callback_interface: false,
+            default_value: None,
+        });
+        function
+    }
+
+    fn callback_argument(name: &str) -> TsArg {
+        TsArg {
+            name: name.into(),
+            ts_type: "Consumer".into(),
+            ffi_converter: "FfiConverterTypeConsumer".into(),
+            is_borrowed_bytes: false,
+            is_callback_interface: true,
+            default_value: None,
+        }
+    }
+
+    #[test]
+    fn synchronous_borrowed_bytes_are_ok() {
+        assert!(validate_borrowed_bytes(&[], &[borrowed_bytes("consume")]).is_ok());
+    }
+
+    #[test]
+    fn force_async_borrowed_bytes_are_ok_because_ffi_stays_sync() {
+        let mut function = borrowed_bytes("consume");
+        function.force_async = true;
+        assert!(validate_borrowed_bytes(&[], &[function]).is_ok());
+    }
+
+    #[test]
+    fn owned_bytes_are_ok() {
+        let mut function = borrowed_bytes("consume");
+        function.arguments[0].is_borrowed_bytes = false;
+        assert!(validate_borrowed_bytes(&[], &[function]).is_ok());
+    }
+
+    #[test]
+    fn borrowed_bytes_on_callback_interface_method_are_rejected() {
+        let callback = callback_interface("Consumer", false, vec![borrowed_bytes("consume")]);
+        let err = validate_borrowed_bytes(&[callback], &[]).unwrap_err();
+        assert!(err.to_string().contains("consume"), "message: {err}");
+    }
+
+    #[test]
+    fn borrowed_bytes_on_rust_async_call_are_rejected() {
+        let mut function = borrowed_bytes("consume");
+        function.ffi_async = callable("consume", true).ffi_async;
+        let err = validate_borrowed_bytes(&[], &[function]).unwrap_err();
+        assert!(err.to_string().contains("consume"), "message: {err}");
+    }
+
+    #[test]
+    fn borrowed_bytes_with_callback_interface_argument_are_rejected() {
+        let mut function = borrowed_bytes("consume");
+        function.arguments.push(callback_argument("consumer"));
+        let err = validate_borrowed_bytes(&[], &[function]).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("consume"), "message: {message}");
+        assert!(message.contains("callback interface"), "message: {message}");
+    }
+
+    #[test]
+    fn owned_bytes_with_callback_interface_argument_are_ok() {
+        let mut function = borrowed_bytes("consume");
+        function.arguments[0].is_borrowed_bytes = false;
+        function.arguments.push(callback_argument("consumer"));
+        assert!(validate_borrowed_bytes(&[], &[function]).is_ok());
     }
 
     #[test]

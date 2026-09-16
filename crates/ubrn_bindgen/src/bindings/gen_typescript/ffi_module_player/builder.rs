@@ -65,14 +65,14 @@ impl PlayerFfiModule {
                     let args: Vec<String> = func
                         .arguments
                         .iter()
-                        .map(|arg| ffi_type_to_player(&arg.ty.ty))
+                        .map(|arg| ffi_type_to_player(&arg.ty))
                         .collect();
 
                     let ret = func
                         .return_type
                         .ty
                         .as_ref()
-                        .map(|rt| ffi_type_to_player(&rt.ty))
+                        .map(ffi_type_to_player)
                         .unwrap_or_else(|| "FfiType.Void".into());
 
                     result.push(PlayerFunctionDef {
@@ -103,7 +103,7 @@ impl PlayerFfiModule {
                     .filter(|a| {
                         a.name != "uniffi_out_return" && a.name != "uniffi_out_dropped_callback"
                     })
-                    .map(|arg| ffi_type_to_player(&arg.ty.ty))
+                    .map(|arg| ffi_type_to_player(&arg.ty))
                     .collect();
 
                 let ret = if has_out_return {
@@ -113,7 +113,7 @@ impl PlayerFfiModule {
                             a.name == "uniffi_out_return" || a.name == "uniffi_out_dropped_callback"
                         })
                         .map(|a| {
-                            let inner = match &a.ty.ty {
+                            let inner = match &a.ty {
                                 general::FfiType::Reference(t)
                                 | general::FfiType::MutReference(t) => t.as_ref(),
                                 t => t,
@@ -125,7 +125,7 @@ impl PlayerFfiModule {
                     ft.return_type
                         .ty
                         .as_ref()
-                        .map(|rt| ffi_type_to_player(&rt.ty))
+                        .map(ffi_type_to_player)
                         .unwrap_or_else(|| "FfiType.Void".into())
                 };
 
@@ -152,7 +152,7 @@ impl PlayerFfiModule {
                     .iter()
                     .map(|f| PlayerFieldDef {
                         name: f.name.clone(),
-                        type_expr: ffi_type_to_player(&f.ty.ty),
+                        type_expr: ffi_type_to_player(&f.ty),
                     })
                     .collect();
 
@@ -204,7 +204,7 @@ impl PlayerFfiModule {
             .iter()
             .map(|arg| FfiArgDecl {
                 name: arg.name.to_lower_camel_case(),
-                type_name: ffi_type_to_ts(&arg.ty.ty),
+                type_name: ffi_type_to_ts(&arg.ty),
             })
             .collect();
 
@@ -215,11 +215,7 @@ impl PlayerFfiModule {
             });
         }
 
-        let return_type = func
-            .return_type
-            .ty
-            .as_ref()
-            .map(|rt| ffi_type_to_ts(&rt.ty));
+        let return_type = func.return_type.ty.as_ref().map(ffi_type_to_ts);
 
         FfiFunctionDecl {
             name: func.name.0.clone(),

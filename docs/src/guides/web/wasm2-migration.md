@@ -18,8 +18,8 @@ The `web` flavor puts the wasm-specific requirements in the crate it generates f
 + crate-type = ["lib", "cdylib"]
 
 + [target.'cfg(target_arch = "wasm32")'.dependencies]
-+ uniffi-runtime-wasm = "0.31.0-3"
-+ uniffi_core = { version = "0.31", features = ["wasm-unstable-single-threaded"] }
++ uniffi-runtime-wasm = "0.31.0-5"
++ uniffi_core = { version = "0.32", features = ["wasm-unstable-single-threaded"] }
 ```
 
 ```diff
@@ -74,8 +74,8 @@ Three things, one of which is easy to miss.
 -  "browser": "src/index.web.ts",
 +  "browser": "src/generated/index.ts",
    "dependencies": {
-     "@ubjs/core": "^0.31.0-3",
-+    "@ubjs/wasm": "^0.31.0-3"
+     "@ubjs/core": "^0.31.0-5",
++    "@ubjs/wasm": "^0.31.0-5"
    }
 ```
 

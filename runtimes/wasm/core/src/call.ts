@@ -6,10 +6,12 @@
 import type { Memory } from "./memory.js";
 import type { Scratch } from "./scratch.js";
 import {
+  FOREIGN_BYTES_SIZE,
   RUST_CALL_STATUS_SIZE,
   RUST_BUFFER_SIZE,
   RCS_ERROR_BUF_OFF,
   readRustBuffer,
+  writeForeignBytes,
   writeRustBufferPayload,
   writeRustCallStatusZero,
   type RustBufferLike,
@@ -56,10 +58,32 @@ interface ScratchSlot {
   scratchAlign: number;
 }
 
+// What `prepare` returns for one argument. Most args are a bare wasm-arg word
+// (pointer or scalar). An arg that owns transient wasm storage returns the
+// word plus a cleanup closure that releases it after the call — on the error
+// path too, because the callee only *borrows* the bytes (`ForeignBytes`).
+//
+// The closure must capture this call's allocation rather than re-reading the
+// shared reserved scratch slot: a re-entrant call of the same export overwrites
+// that slot before the outer `finally` runs, so re-reading it would free the
+// inner allocation twice and leak the outer one.
+interface PreparedArg {
+  word: number;
+  cleanup?: () => void;
+}
+
 interface ArgPlan extends ScratchSlot {
-  // What the dispatcher does at call-time per arg. Returns the wasm-arg int
-  // (pointer or scalar).
-  prepare: (ctx: DispatchContext, base: number, jsArg: any) => number;
+  // What the dispatcher does at call-time per arg. Scalars are a `number`
+  // (i32/f32/f64) or a `bigint` (i64/handle); args owning transient storage
+  // return a `PreparedArg`.
+  prepare: (
+    ctx: DispatchContext,
+    base: number,
+    jsArg: any,
+  ) => number | bigint | PreparedArg;
+  // `prepare` grows wasm memory via `ctx.alloc`, detaching views other args
+  // captured earlier in the call. The dispatcher prepares these last.
+  allocates?: boolean;
 }
 
 interface RetSlot extends ScratchSlot {
@@ -76,11 +100,23 @@ const RUST_BUFFER_SLOT: ScratchSlot = {
   scratchAlign: 8,
 };
 
-/** Scratch a lowered arg needs. Only `RustBuffer` takes a slot; everything
- * else — scalars, callback table indices, and the persistently-allocated
- * `Reference(Struct)` — passes by value. */
+const FOREIGN_BYTES_SLOT: ScratchSlot = {
+  scratchSize: FOREIGN_BYTES_SIZE,
+  scratchAlign: 4,
+};
+
+/** Scratch a lowered arg needs. `RustBuffer` and `ForeignBytes` are structs
+ * written into a slot; everything else — scalars, callback table indices, and
+ * the persistently-allocated `Reference(Struct)` — passes by value. */
 function argSlot(t: FfiTypeDesc): ScratchSlot {
-  return t.tag === "RustBuffer" ? RUST_BUFFER_SLOT : SCALAR_SLOT;
+  switch (t.tag) {
+    case "RustBuffer":
+      return RUST_BUFFER_SLOT;
+    case "ForeignBytes":
+      return FOREIGN_BYTES_SLOT;
+    default:
+      return SCALAR_SLOT;
+  }
 }
 
 /** Scratch a return value needs. `RustBuffer` returns come back through an
@@ -140,6 +176,55 @@ function planArg(t: FfiTypeDesc): ArgPlan {
           return base;
         },
       };
+    case "ForeignBytes":
+      // `&[u8]` arg: `{ len: i32, data: *const u8 }`, passed by pointer on
+      // wasm32 (the native players pass it by value). Codegen hands us the
+      // caller's `Uint8Array`; a `subarray` window is honoured by
+      // `Memory.writeBytes`.
+      return {
+        ...argSlot(t),
+        allocates: true,
+        prepare: (ctx, base, v: Uint8Array) => {
+          // Codegen lowers every `&[u8]` to a `Uint8Array`.
+          if (!(v instanceof Uint8Array)) {
+            throw new Error(
+              `planArg(ForeignBytes): expected a Uint8Array, got ${Object.prototype.toString.call(v)}`,
+            );
+          }
+          const len = v.byteLength;
+          const buf = v.buffer as ArrayBuffer & { detached?: boolean };
+          if (buf.detached === true) {
+            throw new Error(
+              "planArg(ForeignBytes): source view is detached — cannot copy " +
+                "it into wasm memory. The view must not be held across any " +
+                "operation that can grow wasm memory.",
+            );
+          }
+          // Zero-length must reach Rust as `(len 0, null)`.
+          let dataPtr = 0;
+          let cleanup: (() => void) | undefined;
+          if (len > 0) {
+            if (v.buffer === ctx.memory.buffer()) {
+              // Already a view into wasm memory: borrow it. Mirrors
+              // `writeRustBufferPayload`.
+              dataPtr = v.byteOffset;
+            } else {
+              dataPtr = ctx.alloc(len, 1);
+              const allocated = dataPtr;
+              cleanup = () => ctx.free(allocated, len, 1);
+              try {
+                ctx.memory.writeBytes(dataPtr, v);
+              } catch (e) {
+                // A throw here never reaches the dispatcher's cleanup list.
+                cleanup();
+                throw e;
+              }
+            }
+          }
+          writeForeignBytes(ctx.memory, base, { len, dataPtr });
+          return { word: base, cleanup };
+        },
+      };
     case "Callback": {
       const name = t.name;
       return {
@@ -167,6 +252,7 @@ function planArg(t: FfiTypeDesc): ArgPlan {
       const structName = t.inner.name;
       return {
         ...argSlot(t),
+        allocates: true,
         prepare: (ctx, _base, value: Record<string, unknown>) => {
           const layout = ctx.structs.get(structName);
           if (!layout) {
@@ -352,41 +438,75 @@ function buildInterpretedDispatcher(
     // Last JS arg is the status object iff hasRustCallStatus.
     const userArgs = def.hasRustCallStatus ? jsArgs.slice(0, -1) : jsArgs;
     const statusObj = def.hasRustCallStatus ? jsArgs[jsArgs.length - 1] : null;
+    // Per-call cleanup closures collected from `prepare`. The `try` starts
+    // before the prepare loop so storage allocated by an earlier arg is
+    // released even if a later `prepare` throws.
+    const cleanups: Array<() => void> = [];
 
-    if (def.hasRustCallStatus)
-      writeRustCallStatusZero(ctx.memory, base + statusOff);
+    try {
+      if (def.hasRustCallStatus)
+        writeRustCallStatusZero(ctx.memory, base + statusOff);
 
-    const wasmArgs: any[] = [];
-    if (retPlan.hasSret) wasmArgs.push(base + sretOff);
-    for (let i = 0; i < argPlans.length; i++) {
-      const p = argPlans[i];
-      const argBase = argOffsets[i] >= 0 ? base + argOffsets[i] : 0;
-      wasmArgs.push(p.prepare(ctx, argBase, userArgs[i]));
-    }
-    if (def.hasRustCallStatus) wasmArgs.push(base + statusOff);
-
-    const scalarRet = (exportFn as any)(...wasmArgs);
-
-    // Inline status check on the success path — no RustCallStatus object built.
-    if (def.hasRustCallStatus) {
-      const code = ctx.memory.readU8(base + statusOff);
-      statusObj.code = code;
-      if (code !== 0) {
-        // Lift errorBuf into a Uint8Array and free the wasm allocation, to
-        // match the `UniffiByteArray` contract `rust-call.ts` assumes when
-        // it forwards the buffer to liftString / errorHandler.
-        const errBufRb = readRustBuffer(
-          ctx.memory,
-          base + statusOff + RCS_ERROR_BUF_OFF,
-        );
-        (statusObj as any).errorBuf = copyAndFreeRustBuffer(ctx, errBufRb);
-        // On the error path Rust hasn't written a valid value into the sret
-        // slot — `rustCallWithError` will throw via `uniffiCheckCallStatus`
-        // before anything looks at the return, so skip `retPlan.finish`.
-        return undefined;
+      // Prepare allocating args (those that can grow wasm memory and detach
+      // views) last, so every other arg captures what it needs first.
+      const preparedArgs: Array<number | bigint | PreparedArg> = [];
+      for (const allocates of [false, true]) {
+        for (let i = 0; i < argPlans.length; i++) {
+          if (Boolean(argPlans[i].allocates) !== allocates) continue;
+          const argBase = argOffsets[i] >= 0 ? base + argOffsets[i] : 0;
+          const prepared = argPlans[i].prepare(ctx, argBase, userArgs[i]);
+          preparedArgs[i] = prepared;
+          // Collect cleanups as we go: a later `prepare` may throw.
+          if (
+            typeof prepared === "object" &&
+            prepared !== null &&
+            prepared.cleanup
+          ) {
+            cleanups.push(prepared.cleanup);
+          }
+        }
       }
+
+      const wasmArgs: any[] = [];
+      if (retPlan.hasSret) wasmArgs.push(base + sretOff);
+      for (let i = 0; i < argPlans.length; i++) {
+        const prepared = preparedArgs[i];
+        // Objects are `PreparedArg`; numbers and bigints are scalar words.
+        wasmArgs.push(
+          typeof prepared === "object" && prepared !== null
+            ? prepared.word
+            : prepared,
+        );
+      }
+      if (def.hasRustCallStatus) wasmArgs.push(base + statusOff);
+
+      const scalarRet = (exportFn as any)(...wasmArgs);
+
+      // Inline status check on the success path — no RustCallStatus object built.
+      if (def.hasRustCallStatus) {
+        const code = ctx.memory.readU8(base + statusOff);
+        statusObj.code = code;
+        if (code !== 0) {
+          // Lift errorBuf into a Uint8Array and free the wasm allocation, to
+          // match the `UniffiByteArray` contract `rust-call.ts` assumes when
+          // it forwards the buffer to liftString / errorHandler.
+          const errBufRb = readRustBuffer(
+            ctx.memory,
+            base + statusOff + RCS_ERROR_BUF_OFF,
+          );
+          (statusObj as any).errorBuf = copyAndFreeRustBuffer(ctx, errBufRb);
+          // On the error path Rust hasn't written a valid value into the sret
+          // slot — `rustCallWithError` will throw via `uniffiCheckCallStatus`
+          // before anything looks at the return, so skip `retPlan.finish`.
+          return undefined;
+        }
+      }
+      return retPlan.finish(ctx, base + sretOff, scalarRet);
+    } finally {
+      // Releases transient wasm storage (`ForeignBytes` payloads), error path
+      // included.
+      for (const cleanup of cleanups) cleanup();
     }
-    return retPlan.finish(ctx, base + sretOff, scalarRet);
   };
 }
 
@@ -416,10 +536,11 @@ function isSimpleRetType(t: FfiTypeDesc): boolean {
 }
 
 /**
- * Tags that the JIT dispatcher knows how to emit inline as arg types.
- * Restricted to scalars and `RustBuffer` — excludes `Void` (return-only).
- * Anything outside this set returns `undefined` from `buildJitDispatcher`,
- * causing `specializeFunction` to fall back to the interpreted path.
+ * Tags the JIT dispatcher can emit inline as an arg type: scalars and
+ * `RustBuffer` only. Anything else — notably `ForeignBytes`, which needs
+ * post-call cleanup the JIT body has no hook for — makes
+ * `buildJitDispatcher` return `undefined`, so `specializeFunction` falls back
+ * to the interpreted path.
  */
 function isSimpleArgType(t: FfiTypeDesc): boolean {
   switch (t.tag) {

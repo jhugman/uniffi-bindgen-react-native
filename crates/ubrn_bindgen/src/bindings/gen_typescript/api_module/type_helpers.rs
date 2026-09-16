@@ -101,6 +101,12 @@ pub(super) fn type_label_for(config: &Config, ty: &general::Type) -> String {
             type_label_for(config, key_type),
             type_label_for(config, value_type)
         ),
+        // `Box<T>` is a transparent wrapper on the Rust side: it lowers/lifts
+        // identically to `T`, so its TS type label is just the inner type's.
+        general::Type::Box { inner_type } => type_label_for(config, inner_type),
+        general::Type::Set { inner_type } => {
+            format!("Set<{}>", type_label_for(config, inner_type))
+        }
     }
 }
 

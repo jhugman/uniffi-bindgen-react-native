@@ -14,21 +14,19 @@ export enum {{ type_name__Tags }} {
 {%- if let Some(ds) = e.docstring %}
 {{ ds }}
 {%- endif %}
+{%- for variant in e.variants %}
+{% call cb::tagged_enum_variant_interface(e, variant, type_name) %}
+{%- endfor %}
+export type {{ type_name }} = {% for variant in e.variants %}{{ type_name }}_{{ variant.name }}_interface{% if !loop.last %} | {% endif %}{% endfor %};
+
 export const {{ type_name }} = (() => {
   {%- for variant in e.variants %}
     {%- let external_name = variant.name %}
     {%- let variant_class = format!("{external_name}_") %}
-    {%- let variant_interface = format!("{variant_class}_interface") %}
+    {%- let variant_interface = format!("{type_name}_{external_name}_interface") %}
     {%- let variant_tag = format!("{type_name__Tags}.{external_name}") %}
     {%- let has_fields = !variant.fields.is_empty() %}
     {%- let is_tuple = variant.has_nameless_fields %}
-
-    type {{ variant_interface }} = {
-        tag: {{ variant_tag }}
-        {%- if has_fields %};
-        inner: {% call cb::variant_inner_type(variant) %}
-        {%- endif %}
-    };
 
     {%- if let Some(ds) = variant.docstring %}
 {{ ds }}
@@ -156,13 +154,6 @@ export const {{ type_name }} = (() => {
     });
 
 })();
-
-{%- if let Some(ds) = e.docstring %}
-{{ ds }}
-{%- endif %}
-export type {{ type_name }} = InstanceType<
-    typeof {{ type_name }}[{%- for variant in e.variants %}'{{ variant.name }}'{% if !loop.last %} | {% endif %}{%- endfor %}]
->;
 
 // FfiConverter for enum {{ type_name }}
 const {{ e.ffi_converter_name }} = (() => {

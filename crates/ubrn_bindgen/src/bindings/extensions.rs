@@ -25,6 +25,7 @@ pub(crate) impl ComponentInterface {
         let meta = uniffi_meta::FnMetadata {
             module_path: "internal".to_string(),
             name: "ffi__string_to_buffer".to_owned(),
+            orig_name: None,
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -45,6 +46,7 @@ pub(crate) impl ComponentInterface {
         let meta = uniffi_meta::FnMetadata {
             module_path: "internal".to_string(),
             name: "ffi__string_from_buffer".to_owned(),
+            orig_name: None,
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -65,6 +67,7 @@ pub(crate) impl ComponentInterface {
         let meta = uniffi_meta::FnMetadata {
             module_path: "internal".to_string(),
             name: "ffi__string_to_byte_length".to_owned(),
+            orig_name: None,
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -85,6 +88,7 @@ pub(crate) impl ComponentInterface {
         let meta = uniffi_meta::FnMetadata {
             module_path: "internal".to_string(),
             name: "ffi__read_string_from_buffer".to_owned(),
+            orig_name: None,
             is_async: false,
             inputs: Default::default(),
             return_type: None,
@@ -146,6 +150,7 @@ pub(crate) impl Object {
             module_path: "internal".to_string(),
             self_name: self.name().to_string(),
             name: "ffi__bless_pointer".to_owned(),
+            orig_name: None,
             is_async: false,
             inputs: Default::default(),
             return_type: None,

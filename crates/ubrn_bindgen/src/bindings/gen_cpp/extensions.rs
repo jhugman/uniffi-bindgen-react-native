@@ -42,6 +42,12 @@ pub(super) impl FfiFunction {
     fn is_callback_init(&self) -> bool {
         self.name().contains("_callback_vtable_")
     }
+
+    fn has_foreign_bytes_args(&self) -> bool {
+        self.arguments()
+            .iter()
+            .any(|arg| matches!(arg.type_(), FfiType::ForeignBytes))
+    }
 }
 
 #[ext(name = CppFfiTypeExt)]
@@ -62,6 +68,11 @@ pub(super) impl FfiType {
             | Self::RustCallStatus
             | Self::RustBuffer(_)
             | Self::VoidPointer => ci.cpp_namespace_includes(),
+            // `Bridging<ForeignBytes>` is hand-written in `ForeignBytes.h`, in the
+            // `uniffi_jsi` namespace; the generated namespace only declares the
+            // template. Note that the plain C++ struct `ForeignBytes` stays in the
+            // global namespace: `ffi_type_name()` is what renders it, not this.
+            Self::ForeignBytes => ci.cpp_namespace_includes(),
             Self::Callback(name) => format!(
                 "{}::cb::{}",
                 ci.cpp_namespace(),
@@ -75,12 +86,22 @@ pub(super) impl FfiType {
             _ => ci.cpp_namespace(),
         }
     }
+
+    fn is_foreign_bytes(&self) -> bool {
+        matches!(self, Self::ForeignBytes)
+    }
 }
 
 #[ext(name = CppFfiCallbackFunctionExt)]
 pub(super) impl FfiCallbackFunction {
     fn cpp_namespace(&self, ci: &ComponentInterface) -> String {
         FfiType::Callback(self.name().to_string()).cpp_namespace(ci)
+    }
+
+    fn has_foreign_bytes_args(&self) -> bool {
+        self.arguments()
+            .iter()
+            .any(|arg| matches!(arg.type_(), FfiType::ForeignBytes))
     }
 
     fn is_future_callback(&self) -> bool {
