@@ -44,6 +44,14 @@ impl Flavor {
             Flavor::AsyncWasm => "async-wasm",
         }
     }
+
+    /// The `generate wasm2 bindings` switches this flavor asks for.
+    pub fn bindgen_args(&self) -> &'static [&'static str] {
+        match self {
+            Flavor::AsyncWasm => &["--async"],
+            _ => &[],
+        }
+    }
 }
 
 use std::ffi::OsStr;
