@@ -78,13 +78,8 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   // A player over a port answers with a promise; a local one with the handle.
   const rustFuture = await rustFutureFunc();
 
-  // The await above yields control back to the caller before this listener
-  // exists, so a signal aborted synchronously right after the call is caught
-  // via the flag check below instead of relying on the listener firing.
   const abortFunc = createAbortFunction(rustFuture, cancelFunc);
-  if (!asyncOpts?.signal.aborted) {
-    asyncOpts?.signal.addEventListener("abort", abortFunc);
-  }
+  asyncOpts?.signal.addEventListener("abort", abortFunc);
 
   // Keep the Node.js event loop alive while polling the Rust future.
   // The napi runtime's callback TSFNs are deliberately unref'd (so leaked TSFNs
@@ -102,8 +97,9 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
-    // Cancel here (inside the try) rather than above, so a throwing
-    // cancelFunc still frees the future via the `finally` below.
+    // Events don't replay, so no listener catches an abort that landed during
+    // the await above; the flag does, and inside the try a throwing cancelFunc
+    // still frees the future via the `finally` below.
     if (asyncOpts?.signal.aborted) {
       abortFunc();
     }
