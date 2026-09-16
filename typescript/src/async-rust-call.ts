@@ -52,10 +52,10 @@ type PollFunc = (
  */
 export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   rustCaller: UniffiRustCaller<S>,
-  rustFutureFunc: () => bigint,
+  rustFutureFunc: () => bigint | Promise<bigint>,
   pollFunc: PollFunc,
   cancelFunc: (rustFuture: bigint) => void,
-  completeFunc: (rustFuture: bigint, status: S) => F,
+  completeFunc: (rustFuture: bigint, status: S) => F | Promise<F>,
   freeFunc: (rustFuture: bigint) => void,
   liftFunc: (lower: F) => T,
   liftString: (bytes: UniffiByteArray) => string,
@@ -74,11 +74,25 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
     return Promise.reject(new UniffiInternalError.AbortError());
   }
 
-  // This actually calls into the client rust method.
-  const rustFuture = rustFutureFunc();
+  // A player over a port answers with a promise; a local one with the handle.
+  // Either way, awaiting yields control back to the caller before we know the
+  // handle, so a signal aborted synchronously right after this call would be
+  // missed by a listener added only once the handle comes back. Catch that
+  // gap with a listener that just remembers the abort happened.
+  let abortedDuringSetup = false;
+  const earlyAbortFunc = () => {
+    abortedDuringSetup = true;
+  };
+  asyncOpts?.signal.addEventListener("abort", earlyAbortFunc);
+  const rustFuture = await rustFutureFunc();
+  asyncOpts?.signal.removeEventListener("abort", earlyAbortFunc);
 
   const abortFunc = createAbortFunction(rustFuture, cancelFunc);
-  asyncOpts?.signal.addEventListener("abort", abortFunc);
+  if (abortedDuringSetup) {
+    abortFunc();
+  } else {
+    asyncOpts?.signal.addEventListener("abort", abortFunc);
+  }
 
   // Keep the Node.js event loop alive while polling the Rust future.
   // The napi runtime's callback TSFNs are deliberately unref'd (so leaked TSFNs
@@ -107,7 +121,7 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
 
     // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
-      rustCaller.makeRustCall(
+      await rustCaller.makeRustCallAsync(
         (status) => completeFunc(rustFuture, status),
         liftString,
         errorHandler,
