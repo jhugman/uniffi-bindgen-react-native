@@ -15,7 +15,7 @@ use ubrn_bindgen::{render_player_lowlevel_for_test, AbiFlavor};
 
 #[test]
 fn wasm2_player_ffi_renders_expected_markers() {
-    let rendered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2)
+    let rendered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, false)
         .expect("rendering wasm2 player wrapper-ffi.ts should succeed");
 
     // Wasm2 imports from the wasm runtime, not napi.
@@ -81,7 +81,7 @@ fn napi_player_ffi_still_uses_native_module_open() {
     // Sanity check that the non-Wasm2 player flavor still goes through the
     // napi UniffiNativeModule.open(...) path. This guards against the wasm2
     // branch accidentally being taken for non-wasm2 flavors.
-    let rendered = render_player_lowlevel_for_test(&AbiFlavor::Napi)
+    let rendered = render_player_lowlevel_for_test(&AbiFlavor::Napi, false)
         .expect("rendering napi player wrapper-ffi.ts should succeed");
 
     assert!(
@@ -106,4 +106,22 @@ fn napi_player_ffi_still_uses_native_module_open() {
         !rendered.contains("ModuleDefinitions"),
         "napi flavor must not reference the wasm runtime's ModuleDefinitions:\n{rendered}"
     );
+}
+
+#[test]
+fn wasm2_player_ffi_promises_returns_under_async_delivery() {
+    let rendered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, true)
+        .expect("rendering wasm2 player wrapper-ffi.ts should succeed");
+    // The interface is empty in the minimal module, so check the alloc pair
+    // stays synchronous and the header names the mode.
+    assert!(
+        rendered.contains("rustbuffer_alloc(n: number): Uint8Array;"),
+        "alloc stays synchronous under async delivery:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("every function below returns a Promise"),
+        "expected the async-delivery note:\n{rendered}"
+    );
+    let sync = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, false).unwrap();
+    assert!(!sync.contains("returns a Promise"));
 }

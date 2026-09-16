@@ -119,7 +119,10 @@ struct IndexTsWrapper {
 /// integration tests to assert template branching without standing up a
 /// full `general::Namespace`.
 #[doc(hidden)]
-pub fn render_player_lowlevel_for_test(flavor: &crate::AbiFlavor) -> Result<String> {
-    let module = ffi_module_player::PlayerFfiModule::empty_for_test(flavor.clone());
+pub fn render_player_lowlevel_for_test(
+    flavor: &crate::AbiFlavor,
+    async_delivery: bool,
+) -> Result<String> {
+    let module = ffi_module_player::PlayerFfiModule::empty_for_test(flavor.clone(), async_delivery);
     generate_player_lowlevel_code(module)
 }
