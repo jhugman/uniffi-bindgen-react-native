@@ -77,7 +77,7 @@ impl WasmLibRs {
     fn entrypoint(&self) -> String {
         let switches = SwitchArgs {
             flavor: AbiFlavor::Wasm,
-            async_delivery: false,
+            ..Default::default()
         };
         generate_entrypoint(&switches, &self.config.rust_crate, &self.config.modules).unwrap()
     }
