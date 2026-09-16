@@ -32,13 +32,17 @@ const liftString = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
           // A player over a port fires the continuation later, from a message.
           setTimeout(() => cb(handle, 0 /* READY */), 0);
         },
-        /*cancelFunc:*/ () => calls.push("cancel"),
+        /*cancelFunc:*/ () => {
+          calls.push("cancel");
+        },
         /*completeFunc:*/ async (rustFuture, status) => {
           calls.push(`complete ${rustFuture}`);
           status.code = 0;
           return 99;
         },
-        /*freeFunc:*/ (rustFuture) => calls.push(`free ${rustFuture}`),
+        /*freeFunc:*/ (rustFuture) => {
+          calls.push(`free ${rustFuture}`);
+        },
         /*liftFunc:*/ (n: number) => n + 1,
         liftString,
       );
@@ -63,14 +67,18 @@ const liftString = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
           calls.push(`poll ${rustFuture}`);
           setTimeout(() => cb(handle, 0 /* READY */), 0);
         },
-        /*cancelFunc:*/ (rustFuture) => calls.push(`cancel ${rustFuture}`),
+        /*cancelFunc:*/ (rustFuture) => {
+          calls.push(`cancel ${rustFuture}`);
+        },
         /*completeFunc:*/ async (rustFuture, status) => {
           calls.push(`complete ${rustFuture}`);
           // A cancelled Rust future completes with CALL_CANCELLED.
           status.code = 3;
           return 1;
         },
-        /*freeFunc:*/ (rustFuture) => calls.push(`free ${rustFuture}`),
+        /*freeFunc:*/ (rustFuture) => {
+          calls.push(`free ${rustFuture}`);
+        },
         /*liftFunc:*/ (n: number) => n,
         liftString,
         { signal: abortController.signal },
