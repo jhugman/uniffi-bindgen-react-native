@@ -85,4 +85,44 @@ const liftString = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
       t.end();
     },
   );
+
+  await asyncTest(
+    "a void call rejecting over a closed port does not sink the result",
+    async (t) => {
+      const logged: string[] = [];
+      const consoleError = console.error;
+      console.error = (...args: any[]) => {
+        logged.push(args.map((a) => String(a)).join(" "));
+      };
+      try {
+        const result = await uniffiRustCallAsync(
+          caller,
+          /*rustFutureFunc:*/ async () => BigInt(5),
+          /*pollFunc:*/ (rustFuture, cb, handle: UniffiHandle) => {
+            setTimeout(() => cb(handle, 0 /* READY */), 0);
+          },
+          /*cancelFunc:*/ () => {},
+          /*completeFunc:*/ async (rustFuture, status) => {
+            status.code = 0;
+            return 42;
+          },
+          // A closed port rejects the free call; nothing else is listening.
+          /*freeFunc:*/ () => Promise.reject(new Error("port closed")),
+          /*liftFunc:*/ (n: number) => n,
+          liftString,
+        );
+        t.assertEqual(result, 42);
+        // Let the rejection handler attached by the call run.
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), 0));
+      } finally {
+        console.error = consoleError;
+      }
+      t.assertEqual(logged.length, 1, () => `logged: ${logged.join(" | ")}`);
+      t.assertTrue(
+        logged[0].indexOf("port closed") >= 0,
+        () => `expected the rejection to be reported, got: ${logged[0]}`,
+      );
+      t.end();
+    },
+  );
 })();

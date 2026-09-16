@@ -112,7 +112,10 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
       // Calling pollFunc with a callback that resolves the promise that pollRust
       // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
       pollResult = await pollRust((handle) => {
-        pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
+        ignoreVoidResult(
+          pollFunc(rustFuture, uniffiFutureContinuationCallback, handle),
+          "rust future poll",
+        );
       });
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
 
@@ -129,7 +132,7 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
     // We remove the abortFunc now so we don't trigger a use-after-free
     // panic.
     asyncOpts?.signal.removeEventListener("abort", abortFunc);
-    freeFunc(rustFuture);
+    ignoreVoidResult(freeFunc(rustFuture), "rust future free");
   }
 }
 
@@ -157,7 +160,19 @@ function createAbortFunction(
   // We don't do anything other than call cancel.
   // This will cause pollFunc to come back with a POLL_READY,
   // then the makeRustCall will throw an AbortError.
-  return () => cancelFunc(rustFuture);
+  return () => {
+    ignoreVoidResult(cancelFunc(rustFuture), "rust future cancel");
+  };
+}
+
+// A player over a port answers even void calls with a promise; a closed
+// channel rejects them, and nothing else will hear it.
+function ignoreVoidResult(result: unknown, what: string): void {
+  if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+    (result as Promise<unknown>).then(undefined, (e: unknown) =>
+      console.error(`${what} failed`, e),
+    );
+  }
 }
 
 // Rust calls this callback, which resolves the promise returned by pollRust.
