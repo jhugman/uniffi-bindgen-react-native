@@ -46,7 +46,7 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
     write_worker_bootstrap(ts_dir);
 
     let mut src = String::from(
-        "import { MessageChannel, Worker } from \"node:worker_threads\";\n\
+        "import { isMainThread, MessageChannel, Worker } from \"node:worker_threads\";\n\
          import { createSender } from \"@ubjs/worker\";\n",
     );
     for ns in &namespaces {
@@ -55,6 +55,9 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
              import * as mod_{ns} from \"./{ns}.js\";\n"
         ));
     }
+    // No-op today (this file only ever runs on the main thread), but keeps a
+    // future execArgv change from making the Worker spawn a Worker.
+    src.push_str("if (isMainThread) {\n");
     src.push_str("const t0 = performance.now();\n");
     for ns in &namespaces {
         src.push_str(&format!("const ch_{ns} = new MessageChannel();\n"));
@@ -68,13 +71,18 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
          const worker = new Worker(new URL(\"./{WORKER_BOOTSTRAP_FILE}\", import.meta.url), {{\n\
          \x20 workerData: {{ ports }},\n\
          \x20 transferList: Object.values(ports),\n\
-         \x20 // See write_node_bootstrap: skip replaying this file's own\n\
+         \x20 // See async_wasm.rs::write_node_bootstrap: skip replaying this file's own\n\
          \x20 // --import inside the Worker.\n\
          \x20 execArgv: [],\n\
          }});\n\
          // A Rust panic in the Worker must fail the test, not hang it.\n\
          worker.on(\"error\", (e) => {{\n\
          \x20 throw e;\n\
+         }});\n\
+         // A Worker that dies without an `error` event must not leave this\n\
+         // script waiting for a reply until the test timeout.\n\
+         worker.on(\"exit\", (code) => {{\n\
+         \x20 if (code !== 0) throw new Error(`uniffi worker exited with ${{code}}`);\n\
          }});\n",
         ports.join(", ")
     ));
@@ -89,6 +97,7 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
     for ns in &namespaces {
         src.push_str(&format!("ch_{ns}.port2.unref();\n"));
     }
+    src.push_str("}\n");
 
     let path = ts_dir.join("uniffi-bootstrap.async-wasm.ts");
     std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
