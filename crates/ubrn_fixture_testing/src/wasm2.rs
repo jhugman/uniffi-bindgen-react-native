@@ -124,7 +124,8 @@ pub(crate) fn generated_namespaces(ts_dir: &Utf8Path) -> Vec<String> {
 ///
 /// Mirrors the init sequence in the generated index template
 /// (`gen_typescript/templates/index.ts`: openWasm, resolveModule,
-/// registerSync, setNativeModule, `default.initialize()`); keep the two in
+/// registerSync, setNativeModule, `default.initialize()`); `async_wasm::write_worker`
+/// is a third copy of the openWasm/resolveModule half. Keep all three in
 /// step.
 pub(crate) fn write_player_bootstrap(
     ts_dir: &Utf8Path,

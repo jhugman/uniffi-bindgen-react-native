@@ -6,6 +6,9 @@
 // Runs on Wasm2 (direct) and AsyncWasm (over a Worker). Every call is
 // awaited: on Wasm2 the sync exports return values, on AsyncWasm promises,
 // and `await` accepts both. The delta between the two runs is the channel.
+// Every timed call also goes through one extra closure and promise in
+// shape(), which is an equal floor under every µs/call figure on both
+// flavors.
 //
 //   cargo test -p uniffi-fixture-benchmark -- wasm2::test_benchmark_async
 //   cargo test -p uniffi-fixture-benchmark -- async_wasm::
@@ -94,11 +97,18 @@ async function observe(label: string, fn: () => Promise<unknown>) {
     ticks++;
   }, 1);
   const t0 = performance.now();
-  await fn();
-  const wall = performance.now() - t0;
-  // One loop turn so the tick delayed by fn() lands before we read.
-  await new Promise((r) => setTimeout(r, 0));
-  clearInterval(tick);
+  let wall = 0;
+  try {
+    await fn();
+    wall = performance.now() - t0;
+    // One loop turn so the tick delayed by fn() lands before we read.
+    await new Promise((r) => setTimeout(r, 0));
+  } finally {
+    // A failing assertion in fn() must not leave this interval running.
+    clearInterval(tick);
+  }
+  // node's 1 ms interval delivers fewer than 1000 ticks per idle second, so
+  // ticks/wall reads low even when the loop is free.
   console.log(
     `  ${label.padEnd(22)} wall=${fmtMs(wall).padStart(7)}ms  maxGap=${fmtMs(maxGap).padStart(7)}ms  ticks=${String(ticks).padStart(5)}/${Math.floor(wall)}`,
   );
@@ -149,10 +159,9 @@ async function observe(label: string, fn: () => Promise<unknown>) {
       }
       const mb = 1_024 * 1_024;
       const s = "x".repeat(mb);
+      const b1mb = new ArrayBuffer(mb);
       await shape("getBytesAsync 1 MB", 100, () => getBytesAsync(mb));
-      await shape("takeBytesAsync 1 MB", 100, () =>
-        takeBytesAsync(new ArrayBuffer(mb)),
-      );
+      await shape("takeBytesAsync 1 MB", 100, () => takeBytesAsync(b1mb));
       await shape("getStringAsync 1 MB", 100, () => getStringAsync(mb));
       await shape("takeStringAsync 1 MB", 100, () => takeStringAsync(s));
       t.end();
@@ -170,9 +179,10 @@ async function observe(label: string, fn: () => Promise<unknown>) {
       await shape("buildTree depth 8", 100, () => buildTree(8));
       const tree = await buildTree(8);
       await shape("countLeaves depth 8", 100, () => countLeaves(tree));
-      const arr = await getStringArray(1_024, "x".repeat(1_024));
+      const elem = "x".repeat(1_024);
+      const arr = await getStringArray(1_024, elem);
       await shape("getStringArray 1024x1KB", 100, () =>
-        getStringArray(1_024, "x".repeat(1_024)),
+        getStringArray(1_024, elem),
       );
       await shape("takeStringArray 1024x1KB", 100, () => takeStringArray(arr));
       t.end();
