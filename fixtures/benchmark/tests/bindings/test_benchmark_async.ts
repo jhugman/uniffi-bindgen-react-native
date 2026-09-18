@@ -36,6 +36,7 @@ import {
 } from "@/generated/uniffi_benchmark";
 import { asyncTest } from "@/asserts";
 import { benchAsync, fmtMs, RUNS, TIMEOUT_MS } from "./bench_helpers";
+import { monitorEventLoopDelay } from "node:perf_hooks";
 
 const SIZES: Array<{ label: string; bytes: number }> = [
   { label: "1 KB", bytes: 1_024 },
@@ -62,6 +63,41 @@ class TsPing implements Ping {
   async ping(n: number): Promise<number> {
     return n;
   }
+}
+
+/** Grow `iterations` until one `burn` takes about `targetMs`. */
+async function calibrateBurn(targetMs: number): Promise<bigint> {
+  let n = 1_000_000n;
+  for (;;) {
+    const t0 = performance.now();
+    await burn(n);
+    const ms = performance.now() - t0;
+    if (ms >= targetMs) {
+      return (n * BigInt(Math.round(targetMs))) / BigInt(Math.round(ms));
+    }
+    n *= 4n;
+  }
+}
+
+/**
+ * Run `fn` while sampling the main thread: event-loop delay from perf_hooks
+ * and a 1 ms interval whose delivered count says how much of the wall time
+ * the loop was free.
+ */
+async function observe(label: string, fn: () => Promise<unknown>) {
+  const h = monitorEventLoopDelay({ resolution: 1 });
+  let ticks = 0;
+  const tick = setInterval(() => ticks++, 1);
+  h.enable();
+  const t0 = performance.now();
+  await fn();
+  const wall = performance.now() - t0;
+  h.disable();
+  clearInterval(tick);
+  const ns = (v: number) => (v / 1e6).toFixed(1).padStart(7);
+  console.log(
+    `  ${label.padEnd(22)} wall=${fmtMs(wall).padStart(7)}ms  maxDelay=${ns(h.max)}ms  p99=${ns(h.percentile(99))}ms  ticks=${String(ticks).padStart(5)}/${Math.floor(wall)}`,
+  );
 }
 
 (async () => {
@@ -153,5 +189,27 @@ class TsPing implements Ping {
     TIMEOUT_MS,
   );
 
-  // RESPONSIVENESS
+  await asyncTest(
+    "responsiveness: main thread while Rust burns",
+    async (t) => {
+      console.log("\n--- responsiveness: event-loop delay during burn ---");
+      const n = await calibrateBurn(100);
+      const expected = await burn(n);
+      console.log(`  calibrated: burn(${n}) ~ 100ms`);
+      await observe("one 100ms call", async () => {
+        t.assertEqual(await burn(n), expected);
+      });
+      await observe("5 sequential calls", async () => {
+        for (let i = 0; i < 5; i++) t.assertEqual(await burn(n), expected);
+      });
+      await observe("5 concurrent calls", async () => {
+        const results = await Promise.all(
+          Array.from({ length: 5 }, () => burn(n)),
+        );
+        for (const r of results) t.assertEqual(r, expected);
+      });
+      t.end();
+    },
+    TIMEOUT_MS,
+  );
 })();
