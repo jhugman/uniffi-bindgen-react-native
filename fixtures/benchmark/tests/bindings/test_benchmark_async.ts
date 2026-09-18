@@ -92,6 +92,8 @@ async function observe(label: string, fn: () => Promise<unknown>) {
   const t0 = performance.now();
   await fn();
   const wall = performance.now() - t0;
+  // One turn of the loop so a tick and a histogram sample delayed by fn() land before we read.
+  await new Promise((r) => setTimeout(r, 0));
   h.disable();
   clearInterval(tick);
   const ns = (v: number) => (v / 1e6).toFixed(1).padStart(7);
