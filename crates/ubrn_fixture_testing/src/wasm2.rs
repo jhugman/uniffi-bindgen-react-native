@@ -91,11 +91,27 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
         &path,
         format!(
             "import {{ uniffiInitAsync }} from \"./index.js\";\n\
-             await uniffiInitAsync(new URL(\"./{lib_stem}.wasm\", import.meta.url));\n"
+             const t0 = performance.now();\n\
+             await uniffiInitAsync(new URL(\"./{lib_stem}.wasm\", import.meta.url));\n\
+             // Read by the async benchmark; the same span as AsyncWasm's Worker spawn + initialize.\n\
+             (globalThis as any).__ubrnStartupMs = performance.now() - t0;\n"
         ),
     )
     .unwrap_or_else(|e| panic!("write {path}: {e}"));
     path
+}
+
+/// The generated namespaces: one `<ns>-ffi.ts` per uniffi namespace.
+pub(crate) fn generated_namespaces(ts_dir: &Utf8Path) -> Vec<String> {
+    let mut namespaces: Vec<String> = std::fs::read_dir(ts_dir)
+        .expect("read ts dir")
+        .filter_map(|e| e.ok())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter_map(|name| name.strip_suffix("-ffi.ts").map(str::to_owned))
+        .collect();
+    namespaces.sort();
+    assert!(!namespaces.is_empty(), "no *-ffi.ts generated in {ts_dir}");
+    namespaces
 }
 
 /// Write the bootstrap a port-backed flavor preloads, and return its path.
@@ -117,14 +133,7 @@ pub(crate) fn write_player_bootstrap(
     transport_imports: &str,
     wire_namespace: impl Fn(&str) -> String,
 ) -> Utf8PathBuf {
-    let mut namespaces: Vec<String> = std::fs::read_dir(ts_dir)
-        .expect("read ts dir")
-        .filter_map(|e| e.ok())
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter_map(|name| name.strip_suffix("-ffi.ts").map(str::to_owned))
-        .collect();
-    namespaces.sort();
-    assert!(!namespaces.is_empty(), "no *-ffi.ts generated in {ts_dir}");
+    let namespaces = generated_namespaces(ts_dir);
 
     let glue = ts_dir.join(format!("{lib_stem}_bg.js")).exists();
     let mut src = String::new();
