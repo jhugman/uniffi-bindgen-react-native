@@ -36,7 +36,6 @@ import {
 } from "@/generated/uniffi_benchmark";
 import { asyncTest } from "@/asserts";
 import { benchAsync, fmtMs, RUNS, TIMEOUT_MS } from "./bench_helpers";
-import { monitorEventLoopDelay } from "node:perf_hooks";
 
 const SIZES: Array<{ label: string; bytes: number }> = [
   { label: "1 KB", bytes: 1_024 },
@@ -80,25 +79,28 @@ async function calibrateBurn(targetMs: number): Promise<bigint> {
 }
 
 /**
- * Run `fn` while sampling the main thread: event-loop delay from perf_hooks
- * and a 1 ms interval whose delivered count says how much of the wall time
- * the loop was free.
+ * Run `fn` while a 1 ms interval ticks on the main thread. The longest gap
+ * between ticks is how long the loop was blocked; the tick count against
+ * the wall time is how much of the run the loop was free.
  */
 async function observe(label: string, fn: () => Promise<unknown>) {
-  const h = monitorEventLoopDelay({ resolution: 1 });
   let ticks = 0;
-  const tick = setInterval(() => ticks++, 1);
-  h.enable();
+  let last = performance.now();
+  let maxGap = 0;
+  const tick = setInterval(() => {
+    const now = performance.now();
+    maxGap = Math.max(maxGap, now - last);
+    last = now;
+    ticks++;
+  }, 1);
   const t0 = performance.now();
   await fn();
   const wall = performance.now() - t0;
-  // One turn of the loop so a tick and a histogram sample delayed by fn() land before we read.
+  // One loop turn so the tick delayed by fn() lands before we read.
   await new Promise((r) => setTimeout(r, 0));
-  h.disable();
   clearInterval(tick);
-  const ns = (v: number) => (v / 1e6).toFixed(1).padStart(7);
   console.log(
-    `  ${label.padEnd(22)} wall=${fmtMs(wall).padStart(7)}ms  maxDelay=${ns(h.max)}ms  p99=${ns(h.percentile(99))}ms  ticks=${String(ticks).padStart(5)}/${Math.floor(wall)}`,
+    `  ${label.padEnd(22)} wall=${fmtMs(wall).padStart(7)}ms  maxGap=${fmtMs(maxGap).padStart(7)}ms  ticks=${String(ticks).padStart(5)}/${Math.floor(wall)}`,
   );
 }
 
@@ -194,7 +196,9 @@ async function observe(label: string, fn: () => Promise<unknown>) {
   await asyncTest(
     "responsiveness: main thread while Rust burns",
     async (t) => {
-      console.log("\n--- responsiveness: event-loop delay during burn ---");
+      console.log(
+        "\n--- responsiveness: main-thread tick gaps during burn ---",
+      );
       const n = await calibrateBurn(100);
       const expected = await burn(n);
       console.log(`  calibrated: burn(${n}) ~ 100ms`);
