@@ -2084,6 +2084,7 @@ dependencies = [
 name = "uniffi-fixture-benchmark"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
