@@ -284,14 +284,18 @@ impl Module {
     /// only sound because this guard means nothing is added after the flag is
     /// set: what the map holds is a fixed set of entries the flag has already
     /// made inert.
+    ///
+    /// The flag is read under the map lock. `unload` sets the flag and then
+    /// clears the map under this same lock, so a check made outside it could
+    /// pass, lose the lock to that clear, and insert behind it anyway.
     pub fn remember_trampoline(&self, callback_name: &str, identity: u64, fn_ptr: *const c_void) {
-        if self.lifecycle.is_unloading() {
-            return;
-        }
         let mut trampolines = self
             .trampolines
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
+        if self.lifecycle.is_unloading() {
+            return;
+        }
         trampolines
             .entry(identity)
             .or_default()
