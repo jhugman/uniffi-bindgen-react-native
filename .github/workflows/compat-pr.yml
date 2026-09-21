@@ -4,6 +4,13 @@ on:
   pull_request:
     branches: ["main"]
 
+# A stacked PR is evaluated as if it targets main, and a stack sync that
+# pushes a PR's base right after its head fires a second `pull_request`
+# event for it. Keep one run per PR: the newer cancels the older.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ios:
     uses: ./.github/workflows/compat.yml
