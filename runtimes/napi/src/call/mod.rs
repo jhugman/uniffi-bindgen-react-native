@@ -133,25 +133,14 @@ pub(crate) fn call_ffi_function(
                         // the declared arg type is `Callback`, so a non-function here is a
                         // caller error surfaced as a JS exception.
                         let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), raw_fn_val)? };
-                        let user_data = callback::create_callback_user_data(
-                            env,
-                            js_fn,
-                            cb_name,
-                            module,
-                            registration,
-                        )?;
-                        let fn_ptr = module
-                            .make_callback_trampoline(
-                                cb_name,
-                                callback::on_js_thread,
-                                callback::dispatch_to_js_thread,
-                                callback::is_js_thread,
-                                user_data,
-                            )
-                            .map_err(core_err)?;
-                        // Minted and stashed only here, past the function check: `set`
-                        // writes a hidden marker onto the caller's own value, and a value
-                        // that turns out not to be a function is handed back untouched.
+                        // Minted and stashed here, past the function check but before
+                        // anything is built: `set` writes a hidden marker onto the caller's
+                        // own value, and a value that turns out not to be a function is
+                        // handed back untouched. Stashing first means a build failure below
+                        // leaves only an identity with no map entry, which the miss path
+                        // above already handles. Building first would leak the trampoline,
+                        // its userdata and the strong function ref on a failed `set`, and
+                        // leak them again on every retry.
                         let identity = match stashed {
                             Some(identity) => identity,
                             None => {
@@ -168,6 +157,22 @@ pub(crate) fn call_ffi_function(
                                 identity
                             }
                         };
+                        let user_data = callback::create_callback_user_data(
+                            env,
+                            js_fn,
+                            cb_name,
+                            module,
+                            registration,
+                        )?;
+                        let fn_ptr = module
+                            .make_callback_trampoline(
+                                cb_name,
+                                callback::on_js_thread,
+                                callback::dispatch_to_js_thread,
+                                callback::is_js_thread,
+                                user_data,
+                            )
+                            .map_err(core_err)?;
                         module.remember_trampoline(cb_name, identity, fn_ptr);
                         fn_ptr
                     }

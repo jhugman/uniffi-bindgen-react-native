@@ -20,6 +20,11 @@
 // 0.1 MB of "growth" at increasing iteration counts). Instead we assert the
 // invariant that actually matters and is exact: the same function object reuses
 // the same trampoline, and a different function object gets its own.
+//
+// The exact signal is `$uniffiTrampolineCount`, which counts builds at core's
+// single build point. The hidden marker on the function is only the identity
+// core keys its map on; it is stable by construction even when the map misses
+// and a trampoline is built on every call, so it proves nothing about reuse.
 import { test } from "node:test";
 import assert from "node:assert";
 import lib from "../lib.js";
@@ -71,6 +76,11 @@ test("the same callback function reuses one trampoline across calls", () => {
   const status = { code: 0 };
   nm.uniffi_test_fn_call_callback(cb, 1n, 1, status);
   assert.strictEqual(status.code, 0);
+  assert.strictEqual(
+    nm.$uniffiTrampolineCount(),
+    1,
+    "the first call builds exactly one trampoline",
+  );
 
   const afterFirst = trampolineMarkers(cb);
   assert.strictEqual(
@@ -86,6 +96,11 @@ test("the same callback function reuses one trampoline across calls", () => {
   }
 
   assert.strictEqual(hits, 51, "the callback must still be invoked every call");
+  assert.strictEqual(
+    nm.$uniffiTrampolineCount(),
+    1,
+    "50 more calls with the same function must build no more trampolines",
+  );
   assert.deepStrictEqual(
     trampolineMarkers(cb),
     afterFirst,
@@ -102,6 +117,11 @@ test("distinct callback functions get distinct trampolines", () => {
   nm.uniffi_test_fn_call_callback(a, 1n, 1, status);
   nm.uniffi_test_fn_call_callback(b, 1n, 1, status);
 
+  assert.strictEqual(
+    nm.$uniffiTrampolineCount(),
+    2,
+    "two different functions build two trampolines",
+  );
   const [ptrA] = trampolineMarkers(a);
   const [ptrB] = trampolineMarkers(b);
   assert.ok(ptrA && ptrB, "both functions must carry a cached trampoline");
