@@ -59,10 +59,11 @@ struct AbortState {
 //
 // Call it only on the thread that drains this module's CallInvoker, and only
 // with that runtime about to be destroyed. A released worker returns and pops
-// its frame, while a task already posted for it writes the callback's result
-// through out_return and RustCallStatus pointers into that same frame. Nothing
-// stops such a task running except teardown discarding the queue, so aborting
-// from anywhere else hands a live task a dead stack.
+// its frame, while a task already posted for it would write the callback's
+// result through out_return and RustCallStatus pointers into that same frame.
+// The task checks `aborted` before calling into JS and returns without doing
+// so, so a queued task that does run after an abort touches nothing; teardown
+// discarding the queue is the usual case, not the only defence.
 //
 // The sole caller is ~UniffiPlayerRoot, and JSI promises neither half of that:
 // a host object's dtor runs on an unspecified thread and may be as late as

@@ -214,11 +214,11 @@ void marshalFieldToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
     return;
   }
   case UBRN_TY_RUSTCALLSTATUS: {
-    // Inline RustCallStatus: {i8 code, u64 capacity, u64 len, *u8 data} with
-    // natural alignment (code@0, then padding, capacity@8, len@16, data@24).
-    // JS shape is { code, errorBuf? }. Not a registered struct, so handle
-    // inline (mirrors marshal.rs's RustCallStatus arm). slot is already
-    // zero-filled.
+    // Inline RustCallStatus: {i8 code, RustBuffer error_buf}, laid out as the
+    // RustCallStatus mirror says (code@0, error_buf at the buffer's alignment:
+    // 8 on 64-bit and armeabi-v7a, 4 on x86). JS shape is { code, errorBuf? }.
+    // Not a registered struct, so handle inline (mirrors marshal.rs's
+    // RustCallStatus arm). slot is already zero-filled.
     if (!v.isObject())
       return; // zero == success status
     auto obj = v.asObject(rt);
@@ -234,9 +234,8 @@ void marshalFieldToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
       auto eb = obj.getProperty(rt, "errorBuf");
       if (eb.isObject()) {
         UbrnRustBuffer rb = errBufToRustBuffer(rt, module, eb);
-        // capacity@8, len@16, data@24 within the field slot.
-        if (slotSize >= 32)
-          memcpy(slot + 8, &rb, sizeof(rb));
+        if (slotSize >= sizeof(RustCallStatus))
+          memcpy(slot + offsetof(RustCallStatus, error_buf), &rb, sizeof(rb));
       }
     }
     return;
@@ -599,8 +598,9 @@ namespace {
 //
 // That is the whole of what heap-owning buys. The out_return and
 // RustCallStatus pointers travel *inside* the arg bytes and address the Rust
-// caller's own locals, so a task running after its worker has returned still
-// writes a popped frame. Only abortModule's precondition rules that out.
+// caller's own locals, so a task running after its worker has been released
+// would write a popped frame. The task re-reads `aborted` before it calls
+// into JS and returns without doing so once an abort has released the worker.
 struct DispatchSlot {
   std::vector<uint8_t> args;
   std::vector<uint8_t> ret;
@@ -702,6 +702,18 @@ static void cb_dispatch_impl(UbrnOnJsThreadFn on_js, const uint8_t *args,
   // the JS thread is free to drain.
   ud->callInvoker->invokeAsync(
       [on_js, slot, captured, capturedUd](jsi::Runtime &) {
+        // An abort since the post has already released the worker, and with
+        // it the frame the out_return and RustCallStatus pointers inside
+        // slot->args address. Calling into JS now would write a popped stack,
+        // so skip it; the flag is read under the mutex abortModule sets it
+        // under. Marking done is harmless: nothing waits on it any more.
+        {
+          std::lock_guard<std::mutex> lk(captured->mtx);
+          if (captured->aborted) {
+            slot->done = true;
+            return;
+          }
+        }
         // on_js is cb_on_js_thread, already wrapped in its own catch(...)
         // barrier — this try/catch is belt-and-braces. The worker is parked
         // until done is set, so the signal has to happen on every path out of
