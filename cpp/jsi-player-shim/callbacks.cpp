@@ -521,6 +521,26 @@ extern "C" void cb_dispatch(UbrnOnJsThreadFn on_js, const uint8_t *args,
   size_t retLen = shape.retSize;
   std::vector<uint8_t> retBuf(retLen);
 
+  // Invariant: registerNatives ran first and captured the host CallInvoker.
+  // A cross-thread callback before that would be a wiring bug.
+  assert(g_callInvoker != nullptr &&
+         "cb_dispatch: g_callInvoker not set (registerNatives must run first)");
+
+  // A callback with nothing to hand back -- the rust_future continuation and
+  // vtable free -- is posted and forgotten. uniffi invokes the continuation
+  // while holding the future's scheduler mutex, so waiting here for the JS
+  // thread deadlocks whenever that thread is itself inside rust_future_poll
+  // and the poll wakes another future: it blocks on the mutex this worker
+  // holds while this worker blocks on it.
+  if (!shape.hasRcs && !shape.outReturn && retLen == 0) {
+    auto owned = std::make_shared<std::vector<uint8_t>>(std::move(argsCopy));
+    const void *capturedUd = udPtr;
+    g_callInvoker->invokeAsync([on_js, owned, capturedUd](jsi::Runtime &) {
+      on_js(owned->data(), nullptr, capturedUd);
+    });
+    return;
+  }
+
   // Rendezvous: post onto the JS thread via invokeAsync, block until it runs.
   // NEVER invokeSync (it is a no-op in the test harness). uniffi foreign-thread
   // callbacks fire from Rust-owned threads, so the JS thread is free to drain.
@@ -532,11 +552,6 @@ extern "C" void cb_dispatch(UbrnOnJsThreadFn on_js, const uint8_t *args,
   const uint8_t *argsPtr = argsCopy.data();
   uint8_t *retPtr = retLen > 0 ? retBuf.data() : nullptr;
   const void *capturedUd = udPtr;
-
-  // Invariant: registerNatives ran first and captured the host CallInvoker.
-  // A cross-thread callback before that would be a wiring bug.
-  assert(g_callInvoker != nullptr &&
-         "cb_dispatch: g_callInvoker not set (registerNatives must run first)");
 
   g_callInvoker->invokeAsync([=](jsi::Runtime &) {
     on_js(argsPtr, retPtr, capturedUd);
