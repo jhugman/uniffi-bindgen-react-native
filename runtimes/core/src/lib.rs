@@ -23,7 +23,7 @@ pub mod spec;
 #[cfg(test)]
 mod test_support;
 
-pub use call::{slot_size_align, ArgLayout, PreparedCall, SlotLayout};
+pub use call::{return_size, slot_size_align, ArgLayout, PreparedCall, SlotLayout};
 pub use callback::{CallbackFnPtr, DispatchFn, IsJsThreadFn, OnJsThreadFn, VTableField};
 pub use error::{Error, Result};
 pub use ffi_type::{desc_from_name, tag_name_of, FfiTypeDesc, ALL_TAG_NAMES};

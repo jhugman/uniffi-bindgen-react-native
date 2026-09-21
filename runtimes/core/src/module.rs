@@ -82,9 +82,14 @@ impl ResolvedFunction {
     ///
     /// A pointer return is widened to 8 bytes so the byte width does not vary
     /// with the host's pointer size. A `RustBuffer` return is written as its
-    /// 24-byte `repr(C)` form and stays owned by the caller, who must free it —
-    /// so `out` must be at least 24 bytes for a RustBuffer-returning function
+    /// `repr(C)` form, `size_of::<RustBufferC>()` bytes (24 on 64-bit and
+    /// armeabi-v7a, 20 on x86), and stays owned by the caller, who must free it
+    /// — so `out` must hold that many bytes for a RustBuffer-returning function
     /// or the buffer's backing allocation is leaked along with the error.
+    ///
+    /// [`return_size`](crate::return_size) reports the width written here for
+    /// each return type; size `out` from it rather than from the arg-slot
+    /// geometry, which gives pointer width for a pointer return.
     pub(crate) fn invoke(&self, arg_bytes: &[u8], out: &mut [u8]) -> Result<usize> {
         let ffi_args = self.ffi_args(arg_bytes);
 

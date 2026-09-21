@@ -83,9 +83,9 @@ UbrnJsiModule* ubrn_jsi_register(const char* lib_path,
 
 // Invoke `fn_name`. `args[i]` points to `arg_sizes[i]` native-endian bytes for arg i
 // (scalars, RustBuffer, callback fn-ptrs, and struct/vtable pointers). `status` is a
-// *mut RustCallStatus (24+ bytes, caller-allocated) or NULL. The native return value
-// is written into `out_ret` (out_ret_size bytes). Returns 0 on success, non-zero on
-// engine error.
+// *mut RustCallStatus (sizeof(RustCallStatus) bytes, caller-allocated) or NULL. The
+// native return value is written into `out_ret` (out_ret_size bytes). Returns 0 on
+// success, non-zero on engine error.
 int ubrn_jsi_call(UbrnJsiModule* m, const char* fn_name,
                   const void* const* args, const size_t* arg_sizes, size_t n_args,
                   void* status, void* out_ret, size_t out_ret_size);
@@ -169,6 +169,14 @@ int ubrn_jsi_struct_field_offsets(UbrnJsiModule* m, const char* struct_name,
 // Either out-param may be NULL. Pure function of the tag name, resolved at
 // registration. Returns false for a name with no slot geometry.
 bool ubrn_jsi_scalar_slot_size_align(const char* tag_name, size_t* out_size, size_t* out_align);
+
+// Byte width of a function's return value as ubrn_jsi_call writes it, for a
+// player tag name: the slot geometry above, except that a pointer return is
+// always 8 bytes. Size a function's out_ret from this, never from the slot
+// geometry, which is pointer-width and so too small on a 32-bit host.
+// out_size may be NULL. Returns false for a name with no return width
+// (an unrecognized tag, or a Struct).
+bool ubrn_jsi_return_size(const char* tag_name, size_t* out_size);
 
 // Byte offsets and sizes of a callback's argument slots, in CIF order
 // [declared args, out-return ptr?, RustCallStatus ptr?] — the layout core's

@@ -1002,6 +1002,46 @@ pub unsafe extern "C" fn ubrn_jsi_scalar_slot_size_align(
     true
 }
 
+/// Byte width of a function's return value as `ubrn_jsi_call` writes it, for
+/// a player tag name.
+///
+/// Writes it to `*out_size` and returns `true`. Returns `false`, leaving it
+/// untouched, for a null/non-UTF-8 name, a name that is not a tag, or a
+/// `Struct`, which no function returns by value. Mirrors
+/// [`uniffi_runtime_core::return_size`]: the same table
+/// `ubrn_jsi_scalar_slot_size_align` reads, except that a pointer return is
+/// 8 bytes whatever the host's pointer size, so the shim must size a return
+/// buffer from this and not from the slot geometry.
+///
+/// # Safety
+/// `tag_name` must be null or a NUL-terminated C string. `out_size` must be
+/// null or point to a writable `usize`. Called by the C++ shim.
+#[no_mangle]
+pub unsafe extern "C" fn ubrn_jsi_return_size(
+    tag_name: *const c_char,
+    out_size: *mut usize,
+) -> bool {
+    // SAFETY: per this function's contract, `tag_name` is null or a
+    // NUL-terminated C string, satisfying cstr's contract.
+    let Some(name) = (unsafe { cstr(tag_name) }) else {
+        return false;
+    };
+    // A Struct return needs no name: it has no return width, so it is
+    // rejected below whatever the name would have been.
+    let Ok(desc) = desc_from_name(&name, None) else {
+        return false;
+    };
+    let Ok(size) = uniffi_runtime_core::return_size(&desc) else {
+        return false;
+    };
+    if !out_size.is_null() {
+        // SAFETY: per this function's contract, `out_size` (checked non-null
+        // above) points to a writable `usize`.
+        unsafe { *out_size = size };
+    }
+    true
+}
+
 /// Query the argument-buffer layout core's trampoline packs for a callback.
 ///
 /// Writes the whole buffer's byte length to `*out_total_size`, and the per-slot
@@ -1255,6 +1295,8 @@ const _: () = {
 mod tests {
     use super::*;
     use std::ffi::CString;
+    use std::mem::size_of;
+    use uniffi_runtime_core::ffi_c_types::RustBufferC;
 
     /// The C++ shim sizes every flat arg slot from this export, so it must
     /// answer with core's geometry and must report "no slot" (rather than a
@@ -1311,5 +1353,35 @@ mod tests {
                 std::ptr::null_mut(),
             )
         });
+    }
+
+    /// The C++ shim sizes every function's return buffer from this export, so
+    /// it must answer with the width core's call path writes: 8 for a pointer
+    /// on every host, and "no width" for the names core refuses.
+    #[test]
+    fn return_size_widens_pointers_and_rejects_structs() {
+        for (name, want) in [("Void", 0), ("UInt16", 2), ("Handle", 8)] {
+            let mut size = usize::MAX;
+            let c = CString::new(name).unwrap();
+            // SAFETY: `c` is a live NUL-terminated C string; `size` is a live,
+            // writable local.
+            let ok = unsafe { ubrn_jsi_return_size(c.as_ptr(), &mut size) };
+            assert!(ok, "{name} should have a return width");
+            assert_eq!(size, want, "{name}");
+        }
+        let mut size = usize::MAX;
+        let c = CString::new("RustBuffer").unwrap();
+        // SAFETY: as above.
+        assert!(unsafe { ubrn_jsi_return_size(c.as_ptr(), &mut size) });
+        assert_eq!(size, size_of::<RustBufferC>());
+
+        for name in ["Struct", "NotATag"] {
+            size = usize::MAX;
+            let c = CString::new(name).unwrap();
+            // SAFETY: as above.
+            let ok = unsafe { ubrn_jsi_return_size(c.as_ptr(), &mut size) };
+            assert!(!ok, "{name} should have no return width");
+            assert_eq!(size, usize::MAX);
+        }
     }
 }

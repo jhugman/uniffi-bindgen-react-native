@@ -73,6 +73,27 @@ pub fn slot_size_align(desc: &FfiTypeDesc) -> Result<(usize, usize)> {
     }
 }
 
+/// Byte width of a function's return value as [`Module::call`] writes it.
+///
+/// Differs from [`slot_size_align`] for pointer returns, which `invoke`
+/// widens to 8 bytes so the width does not vary with the host's pointer size.
+/// Bridges size the return buffer from this so the width the writer uses and
+/// the width the reader allocates come from one place; sizing from the slot
+/// geometry gives pointer width, which is too small on a 32-bit host.
+///
+/// Not for callback returns: a trampoline's return is written by libffi at
+/// the CIF's own width, which `Module::callback_return_size` reports.
+pub fn return_size(desc: &FfiTypeDesc) -> Result<usize> {
+    match desc {
+        FfiTypeDesc::Void => Ok(0),
+        FfiTypeDesc::VoidPointer
+        | FfiTypeDesc::Reference(_)
+        | FfiTypeDesc::MutReference(_)
+        | FfiTypeDesc::Callback(_) => Ok(size_of::<u64>()),
+        other => slot_size_align(other).map(|(size, _)| size),
+    }
+}
+
 impl ArgLayout {
     /// Walk the argument list and compute a packed layout with correct alignment
     /// for each slot. If `has_rust_call_status` is true, a pointer-sized slot is
@@ -303,10 +324,32 @@ mod tests {
     use std::sync::Arc;
 
     use crate::module::AbortCallbacksFn;
+
     use crate::spec::{FunctionDef, ModuleSpec};
     use crate::test_support::{
         fixture_cdylib_path, hello_world_rustbuffer_symbols, noop_abort_callbacks,
     };
+
+    /// The width `invoke` writes, per return type: 8 for every pointer kind on
+    /// every host, the slot width otherwise, and none for a bare Struct.
+    #[test]
+    fn return_size_widens_pointer_returns() {
+        for desc in [
+            FfiTypeDesc::VoidPointer,
+            FfiTypeDesc::Reference(Box::new(FfiTypeDesc::Struct("S".into()))),
+            FfiTypeDesc::MutReference(Box::new(FfiTypeDesc::Struct("S".into()))),
+            FfiTypeDesc::Callback("cb".into()),
+        ] {
+            assert_eq!(return_size(&desc).unwrap(), 8, "{desc:?}");
+        }
+        assert_eq!(return_size(&FfiTypeDesc::Void).unwrap(), 0);
+        assert_eq!(return_size(&FfiTypeDesc::UInt16).unwrap(), 2);
+        assert_eq!(
+            return_size(&FfiTypeDesc::RustBuffer).unwrap(),
+            size_of::<RustBufferC>()
+        );
+        assert!(return_size(&FfiTypeDesc::Struct("S".into())).is_err());
+    }
 
     #[test]
     fn layout_int32_int64() {

@@ -89,9 +89,11 @@ pub fn register(
         let has_rust_call_status = func_def.has_rust_call_status;
         // Resolved here rather than per call: the return width never changes,
         // and looking it up in the closure would re-hash the function name on
-        // every invocation.
+        // every invocation. Sized from `return_size`, the width core's call
+        // path writes, not from the arg-slot geometry: a pointer return is
+        // written as 8 bytes whatever the host's pointer size.
         let ret_desc: Rc<FfiTypeDesc> = Rc::new(func_def.ret.clone());
-        let (ret_size, _) = uniffi_runtime_core::slot_size_align(&ret_desc).map_err(core_err)?;
+        let ret_size = uniffi_runtime_core::return_size(&ret_desc).map_err(core_err)?;
         let reg_for_call = Arc::clone(&registration);
 
         let js_func = env.create_function_from_closure(&name, move |ctx| {

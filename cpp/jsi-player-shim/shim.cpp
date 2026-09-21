@@ -623,7 +623,13 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath,
           ArgDesc retDesc =
               argDescFromDefObject(rt, f.getProperty(rt, "ret").asObject(rt));
           info.retTag = retDesc.tag;
-          info.retSize = retDesc.size;
+          // The width ubrn_jsi_call writes, not the slot width: a pointer
+          // return is 8 bytes on every host. Sizing from ArgDesc::size would
+          // undersize the buffer on a 32-bit ABI and fail every such call.
+          info.retSize = 0;
+          if (info.retTag != UBRN_TY_UNSUPPORTED &&
+              !ubrn_jsi_return_size(retDesc.tagName.c_str(), &info.retSize))
+            supported = false;
           if (info.retTag == UBRN_TY_UNSUPPORTED)
             supported = false;
           info.hasRcs = f.getProperty(rt, "hasRustCallStatus").getBool();
