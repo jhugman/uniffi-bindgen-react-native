@@ -62,12 +62,29 @@ jobs:
       - name: Installing hermes and test-runner
         run: |
           cargo xtask bootstrap hermes --branch rn/0.77-stable
-          cargo xtask bootstrap
+          cargo xtask bootstrap test-runner
+          cargo xtask bootstrap yarn
 
       - name: Run tests of generated JSI bindings
         run: "cargo test -- jsi::"
 
-      - name: Run tests of generated Jsi2 (player shim) bindings
+  integration-tests-jsi2-bindings:
+    name: 🧩 Integration tests (JSI2 player bindings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install tooling for building C++
+        run: sudo apt-get install -y cmake ninja-build
+
+      - name: Installing hermes, test-runner and the player shim
+        run: |
+          cargo xtask bootstrap hermes --branch rn/0.77-stable
+          cargo xtask bootstrap test-runner
+          cargo xtask bootstrap jsi-player-shim
+          cargo xtask bootstrap yarn
+
+      - name: Run tests of generated JSI2 bindings
         run: "cargo test -- jsi2::"
 
   integration-tests-wasm-bindings:
