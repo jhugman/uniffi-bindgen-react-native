@@ -140,6 +140,8 @@ pub(crate) struct TsCallable {
     /// `forceAsync` names this callable's owning type or function: give it an
     /// async signature over a synchronous FFI body.
     pub force_async: bool,
+    /// The outbound call (or dedicated poll for Rust async) can suspend.
+    pub jspi: bool,
 }
 
 impl TsCallable {
@@ -152,8 +154,9 @@ impl TsCallable {
     /// True when the TypeScript signature is async: the `async` keyword, a
     /// `Promise<T>` return, a `static async` constructor. Async Rust renders
     /// async, and so does `forceAsync` — over an unchanged synchronous body.
+    /// JSPI also renders async, but awaits the suspending FFI call itself.
     pub fn renders_async(&self) -> bool {
-        self.ffi_async.is_some() || self.force_async
+        self.ffi_async.is_some() || self.force_async || self.jspi
     }
     pub fn is_throwing(&self) -> bool {
         self.throws.is_some()

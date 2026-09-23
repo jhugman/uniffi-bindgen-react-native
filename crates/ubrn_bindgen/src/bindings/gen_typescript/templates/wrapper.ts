@@ -18,6 +18,9 @@
 // @ts-nocheck
 {%- endif %}
 
+{%- if module.requires_jspi %}
+import "./uniffi-jspi";
+{%- endif %}
 {%- if module.flavor.supports_globalthis_native_module() || module.flavor.supports_player() %}
 import nativeModule from "./{{ module.module_name }}-ffi";
 {%- else %}
@@ -47,7 +50,14 @@ const _nativeModule = Object.assign({}, wasmBundle, {
   rustbuffer_free: (_: Uint8Array): void => {},
 });
 const nativeModule = () => _nativeModule;
-const uniffiCaller = new UniffiRustCaller(() => new wasmBundle.RustCallStatus());
+const uniffiCaller = new UniffiRustCaller(
+  () => new wasmBundle.RustCallStatus(),
+  {%- if module.requires_jspi %}
+  // Reading errorBuf consumes the wasm-bindgen wrapper. Only after settlement
+  // may we read the borrowed status and release it, including on rejection.
+  (status) => ({ code: status.code, errorBuf: status.errorBuf }),
+  {%- endif %}
+);
 {%- endif %}
 
 const uniffiIsDebug =

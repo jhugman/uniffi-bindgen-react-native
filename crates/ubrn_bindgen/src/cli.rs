@@ -153,6 +153,29 @@ impl BindingsArgs {
         let source_path = path_or_shim(&self.source.source)?;
         let loader = self.create_loader(manifest_path)?;
 
+        // TypeScript generation via pipeline
+        // The pipeline needs per-crate configs (not the --config override) so that
+        // each namespace gets its own crate's uniffi.toml (e.g. custom type mappings).
+        // TODO check this is the desired behavior in uniffi-rs 0.31.x.
+        let pipeline_loader = self.create_pipeline_loader(manifest_path)?;
+        let metadata = load_metadata(&pipeline_loader, &source_path)?;
+        let initial_root = pipeline_loader.load_pipeline_initial_root(&source_path, metadata)?;
+        let general_root = general::pipeline("react-native").execute(initial_root)?;
+
+        let mut jspi_exports = std::collections::HashMap::new();
+        for (name, namespace) in &general_root.namespaces {
+            let config = extract_ts_config(namespace)?;
+            let exports = config.jspi_exports(namespace, &switches.flavor)?;
+            jspi_exports.insert(name.clone(), exports);
+        }
+        let requires_jspi = jspi_exports.values().any(|exports| !exports.is_empty());
+        if requires_jspi {
+            ubrn_common::write_file(
+                ts_dir.join("uniffi-jspi.ts"),
+                include_str!("bindings/gen_typescript/templates/jspi-support.ts"),
+            )?;
+        }
+
         // C++/Rust generation via ComponentInterface
         match &switches.flavor {
             AbiFlavor::Jsi => {
@@ -173,20 +196,17 @@ impl BindingsArgs {
                 for c in components.iter_mut() {
                     c.ci.derive_ffi_funcs()?;
                 }
+                for component in &mut components {
+                    component.config.jspi_exports = jspi_exports
+                        .get(component.ci.namespace())
+                        .cloned()
+                        .unwrap_or_default();
+                }
                 generate_rs(&components, &switches, &abi_dir, !out.no_format)?;
             }
             #[cfg(feature = "wasm")]
             AbiFlavor::Wasm2 => { /* No native shim for Wasm2 */ }
         }
-
-        // TypeScript generation via pipeline
-        // The pipeline needs per-crate configs (not the --config override) so that
-        // each namespace gets its own crate's uniffi.toml (e.g. custom type mappings).
-        // TODO check this is the desired behavior in uniffi-rs 0.31.x.
-        let pipeline_loader = self.create_pipeline_loader(manifest_path)?;
-        let metadata = load_metadata(&pipeline_loader, &source_path)?;
-        let initial_root = pipeline_loader.load_pipeline_initial_root(&source_path, metadata)?;
-        let general_root = general::pipeline("react-native").execute(initial_root)?;
 
         generate_ffi_from_pipeline(
             &general_root,
@@ -194,7 +214,7 @@ impl BindingsArgs {
             &ts_dir,
             self.lib_resolution.clone(),
         )?;
-        let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir)?;
+        let modules = generate_api_from_pipeline(&general_root, &switches, &ts_dir, requires_jspi)?;
         if switches.flavor.supports_index_ts_at_generation() {
             generate_index_from_modules(&modules, &general_root, &switches, &ts_dir, &source_path)?;
         }
@@ -238,6 +258,7 @@ fn generate_api_from_pipeline(
     general_root: &general::Root,
     switches: &SwitchArgs,
     ts_dir: &Utf8Path,
+    requires_jspi: bool,
 ) -> Result<Vec<ModuleMetadata>> {
     let mut modules = Vec::new();
     for (name, namespace) in &general_root.namespaces {
@@ -249,12 +270,15 @@ fn generate_api_from_pipeline(
             &config,
         );
         let ffi_exports = ffi_module.exported_names();
-        let api_module = gen_typescript::api_module::TsApiModule::from_general(
+        let mut api_module = gen_typescript::api_module::TsApiModule::from_general(
             &config,
             namespace,
             switches.flavor.clone(),
             ffi_exports,
         )?;
+        // Every namespace shares one wasm bundle; even an unselected namespace
+        // must evaluate the guard before its static import of that glue.
+        api_module.requires_jspi = requires_jspi;
         let code = gen_typescript::generate_api_code_from_ir(api_module)?;
         let path = ts_dir.join(module.ts_filename());
         ubrn_common::write_file(path, code)?;
@@ -327,7 +351,8 @@ fn generate_ffi_from_pipeline(
         let module = ModuleMetadata::new(name);
         let path = ts_dir.join(module.ts_ffi_filename());
 
-        let config = extract_ts_config(namespace)?;
+        let mut config = extract_ts_config(namespace)?;
+        config.resolved_jspi_exports = config.jspi_exports(namespace, &switches.flavor)?;
         let code = match &switches.flavor {
             AbiFlavor::Napi => {
                 let lib_resolution = lib_resolution.clone().ok_or_else(|| {

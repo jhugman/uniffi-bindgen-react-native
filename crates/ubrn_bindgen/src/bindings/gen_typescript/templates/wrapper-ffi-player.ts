@@ -36,9 +36,18 @@ const DEFINITIONS = {
   functions: {
     {%- for func in module.functions %}
     "{{ func.name }}": {
+      {%- if let Some(export_name) = func.export_name %}
+      exportName: "{{ export_name }}",
+      {%- endif %}
+      {%- if func.copy_result %}
+      copyResult: true,
+      {%- endif %}
       args: [{{ func.args.join(", ") }}],
       ret: {{ func.ret }},
       hasRustCallStatus: {{ func.has_rust_call_status }},
+      {%- if func.jspi %}
+      jspi: true,
+      {%- endif %}
     },
     {%- endfor %}
   },
@@ -78,6 +87,9 @@ interface NativeModuleInterface {
     // and `nativeModule().rustbuffer_free(...)`. The runtime's registered
     // module exposes them as method properties.
     rustbuffer_alloc(n: number): Uint8Array;
+    {%- if module.flavor.is_wasm2() %}
+    rustbuffer_alloc_jspi(n: number): Uint8Array;
+    {%- endif %}
     rustbuffer_free(view: Uint8Array): void;
 }
 

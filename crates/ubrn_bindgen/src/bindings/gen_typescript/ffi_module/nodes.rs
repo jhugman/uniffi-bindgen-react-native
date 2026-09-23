@@ -49,6 +49,7 @@ impl TsFfiModule {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct FfiFunctionDecl {
     /// Includes the `ubrn_` prefix.
     pub name: String,
@@ -56,6 +57,7 @@ pub(crate) struct FfiFunctionDecl {
     pub return_type: Option<String>,
 }
 
+#[derive(Clone)]
 pub(crate) struct FfiArgDecl {
     /// camelCase, except `"uniffi_out_err"` which keeps its uniffi convention name.
     pub name: String,

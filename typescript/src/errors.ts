@@ -158,7 +158,18 @@ export const UniffiInternalError = (() => {
       super(message);
     }
   }
+  class JspiPollError extends Error {
+    readonly cause: unknown;
+    constructor(cause: unknown) {
+      super(
+        "JSPI future polling failed unexpectedly; discard this WASM instance. The future was not freed because its Rust stack may not have unwound.",
+      );
+      this.name = "JspiPollError";
+      this.cause = cause;
+    }
+  }
   return {
+    JspiPollError,
     ApiChecksumMismatch,
     NumberOverflow,
     DateTimeOverflow,

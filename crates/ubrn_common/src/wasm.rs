@@ -36,12 +36,17 @@ pub fn stage_wasm(
 ) -> Result<Utf8PathBuf> {
     let dst = out_dir.join(format!("{lib_stem}.wasm"));
     let _ = std::fs::remove_file(&dst);
+    std::fs::copy(built, &dst).with_context(|| format!("copy {built} -> {dst}"))?;
 
     if has_wasm_bindgen_imports(built)? {
+        // Rewrite the raw cargo artifact before wasm-bindgen introduces JSPI
+        // exception tags/instructions that our pinned Walrus cannot parse.
+        // --keep-lld-exports preserves this growable table in its output.
+        export_growable_table(&dst)?;
         // wasm-bindgen-cli runs its own DCE, and its output depends on a
         // constellation of mangled exports (`_dyn_*`, `__externref_*`) the
         // keep-list below can't safely capture. Trust its result.
-        run_wasm_bindgen(built, out_dir, lib_stem)?;
+        run_wasm_bindgen(&dst, out_dir, lib_stem)?;
         let bg_wasm = out_dir.join(format!("{lib_stem}_bg.wasm"));
         std::fs::rename(&bg_wasm, &dst).with_context(|| format!("rename {bg_wasm} -> {dst}"))?;
 
@@ -58,14 +63,13 @@ pub fn stage_wasm(
         // The generated `index.ts` imports this; wasm-bindgen writes none.
         crate::write_file(out_dir.join(format!("{lib_stem}_bg.d.ts")), GLUE_DTS)?;
     } else {
-        std::fs::copy(built, &dst).with_context(|| format!("copy {built} -> {dst}"))?;
         if strip_dead_code {
             dce_wasm(&dst)?;
         }
+        export_growable_table(&dst)?;
     }
 
-    // After whichever rewrite ran above, so neither can drop the export.
-    export_growable_table(&dst)?;
+    // Do not run Walrus after wasm-bindgen: JSPI output contains EH features.
     Ok(dst)
 }
 

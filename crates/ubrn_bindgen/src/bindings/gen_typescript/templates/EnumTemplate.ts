@@ -52,7 +52,7 @@ export namespace {{ e.ts_name }} {
     }
 {%- endfor %}
 {%- for method in e.methods %}
-    export {% if method.renders_async() %}async {% endif %}function {{ method.name }}(self_: {{ e.ts_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
+    export {% if method.renders_async() %}async {% endif %}function {{ method.name }}(self_: {{ e.ts_name }}{% if !method.arguments.is_empty() || method.is_ffi_async() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
 {%- call cb::call_body_value(method) %}
     }
 {%- endfor %}

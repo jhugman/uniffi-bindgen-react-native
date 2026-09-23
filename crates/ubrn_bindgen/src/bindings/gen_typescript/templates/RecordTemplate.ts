@@ -72,7 +72,7 @@ export const {{ rec.ts_name }} = (() => {
         },
 {%- endfor %}
 {%- for method in rec.methods %}
-        {% if method.renders_async() %}async {% endif %}{{ method.name }}(self_: {{ rec.ts_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
+        {% if method.renders_async() %}async {% endif %}{{ method.name }}(self_: {{ rec.ts_name }}{% if !method.arguments.is_empty() || method.is_ffi_async() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
 {%- call cb::call_body_value(method) %}
         },
 {%- endfor %}

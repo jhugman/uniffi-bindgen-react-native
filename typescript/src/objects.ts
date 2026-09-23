@@ -42,6 +42,18 @@ export abstract class UniffiAbstractObject {
     this.uniffiDestroy();
     return v;
   }
+
+  /**
+   * Keep this object alive until an async block settles, then release it even
+   * if the block rejects. Destruction itself is synchronous and must not suspend.
+   */
+  public async uniffiUseAsync<T>(block: (obj: this) => Promise<T>): Promise<T> {
+    try {
+      return await block(this);
+    } finally {
+      this.uniffiDestroy();
+    }
+  }
 }
 
 /**

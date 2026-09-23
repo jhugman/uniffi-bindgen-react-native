@@ -38,6 +38,7 @@ pub(crate) struct TsApiModule {
     pub module_name: String,
     pub namespace_docstring: Option<String>,
     pub strict_type_checking: bool,
+    pub requires_jspi: bool,
     pub flavor: AbiFlavor,
     pub is_debug: bool,
     pub is_verbose: bool,
@@ -493,6 +494,10 @@ impl TsApiModule {
         flavor: AbiFlavor,
         ffi_exported_definitions: Vec<ffi_module::FfiExportedName>,
     ) -> anyhow::Result<Self> {
+        let mut resolved_config = config.clone();
+        resolved_config.resolved_jspi_exports =
+            config.jspi_exports(namespace, &flavor)?;
+        let config = &resolved_config;
         let module_name = namespace.name.clone();
         let namespace_docstring = namespace.docstring.as_deref().map(format_docstring);
         let supports_rust_backtrace = flavor.supports_rust_backtrace();
@@ -520,6 +525,7 @@ impl TsApiModule {
             converter_imports: Vec::new(),
             exported_converters: BTreeSet::new(),
             type_definitions,
+            requires_jspi: !config.resolved_jspi_exports.is_empty(),
             functions,
             initialization,
         };
@@ -573,9 +579,30 @@ impl TsApiModule {
         module.exported_converters = acc.exported_converters;
 
         validate_force_async(&module.type_definitions)?;
+        for td in &module.type_definitions {
+            if let TsTypeDefinition::Object(obj) = td {
+                validate_jspi_factory(
+                    &obj.ts_name,
+                    obj.primary_constructor.as_ref(),
+                    &obj.alternate_constructors,
+                )?;
+            }
+        }
 
         Ok(module)
     }
+}
+
+fn validate_jspi_factory(
+    name: &str,
+    primary: Option<&TsCallable>,
+    alternates: &[TsCallable],
+) -> anyhow::Result<()> {
+    if let Some(primary) = primary.filter(|c| c.jspi) {
+        anyhow::ensure!(!alternates.iter().any(|c| c.name == primary.name),
+            "jspi primary factory `{name}.{}` conflicts with an alternate constructor; rename the alternate constructor", primary.name);
+    }
+    Ok(())
 }
 
 /// Reject `forceAsync` on a callback interface or `WithForeign` trait interface
@@ -638,7 +665,7 @@ fn force_async_error_block(kind: &str, name: &str, methods: &[TsCallable]) -> Op
 }
 
 #[cfg(test)]
-mod force_async_validation_tests {
+mod async_validation_tests {
     use super::*;
 
     fn callable(name: &str, ffi_async: bool) -> TsCallable {
@@ -657,7 +684,31 @@ mod force_async_validation_tests {
             }),
             receiver: None,
             force_async: false,
+            jspi: false,
         }
+    }
+
+    #[test]
+    fn jspi_primary_factory_cannot_shadow_an_alternate_constructor() {
+        let mut primary = callable("create", false);
+        primary.jspi = true;
+        assert!(
+            validate_jspi_factory("Processor", Some(&primary), &[callable("create", false)])
+                .unwrap_err()
+                .to_string()
+                .contains("Processor.create")
+        );
+        assert!(validate_jspi_factory(
+            "Processor",
+            Some(&primary),
+            &[callable("fromValue", false)]
+        )
+        .is_ok());
+        primary.jspi = false;
+        assert!(
+            validate_jspi_factory("Processor", Some(&primary), &[callable("create", false)])
+                .is_ok()
+        );
     }
 
     fn callback_interface(

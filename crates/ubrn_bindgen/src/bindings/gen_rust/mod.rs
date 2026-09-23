@@ -174,6 +174,13 @@ impl<'a> ComponentTemplate<'a> {
             .map(|f| self.ffi_function(&f))
             .collect::<TokenStream>();
 
+        // Limit adapters to UniFFI's future infrastructure. A public function
+        // whose name ends in `_jspi` must not create an alias for another API.
+        let jspi_adapters = ci
+            .iter_futures_ffi_function_definitions()
+            .map(|f| self.ffi_jspi_adapter(&f))
+            .collect::<TokenStream>();
+
         let extern_c: TokenStream = ci
             .iter_ffi_functions_js_to_abi_rust()
             .map(|f| self.ffi_function_decl_c_abi(&f))
@@ -188,6 +195,7 @@ impl<'a> ComponentTemplate<'a> {
             }
 
             #ffi_funcs
+            #jspi_adapters
 
             #definitions
         }
@@ -243,12 +251,32 @@ impl<'a> ComponentTemplate<'a> {
     }
 
     fn ffi_function(&mut self, func: &FfiFunction) -> TokenStream {
+        self.ffi_function_named(func, func.name())
+    }
+
+    fn ffi_jspi_adapter(&mut self, func: &FfiFunction) -> TokenStream {
+        // Preserve the original poll export for unselected async APIs.
+        let alias = format!("{}_jspi", func.name());
+        if self.params.config.jspi_exports.contains(&alias) {
+            self.ffi_function_named(func, &alias)
+        } else {
+            TokenStream::new()
+        }
+    }
+
+    fn ffi_function_named(&mut self, func: &FfiFunction, export_name: &str) -> TokenStream {
         let runtime = self.runtime_ident();
         let uniffi = self.uniffi_ident();
 
-        let annotation = quote! { #[wasm_bindgen] };
+        // Future creation stays synchronous; only its poll adapter suspends.
+        let annotation =
+            if self.params.config.jspi_exports.contains(export_name) && !func.is_async() {
+                quote! { #[wasm_bindgen(jspi)] }
+            } else {
+                quote! { #[wasm_bindgen] }
+            };
         let func_ident = ident(func.name());
-        let foreign_func_ident = self.flavor.foreign_ident(func.name());
+        let foreign_func_ident = self.flavor.foreign_ident(export_name);
 
         let args = func.arguments();
         let js_args_decl = self.arg_list_decl(&args, |t| self.ffi_type_foreign_to_rust(t));
@@ -815,8 +843,9 @@ mod unit_tests {
     use super::*;
 
     fn subject<'component>() -> ComponentTemplate<'component> {
+        static CONFIG: std::sync::LazyLock<Config> = std::sync::LazyLock::new(Config::default);
         ComponentTemplate::new(
-            &Config {},
+            &CONFIG,
             &SwitchArgs {
                 flavor: crate::AbiFlavor::Wasm,
             },
@@ -913,6 +942,51 @@ mod unit_tests {
             string.trim(),
             "fn happy_path_func (status_ : & mut u :: RustCallStatus) -> i8 ;"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn jspi_marks_only_selected_ffi_exports() -> Result<()> {
+        let config = Config {
+            jspi_exports: ["selected".to_owned(), "ordinary_jspi".to_owned()].into(),
+        };
+        let switches = SwitchArgs {
+            flavor: crate::AbiFlavor::Wasm,
+        };
+        let mut template = ComponentTemplate::new(&config, &switches);
+        for (name, selected) in [
+            ("selected", true),
+            ("rustbuffer_alloc", false),
+            ("ordinary", false),
+        ] {
+            let code = formatted(template.ffi_function(&func(name, no_args(), void())), true)?;
+            assert_eq!(code.contains("#[wasm_bindgen(jspi)]"), selected);
+            assert!(code.contains("&mut js::RustCallStatus"));
+            assert!(!code.contains("ubrn_ordinary_jspi"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn jspi_poll_adapter_preserves_original_export() -> Result<()> {
+        let config = Config {
+            jspi_exports: ["rust_future_poll_u32_jspi".to_owned()].into(),
+        };
+        let switches = SwitchArgs {
+            flavor: crate::AbiFlavor::Wasm,
+        };
+        let mut template = ComponentTemplate::new(&config, &switches);
+        let input = func("rust_future_poll_u32", no_args(), void());
+        let original = template.ffi_function(&input);
+        assert!(!original
+            .to_string()
+            .contains("ubrn_rust_future_poll_u32_jspi"));
+        let adapter = template.ffi_jspi_adapter(&input);
+        let code = formatted(quote! { #original #adapter }, true)?;
+        assert!(code.contains("#[wasm_bindgen]\npub fn ubrn_rust_future_poll_u32("));
+        assert!(code.contains("#[wasm_bindgen(jspi)]\npub fn ubrn_rust_future_poll_u32_jspi("));
+        assert_eq!(code.matches("unsafe { rust_future_poll_u32(").count(), 2);
+        assert!(!code.contains("unsafe { rust_future_poll_u32_jspi("));
         Ok(())
     }
 

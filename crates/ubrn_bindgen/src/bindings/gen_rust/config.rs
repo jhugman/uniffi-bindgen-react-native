@@ -8,4 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RustConfig {}
+pub(crate) struct RustConfig {
+    #[serde(skip)]
+    pub(crate) jspi_exports: std::collections::HashSet<String>,
+}

@@ -26,13 +26,67 @@ impl PlayerFfiModule {
         let has_async = namespace_has_async(namespace);
 
         let symbols = Self::build_symbols(namespace);
-        let functions = Self::build_functions(namespace, has_async);
+        let mut functions = Self::build_functions(namespace, has_async);
         let callbacks = Self::build_callbacks(namespace);
         let structs = Self::build_structs(namespace);
-
-        // Reuse TsFfiModule for the typed interface, but we'll use raw
-        // symbol names (no ubrn_ prefix) in the NativeModuleInterface.
-        let ts_module = Self::build_typed_module(namespace, has_async);
+        let mut ts_module = Self::build_typed_module(namespace, has_async);
+        // FFI async metadata includes constructors and object/value methods,
+        // not only namespace-level functions.
+        let async_functions: Vec<_> = namespace
+            .ffi_definitions
+            .iter()
+            .filter_map(|def| match def {
+                general::FfiDefinition::RustFunction(f) if f.async_data.is_some() => Some(f),
+                _ => None,
+            })
+            .collect();
+        let async_creations: std::collections::HashSet<_> =
+            async_functions.iter().map(|f| f.name.0.as_str()).collect();
+        for (f, typed) in functions.iter_mut().zip(&mut ts_module.functions) {
+            f.jspi = config.resolved_jspi_exports.contains(&f.name)
+                && !async_creations.contains(f.name.as_str());
+            if f.jspi {
+                typed.return_type = Some(format!(
+                    "Promise<{}>",
+                    typed.return_type.as_deref().unwrap_or("void")
+                ));
+            }
+        }
+        // Selected futures use aliases so ordinary async APIs keep synchronous
+        // shared polls and the existing completion handoff.
+        let mut aliases = std::collections::HashSet::new();
+        for callable in async_functions {
+            if !config.resolved_jspi_exports.contains(&callable.name.0) {
+                continue;
+            }
+            let Some(ad) = &callable.async_data else {
+                continue;
+            };
+            for (symbol, poll) in [
+                (&ad.ffi_rust_future_poll.0, true),
+                (&ad.ffi_rust_future_complete.0, false),
+            ] {
+                if !aliases.insert(symbol.clone()) {
+                    continue;
+                }
+                let index = functions
+                    .iter()
+                    .position(|f| &f.name == symbol)
+                    .expect("future FFI export");
+                let mut function = functions[index].clone();
+                function.export_name = Some(symbol.clone());
+                function.name = format!("{symbol}_jspi");
+                function.jspi = poll;
+                function.copy_result = !poll;
+                let mut typed = ts_module.functions[index].clone();
+                typed.name = function.name.clone();
+                if poll {
+                    typed.return_type = Some("Promise<void>".into());
+                }
+                functions.push(function);
+                ts_module.functions.push(typed);
+            }
+        }
 
         Self {
             strict_type_checking: config.strict_type_checking,
@@ -76,6 +130,9 @@ impl PlayerFfiModule {
                         .unwrap_or_else(|| "FfiType.Void".into());
 
                     result.push(PlayerFunctionDef {
+                        jspi: false,
+                        export_name: None,
+                        copy_result: false,
                         name: func.name.0.clone(),
                         args,
                         ret,

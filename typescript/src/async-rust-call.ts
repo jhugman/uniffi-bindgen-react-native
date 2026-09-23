@@ -33,7 +33,7 @@ type PollFunc = (
   rustFuture: bigint,
   cb: UniffiRustFutureContinuationCallback,
   handle: UniffiHandle,
-) => void;
+) => void | Promise<void>;
 
 /**
  * This method calls an asynchronous method on the Rust side.
@@ -61,6 +61,7 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   liftString: (bytes: UniffiByteArray) => string,
   asyncOpts?: { signal: AbortSignal },
   errorHandler?: UniffiErrorHandler,
+  suspendingPoll = false,
 ): Promise<T> {
   // If the underlying Rust API supports task cancellation, then we should
   // check if should bail early.
@@ -95,17 +96,42 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
 
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
+  let canFree = true;
   try {
     let pollResult: number | undefined;
     do {
       // Calling pollFunc with a callback that resolves the promise that pollRust
       // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
-      pollResult = await pollRust((handle) => {
-        pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
-      });
+      try {
+        pollResult = await pollRust((handle) =>
+          pollFunc(rustFuture, uniffiFutureContinuationCallback, handle),
+        );
+      } catch (cause) {
+        if (suspendingPoll) {
+          // A trap may bypass Rust destructors, leaving the future mutex locked.
+          // Never reenter this future, including cancel or free, after failure.
+          canFree = false;
+          throw new UniffiInternalError.JspiPollError(cause);
+        }
+        throw cause;
+      }
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
 
     // Now it's ready, all we need to do is pick up the result (and error).
+    if (suspendingPoll) {
+      // Complete itself is synchronous, but use the owning status path to
+      // consume the wasm status on success, cancellation, and Rust errors.
+      const complete = async (status: S) => completeFunc(rustFuture, status);
+      return liftFunc(
+        await (errorHandler
+          ? rustCaller.rustCallAsyncWithError(
+              errorHandler,
+              complete,
+              liftString,
+            )
+          : rustCaller.rustCallAsync(complete, liftString)),
+      );
+    }
     return liftFunc(
       rustCaller.makeRustCall(
         (status) => completeFunc(rustFuture, status),
@@ -118,7 +144,7 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
     // We remove the abortFunc now so we don't trigger a use-after-free
     // panic.
     asyncOpts?.signal.removeEventListener("abort", abortFunc);
-    freeFunc(rustFuture);
+    if (canFree) freeFunc(rustFuture);
   }
 }
 
@@ -131,12 +157,21 @@ const UNIFFI_RUST_FUTURE_RESOLVER_MAP = new UniffiHandleMap<
 // pollRust makes a new promise, stores the resolver in the resolver map,
 // then calls the pollFunc with the handle.
 async function pollRust(
-  pollFunc: (handle: UniffiHandle) => void,
+  pollFunc: (handle: UniffiHandle) => void | Promise<void>,
 ): Promise<number> {
-  return new Promise<number>((resolve) => {
-    const handle = UNIFFI_RUST_FUTURE_RESOLVER_MAP.insert(resolve);
-    pollFunc(handle);
+  let handle!: UniffiHandle;
+  const continuation = new Promise<number>((resolve) => {
+    handle = UNIFFI_RUST_FUTURE_RESOLVER_MAP.insert(resolve);
   });
+  try {
+    // Neither signal implies the other: a callback may fire inside a suspended
+    // poll, or a Pending poll may return long before its callback fires.
+    await pollFunc(handle);
+    return await continuation;
+  } finally {
+    // Also remove on throw/rejection. Late callbacks become harmless no-ops.
+    UNIFFI_RUST_FUTURE_RESOLVER_MAP.remove(handle);
+  }
 }
 
 function createAbortFunction(
@@ -144,8 +179,9 @@ function createAbortFunction(
   cancelFunc: (rustFuture: bigint) => void,
 ): () => void {
   // We don't do anything other than call cancel.
-  // This will cause pollFunc to come back with a POLL_READY,
-  // then the makeRustCall will throw an AbortError.
+  // This wakes a waiting continuation. Cancellation is best effort: an
+  // active poll can still produce a successful result. It cannot unwind a
+  // suspended JS import, and cleanup must wait for that poll to settle.
   return () => cancelFunc(rustFuture);
 }
 

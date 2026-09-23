@@ -459,9 +459,24 @@ pub(super) fn build_callable(
         .as_ref()
         .map(|type_node| build_error_type(config, type_node));
     let callable_ffi_name = ffi_name(flavor, &callable.ffi_func.0);
+    let jspi = config.resolved_jspi_exports.contains(&callable.ffi_func.0);
     let ffi_async = callable.async_data.as_ref().map(|ad| TsAsyncFfi {
-        poll: ffi_name(flavor, &ad.ffi_rust_future_poll.0),
-        complete: ffi_name(flavor, &ad.ffi_rust_future_complete.0),
+        poll: ffi_name(
+            flavor,
+            &if jspi {
+                format!("{}_jspi", ad.ffi_rust_future_poll.0)
+            } else {
+                ad.ffi_rust_future_poll.0.clone()
+            },
+        ),
+        complete: ffi_name(
+            flavor,
+            &if jspi && flavor.is_wasm2() {
+                format!("{}_jspi", ad.ffi_rust_future_complete.0)
+            } else {
+                ad.ffi_rust_future_complete.0.clone()
+            },
+        ),
         free: ffi_name(flavor, &ad.ffi_rust_future_free.0),
         cancel: ffi_name(flavor, &ad.ffi_rust_future_cancel.0),
     });
@@ -476,6 +491,7 @@ pub(super) fn build_callable(
         ffi_async,
         receiver,
         force_async,
+        jspi,
     }
 }
 

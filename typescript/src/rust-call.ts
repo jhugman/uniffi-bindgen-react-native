@@ -20,7 +20,46 @@ export type UniffiRustCallStatus = {
   errorBuf?: UniffiByteArray;
 };
 export class UniffiRustCaller<Status extends UniffiRustCallStatus> {
-  constructor(private statusConstructor: () => Status) {}
+  constructor(
+    private statusConstructor: () => Status,
+    // Some backends own a status wrapper that must survive suspension. Snapshot
+    // and release it exactly once, after settlement, before checking errors.
+    private consumeAsyncStatus: (status: Status) => UniffiRustCallStatus = (
+      s,
+    ) => s,
+  ) {}
+
+  rustCallAsync<T>(
+    caller: RustCallFn<Status, Promise<T>>,
+    liftString: StringLifter = emptyStringLifter,
+  ): Promise<T> {
+    return this.makeRustCallAsync(caller, liftString);
+  }
+
+  rustCallAsyncWithError<T>(
+    errorHandler: UniffiErrorHandler,
+    caller: RustCallFn<Status, Promise<T>>,
+    liftString: StringLifter = emptyStringLifter,
+  ): Promise<T> {
+    return this.makeRustCallAsync(caller, liftString, errorHandler);
+  }
+
+  private async makeRustCallAsync<T>(
+    caller: RustCallFn<Status, Promise<T>>,
+    liftString: StringLifter,
+    errorHandler?: UniffiErrorHandler,
+  ): Promise<T> {
+    const callStatus = this.statusConstructor();
+    let status: UniffiRustCallStatus;
+    let value: T;
+    try {
+      value = await caller(callStatus);
+    } finally {
+      status = this.consumeAsyncStatus(callStatus);
+    }
+    uniffiCheckCallStatus(status, liftString, errorHandler);
+    return value;
+  }
 
   rustCall<T>(
     caller: RustCallFn<Status, T>,

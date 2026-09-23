@@ -15,6 +15,8 @@ export enum {{ type_name__Tags }} {
 {{ ds }}
 {%- endif %}
 export const {{ type_name }} = (() => {
+    // Keep method signatures independent of the inferred exported factory.
+    type {{ type_name }} = {% for variant in e.variants %}{{ variant.name }}_{% if !loop.last %} | {% endif %}{% endfor %};
   {%- for variant in e.variants %}
     {%- let external_name = variant.name %}
     {%- let variant_class = format!("{external_name}_") %}
@@ -143,7 +145,7 @@ export const {{ type_name }} = (() => {
         {%- endfor %}
         {%- for method in e.methods %}
 {% call cb::docstring(method.docstring) %}
-        {% if method.renders_async() %}async {% endif %}{{ method.name }}(self_: {{ type_name }}{% if !method.arguments.is_empty() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
+        {% if method.renders_async() %}async {% endif %}{{ method.name }}(self_: {{ type_name }}{% if !method.arguments.is_empty() || method.is_ffi_async() %}, {% endif %}{% call cb::arg_list_decl(method) %}): {% call cb::return_type(method) %} {
 {%- call cb::call_body_value(method) %}
         },
         {%- endfor %}

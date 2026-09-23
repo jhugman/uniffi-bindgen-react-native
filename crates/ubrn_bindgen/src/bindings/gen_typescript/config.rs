@@ -32,7 +32,13 @@ pub(crate) struct TsConfig {
     /// synchronous: this is a migration aid toward moving them off the main
     /// thread.
     #[serde(default)]
-    pub(crate) force_async: ForceAsync,
+    pub(crate) force_async: AsyncSelection,
+    /// Suspend selected public web calls using wasm-bindgen JSPI.
+    #[serde(default)]
+    pub(crate) jspi: AsyncSelection,
+    /// Resolved from the namespace before building API IR; never user supplied.
+    #[serde(skip)]
+    pub(crate) resolved_jspi_exports: std::collections::HashSet<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -62,23 +68,23 @@ impl TsConfig {
     }
 }
 
-/// `forceAsync` config value: a bool (all / nothing) or an explicit name list.
+/// Async API selection config value: a bool (all / nothing) or an explicit name list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum ForceAsync {
+pub(crate) enum AsyncSelection {
     /// `forceAsync = true | false`
     All(bool),
     /// `forceAsync = ["ProcTraitMethods", "makeFlatTraitEnum"]`
     Named(Vec<String>),
 }
 
-impl Default for ForceAsync {
+impl Default for AsyncSelection {
     fn default() -> Self {
         Self::All(false)
     }
 }
 
-impl ForceAsync {
+impl AsyncSelection {
     /// Whether the type or top-level function named `name` should render async.
     ///
     /// Both sides are normalized to UpperCamelCase before comparing, so a
@@ -86,11 +92,25 @@ impl ForceAsync {
     /// `trait_record`.
     pub(crate) fn is_forced(&self, name: &str) -> bool {
         match self {
-            ForceAsync::All(b) => *b,
-            ForceAsync::Named(names) => {
+            AsyncSelection::All(b) => *b,
+            AsyncSelection::Named(names) => {
                 let target = name.to_upper_camel_case();
                 names.iter().any(|n| n.to_upper_camel_case() == target)
             }
+        }
+    }
+}
+
+impl TsConfig {
+    pub(crate) fn jspi_exports(
+        &self,
+        namespace: &uniffi_bindgen::pipeline::general::Namespace,
+        flavor: &crate::AbiFlavor,
+    ) -> anyhow::Result<std::collections::HashSet<String>> {
+        if flavor.is_wasm2() {
+            super::jspi::resolve_wasm2(&self.jspi, namespace)
+        } else {
+            super::jspi::resolve(&self.jspi, namespace, !flavor.supports_plain_call_status())
         }
     }
 }
@@ -122,14 +142,14 @@ mod force_async_tests {
 
     #[test]
     fn all_true_forces_everything() {
-        let fa = ForceAsync::All(true);
+        let fa = AsyncSelection::All(true);
         assert!(fa.is_forced("AnyType"));
         assert!(fa.is_forced("any_function"));
     }
 
     #[test]
     fn default_is_all_false() {
-        let fa = ForceAsync::default();
+        let fa = AsyncSelection::default();
         assert!(!fa.is_forced("AnyType"));
         let cfg = TsConfig::default();
         assert!(!cfg.force_async.is_forced("AnyType"));
@@ -137,7 +157,7 @@ mod force_async_tests {
 
     #[test]
     fn named_matches_across_case_conventions() {
-        let fa = ForceAsync::Named(vec!["makeFlatTraitEnum".into(), "TraitRecord".into()]);
+        let fa = AsyncSelection::Named(vec!["makeFlatTraitEnum".into(), "TraitRecord".into()]);
         // Candidates arrive in any spelling; all normalize to UpperCamelCase.
         assert!(fa.is_forced("make_flat_trait_enum")); // snake_case Rust fn
         assert!(fa.is_forced("makeFlatTraitEnum")); // lowerCamel TS name

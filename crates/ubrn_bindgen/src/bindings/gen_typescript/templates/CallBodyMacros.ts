@@ -76,22 +76,23 @@ console.debug(`-- {{ ffi_name }}`);
    by `rustbuffer_alloc`, so there is no JS-side intermediate copy. -#}
 {%- macro arg_list_lowered(callable) %}
     {%- for arg in callable.arguments %}
-        {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc),
+        {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc{% if callable.jspi && module.flavor.is_wasm2() %}_jspi{% endif %}),
     {%- endfor %}
 {%- endmacro -%}
 
-{#- Sync FFI call with pointer receiver. -#}
+{#- FFI call with pointer receiver; selected JSPI methods await it. -#}
 {%- macro to_ffi_pointer_call(callable, obj_factory) -%}
+    {%- if callable.jspi %}await {% endif %}
     {%- match callable.throws -%}
     {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
+        uniffiCaller.rustCall{% if callable.jspi %}Async{% endif %}WithError(
             /*liftError:*/ {{ e.lift_error_fn }},
             /*caller:*/ (callStatus) => {
     {%- else -%}
-        uniffiCaller.rustCall(
+        uniffiCaller.rustCall{% if callable.jspi %}Async{% endif %}(
             /*caller:*/ (callStatus) => {
     {%- endmatch %}
-            {%- if callable.return_type.is_some() %}
+            {%- if callable.return_type.is_some() || callable.jspi %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {{ obj_factory }}.clonePointer(this),
@@ -102,18 +103,19 @@ console.debug(`-- {{ ffi_name }}`);
     )
 {%- endmacro -%}
 
-{#- Sync FFI call with no receiver (top-level function or constructor). -#}
+{#- FFI call with no receiver; selected JSPI functions and constructors await it. -#}
 {%- macro to_ffi_call(callable) -%}
+    {%- if callable.jspi %}await {% endif %}
     {%- match callable.throws -%}
     {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
+        uniffiCaller.rustCall{% if callable.jspi %}Async{% endif %}WithError(
             /*liftError:*/ {{ e.lift_error_fn }},
             /*caller:*/ (callStatus) => {
     {%- else -%}
-        uniffiCaller.rustCall(
+        uniffiCaller.rustCall{% if callable.jspi %}Async{% endif %}(
             /*caller:*/ (callStatus) => {
     {%- endmatch %}
-            {%- if callable.return_type.is_some() %}
+            {%- if callable.return_type.is_some() || callable.jspi %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {%- call arg_list_lowered(callable) %}
@@ -123,23 +125,24 @@ console.debug(`-- {{ ffi_name }}`);
     )
 {%- endmacro -%}
 
-{#- Sync FFI call with value receiver (enum/record methods). -#}
+{#- FFI call with value receiver; selected JSPI methods await it. -#}
 {%- macro to_ffi_value_call(callable) -%}
     {%- match callable.value_receiver_ffi_converter() -%}
     {%- when Some with (ffi_converter) -%}
+    {%- if callable.jspi %}await {% endif %}
     {%- match callable.throws -%}
     {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
+        uniffiCaller.rustCall{% if callable.jspi %}Async{% endif %}WithError(
             /*liftError:*/ {{ e.lift_error_fn }},
             /*caller:*/ (callStatus) => {
     {%- else -%}
-        uniffiCaller.rustCall(
+        uniffiCaller.rustCall{% if callable.jspi %}Async{% endif %}(
             /*caller:*/ (callStatus) => {
     {%- endmatch %}
-            {%- if callable.return_type.is_some() %}
+            {%- if callable.return_type.is_some() || callable.jspi %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
-                {{ ffi_converter }}.lower(self_, nativeModule().rustbuffer_alloc),
+                {{ ffi_converter }}.lower(self_, nativeModule().rustbuffer_alloc{% if callable.jspi && module.flavor.is_wasm2() %}_jspi{% endif %}),
                 {%- call arg_list_lowered(callable) %}
                 callStatus);
             },
@@ -158,8 +161,11 @@ console.debug(`-- {{ ffi_name }}`);
    instead to avoid allocating a fresh closure object at every call
    site invocation (V8-friendlier). -#}
 
-{#- Call body for value-receiver method: sync only (trait methods are never async). -#}
+{#- Call body for value-receiver methods, including Rust async methods. -#}
 {%- macro call_body_value(callable) %}
+{%- if callable.is_ffi_async() %}
+{%- call call_body_async(callable, "unreachable") %}
+{%- else %}
 {%- match callable.return_type -%}
 {%-     when Some with (return_type) %}
 {%- if return_type.is_rust_buffer %}
@@ -175,6 +181,7 @@ console.debug(`-- {{ ffi_name }}`);
 {%-     when None %}
 {%-         call to_ffi_value_call(callable) %};
 {%- endmatch %}
+{%- endif %}
 {%- endmacro %}
 
 {#- Call body for method (pointer receiver): sync or async. -#}
@@ -248,11 +255,13 @@ console.debug(`-- {{ ffi_name }}`);
             /*rustCaller:*/ uniffiCaller,
             /*rustFutureFunc:*/ () => {
                 return {% call native_method_handle(callable.ffi_name) %}(
-                    {%- if callable.receiver.is_some() %}
+                    {%- if let Some(ffi_converter) = callable.value_receiver_ffi_converter() %}
+                    {{ ffi_converter }}.lower(self_, nativeModule().rustbuffer_alloc{% if callable.jspi && module.flavor.is_wasm2() %}_jspi{% endif %}){% if !callable.arguments.is_empty() %},{% endif %}
+                    {%- else if callable.receiver.is_some() %}
                     {{ obj_factory }}.clonePointer(this){% if !callable.arguments.is_empty() %},{% endif %}
                     {%- endif %}
                     {%- for arg in callable.arguments -%}
-                    {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc){% if !loop.last %},{% endif %}
+                    {{ arg.ffi_converter }}.lower({{ arg.name }}, nativeModule().rustbuffer_alloc{% if callable.jspi && module.flavor.is_wasm2() %}_jspi{% endif %}){% if !loop.last %},{% endif %}
                     {%- endfor %}
                 );
             },
@@ -288,9 +297,11 @@ console.debug(`-- {{ ffi_name }}`);
             /*asyncOpts:*/ asyncOpts_,
             {%- match callable.throws %}
             {%- when Some with (e) %}
-            /*errorHandler:*/ {{ e.lift_error_fn }}
+            /*errorHandler:*/ {{ e.lift_error_fn }},
             {%- else %}
+            /*errorHandler:*/ undefined,
             {% endmatch %}
+            /*suspendingPoll:*/ {{ callable.jspi }},
         )
 {%- when None %}
 {#- unreachable: caller guards with is_ffi_async() -#}
@@ -300,7 +311,7 @@ console.debug(`-- {{ ffi_name }}`);
 {#- Verbose-mode poll handle wrapper. -#}
 {%- macro native_method_handle_poll(method_name) %}
 {%- if module.is_verbose -%}
-(rustFuture: bigint, cb: UniffiRustFutureContinuationCallback, handle: UniffiHandle): void => {
+(rustFuture: bigint, cb: UniffiRustFutureContinuationCallback, handle: UniffiHandle): void | Promise<void> => {
     {% call log_message("   poll    : ", method_name, "") %}
     return nativeModule().{{ method_name }}(rustFuture, cb, handle);
 }

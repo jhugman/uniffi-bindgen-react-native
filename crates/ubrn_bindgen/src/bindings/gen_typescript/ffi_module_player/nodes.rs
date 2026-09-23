@@ -84,7 +84,11 @@ pub(crate) struct PlayerSymbols {
     pub rustbuffer_from_bytes: String,
 }
 
+#[derive(Clone)]
 pub(crate) struct PlayerFunctionDef {
+    pub export_name: Option<String>,
+    pub copy_result: bool,
+    pub jspi: bool,
     /// The raw FFI symbol name (e.g. "uniffi_arithmetical_fn_func_add").
     pub name: String,
     /// Player FfiType expressions for arguments (e.g. "FfiType.UInt32").
