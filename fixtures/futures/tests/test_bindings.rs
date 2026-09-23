@@ -9,8 +9,8 @@ ubrn_macros::build_foreign_language_testcases! {
     // aborts mid-call holding a Rust mutex, and `freeFunc` then aborts again
     // trying to re-lock it. Re-enable once TimerFuture drops host threads.
     "tests/bindings/test_futures.ts" => [Jsi, Napi, Jsi2],
-    // Jsi2 only: asserts on `$uniffiTrampolineCount`, a diagnostic the JSI
-    // player exposes. The other flavors have their own trampoline caches
-    // (napi keys on a hidden Symbol) and no equivalent hook.
-    "tests/bindings/test_trampoline_cache.ts" => [Jsi2],
+    // No Wasm/Wasm2, as above. Both player bridges expose
+    // `$uniffiTrampolineCount` and both count builds at core's single build
+    // point, so the same assertion holds for each.
+    "tests/bindings/test_trampoline_cache.ts" => [Jsi2, Napi],
 }

@@ -70,16 +70,47 @@ impl Module {
         self.lifecycle.is_unloading()
     }
 
+    /// Stop this module serving its frontend: set the unloading flag, then call
+    /// whatever abort hook was registered. Nothing is drained, nothing is freed
+    /// and the library stays mapped, so there is nothing to wait for.
+    ///
+    /// Releasing parked callbacks is the abort hook's job, and the hook is the
+    /// frontend's to supply.
+    ///
+    /// The trampoline map is left intact on purpose: the flag alone makes every
+    /// entry inert, and clearing it would only let a later marshal build a
+    /// replacement nothing can ever call.
+    ///
+    /// One way, but it does not foreclose the others: `unload` only skips the
+    /// abort hook when the flag is already set, and still drains and clears
+    /// the map, so `disarm` then `unload` then `unload_force` is safe.
+    ///
+    /// Returns `Ok(())` immediately if the module is already unloading.
+    pub fn disarm(&self) -> Result<()> {
+        if !self.lifecycle.begin_unload() {
+            return Ok(());
+        }
+        (self.abort_callbacks)(self.abort_user_data);
+        Ok(())
+    }
+
     /// Initiate orderly shutdown: set the unloading flag, abort frontend callbacks,
     /// then wait for in-flight calls to drain.
     ///
-    /// Returns `Ok(())` immediately if the module is already unloading or unloaded.
+    /// The abort hook runs only for the call that sets the flag. The drain and
+    /// the map clear run every time, so a second `unload`, or one behind a
+    /// `disarm`, still leaves nothing in flight and nothing in the map for
+    /// `unload_force` to close underneath. Both are idempotent, so repeating
+    /// them costs nothing.
     pub fn unload(&self) -> Result<()> {
-        if !self.lifecycle.begin_unload() {
-            return Ok(()); // already unloading/unloaded
+        if self.lifecycle.begin_unload() {
+            (self.abort_callbacks)(self.abort_user_data);
         }
-        (self.abort_callbacks)(self.abort_user_data);
         self.lifecycle.wait_for_drain();
+        self.trampolines
+            .lock()
+            .expect("trampolines mutex poisoned")
+            .clear();
         Ok(())
     }
 

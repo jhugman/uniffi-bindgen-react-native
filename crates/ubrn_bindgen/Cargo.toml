@@ -47,3 +47,4 @@ optional = true
 [dev-dependencies]
 camino = { workspace = true }
 expect-test = "1"
+uniffi-runtime-core = { path = "../../runtimes/core" }

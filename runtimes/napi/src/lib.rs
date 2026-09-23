@@ -44,6 +44,9 @@
 //! that registered it, alongside the `napi_env` and `ThreadsafeFunction` it already held for that
 //! same thread.
 
+#![deny(unsafe_op_in_unsafe_fn)]
+#![deny(clippy::undocumented_unsafe_blocks)]
+
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
@@ -101,6 +104,7 @@ struct TsfnHandle(napi::sys::napi_threadsafe_function);
 // whole purpose of the type. This is an opaque handle that is never dereferenced here, only handed
 // back to `napi_release_threadsafe_function`.
 unsafe impl Send for TsfnHandle {}
+// SAFETY: see above.
 unsafe impl Sync for TsfnHandle {}
 
 impl EnvState {
@@ -212,6 +216,8 @@ unsafe extern "C" fn env_cleanup_hook(data: *mut std::ffi::c_void) {
     // worker threads waiting on `rx.recv()` — and one of those may come straight back through a
     // callback, so it must not find this sweep still holding the lock it needs.
     for handle in state.close() {
+        // SAFETY: an opaque handle this environment owned; `close` hands it out exactly
+        // once, so releasing it here does not race the registration path.
         unsafe {
             napi::sys::napi_release_threadsafe_function(
                 handle.0,
@@ -235,6 +241,8 @@ fn install_env_cleanup_hook(env: &Env) {
         }
         states.insert(key, Arc::new(EnvState::new()));
     }
+    // SAFETY: `raw` is a live `napi_env` (this function's own parameter); the hook data
+    // passed is that same `raw` cast to `c_void`, matching what `env_cleanup_hook` expects.
     unsafe {
         napi::sys::napi_add_env_cleanup_hook(raw, Some(env_cleanup_hook), raw.cast());
     }

@@ -110,6 +110,15 @@ export class FfiConverterObjectWithCallbacks<T> extends FfiConverterObject<T> {
     return this.handleMap.insert(value);
   }
 
+  // A miss falls through to the Arc-pointer interpretation, which is right for
+  // a Rust-backed object and wrong for a foreign handle minted by a runtime
+  // that no longer exists: handle maps renumber from 1 per runtime, so after a
+  // reload an odd handle from the previous one is absent here and `super.lift`
+  // hands it to `clonePointer` as an address. `handleMap.get` has a stale-handle
+  // guard for this, and this path is where it is bypassed. Telling the two
+  // cases apart is possible — `lower` mints even handles for Rust-backed
+  // objects and odd ones for foreign — but rejecting an odd miss changes a
+  // crash into a thrown error on a path some callers may rely on.
   lift(value: UniffiHandle): T {
     if (this.handleMap.has(value)) {
       return this.handleMap.get(value);

@@ -35,9 +35,10 @@ pub(crate) struct Registration {
     /// `byteLength` is `rb.len`, but Rust may have allocated `rb.capacity > rb.len`, so
     /// the capacity is stashed here for `rustbuffer_free(view)` to read back.
     pub(crate) capacity_symbol: CapacitySymbol,
-    /// Hidden keys caching a built callback trampoline on the JS function it was built
-    /// for. Without this, dispatch rebuilds one per call — a permanent ~3 KB leak, and
-    /// the async poll loop passes its continuation on every poll. See `callback::cache`.
+    /// Hidden keys stashing the identity minted for each JS function, used to look
+    /// up a built callback trampoline in core's trampoline map. Without this,
+    /// dispatch rebuilds one per call — a permanent ~3 KB leak, and the async poll
+    /// loop passes its continuation on every poll. See `callback::cache`.
     pub(crate) trampolines: crate::callback::cache::TrampolineCache,
 }
 
@@ -60,7 +61,9 @@ pub fn register(
     // `Arc<Registration>` keeps both Symbols alive across the module facade's lifetime
     // (the closures captured below outlive this call).
     let registration = Arc::new(Registration {
+        // SAFETY: env is the active napi env supplied by node for this register call.
         capacity_symbol: unsafe { CapacitySymbol::new(env.raw())? },
+        // SAFETY: as above.
         trampolines: unsafe {
             crate::callback::cache::TrampolineCache::new(env.raw(), module.spec_callbacks().keys())?
         },
@@ -84,6 +87,13 @@ pub fn register(
         })?;
         let arg_types: Rc<Vec<FfiTypeDesc>> = Rc::new(func_def.args.clone());
         let has_rust_call_status = func_def.has_rust_call_status;
+        // Resolved here rather than per call: the return width never changes,
+        // and looking it up in the closure would re-hash the function name on
+        // every invocation. Sized from `return_size`, the width core's call
+        // path writes, not from the arg-slot geometry: a pointer return is
+        // written as 8 bytes whatever the host's pointer size.
+        let ret_desc: Rc<FfiTypeDesc> = Rc::new(func_def.ret.clone());
+        let ret_size = uniffi_runtime_core::return_size(&ret_desc).map_err(core_err)?;
         let reg_for_call = Arc::clone(&registration);
 
         let js_func = env.create_function_from_closure(&name, move |ctx| {
@@ -93,6 +103,8 @@ pub fn register(
                 &fn_name,
                 &module_ref,
                 &arg_types,
+                &ret_desc,
+                ret_size,
                 has_rust_call_status,
                 &reg_for_call,
             )
@@ -114,12 +126,11 @@ pub fn register(
                 "rustbuffer_alloc size must be non-negative".to_string(),
             ));
         }
-        // SAFETY: `alloc_ptr` was resolved at registration time via dlsym; module
-        // (and thus the loaded library) outlives this closure thanks to the captured Arc.
-        let rb =
-            unsafe { napi_utils::rustbuffer_alloc(size_arg, alloc_module.rb_ops().alloc_ptr)? };
+        let rb = alloc_module.rustbuffer_alloc(size_arg).map_err(core_err)?;
         let len = usize::try_from(rb.capacity).map_err(|_| {
             // Free what we just allocated to avoid leaking on the error path.
+            // SAFETY: `rb` was just allocated above and not yet handed to JS, so this is
+            // the sole owner; `free_ptr` was resolved at registration time.
             unsafe { napi_utils::free_rustbuffer(rb, alloc_module.rb_ops().free_ptr) };
             napi::Error::from_reason("RustBuffer capacity exceeds addressable memory".to_string())
         })?;
@@ -150,6 +161,8 @@ pub fn register(
                 .capacity_symbol
                 .set(ctx.env.raw(), typedarray, rb.capacity)?
         };
+        // SAFETY: `ctx.env` is the active env for this callback, and `typedarray` is the
+        // live napi_value created above.
         unsafe { JsUnknown::from_raw(ctx.env.raw(), typedarray) }
     })?;
     result.set_named_property("rustbuffer_alloc", alloc_fn)?;
@@ -209,6 +222,19 @@ pub fn register(
         ctx.env.get_undefined().map(|u| u.into_unknown())
     })?;
     result.set_named_property("rustbuffer_free", free_fn)?;
+
+    // A diagnostic, not part of the FFI surface: how many callback trampolines
+    // this module has built. Trampolines are leaked by design, so reuse is the
+    // only thing bounding the total, and nothing else observable moves when
+    // reuse breaks — the leak pins the same JS function object every time.
+    // Named to match the JSI player's identical hook, and counting the same
+    // thing: builds, from core's single build point.
+    let count_module = Arc::clone(&module);
+    let count_fn = env.create_function_from_closure("$uniffiTrampolineCount", move |ctx| {
+        ctx.env
+            .create_int64(count_module.trampolines_built() as i64)
+    })?;
+    result.set_named_property("$uniffiTrampolineCount", count_fn)?;
 
     Ok((result, module))
 }

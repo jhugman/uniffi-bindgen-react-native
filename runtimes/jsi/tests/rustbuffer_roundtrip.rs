@@ -6,14 +6,15 @@
 //! C-ABI RustBuffer alloc/from_bytes/free round-trips against a real cdylib.
 
 mod common;
-use common::{fixture_cdylib, register_hello_world, UBRN_TY_U32};
+use common::{fixture_cdylib, register_hello_world, TAG_UINT32};
 use uniffi_runtime_jsi::{
     ubrn_jsi_call, ubrn_jsi_free, ubrn_jsi_register, ubrn_jsi_rustbuffer_alloc,
     ubrn_jsi_rustbuffer_free, ubrn_jsi_rustbuffer_from_bytes, UbrnFunctionSpec, UbrnModuleSpec,
 };
 
-/// Type tag for a RustBuffer; mirrors `UBRN_TY_RUSTBUFFER` in `runtimes/jsi/include/ubrn_jsi.h`.
-const UBRN_TY_RUSTBUFFER: u8 = 12;
+/// Player tag name for a RustBuffer, from the wire vocabulary in
+/// `runtimes/jsi/include/ubrn_jsi.h`.
+const TAG_RUSTBUFFER: &str = "RustBuffer";
 
 #[test]
 fn alloc_then_free() {
@@ -46,13 +47,15 @@ fn register_with_describe() -> *mut uniffi_runtime_jsi::UbrnJsiModule {
     let free = std::ffi::CString::new("ffi_hello_world_rustbuffer_free").unwrap();
     let from_bytes = std::ffi::CString::new("ffi_hello_world_rustbuffer_from_bytes").unwrap();
     let describe_name = std::ffi::CString::new("uniffi_hello_world_fn_func_describe").unwrap();
-    let arg_tags: [u8; 1] = [UBRN_TY_U32];
+    let u32_tag = std::ffi::CString::new(TAG_UINT32).unwrap();
+    let rustbuffer_tag = std::ffi::CString::new(TAG_RUSTBUFFER).unwrap();
+    let arg_tag_names = [u32_tag.as_ptr()];
     let fn_spec = UbrnFunctionSpec {
         name: describe_name.as_ptr(),
-        arg_tags: arg_tags.as_ptr(),
+        arg_tag_names: arg_tag_names.as_ptr(),
         n_args: 1,
         arg_type_names: std::ptr::null(),
-        ret_tag: UBRN_TY_RUSTBUFFER,
+        ret_tag_name: rustbuffer_tag.as_ptr(),
         has_rust_call_status: 1,
     };
     let spec = UbrnModuleSpec {
@@ -102,7 +105,7 @@ fn describe_returns_rustbuffer() {
             size_of::<RustBufferC>(),
         )
     };
-    assert_eq!(rc, 0, "ubrn_jsi_call returned error code {rc} (6 = write failed: unsupported type or buffer too small)");
+    assert_eq!(rc, 0, "ubrn_jsi_call returned error code {rc} (6 = unsupported return type; 5 = any other call failure, including a too-small return buffer)");
     assert_eq!(
         status.code, 0,
         "RustCallStatus code was non-zero: {}",

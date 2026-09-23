@@ -6,60 +6,63 @@
 #include "callbacks.h"
 
 #include <atomic>
-#include <cassert>
 
 namespace ubrn_cb {
-
-std::shared_ptr<facebook::react::CallInvoker> g_callInvoker;
-std::thread::id g_jsThreadId;
 
 // ---------------------------------------------------------------------------
 // Layout
 // ---------------------------------------------------------------------------
 
-CallbackShape buildShape(const std::vector<ArgDesc> &args, uint8_t retTag,
-                         const std::string &retName, bool hasRcs,
-                         bool outReturn) {
+CallbackShape buildShape(jsi::Runtime &rt, UbrnJsiModule *module,
+                         const std::string &cbName,
+                         const std::vector<ArgDesc> &args, const ArgDesc &ret,
+                         bool hasRcs, bool outReturn) {
   CallbackShape shape;
   shape.args = args;
   shape.hasRcs = hasRcs;
   shape.outReturn = outReturn;
-  shape.retTag = retTag;
-  shape.retName = retName;
+  shape.retTag = ret.tag;
+  shape.retName = ret.name;
+  shape.retTagSize = ret.size;
+  // ret_size: 0 for void or out_return, else the scalar/RustBuffer slot size.
+  shape.retSize = (outReturn || ret.tag == UBRN_TY_VOID) ? 0 : shape.retTagSize;
 
-  size_t offset = 0;
-  auto place = [&](uint8_t tag) -> SlotLayout {
-    size_t size = tagSize(tag);
-    size_t align = tagAlign(tag);
-    offset = (offset + align - 1) & ~(align - 1);
-    SlotLayout slot{offset, size};
-    offset += size;
-    return slot;
-  };
+  // Core lays out the buffer its trampoline packs, in CIF order:
+  // [declared args, out_return ptr?, RustCallStatus ptr?].
+  const size_t nSlots =
+      args.size() + (outReturn ? 1u : 0u) + (hasRcs ? 1u : 0u);
+  std::vector<size_t> offsets(nSlots);
+  std::vector<size_t> sizes(nSlots);
+  int n = ubrn_jsi_callback_arg_layout(module, cbName.c_str(), &shape.totalSize,
+                                       offsets.data(), sizes.data(), nSlots);
+  if (n < 0) {
+    // Core has no flat arg buffer for this signature — a struct passed by
+    // value, as in ForeignFutureComplete*. It refuses a trampoline for the
+    // same reason, so such a callback is only ever invoked as an incoming fn
+    // pointer, which reads `args`, never the slots below. Leave them empty.
+    return shape;
+  }
+  if ((size_t)n != nSlots) {
+    // Core and the shim disagree on how many slots this signature has, so any
+    // offset read out of the truncated arrays would be the wrong one.
+    throw jsi::JSError(rt, "uniffi jsi player: callback '" + cbName + "' has " +
+                               std::to_string(n) + " slots in core, " +
+                               std::to_string(nSlots) + " here");
+  }
 
   shape.argSlots.reserve(args.size());
-  for (const auto &a : args) {
-    shape.argSlots.push_back(place(a.tag));
+  for (size_t i = 0; i < args.size(); i++) {
+    shape.argSlots.push_back(SlotLayout{offsets[i], sizes[i]});
   }
-  // out_return appears as an extra VoidPointer (pointer-sized) arg slot, before
-  // the RustCallStatus slot — matching core::ArgLayout when out_return is set.
+  size_t next = args.size();
   if (outReturn) {
-    shape.outReturnSlot = place(UBRN_TY_HANDLE); // pointer-sized
+    shape.outReturnSlot = SlotLayout{offsets[next], sizes[next]};
+    next++;
   }
   if (hasRcs) {
-    shape.rcsSlot = place(UBRN_TY_HANDLE); // *mut RustCallStatus, pointer-sized
+    shape.rcsSlot = SlotLayout{offsets[next], sizes[next]};
   }
-  // After placing every slot, `offset` is the end of the full buffer —
-  // exactly core::ArgLayout::compute's total_size for
-  // [declared_args, out_return_ptr?, RCS_ptr?].
-  shape.totalSize = offset;
-
-  // ret_size: 0 for void or out_return, else the scalar/RustBuffer slot size.
-  if (outReturn || retTag == UBRN_TY_VOID) {
-    shape.retSize = 0;
-  } else {
-    shape.retSize = tagSize(retTag);
-  }
+  shape.slotsValid = true;
   return shape;
 }
 
@@ -121,8 +124,8 @@ jsi::Value readArgToJs(jsi::Runtime &rt, UbrnJsiModule *module,
 
 // Write a JS value (already lowered by the codegen) into a return-byte buffer
 // of `size` bytes, per `tag`. For RustBuffer, the JS value is a Uint8Array
-// which we copy into a Rust buffer and store as its 24-byte repr(C). Ports
-// write_js_return_to_bytes.
+// which we copy into a Rust buffer and store as its repr(C) UbrnRustBuffer
+// (size is target-dependent). Ports write_js_return_to_bytes.
 void writeJsToBytes(jsi::Runtime &rt, UbrnJsiModule *module, uint8_t tag,
                     const jsi::Value &v, uint8_t *dst, size_t size) {
   if (tag == UBRN_TY_RUSTBUFFER) {
@@ -134,7 +137,7 @@ void writeJsToBytes(jsi::Runtime &rt, UbrnJsiModule *module, uint8_t tag,
   scalarToBytes(rt, tag, v, dst);
 }
 
-// Pull the 24-byte UbrnRustBuffer out of a JS Uint8Array (errBuf) into a Rust
+// Pull the repr(C) UbrnRustBuffer out of a JS Uint8Array (errBuf) into a Rust
 // buffer, for the RustCallStatus error path.
 UbrnRustBuffer errBufToRustBuffer(jsi::Runtime &rt, UbrnJsiModule *module,
                                   const jsi::Value &v) {
@@ -211,11 +214,11 @@ void marshalFieldToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
     return;
   }
   case UBRN_TY_RUSTCALLSTATUS: {
-    // Inline RustCallStatus: {i8 code, u64 capacity, u64 len, *u8 data} with
-    // natural alignment (code@0, then padding, capacity@8, len@16, data@24).
-    // JS shape is { code, errorBuf? }. Not a registered struct, so handle
-    // inline (mirrors marshal.rs's RustCallStatus arm). slot is already
-    // zero-filled.
+    // Inline RustCallStatus: {i8 code, RustBuffer error_buf}, laid out as the
+    // RustCallStatus mirror says (code@0, error_buf at the buffer's alignment:
+    // 8 on 64-bit and armeabi-v7a, 4 on x86). JS shape is { code, errorBuf? }.
+    // Not a registered struct, so handle inline (mirrors marshal.rs's
+    // RustCallStatus arm). slot is already zero-filled.
     if (!v.isObject())
       return; // zero == success status
     auto obj = v.asObject(rt);
@@ -231,9 +234,8 @@ void marshalFieldToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
       auto eb = obj.getProperty(rt, "errorBuf");
       if (eb.isObject()) {
         UbrnRustBuffer rb = errBufToRustBuffer(rt, module, eb);
-        // capacity@8, len@16, data@24 within the field slot.
-        if (slotSize >= 32)
-          memcpy(slot + 8, &rb, sizeof(rb));
+        if (slotSize >= sizeof(RustCallStatus))
+          memcpy(slot + offsetof(RustCallStatus, error_buf), &rb, sizeof(rb));
       }
     }
     return;
@@ -245,7 +247,7 @@ void marshalFieldToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
     return;
   }
   default:
-    // Scalars / Handle. scalarToBytes writes tagSize(tag) bytes.
+    // Scalars / Handle. scalarToBytes writes the tag's slot width.
     scalarToBytes(rt, type.tag, v, slot);
     return;
   }
@@ -267,12 +269,32 @@ std::vector<uint8_t> marshalArgToBytes(jsi::Runtime &rt, UbrnJsiModule *module,
     return out;
   }
   // Scalars / Handle / pointer-sized.
-  size_t sz = tagSize(desc.tag);
+  size_t sz = desc.size;
   std::vector<uint8_t> out(sz ? sz : 1, 0);
   scalarToBytes(rt, desc.tag, v, out.data());
   out.resize(sz);
   return out;
 }
+
+// The identity a JS function is known by in core's trampoline reuse map.
+//
+// NativeState rather than a property: it lives in an internal slot, so it is
+// invisible to Object.keys, spreads and JSON.stringify — the reuse rule must
+// stay unobservable from JS — and it is never inherited, so a function whose
+// prototype is another callback cannot borrow its identity and be handed the
+// wrong trampoline. Same mechanism as RustBufferOwner in value_conv.h.
+class TrampolineId : public jsi::NativeState {
+public:
+  explicit TrampolineId(uint64_t id) : id(id) {}
+  const uint64_t id;
+};
+
+// Source of those identities. Process-global because the stash is: one JS
+// function holds one NativeState slot and is marshalled by every module that
+// takes it, so an id must be unique across all of their maps. Starts at 1: 0 is
+// trampolineForJsFn's "no identity" sentinel. Atomic because a process can run
+// more than one JS runtime, each on its own thread.
+std::atomic<uint64_t> g_nextTrampolineId{1};
 
 // Wrap an incoming Rust fn pointer as a callable JS function: when JS calls it,
 // each arg is marshalled to C bytes and the fn ptr is invoked through core's
@@ -286,9 +308,10 @@ jsi::Value makeFnPointerWrapper(jsi::Runtime &rt, UbrnJsiModule *module,
                        "uniffi jsi player: unknown callback '" + cbName + "'");
   }
   // Borrow the declared arg descs (the completer's signature) by pointer: they
-  // live in `info.callbacks` (process-lifetime ModuleCallbackInfo, captured
-  // into the module closures via shared_ptr), so they outlive every completer
-  // call.
+  // live in `info.callbacks`, which the module object's closures and the
+  // player root both own via shared_ptr. The root is the last of those to go,
+  // and its destructor disarms before the registry is freed, so a call that
+  // gets this far reads descs that are still alive.
   const std::vector<ArgDesc> *argTypes = &cbIt->second.args;
   const ModuleCallbackInfo *infoPtr = &info;
   return jsi::Function::createFromHostFunction(
@@ -344,18 +367,50 @@ const void *trampolineForJsFn(jsi::Runtime &rt, UbrnJsiModule *module,
   }
   auto jsFnObj = v.asObject(rt).getFunction(rt);
 
-  // Reuse this function's trampoline if it already has one. Nothing below runs
-  // on a hit; see ModuleCallbackInfo::trampolines for why reuse is safe and why
-  // a scan beats building a closure.
-  for (const auto &entry : info.trampolines) {
-    if (entry.cbName == cbName &&
-        jsi::Object::strictEquals(rt, *entry.fn, jsFnObj)) {
-      return entry.fnPtr;
+  // The identity core's reuse map keys on, alongside the callback name. Read
+  // the stash before minting: a fresh identity per marshal would build a
+  // trampoline per call, which is the leak reuse exists to prevent. 0 means
+  // "no identity" — minted ones start at 1 — and marshals without memoising.
+  //
+  // Two function classes never get an identity and so leak one CbUserData plus
+  // one libffi closure per marshal — unbounded growth for that input, not
+  // merely "no reuse": one already carrying another owner's NativeState, whose
+  // slot must not be overwritten, and one that refuses the write (frozen or
+  // proxied). Accepted because neither is common as a callback in practice.
+  uint64_t identity = 0;
+  if (jsFnObj.hasNativeState(rt)) {
+    auto stashed =
+        std::dynamic_pointer_cast<TrampolineId>(jsFnObj.getNativeState(rt));
+    if (stashed) {
+      identity = stashed->id;
+    }
+  } else {
+    uint64_t minted =
+        g_nextTrampolineId.fetch_add(1, std::memory_order_relaxed);
+    try {
+      jsFnObj.setNativeState(rt, std::make_shared<TrampolineId>(minted));
+      identity = minted;
+    } catch (const jsi::JSIException &) {
+    }
+  }
+
+  // Nothing below runs on a hit; see ModuleCallbackInfo for why reuse is safe.
+  if (identity != 0) {
+    if (const void *hit =
+            ubrn_jsi_trampoline_for(module, cbName.c_str(), identity)) {
+      return hit;
     }
   }
 
   auto jsFn = std::make_shared<jsi::Function>(std::move(jsFnObj));
-  auto *ud = new CbUserData{&rt, jsFn, cbIt->second, module, &info};
+  auto *ud = new CbUserData{&rt,
+                            jsFn,
+                            cbIt->second,
+                            module,
+                            &info,
+                            info.callInvoker,
+                            info.jsThreadId,
+                            info.abortState};
   const void *fnPtr =
       ubrn_jsi_make_trampoline(module, cbName.c_str(), cb_on_js_thread,
                                cb_dispatch, cb_is_js_thread, ud);
@@ -363,7 +418,10 @@ const void *trampolineForJsFn(jsi::Runtime &rt, UbrnJsiModule *module,
     throw jsi::JSError(rt, "uniffi jsi player: make_trampoline failed for '" +
                                cbName + "'");
   }
-  info.trampolines.push_back({cbName, jsFn, fnPtr});
+  info.trampolinesBuilt++;
+  if (identity != 0) {
+    ubrn_jsi_remember_trampoline(module, cbName.c_str(), identity, fnPtr);
+  }
   return fnPtr;
 }
 
@@ -371,11 +429,27 @@ const void *trampolineForJsFn(jsi::Runtime &rt, UbrnJsiModule *module,
 // cb_on_js_thread — runs on the JS thread (see core trampoline protocol).
 // ---------------------------------------------------------------------------
 
-extern "C" void cb_on_js_thread(const uint8_t *args, uint8_t *ret,
-                                const void *udPtr) {
+// The body. Everything below can throw: the JS callback itself, an
+// unmarshallable argument, an unknown struct, an already-consumed buffer.
+static void cb_on_js_thread_impl(const uint8_t *args, uint8_t *ret,
+                                 const void *udPtr) {
   const auto *ud = static_cast<const CbUserData *>(udPtr);
   jsi::Runtime &rt = *ud->rt;
   const CallbackShape &shape = ud->shape;
+
+  // A shape with no slots would make every read below index past the end of
+  // argSlots. It cannot reach here — core computes the same layout before it
+  // builds a trampoline, so a callback it gives no layout for gets no
+  // trampoline either — but that invariant lives in core, so enforce it here
+  // rather than trusting it. Returning, not throwing: core reaches this through
+  // a plain `extern "C"` fn pointer on the same-thread path, where an exception
+  // would unwind into Rust. Every synchronous vtable method is out_return, so
+  // ret_size is 0 here: Rust reads back FfiDefault::ffi_default() with
+  // call_status.code still 0, a successful empty return, not a reported
+  // failure.
+  if (!shape.slotsValid) {
+    return;
+  }
 
   size_t declared = shape.args.size();
 
@@ -434,9 +508,8 @@ extern "C" void cb_on_js_thread(const uint8_t *args, uint8_t *ret,
         memcpy(outReturnPtr, bytes.data(), bytes.size());
       } else if (outReturnPtr != nullptr && shape.retTag != UBRN_TY_VOID &&
                  shape.retTag != UBRN_TY_STRUCT) {
-        size_t size = tagSize(shape.retTag);
         writeJsToBytes(rt, ud->module, shape.retTag, result,
-                       static_cast<uint8_t *>(outReturnPtr), size);
+                       static_cast<uint8_t *>(outReturnPtr), shape.retTagSize);
       }
       return;
     }
@@ -466,9 +539,8 @@ extern "C" void cb_on_js_thread(const uint8_t *args, uint8_t *ret,
             rt, ud->module, *ud->info, shape.retName, pointee.asObject(rt));
         memcpy(outReturnPtr, bytes.data(), bytes.size());
       } else {
-        size_t size = tagSize(shape.retTag);
         writeJsToBytes(rt, ud->module, shape.retTag, pointee,
-                       static_cast<uint8_t *>(outReturnPtr), size);
+                       static_cast<uint8_t *>(outReturnPtr), shape.retTagSize);
       }
     }
     return;
@@ -498,33 +570,115 @@ extern "C" void cb_on_js_thread(const uint8_t *args, uint8_t *ret,
   }
 }
 
+// Core invokes this through a plain `extern "C"` fn pointer, which rustc marks
+// nounwind — on the same-thread path it is called straight from
+// `trampoline_body`. A C++ exception crossing that frame is undefined
+// behaviour, so nothing may escape here. Every synchronous vtable method is
+// out_return, so ret_size is 0 here: Rust reads back FfiDefault::ffi_default()
+// with call_status.code still 0, a successful empty return, not a reported
+// failure.
+extern "C" void cb_on_js_thread(const uint8_t *args, uint8_t *ret,
+                                const void *udPtr) {
+  try {
+    cb_on_js_thread_impl(args, ret, udPtr);
+  } catch (...) {
+  }
+}
+
 // ---------------------------------------------------------------------------
 // cb_dispatch — runs on a worker thread; rendezvous onto the JS thread.
 // ---------------------------------------------------------------------------
 
-extern "C" void cb_dispatch(UbrnOnJsThreadFn on_js, const uint8_t *args,
-                            uint8_t *ret, const void *udPtr) {
+namespace {
+
+// One cross-thread callback's transfer buffer: the arg bytes copied off the
+// worker's stack, the return bytes the JS thread writes, and the flag the
+// rendezvous waits on. Heap-owned and shared with the posted task, so these two
+// buffers outlive the worker's frame even when an abort releases it early.
+//
+// That is the whole of what heap-owning buys. The out_return and
+// RustCallStatus pointers travel *inside* the arg bytes and address the Rust
+// caller's own locals, so a task running after its worker has been released
+// would write a popped frame. The task re-reads `aborted` before it calls
+// into JS and returns without doing so once an abort has released the worker.
+struct DispatchSlot {
+  std::vector<uint8_t> args;
+  std::vector<uint8_t> ret;
+  bool done = false;
+};
+
+} // namespace
+
+void abortModule(const ModuleCallbackInfo &info) {
+  const auto &state = info.abortState;
+  if (state == nullptr) {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lk(state->mtx);
+    state->aborted = true;
+  }
+  state->cv.notify_all();
+}
+
+static void cb_dispatch_impl(UbrnOnJsThreadFn on_js, const uint8_t *args,
+                             uint8_t *ret, const void *udPtr) {
   const auto *ud = static_cast<const CbUserData *>(udPtr);
   const CallbackShape &shape = ud->shape;
 
-  // Copy the FULL arg buffer so the calling (worker) thread can release its
-  // stack. core's trampoline lays it out as [declared_args, out_return_ptr?,
-  // RCS_ptr?]; shape.totalSize covers all of those (matching core's
-  // ArgLayout::total_size and the NAPI oracle's arg_layout.total_size). Using
-  // only argSlots.back() would truncate the out_return and RCS pointer slots,
-  // so cb_on_js_thread would read those pointers past the end of the copy.
-  size_t argsLen = shape.totalSize;
-  std::vector<uint8_t> argsCopy(argsLen);
-  if (argsLen > 0 && args != nullptr) {
-    memcpy(argsCopy.data(), args, argsLen);
+  // Same guard as cb_on_js_thread, applied before posting: a slotless shape
+  // would copy a zero-length buffer and cb_on_js_thread would then index past
+  // the end of argSlots. Returning here leaves ret_size at 0 for the common
+  // out_return case, so Rust reads back FfiDefault::ffi_default() with
+  // call_status.code still 0 — a successful empty return, not a reported
+  // failure.
+  if (!shape.slotsValid) {
+    return;
   }
-  size_t retLen = shape.retSize;
-  std::vector<uint8_t> retBuf(retLen);
 
-  // Invariant: registerNatives ran first and captured the host CallInvoker.
-  // A cross-thread callback before that would be a wiring bug.
-  assert(g_callInvoker != nullptr &&
-         "cb_dispatch: g_callInvoker not set (registerNatives must run first)");
+  // Every trampoline carries the invoker and release valve of the runtime it
+  // was built for. Checked, not asserted: release builds define NDEBUG, and the
+  // dereferences below would be null on a worker thread. Returning here leaves
+  // ret_size at 0 for the out_return case, so Rust reads back
+  // FfiDefault::ffi_default() with call_status.code still 0 — a successful
+  // empty return, not a reported failure.
+  const auto &state = ud->abortState;
+  if (ud->callInvoker == nullptr || state == nullptr) {
+    return;
+  }
+
+  // Already torn down: post nothing. This userdata keeps the invoker alive past
+  // its runtime, so the call below would otherwise succeed and queue a task
+  // nothing will ever drain.
+  //
+  // A filter, not a barrier: an abort landing between this check and the post
+  // still queues that orphan. What keeps the worker itself safe is the wait
+  // predicate, which re-reads `aborted` under the same mutex and so returns on
+  // a signal already given rather than parking on one that has passed. Holding
+  // the mutex across the post would close the window, at the price of calling
+  // into the host's scheduler underneath one of our own locks.
+  {
+    std::lock_guard<std::mutex> lk(state->mtx);
+    if (state->aborted) {
+      return;
+    }
+  }
+
+  // Copy the FULL arg buffer so the worker thread can release its stack. core's
+  // trampoline lays it out as [declared_args, out_return_ptr?, RCS_ptr?];
+  // shape.totalSize covers all of those (matching core's ArgLayout::total_size
+  // and the NAPI oracle's arg_layout.total_size). Using only argSlots.back()
+  // would truncate the out_return and RCS pointer slots, so cb_on_js_thread
+  // would read those pointers past the end of the copy.
+  auto slot = std::make_shared<DispatchSlot>();
+  slot->args.resize(shape.totalSize);
+  if (shape.totalSize > 0 && args != nullptr) {
+    memcpy(slot->args.data(), args, shape.totalSize);
+  }
+  slot->ret.resize(shape.retSize);
+
+  const void *capturedUd = udPtr;
+  auto captured = state;
 
   // A callback with nothing to hand back -- the rust_future continuation and
   // vtable free -- is posted and forgotten. uniffi invokes the continuation
@@ -532,43 +686,80 @@ extern "C" void cb_dispatch(UbrnOnJsThreadFn on_js, const uint8_t *args,
   // thread deadlocks whenever that thread is itself inside rust_future_poll
   // and the poll wakes another future: it blocks on the mutex this worker
   // holds while this worker blocks on it.
-  if (!shape.hasRcs && !shape.outReturn && retLen == 0) {
-    auto owned = std::make_shared<std::vector<uint8_t>>(std::move(argsCopy));
-    const void *capturedUd = udPtr;
-    g_callInvoker->invokeAsync([on_js, owned, capturedUd](jsi::Runtime &) {
-      on_js(owned->data(), nullptr, capturedUd);
+  if (!shape.hasRcs && !shape.outReturn && shape.retSize == 0) {
+    ud->callInvoker->invokeAsync([on_js, slot, capturedUd](jsi::Runtime &) {
+      try {
+        on_js(slot->args.data(), nullptr, capturedUd);
+      } catch (...) {
+      }
     });
     return;
   }
 
-  // Rendezvous: post onto the JS thread via invokeAsync, block until it runs.
-  // NEVER invokeSync (it is a no-op in the test harness). uniffi foreign-thread
-  // callbacks fire from Rust-owned threads, so the JS thread is free to drain.
-  auto mtx = std::make_shared<std::mutex>();
-  auto cv = std::make_shared<std::condition_variable>();
-  auto done = std::make_shared<bool>(false);
-
-  // Capture raw pointers/spans by value into the task.
-  const uint8_t *argsPtr = argsCopy.data();
-  uint8_t *retPtr = retLen > 0 ? retBuf.data() : nullptr;
-  const void *capturedUd = udPtr;
-
-  g_callInvoker->invokeAsync([=](jsi::Runtime &) {
-    on_js(argsPtr, retPtr, capturedUd);
-    {
-      std::lock_guard<std::mutex> lk(*mtx);
-      *done = true;
-    }
-    cv->notify_one();
-  });
+  // Rendezvous: post onto the JS thread via invokeAsync, block until it runs or
+  // the module is aborted. NEVER invokeSync (it is a no-op in the test
+  // harness). uniffi foreign-thread callbacks fire from Rust-owned threads, so
+  // the JS thread is free to drain.
+  ud->callInvoker->invokeAsync(
+      [on_js, slot, captured, capturedUd](jsi::Runtime &) {
+        // An abort since the post has already released the worker, and with
+        // it the frame the out_return and RustCallStatus pointers inside
+        // slot->args address. Calling into JS now would write a popped stack,
+        // so skip it; the flag is read under the mutex abortModule sets it
+        // under. Marking done is harmless: nothing waits on it any more.
+        {
+          std::lock_guard<std::mutex> lk(captured->mtx);
+          if (captured->aborted) {
+            slot->done = true;
+            return;
+          }
+        }
+        // on_js is cb_on_js_thread, already wrapped in its own catch(...)
+        // barrier — this try/catch is belt-and-braces. The worker is parked
+        // until done is set, so the signal has to happen on every path out of
+        // this task or that worker waits for an abort instead. Returning here
+        // leaves ret_size at 0 for the out_return case, so Rust reads back
+        // FfiDefault::ffi_default() with call_status.code still 0 — a
+        // successful empty return, not a reported failure.
+        try {
+          on_js(slot->args.data(),
+                slot->ret.empty() ? nullptr : slot->ret.data(), capturedUd);
+        } catch (...) {
+        }
+        {
+          std::lock_guard<std::mutex> lk(captured->mtx);
+          slot->done = true;
+        }
+        // notify_all, not notify_one: this condvar is shared by every
+        // cross-thread callback of the module, so waking one arbitrary waiter
+        // can wake a worker whose own task has not run and leave this one
+        // parked.
+        captured->cv.notify_all();
+      });
 
   {
-    std::unique_lock<std::mutex> lk(*mtx);
-    cv->wait(lk, [&] { return *done; });
+    std::unique_lock<std::mutex> lk(state->mtx);
+    state->cv.wait(lk, [&] { return slot->done || state->aborted; });
+    // The completing task fills slot->ret and then publishes done under this
+    // mutex, so a wake on done sees the fill. A wake on aborted races nothing:
+    // abort runs on the thread that drains this invoker, immediately before
+    // the runtime dies, so no queued task ever runs. slot->ret is then still
+    // the zero fill from resize, which is what core's unloading path produces.
+    if (shape.retSize > 0 && ret != nullptr) {
+      memcpy(ret, slot->ret.data(), shape.retSize);
+    }
   }
+}
 
-  if (retLen > 0 && ret != nullptr) {
-    memcpy(ret, retBuf.data(), retLen);
+// Core invokes this through a plain `extern "C"` fn pointer, which rustc marks
+// nounwind — `trampoline_body` calls it directly on the foreign-thread path. A
+// C++ exception crossing that frame is undefined behaviour, and everything
+// above allocates, so nothing may escape here.
+extern "C" void cb_dispatch(UbrnOnJsThreadFn on_js, const uint8_t *args,
+                            uint8_t *ret, const void *udPtr) {
+  try {
+    cb_dispatch_impl(on_js, args, ret, udPtr);
+  } catch (...) {
   }
 }
 
@@ -576,8 +767,16 @@ extern "C" void cb_dispatch(UbrnOnJsThreadFn on_js, const uint8_t *args,
 // cb_is_js_thread
 // ---------------------------------------------------------------------------
 
-extern "C" bool cb_is_js_thread(const void *) {
-  return std::this_thread::get_id() == g_jsThreadId;
+// The answer is per-runtime, not per-process: two runtimes in one process each
+// have their own JS thread, and a trampoline belongs to exactly one of them.
+//
+// `udPtr` is the pointer handed to ubrn_jsi_make_trampoline, which is always a
+// live CbUserData, so it is dereferenced unconditionally here as it is in
+// cb_on_js_thread and cb_dispatch. Answering `false` for a null instead would
+// only route the call into those two, which dereference it anyway.
+extern "C" bool cb_is_js_thread(const void *udPtr) {
+  const auto *ud = static_cast<const CbUserData *>(udPtr);
+  return std::this_thread::get_id() == ud->jsThreadId;
 }
 
 // ---------------------------------------------------------------------------
@@ -596,8 +795,9 @@ const void *buildVTableStruct(jsi::Runtime &rt, UbrnJsiModule *module,
   const StructLayout &layout = structIt->second;
 
   // The callback name pointers refer to `layout.fields[*].second`, owned by
-  // `info.structs` (process-lifetime ModuleCallbackInfo), so they stay valid
-  // for the duration of (and well past) the ubrn_jsi_build_vtable call below.
+  // `info.structs`, which lives as long as the registering runtime — so they
+  // stay valid for the duration of (and well past) the ubrn_jsi_build_vtable
+  // call below.
   std::vector<const char *> callbackNamePtrs;
   std::vector<const void *> fnPtrs;
   callbackNamePtrs.reserve(layout.fields.size());

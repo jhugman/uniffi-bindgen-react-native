@@ -20,14 +20,16 @@
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::path::Path;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
 use libffi::low::CodePtr;
 use libffi::middle::Cif;
 
-use crate::call::{ArgLayout, CallReturn};
+use crate::call::{slot_size_align, ArgLayout};
 use crate::cif::ffi_type_for;
-use crate::ffi_c_types::RustBufferOps;
+use crate::ffi_c_types::{RustBufferC, RustBufferOps};
+use crate::ffi_type::desc_from_name;
 use crate::library::LibraryHandle;
 use crate::spec::{CallbackDef, FunctionDef, ModuleSpec, StructDef};
 use crate::{Error, FfiTypeDesc, Result};
@@ -45,19 +47,25 @@ pub(crate) struct ResolvedFunction {
 }
 
 impl ResolvedFunction {
-    /// Build libffi `Arg` references from `arg_bytes` and call the resolved symbol.
+    /// Build libffi `Arg` references into `arg_bytes`, one per CIF argument.
     ///
-    /// The `Arg` pointers into `arg_bytes` are stack-local — they are created,
-    /// passed to `cif.call`, and dropped within this method.
-    pub(crate) fn invoke(&self, arg_bytes: &[u8]) -> Result<CallReturn> {
+    /// `invoke` dispatches through this, so the slot-offset reasoning lives in
+    /// one place. The returned `Arg`s borrow `arg_bytes` and must not outlive
+    /// the `cif.call` they are handed to.
+    ///
+    /// `arg_bytes` must be at least `self.arg_layout.total_size` bytes; it is
+    /// always the [`PreparedCall`](crate::PreparedCall) buffer, which
+    /// `prepare_call` sizes from this very layout.
+    fn ffi_args<'a>(&self, arg_bytes: &'a [u8]) -> Vec<libffi::middle::Arg<'a>> {
         let buf_ptr = arg_bytes.as_ptr();
 
-        let mut ffi_args: Vec<libffi::middle::Arg> =
+        let mut ffi_args: Vec<libffi::middle::Arg<'a>> =
             Vec::with_capacity(self.arg_layout.arg_slots.len() + 1);
         for slot in &self.arg_layout.arg_slots {
-            // SAFETY: slot.offset + slot.size <= arg_bytes.len(), enforced by ArgLayout::compute.
+            // SAFETY: ArgLayout::compute bounds slot.offset + slot.size by total_size,
+            // and arg_bytes is at least that long (see this fn's doc comment).
             let slot_ptr = unsafe { buf_ptr.add(slot.offset) };
-            // SAFETY: slot_ptr points into arg_bytes which is alive for this call.
+            // SAFETY: slot_ptr points into arg_bytes, which outlives the returned Arg.
             ffi_args.push(unsafe { libffi::middle::arg(&*slot_ptr) });
         }
         if let Some(rcs_slot) = &self.arg_layout.rust_call_status_slot {
@@ -66,51 +74,90 @@ impl ResolvedFunction {
             // SAFETY: slot_ptr points into arg_bytes, same reasoning as above.
             ffi_args.push(unsafe { libffi::middle::arg(&*slot_ptr) });
         }
+        ffi_args
+    }
+
+    /// Call the resolved symbol, writing the return value's native-endian bytes
+    /// into `out`. Returns the number of bytes written (0 for a void return).
+    ///
+    /// A pointer return is widened to 8 bytes so the byte width does not vary
+    /// with the host's pointer size. A `RustBuffer` return is written as its
+    /// `repr(C)` form, `size_of::<RustBufferC>()` bytes (24 on 64-bit and
+    /// armeabi-v7a, 20 on x86), and stays owned by the caller, who must free it
+    /// — so `out` must hold that many bytes for a RustBuffer-returning function
+    /// or the buffer's backing allocation is leaked along with the error.
+    ///
+    /// [`return_size`](crate::return_size) reports the width written here for
+    /// each return type; size `out` from it rather than from the arg-slot
+    /// geometry, which gives pointer width for a pointer return.
+    pub(crate) fn invoke(&self, arg_bytes: &[u8], out: &mut [u8]) -> Result<usize> {
+        let ffi_args = self.ffi_args(arg_bytes);
 
         let code_ptr = CodePtr::from_ptr(self.symbol);
         let ffi_args = &ffi_args;
 
-        // SAFETY: The CIF was built from the same FunctionDef as the arg buffer layout.
-        // Each ffi_arg points into arg_bytes (alive for this call). code_ptr is a
-        // resolved symbol from a loaded library alive for the Module's lifetime.
-        let ret = unsafe {
-            match &self.def.ret {
-                FfiTypeDesc::Void => {
-                    self.cif.call::<()>(code_ptr, ffi_args);
-                    CallReturn::Void
-                }
-                FfiTypeDesc::UInt8 => CallReturn::U8(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::Int8 => CallReturn::I8(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::UInt16 => CallReturn::U16(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::Int16 => CallReturn::I16(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::UInt32 => CallReturn::U32(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::Int32 => CallReturn::I32(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::UInt64 | FfiTypeDesc::Handle => {
-                    CallReturn::U64(self.cif.call(code_ptr, ffi_args))
-                }
-                FfiTypeDesc::Int64 => CallReturn::I64(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::Float32 => CallReturn::F32(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::Float64 => CallReturn::F64(self.cif.call(code_ptr, ffi_args)),
-                FfiTypeDesc::RustBuffer => {
-                    CallReturn::RustBuffer(self.cif.call(code_ptr, ffi_args))
-                }
-                FfiTypeDesc::VoidPointer
-                | FfiTypeDesc::Reference(_)
-                | FfiTypeDesc::MutReference(_)
-                | FfiTypeDesc::Callback(_) => {
-                    let v: usize = self.cif.call(code_ptr, ffi_args);
-                    CallReturn::Pointer(v)
-                }
-                other => {
-                    return Err(Error::UnsupportedType(format!(
-                        "return type {other:?} not yet supported"
-                    )));
-                }
-            }
-        };
+        // Each arm picks the Rust return type that `ffi_type_for` mapped `self.def.ret`
+        // to when `Module::new` built the CIF, so the call's type parameter and the
+        // CIF's return type always agree.
+        macro_rules! call_and_put {
+            ($ty:ty) => {{
+                // SAFETY: The CIF was built from the same FunctionDef as the arg buffer
+                // layout, and $ty is the Rust type of that CIF's return type. Each
+                // ffi_arg points into arg_bytes (alive for this call). code_ptr is a
+                // resolved symbol from a loaded library alive for the Module's lifetime.
+                let v: $ty = unsafe { self.cif.call(code_ptr, ffi_args) };
+                put_return_bytes(out, &v.to_ne_bytes())
+            }};
+        }
 
-        Ok(ret)
+        match &self.def.ret {
+            FfiTypeDesc::Void => {
+                // SAFETY: as in `call_and_put!`, with `()` for the CIF's void return type.
+                unsafe { self.cif.call::<()>(code_ptr, ffi_args) };
+                Ok(0)
+            }
+            FfiTypeDesc::UInt8 => call_and_put!(u8),
+            FfiTypeDesc::Int8 => call_and_put!(i8),
+            FfiTypeDesc::UInt16 => call_and_put!(u16),
+            FfiTypeDesc::Int16 => call_and_put!(i16),
+            FfiTypeDesc::UInt32 => call_and_put!(u32),
+            FfiTypeDesc::Int32 => call_and_put!(i32),
+            FfiTypeDesc::UInt64 | FfiTypeDesc::Handle => call_and_put!(u64),
+            FfiTypeDesc::Int64 => call_and_put!(i64),
+            FfiTypeDesc::Float32 => call_and_put!(f32),
+            FfiTypeDesc::Float64 => call_and_put!(f64),
+            FfiTypeDesc::RustBuffer => {
+                // SAFETY: as in `call_and_put!`, with RustBufferC for the CIF's RustBuffer
+                // return type — the same repr(C) struct `ffi_type_for` describes to libffi.
+                let rb: RustBufferC = unsafe { self.cif.call(code_ptr, ffi_args) };
+                put_return_bytes(out, &crate::slot::rust_buffer_to_bytes(&rb))
+            }
+            FfiTypeDesc::VoidPointer
+            | FfiTypeDesc::Reference(_)
+            | FfiTypeDesc::MutReference(_)
+            | FfiTypeDesc::Callback(_) => {
+                // SAFETY: as in `call_and_put!`, with usize for the CIF's pointer return type.
+                let v: usize = unsafe { self.cif.call(code_ptr, ffi_args) };
+                put_return_bytes(out, &(v as u64).to_ne_bytes())
+            }
+            other => Err(Error::UnsupportedType(format!(
+                "return type {other:?} not yet supported"
+            ))),
+        }
     }
+}
+
+/// Copy a return value's bytes into the front of `out`, or fail if they don't fit.
+fn put_return_bytes(out: &mut [u8], bytes: &[u8]) -> Result<usize> {
+    if out.len() < bytes.len() {
+        return Err(Error::Other(format!(
+            "return buffer too small: need {}, have {}",
+            bytes.len(),
+            out.len()
+        )));
+    }
+    out[..bytes.len()].copy_from_slice(bytes);
+    Ok(bytes.len())
 }
 
 // SAFETY: ResolvedFunction is created on one thread and read-only thereafter.
@@ -139,12 +186,26 @@ pub struct Module {
     pub(crate) abort_callbacks: AbortCallbacksFn,
     pub(crate) abort_user_data: *const c_void,
     pub(crate) lifecycle: crate::lifecycle::UnloadState,
+    /// Trampoline reuse cache for an engine-minted JS function identity and the
+    /// callback name it was marshalled under. Keyed identity-first so a lookup
+    /// borrows the name rather than allocating one — this is read on every
+    /// callback marshal. Stores `usize`, not a raw pointer, so the field carries
+    /// no pointer of its own; the `Mutex` is what the impls below rest on.
+    pub(crate) trampolines: Mutex<HashMap<u64, HashMap<String, usize>>>,
+    /// Trampolines this module has built, counting those the frontend never
+    /// remembered. Monotonic: a trampoline is leaked by design, so nothing here
+    /// ever decreases and the count is a leak total, not a live-entry count.
+    /// Reuse is the only thing bounding it, which is what makes it worth
+    /// exposing — see [`Module::trampolines_built`].
+    pub(crate) trampolines_built: AtomicU64,
 }
 
-// SAFETY: all interior mutability is via atomics in UnloadState; ResolvedFunction is immutable
-// after construction. Raw pointers (abort_user_data, rb_ops) are stable for the Module lifetime.
+// SAFETY: interior mutability is via atomics in UnloadState and via Mutex (library,
+// trampolines); ResolvedFunction is immutable after construction. Raw pointers
+// (abort_user_data, rb_ops) are stable for the Module lifetime.
 unsafe impl Send for Module {}
-// SAFETY: Mutex guards library; all other fields are immutable; see Send impl above.
+// SAFETY: Mutex guards library and trampolines; all other fields are immutable;
+// see Send impl above.
 unsafe impl Sync for Module {}
 
 // ---------------------------------------------------------------------------
@@ -229,6 +290,8 @@ impl Module {
             abort_callbacks,
             abort_user_data,
             lifecycle: crate::lifecycle::UnloadState::new(),
+            trampolines: Mutex::new(HashMap::new()),
+            trampolines_built: AtomicU64::new(0),
         }))
     }
 }
@@ -265,6 +328,59 @@ impl Module {
             .cloned()
             .ok_or_else(|| Error::UnknownStruct(struct_name.to_string()))
     }
+
+    /// Look up a callback definition by name.
+    pub(crate) fn callback_def(&self, callback_name: &str) -> Result<&CallbackDef> {
+        self.spec
+            .callbacks
+            .get(callback_name)
+            .ok_or_else(|| Error::UnknownCallback(callback_name.to_string()))
+    }
+
+    /// Compute the CIF-ordered argument layout for a callback: `[declared_args,
+    /// out_return_ptr?, RustCallStatus_ptr?]`. `make_callback_trampoline` builds
+    /// its own layout from the same [`callback_arg_layout_for`], so the offsets
+    /// a caller packs at are by construction the ones the trampoline unpacks at.
+    pub fn callback_arg_layout(&self, callback_name: &str) -> Result<ArgLayout> {
+        callback_arg_layout_for(self.callback_def(callback_name)?)
+    }
+
+    /// Byte width of the value a callback's trampoline writes back through
+    /// libffi's return slot. `make_callback_trampoline` sizes its return buffer
+    /// from this, so a bridge that copies those bytes out reads the same width
+    /// core wrote.
+    pub fn callback_return_size(&self, callback_name: &str) -> Result<usize> {
+        crate::callback::return_size(self.callback_def(callback_name)?)
+    }
+}
+
+/// The layout half of [`Module::callback_arg_layout`], taking an already-resolved
+/// definition so a caller holding one does not look it up again.
+pub(crate) fn callback_arg_layout_for(def: &CallbackDef) -> Result<ArgLayout> {
+    let mut layout_args = def.args.clone();
+    if def.out_return {
+        layout_args.push(FfiTypeDesc::VoidPointer);
+    }
+    ArgLayout::compute(&layout_args, def.has_rust_call_status)
+}
+
+/// Size and alignment of one argument slot for a player tag name.
+///
+/// Routes through [`desc_from_name`] and [`slot_size_align`] — the single
+/// desc-keyed source of truth — so no size is computed twice in this codebase.
+/// `desc_from_name` requires a type name for the `Callback`, `Struct` and
+/// `Reference` tags; geometry doesn't depend on it, so a placeholder satisfies
+/// it.
+///
+/// Answers only for the wire vocabulary, so `None` covers four cases: an
+/// unknown name; `Struct`, which `slot_size_align` rejects as a bare arg slot;
+/// and `VoidPointer`/`MutReference`/`ForeignBytes`, which `desc_from_name` does
+/// not build even though `slot_size_align` could size the first two. A bridge
+/// sending one of those names must map it to a wire name first.
+pub fn slot_size_align_for_name(tag_name: &str) -> Option<(usize, usize)> {
+    const PLACEHOLDER_NAME: &str = "_";
+    let desc = desc_from_name(tag_name, Some(PLACEHOLDER_NAME)).ok()?;
+    slot_size_align(&desc).ok()
 }
 
 // Call methods (prepare_call, call, rustbuffer_*, call_callback_ptr) live in call.rs.
@@ -340,4 +456,131 @@ pub struct StructLayout {
 pub struct StructFieldLayout {
     pub offset: usize,
     pub size: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::test_support::{callback_def, test_module};
+
+    #[test]
+    fn slot_geometry_matches_the_desc_keyed_source() {
+        assert_eq!(slot_size_align_for_name("UInt16"), Some((2, 2)));
+        assert_eq!(slot_size_align_for_name("RustBuffer"), Some((24, 8)));
+        assert_eq!(slot_size_align_for_name("NotATag"), None);
+    }
+
+    /// Covers all four `(out_return, has_rust_call_status)` combinations against
+    /// offsets and sizes spelled out here, so a drift this accessor and
+    /// `make_callback_trampoline` share still fails. The `out_return` cases are
+    /// the ones that matter: they must append a pointer-sized arg_slot *before*
+    /// any trailing RustCallStatus slot, matching the CIF's
+    /// `[declared_args, out_return_ptr?, RCS_ptr?]`.
+    #[test]
+    fn callback_arg_layout_matches_trampoline_ordering() {
+        let mut callbacks = HashMap::new();
+        callbacks.insert(
+            "plain".to_string(),
+            callback_def(vec![FfiTypeDesc::Int32, FfiTypeDesc::Int64], false, false),
+        );
+        callbacks.insert(
+            "with_rcs".to_string(),
+            callback_def(vec![FfiTypeDesc::Int32], true, false),
+        );
+        callbacks.insert(
+            "with_out_return".to_string(),
+            callback_def(vec![FfiTypeDesc::Int32], false, true),
+        );
+        callbacks.insert(
+            "with_out_return_and_rcs".to_string(),
+            callback_def(vec![FfiTypeDesc::Int32], true, true),
+        );
+        let m = test_module(callbacks, Default::default());
+
+        // out_return=false, has_rust_call_status=false: just the declared args,
+        // packed with natural alignment. No appended slots at all.
+        let plain = m.callback_arg_layout("plain").unwrap();
+        assert_eq!(plain.arg_slots.len(), 2);
+        assert_eq!(plain.arg_slots[0].offset, 0);
+        assert_eq!(plain.arg_slots[0].size, 4);
+        assert_eq!(plain.arg_slots[1].offset, 8); // Int64 aligned to 8
+        assert_eq!(plain.arg_slots[1].size, 8);
+        assert_eq!(plain.total_size, 16);
+        assert!(plain.rust_call_status_slot.is_none());
+
+        // out_return=false, has_rust_call_status=true: declared args unchanged,
+        // RCS is a separate trailing slot, not an arg_slot.
+        let with_rcs = m.callback_arg_layout("with_rcs").unwrap();
+        assert_eq!(with_rcs.arg_slots.len(), 1);
+        assert_eq!(with_rcs.arg_slots[0].offset, 0);
+        assert_eq!(with_rcs.arg_slots[0].size, 4);
+        let rcs_slot = with_rcs.rust_call_status_slot.as_ref().unwrap();
+        assert_eq!(rcs_slot.offset, 8);
+        assert_eq!(rcs_slot.size, 8);
+        assert_eq!(with_rcs.total_size, 16);
+
+        // out_return=true, has_rust_call_status=false: the out-return pointer is
+        // appended as an extra arg_slot (pointer-sized, at offset 8). No RCS slot.
+        let with_out = m.callback_arg_layout("with_out_return").unwrap();
+        assert_eq!(with_out.arg_slots.len(), 2);
+        assert_eq!(with_out.arg_slots[0].offset, 0);
+        assert_eq!(with_out.arg_slots[0].size, 4);
+        assert_eq!(with_out.arg_slots[1].offset, 8);
+        assert_eq!(with_out.arg_slots[1].size, 8);
+        assert_eq!(with_out.total_size, 16);
+        assert!(with_out.rust_call_status_slot.is_none());
+
+        // out_return=true, has_rust_call_status=true: the risk case. The
+        // out-return pointer must land in arg_slots (offset 8, before the RCS
+        // slot), and RCS must be the trailing slot at offset 16 — matching CIF
+        // order [declared_args, out_return_ptr, RCS_ptr].
+        let with_both = m.callback_arg_layout("with_out_return_and_rcs").unwrap();
+        assert_eq!(with_both.arg_slots.len(), 2);
+        assert_eq!(with_both.arg_slots[0].offset, 0);
+        assert_eq!(with_both.arg_slots[0].size, 4);
+        assert_eq!(with_both.arg_slots[1].offset, 8);
+        assert_eq!(with_both.arg_slots[1].size, 8);
+        let rcs_slot = with_both.rust_call_status_slot.as_ref().unwrap();
+        assert_eq!(rcs_slot.offset, 16);
+        assert_eq!(rcs_slot.size, 8);
+        assert_eq!(with_both.total_size, 24);
+    }
+
+    #[test]
+    fn callback_arg_layout_unknown_name_errors() {
+        let m = test_module(HashMap::new(), Default::default());
+        assert!(matches!(
+            m.callback_arg_layout("nope"),
+            Err(Error::UnknownCallback(name)) if name == "nope"
+        ));
+    }
+
+    #[test]
+    fn trampoline_map_returns_what_was_remembered_and_is_keyed_on_both_parts() {
+        let m = test_module(Default::default(), Default::default());
+        let p = 0x1234 as *const std::ffi::c_void;
+        assert!(m.trampoline_for("cb", 7).is_none());
+        m.remember_trampoline("cb", 7, p);
+        assert_eq!(m.trampoline_for("cb", 7), Some(p));
+        assert!(m.trampoline_for("cb", 8).is_none(), "different identity");
+        assert!(m.trampoline_for("other", 7).is_none(), "different callback");
+    }
+
+    /// Unload empties the map, and it stays empty: a marshal still in flight
+    /// when unload ran would otherwise refill it with a pointer into a library
+    /// `unload_force` is about to close.
+    #[test]
+    fn trampoline_map_is_emptied_by_unload_and_stays_empty() {
+        let m = test_module(Default::default(), Default::default());
+        m.remember_trampoline("cb", 1, 0x1234 as *const std::ffi::c_void);
+        m.unload().expect("unload");
+        assert!(m.trampoline_for("cb", 1).is_none());
+
+        m.remember_trampoline("cb", 1, 0x1234 as *const std::ffi::c_void);
+        assert!(
+            m.trampoline_for("cb", 1).is_none(),
+            "an insert after unload must not land"
+        );
+    }
 }
