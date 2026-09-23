@@ -5,14 +5,15 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 (--ios | --android) [--rn-version VERSION] [--work-dir DIR] [--keep]"
+  echo "Usage: $0 (--ios | --android) [--run] [--rn-version VERSION] [--work-dir DIR] [--keep]"
 }
 
-PLATFORM=""; RN_VERSION="latest"; WORK="/tmp/ubrn-player-smoke"; KEEP=false
+PLATFORM=""; RN_VERSION="latest"; WORK="/tmp/ubrn-player-smoke"; KEEP=false; RUN=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --ios) PLATFORM=ios ;;
     --android) PLATFORM=android ;;
+    --run) RUN=true ;;
     --rn-version) RN_VERSION="$2"; shift ;;
     --work-dir) WORK="$2"; shift ;;
     --keep) KEEP=true ;;
@@ -27,6 +28,9 @@ done
 WORK="$WORK/$PLATFORM"
 
 ROOT=$(git rev-parse --show-toplevel)
+# shellcheck source=scripts/lib/rn-app.sh
+source "$ROOT/scripts/lib/rn-app.sh"
+trap rnapp_cleanup EXIT
 APP=PlayerSmoke
 
 echo "-- 1. prebuilt Rust half for $PLATFORM"
@@ -52,9 +56,11 @@ npx --yes @react-native-community/cli@latest init "$APP" \
 cd "$WORK/$APP"
 npm install
 npm install "$ROOT/typescript/$CORE_TGZ" "$ROOT/runtimes/jsi/$PLAYER_TGZ"
-# The import is what makes autolinking's work observable at runtime later; the
-# gate here is that the native side compiles and links.
-printf 'import "@ubjs/react-native";\n%s' "$(cat App.tsx)" > App.tsx
+# Importing the player installs it; the sentinel proves the TurboModule
+# registered and put the host object on the global.
+# shellcheck disable=SC2016  # ${...} here is a JS template literal, not shell.
+rnapp_prepend_app_tsx "$WORK/$APP" 'import "@ubjs/react-native";
+console.log(`UBRN_PLAYER_OK uniffi=${typeof (globalThis as any).uniffi}`);'
 grep -q '"@ubjs/react-native"' package.json || { echo "player is not a direct dependency"; exit 1; }
 
 echo "-- 4. build $PLATFORM"
@@ -95,6 +101,17 @@ else
   [ "$NEEDED" = "[libuniffi_runtime_jsi.so]" ] ||
     { echo "shim NEEDED ${NEEDED:-nothing} for the Rust half, want [libuniffi_runtime_jsi.so]"; exit 1; }
   echo "$SHIM NEEDED $NEEDED"
+fi
+
+if [ "$RUN" = true ]; then
+  cd "$WORK/$APP"
+  echo "-- 5. run $PLATFORM"
+  if [ "$PLATFORM" = ios ]; then
+    rnapp_run_ios "$WORK/$APP" "$APP" "UBRN_PLAYER_OK uniffi=object"
+  else
+    rnapp_run_android "$WORK/$APP" "$APP" "UBRN_PLAYER_OK uniffi=object"
+  fi
+  echo "✅ $PLATFORM: globalThis.uniffi is installed in a running app"
 fi
 
 echo "✅ $PLATFORM: @ubjs/react-native compiles and links in a fresh RN $RN_VERSION app"

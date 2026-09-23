@@ -47,6 +47,7 @@
 
 - [`ubrn` Command Line](reference/commandline.md)
 - [Node.js (N-API) support](reference/nodejs.md)
+- [React Native through the JSI player (jsi2)](reference/jsi2.md)
 - [WebAssembly (`wasm2`) support](reference/wasm2/overview.md)
   - [`wasm2` reference](reference/wasm2/reference.md)
   - [`wasm2` cookbook](reference/wasm2/cookbook.md)

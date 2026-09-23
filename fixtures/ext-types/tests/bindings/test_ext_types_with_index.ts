@@ -6,7 +6,7 @@
 // To run:
 //   cargo test -p uniffi-fixture-ext-types -- napi
 
-import { test } from "@/asserts";
+import { asyncTest, test } from "@/asserts";
 
 import bindings, {
   uniffiInitAsync,
@@ -19,9 +19,13 @@ import bindings, {
 
 import "@/polyfills";
 
-// Idempotence: calling uniffiInitAsync twice must not throw.
-await uniffiInitAsync();
-await uniffiInitAsync();
+// Idempotence: calling uniffiInitAsync twice must not throw. Not a top-level
+// await: the jsi bundle path compiles to es5, which has no such thing.
+asyncTest("uniffiInitAsync is idempotent", async (t) => {
+  await uniffiInitAsync();
+  await uniffiInitAsync();
+  t.end();
+});
 
 test("namespaced default exposes all 5 namespaces", (t) => {
   t.assertNotNull(bindings.custom_types);

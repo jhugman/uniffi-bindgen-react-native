@@ -7,12 +7,14 @@ on:
       - "runtimes/jsi/**"
       - "typescript/**"
       - "scripts/test-player-package.sh"
+      - "scripts/lib/rn-app.sh"
       - ".github/workflows/player-package.yml"
   pull_request:
     paths:
       - "runtimes/jsi/**"
       - "typescript/**"
       - "scripts/test-player-package.sh"
+      - "scripts/lib/rn-app.sh"
       - ".github/workflows/player-package.yml"
 
 env:
@@ -36,7 +38,7 @@ jobs:
         with:
           ruby-version: "3.3"
           bundler-cache: false
-      - run: scripts/test-player-package.sh --ios
+      - run: scripts/test-player-package.sh --ios --run
 
   android:
     name: "Android · rn latest"
