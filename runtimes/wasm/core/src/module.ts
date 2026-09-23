@@ -19,6 +19,7 @@ import {
 } from "./call.js";
 import { CallbackTable, type CallbackDef } from "./callback.js";
 import { FutureRegistry } from "./future.js";
+import { JspiCalls, isJspiResult, ownJspiResult } from "./jspi-call.js";
 
 export type WasmSource =
   | WebAssembly.Module
@@ -147,6 +148,7 @@ function installPanicLog(
 }
 
 export class UniffiNativeModule {
+  private jspiCalls?: JspiCalls;
   readonly memory: Memory;
   readonly scratch: Scratch;
   readonly exports: WebAssembly.Exports;
@@ -159,6 +161,9 @@ export class UniffiNativeModule {
   private constructor(instance: WebAssembly.Instance) {
     this.instance = instance;
     this.exports = instance.exports;
+    if (typeof this.exports.__ubrn_jspi_enter === "function") {
+      this.jspiCalls = new JspiCalls(this.exports);
+    }
 
     for (const name of REQUIRED_EXPORTS) {
       if (!(name in this.exports)) {
@@ -283,6 +288,7 @@ export class UniffiNativeModule {
     definitions: ModuleDefinitions,
     opts?: { disableJit?: boolean },
   ): NativeModuleInterface {
+    this.jspiCalls?.check();
     if (!definitions.symbols.rustbuffer_alloc) {
       throw new Error(
         "register: definitions.symbols.rustbuffer_alloc must be a non-empty string",
@@ -321,12 +327,32 @@ export class UniffiNativeModule {
     };
 
     const result: NativeModuleInterface = Object.create(null);
+    if (Object.values(definitions.functions).some((def) => def.jspi)) {
+      this.jspiCalls ??= new JspiCalls(this.exports);
+    }
     for (const [fnName, def] of Object.entries(definitions.functions)) {
-      const exportFn = this.exports[fnName];
+      const exportFn = this.exports[def.exportName ?? fnName];
       if (typeof exportFn !== "function") {
         throw new Error(`register: wasm export "${fnName}" not found`);
       }
-      result[fnName] = specializeFunction(ctx, exportFn, def, fnName);
+      const rawDispatch = def.jspi
+        ? this.jspiCalls!.build(ctx, exportFn, def)
+        : specializeFunction(ctx, exportFn, def, fnName);
+      const dispatch =
+        def.copyResult && def.ret.tag === "RustBuffer"
+          ? (...args: any[]) => {
+              const view = rawDispatch(...args);
+              return view === undefined
+                ? undefined
+                : ownJspiResult(view, result.rustbuffer_free);
+            }
+          : rawDispatch;
+      result[fnName] = this.jspiCalls
+        ? (...args: any[]) => {
+            this.jspiCalls!.check();
+            return dispatch(...args);
+          }
+        : dispatch;
     }
 
     // JS-callable allocator pair, exposed alongside the per-function entries.
@@ -356,11 +382,14 @@ export class UniffiNativeModule {
      * `rustbuffer_free(view)` will leak the original allocation.
      */
     result.rustbuffer_alloc = (n: number): Uint8Array => {
+      this.jspiCalls?.check();
       if (n === 0) return new Uint8Array(0);
       const ptr = alloc(n, 1);
       return new Uint8Array(memory.buffer(), ptr, n);
     };
     result.rustbuffer_free = (view: Uint8Array): void => {
+      this.jspiCalls?.check();
+      if (isJspiResult(view)) return;
       const hint = getCapacityHint(view);
       if (view.byteLength === 0 && hint === undefined) return;
       if ((view.buffer as ArrayBuffer).byteLength === 0) {
@@ -377,6 +406,12 @@ export class UniffiNativeModule {
       free(view.byteOffset, cap, 1);
     };
 
+    // Selected calls lower all inputs before entering WASM. JS-owned buffers
+    // survive further argument/frame allocations and are copied by the driver.
+    result.rustbuffer_alloc_jspi = (n: number): Uint8Array => {
+      this.jspiCalls?.check();
+      return new Uint8Array(n);
+    };
     return result;
   }
 }

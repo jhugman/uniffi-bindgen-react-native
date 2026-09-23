@@ -19,6 +19,12 @@ import type { FfiTypeDesc } from "./ffi-type.js";
 import type { CallbackDef } from "./callback.js";
 
 export interface FunctionDef {
+  /** Alias a raw export while retaining a separate dispatch policy. */
+  exportName?: string;
+  /** Copy/free a synchronous RustBuffer result before it crosses an await. */
+  copyResult?: boolean;
+  /** Opt in to the instrumented __ubrn_jspi_enter boundary. */
+  jspi?: boolean;
   args: FfiTypeDesc[];
   ret: FfiTypeDesc;
   hasRustCallStatus: boolean;

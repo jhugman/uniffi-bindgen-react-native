@@ -18,6 +18,25 @@
 use std::alloc::{alloc, dealloc, Layout};
 use std::sync::atomic::{AtomicU32, Ordering};
 
+/// Export the instrumented entry required by wasm2 JSPI bindings.
+/// Invoke once in the final cdylib, which must directly depend on a JSPI-capable
+/// wasm-bindgen (tested with 0.2.128) and use its matching CLI. Keeping the
+/// attribute in the consuming crate avoids changing this helper's dependencies.
+#[macro_export]
+macro_rules! export_jspi_entry {
+    () => {
+        #[cfg(target_arch = "wasm32")]
+        #[wasm_bindgen::prelude::wasm_bindgen(jspi)]
+        /// # Safety
+        /// `target` must be a WASM `(i32) -> ()` thunk in this module's function
+        /// table; `frame` must point to valid, independently owned call storage.
+        pub unsafe fn __ubrn_jspi_enter(target: u32, frame: u32) {
+            let call: unsafe extern "C" fn(u32) = unsafe { ::std::mem::transmute(target as usize) };
+            unsafe { call(frame) };
+        }
+    };
+}
+
 /// # Safety
 ///
 /// `size` and `align` must form a valid `Layout` (non-zero `align`, power of

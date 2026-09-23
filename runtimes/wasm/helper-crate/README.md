@@ -42,4 +42,22 @@ is missing. It does not yet check that the exports survived linking.
 
 The JavaScript half ships separately, as [`@ubjs/wasm`][npm] on npm.
 
+## Optional JSPI entry
+
+For generated `wasm2` bindings with `bindings.typescript.jspi` enabled, export
+the instrumented entry once from the final cdylib:
+
+```rust
+#[cfg(target_arch = "wasm32")]
+uniffi_runtime_wasm::export_jspi_entry!();
+```
+
+The consuming crate must directly depend on a JSPI-capable `wasm-bindgen`
+(tested with `0.2.128`), and staging must use the matching CLI. The macro expands
+there so this helper does not pin or upgrade wasm-bindgen for every consumer.
+The player calls this unsafe ABI entry with validated signature thunks and
+independently owned call frames. Do not call it directly with arbitrary table
+indices or pointers. The initial wasm2 JSPI selection supports synchronous
+top-level functions; lifecycle exports and Rust async polling remain synchronous.
+
 [npm]: https://www.npmjs.com/package/@ubjs/wasm
