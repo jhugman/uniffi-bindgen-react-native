@@ -3,7 +3,7 @@ The `uniffi.toml` file is a toml file used to customize [the generation of C++ a
 To include the file when invoking `ubrn`, specify the path in the
 [corresponding key of the config](../reference/config-yaml.md#bindings).
 
-As of time of writing, `[bindings.typescript]` supports `logLevel`, `consoleImport`, `customTypes`, `strictObjectTypes`, `strictTypeChecking`, `strictByteArrays` and `forceAsync`; `[bindings.kotlin]` supports `cdylib_name` and `package_name`. Each is described below.
+As of time of writing, `[bindings.typescript]` supports `logLevel`, `consoleImport`, `customTypes`, `strictObjectTypes`, `strictTypeChecking`, `strictByteArrays`, `forceAsync` and `jspi`; `[bindings.kotlin]` supports `cdylib_name` and `package_name`. Each is described below.
 
 ### Opting out of Interface generation
 
@@ -96,6 +96,180 @@ A callback interface, or a `[Trait, WithForeign]` interface, is implemented in T
 Rust calls into these types through a vtable, and each slot is sync or async according to the Rust method. On the way out, `forceAsync` only has to wrap a return value in a resolved promise; on the way in, it would have to hand a promise to a synchronous slot, which has no way to wait for it. Make the methods `async fn` in Rust, or leave the interface out of the list.
 
 The [`force-async`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async) and [`force-async-list`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async-list) fixtures exercise both forms.
+
+### Suspending web calls with JSPI
+
+`jspi` enables experimental WebAssembly JavaScript Promise Integration on the
+`web` (`wasm`) backend. A synchronous Rust function can call a
+Promise-returning JavaScript import and suspend until it settles, while the
+JavaScript event loop keeps running. Its generated TypeScript API returns a
+`Promise` and checks the Rust error status only after settlement.
+
+Set this in the exporting crate's `uniffi.toml`:
+
+```toml
+[bindings.typescript]
+jspi = ["compute", "fetchBytes", "Processor"]
+```
+
+Names use the same case normalization as `forceAsync`: `fetchBytes` matches
+`fetch_bytes`. A name selects either a top-level function or an object, record,
+or enum type. A type selects its constructors, methods, and exported
+trait helpers (`Display`, `Debug`, `Eq`, `Hash`, `Ord`). Select methods through
+their owning type; individual method names and qualified names are not accepted.
+`jspi = true` selects all eligible functions and types; `false` (the default) or
+an empty list disables it.
+
+Selected Rust `async fn` exports use a dedicated JSPI poll adapter, including
+async methods and constructors on selected types. Their future creation remains
+synchronous; the async body can suspend during polling. Unselected async APIs
+retain their ordinary poll exports. Argument lifting during future creation and
+custom conversion outside the poll must not suspend.
+Callback interfaces and callback-capable trait interfaces are excluded by `true`
+and rejected when named explicitly. Unknown or ambiguous names are errors too.
+Destructors and infrastructure exports such as allocation, cloning, checksums,
+and callback registration remain synchronous. Non-WASM backends reject an enabled
+setting; see below for the `wasm2` setup and dispatcher details.
+
+An object's selected primary constructor becomes an async static `create` factory;
+use `await Processor.create(...)` instead of `new Processor(...)`. Alternate
+constructors retain their names and return Promises. An alternate constructor named
+`create` conflicts with this primary factory and must be renamed. Generated record
+helpers such as `Payload.create({...})` and enum variant constructors stay
+synchronous: they only construct JavaScript values. Exported Rust trait helpers
+also return Promises; `Display` becomes `asyncToString()`.
+
+Explicit destruction and garbage-collection cleanup stay synchronous, so Rust
+`Drop` implementations must not reach suspending imports. In-flight method calls
+hold their own cloned Rust handles. `uniffiDestroy()` releases the JavaScript
+wrapper's handle immediately, prevents new calls on it, and allows already-started
+calls to finish; the Rust object drops when the final handle is released.
+For a block containing awaited calls, use `uniffiUseAsync` to release the wrapper
+after success or rejection:
+
+```typescript
+const processor = await Processor.create(/* constructor arguments */);
+// With interface-shaped returns, narrow to the concrete implementation first.
+if (Processor.instanceOf(processor)) {
+  const result = await processor.uniffiUseAsync(async (p) => {
+    await p.prepare();
+    return p.compute();
+  });
+}
+```
+
+`uniffiUse` remains a synchronous helper; it does not wait for a returned Promise.
+
+Rust async APIs retain their optional `AbortSignal`. Cancellation is best effort:
+if an active poll produces a value, that value can win the cancellation race.
+Aborting cannot unwind a suspended JavaScript import; the call and its cleanup
+wait for the import and poll to settle. A Promise that never settles can therefore
+keep the future alive indefinitely. Poll continuation and Promise settlement are
+separate signals; the runtime waits for both before repolling or completing.
+
+An unexpected JSPI poll throw or rejection raises `UniffiInternalError.JspiPollError`
+with the original `cause`. Treat it as fatal and discard the WASM instance; do not
+continue calling into it or destroy its objects. The runtime removes the failed
+call's continuation and abort listener but deliberately does not complete, cancel,
+or free that future: a trap can bypass Rust destructors and leave its mutex locked.
+This retains Rust resources until the instance is discarded. Other calls are not
+automatically cancelled or disabled. Ordinary UniFFI errors and caught import
+rejections use the normal completion and cleanup path.
+
+
+JSPI is separate from `forceAsync`: it changes the WASM boundary to permit actual
+suspension. A function selected by both settings is still a single Promise-returning
+call. Unselected calls retain their existing behavior. JSPI does not discover
+suspending imports by inspecting the Rust call graph; every entry point that
+reaches one must be selected. Synchronous inbound callback frames must not suspend. Regular UniFFI async
+foreign callbacks use their existing future protocol and do not require JSPI
+suspension across the callback frame.
+
+The exporting crate and generated wrapper crate need a JSPI-capable wasm-bindgen
+version (tested with **0.2.128**), with the CLI at the exact same version. Update
+older Cargo locks explicitly; adding this setting does not upgrade dependencies.
+Use `UBRN_WASM_BINDGEN` to select a matching CLI. A JSPI-capable browser is required;
+Node 24.14.0 needs both `--experimental-wasm-jspi` and
+`--experimental-wasm-exnref`. Generated modules check JSPI support before importing
+wasm-bindgen glue. Any additional optimizer must support the emitted exception
+instructions (for wasm-opt, enable exceptions or skip optimization). See the
+[wasm-bindgen JSPI guide](https://wasm-bindgen.github.io/wasm-bindgen/reference/jspi.html).
+
+Overlapping invocations have independent status wrappers, kept alive through
+settlement and then consumed, including on rejection. Application state may still
+need protection from reentrant calls. Import rejection can be caught in Rust and
+returned as an ordinary UniFFI error. Do not rely on uncaught import rejection to
+clean up arbitrary Rust resources across an `extern "C"` boundary; use `catch` on
+fallible suspending imports and propagate a `Result`.
+
+### Suspending wasm2 calls with JSPI
+
+The `wasm2` player supports selected top-level functions and object/record/enum
+types, including Rust async callables. Use the same boolean/name-list `jspi`
+configuration and case normalization described above. `true` selects eligible
+functions and types. Selecting a type includes its Rust constructors, methods
+and exported trait helpers; callback-capable types are excluded and rejected
+when named. Unsupported callback/reference ABI shapes are also excluded.
+
+Selected primary object constructors become `await Type.create(...)`; alternate
+constructors retain their names. JS-only record helpers and enum variants stay
+synchronous. In-flight methods own cloned handles, so explicit destruction
+prevents new calls while allowing existing calls to finish. Use
+`uniffiUseAsync` for an awaited scope with cleanup on success or rejection.
+Allocation, cloning, destruction and initialization stay synchronous; Rust
+`Drop` must not suspend. `forceAsync` is independent.
+
+The exporting cdylib must depend directly on a JSPI-capable wasm-bindgen
+(tested with `0.2.128`) and use the matching CLI, as for `web`. Add this once in
+the exporting crate's `lib.rs`:
+
+```rust
+#[cfg(target_arch = "wasm32")]
+uniffi_runtime_wasm::export_jspi_entry!();
+```
+
+This macro emits an instrumented `__ubrn_jspi_enter` export in the consuming
+crate. It does not add a wasm-bindgen dependency or change its version. Keep
+the ordinary `uniffi-runtime-wasm` dependency/linkage and single-threaded UniFFI
+configuration. `ubrn build wasm2` stages the growable table before wasm-bindgen;
+do not run an incompatible optimizer over its JSPI output.
+
+For example:
+
+```toml
+[bindings.typescript]
+jspi = ["compute", "fetchBytes"]
+```
+
+Generated selected calls return Promises. The player emits small WASM thunks
+for each signature; these call raw Rust exports through the instrumented entry
+without an intervening JavaScript frame. Each invocation owns its call frame
+until settlement. Selected calls lower buffers into JS-owned memory before
+copying them into Rust allocations, and copy/free returned buffers before
+resolving. This permits overlap, arbitrary completion order and memory growth
+without handing detached views to generated converters. Unselected calls keep
+their synchronous dispatch and buffer path.
+
+Selected Rust async functions retain UniFFI's future protocol. Creation stays
+synchronous and must not suspend while lifting arguments. Dedicated poll aliases
+use the instrumented entry and a synchronous continuation callback; the runtime
+waits for both the continuation and poll Promise before completing, repolling,
+or freeing. Dedicated completion aliases copy/free owned results synchronously
+before crossing an `await`. Original shared polls/completions remain unchanged
+for unselected async APIs. Cancellation is best effort: it cannot unwind a
+suspended import, cleanup waits for settlement, and a Ready result can win an
+abort. Destructors and custom converters must not suspend.
+
+Catch fallible suspending imports in Rust and propagate `Result`. An unexpected
+entry throw/rejection raises `JspiCallError` with its cause, retains frames whose
+Rust ownership is unknown, and disables further calls through that player's
+registered APIs. Async calls wrap a failed poll in `JspiPollError`, retaining
+its cause and skipping completion/free for that future. Discard the entire WASM
+instance. Already-suspended imports
+cannot be forcibly unwound, and raw export access bypasses this guard. Recoverable
+UniFFI errors consume their error buffers and release their frames normally.
+Destructors, synchronous inbound callbacks and custom converters must not suspend.
+The runtime does not impose application-specific serialization.
 
 ### Logging the FFI
 

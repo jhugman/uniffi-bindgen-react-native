@@ -97,6 +97,12 @@ Three things happen to the copy, in [`ubrn_common::wasm`](https://github.com/jhu
 
 **The function table is exported, and made growable.** The player adds trampolines to `__indirect_function_table`, so the module must export it without an upper bound. `wasm-ld` will do that given `--export-table --growable-table`, but link arguments belong to the `cdylib`'s own link step, which a dependency cannot reach — every consumer would need `RUSTFLAGS`. Rewriting after the link works whatever built the module.
 
+For modules using wasm-bindgen, the table rewrite runs on the staged copy
+**before** wasm-bindgen. Its `--keep-lld-exports` option preserves the table.
+There is no Walrus pass afterwards: the pinned Walrus cannot parse the exception
+tags and instructions introduced by wasm-bindgen's JSPI transform. Plain modules
+still receive the table rewrite after optional dead-code elimination.
+
 **Dead code is eliminated, for this project's fixtures only.** Stripping exports the player cannot reach lets a garbage-collection pass reclaim what they held, but the keep-list is a heuristic, and a user's `cdylib` may export symbols for a consumer the command line cannot see. So it runs on fixtures and never on your crate.
 
 ## Opening a module
@@ -126,6 +132,26 @@ The two paths must agree exactly, down to details like coercing small integers w
 ```
 
 ## A call, end to end
+
+Selected JSPI calls take a separate interpreted path in `jspi-call.ts`.
+`FunctionDef.jspi` chooses it, and the consuming cdylib supplies
+`__ubrn_jspi_enter` through `export_jspi_entry!()`. `jspi-thunk.ts` generates
+signature-specific WASM adapters importing the raw target and memory; the Rust
+entry calls their uniform `(i32 frame) -> void` export through the function table.
+Modules are cached by signature, and installed adapters by raw target per instance.
+
+Arguments and results occupy eight-byte frame slots, with separate ABI storage
+for status, RustBuffer descriptors and aggregate returns. Frames are heap
+allocations per invocation rather than shared scratch. Generated selected calls
+use `rustbuffer_alloc_jspi` to lower into JS-owned buffers, so lowering later
+arguments cannot detach earlier ones. The dispatcher copies them into Rust-owned
+allocations before entering. On settlement it consumes error/result buffers and
+copies results to JS before resolving; the later generated `rustbuffer_free`
+recognizes those already-consumed results. Unexpected entry rejection retains
+uncertain frames and disables registered calls for that instance. No real trap
+is deliberately triggered in tests; unit tests mock the promising boundary.
+
+The following describes the ordinary synchronous path.
 
 Take `scan_receipt(image: Vec<u8>) -> Result<Receipt, ScanError>`, whose FFI signature takes a `RustBuffer` and a `RustCallStatus`, and returns a `RustBuffer` through a hidden pointer.
 
