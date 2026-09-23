@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Generated JSPI fixture</title>
+<pre id="result">Running…</pre>
+<script type="module">
+  import { run } from "./generated/test.js";
+  const timeout = setTimeout(() => {
+    document.querySelector("#result").textContent = "JSPI fixture timed out";
+  }, 15000);
+  try {
+    const bytes = await (
+      await fetch("./generated/ts/wasm-bindgen/index_bg.wasm")
+    ).arrayBuffer();
+    document.querySelector("#result").textContent = await run(bytes);
+  } catch (error) {
+    document.querySelector("#result").textContent = error.stack;
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+</script>

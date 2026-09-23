@@ -1,0 +1,22 @@
+[package]
+name = "jspi-codegen"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+bindings = []
+
+[dependencies]
+uniffi = "=0.31.2"
+thiserror = "2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.128"
+uniffi-runtime-javascript = { path = "../../../crates/uniffi-runtime-javascript", features = ["wasm32"] }
+uniffi_core = { version = "=0.31.2", features = ["wasm-unstable-single-threaded"] }
