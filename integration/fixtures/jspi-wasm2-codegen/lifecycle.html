@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Generated wasm2 JSPI fixture</title>
+<pre id="result">Running…</pre>
+<script type="module">
+  try {
+    const { run } = await import("./generated/lifecycle-test.js");
+    const bytes = new Uint8Array(await (await fetch("./generated/api/jspi_wasm2_codegen.wasm")).arrayBuffer());
+    document.querySelector("#result").textContent = await run(bytes);
+  } catch (error) {
+    document.querySelector("#result").textContent = error.stack;
+    throw error;
+  }
+</script>

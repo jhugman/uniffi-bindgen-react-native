@@ -1,0 +1,22 @@
+[package]
+name = "jspi-wasm2-codegen"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.128"
+uniffi = "=0.31.2"
+uniffi_core = { version = "=0.31.2", features = ["wasm-unstable-single-threaded"] }
+thiserror = "2"
+uniffi-runtime-wasm = { path = "../../../runtimes/wasm/helper-crate" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ubrn_common = { path = "../../../crates/ubrn_common", features = ["wasm"] }
+camino = "1"
+anyhow = "1"

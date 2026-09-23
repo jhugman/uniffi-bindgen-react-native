@@ -1,0 +1,4 @@
+[bindings.typescript]
+jspi = ["compute", "mixed", "wide", "narrow", "scalar", "complete_void", "bytes", "combine", "text", "record", "no_arguments", "suspended_future", "async_combine", "async_scalar", "async_void", "Processor", "Payload", "Mode", "Choice"]
+strictTypeChecking = true
+strictByteArrays = true

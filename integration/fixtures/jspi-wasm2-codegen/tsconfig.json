@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@ubjs/core": ["../../../typescript/src/index.ts"],
+      "@ubjs/wasm": ["../../../runtimes/wasm/browser/src/index.ts"],
+      "@ubjs/wasm/core": ["../../../runtimes/wasm/core/src/index.ts"]
+    }
+  },
+  "include": ["lifecycle-test.ts", "generated-test.ts", "generated/api/**/*.ts"]
+}
