@@ -41,7 +41,7 @@ fn js_ffi_type_keys(rel: &str, opener: &str) -> BTreeSet<String> {
 /// Tag names read from the shim's `static constexpr Entry kTable[] = { ... }`
 /// array: each entry is `{"Name", UBRN_TY_X},`.
 fn shim_tag_table_keys() -> BTreeSet<String> {
-    let rel = "cpp/jsi-player-shim/value_conv.h";
+    let rel = "runtimes/jsi/cpp/value_conv.h";
     let src = std::fs::read_to_string(workspace_root().join(rel))
         .unwrap_or_else(|e| panic!("reading {rel}: {e}"));
     let table = src
@@ -96,7 +96,7 @@ fn every_projection_of_the_tag_vocabulary_agrees() {
     let shim = shim_tag_table_keys();
     assert_eq!(
         wire_only, shim,
-        "core wire-eligible names vs cpp/jsi-player-shim/value_conv.h kTable"
+        "core wire-eligible names vs runtimes/jsi/cpp/value_conv.h kTable"
     );
 }
 

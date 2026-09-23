@@ -113,6 +113,7 @@ const getter: () => NativeModuleInterface = () => {
       {%- when Some with (resolution) %}
         {%- match resolution %}
         {%- when LibResolution::Colocated %}
+        {%- when LibResolution::Name with (_name) %}
         {%- when LibResolution::Absolute with (path) %}
       override: "{{ path }}",
       {%- when LibResolution::Require { base, triple_style } %}
@@ -140,6 +141,8 @@ const getter: () => NativeModuleInterface = () => {
     const libPath = "{{ module.crate_name }}";
       {%- when LibResolution::Require { base, triple_style } %}
     const libPath = "{{ base }}";
+      {%- when LibResolution::Name with (name) %}
+    const libPath = { name: "{{ name }}" };
       {%- endmatch %}
     {%- when None %}
     const libPath = "{{ module.crate_name }}";

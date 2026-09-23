@@ -1,0 +1,59 @@
+{
+  "name": "@ubjs/react-native",
+  "version": "0.31.0-5",
+  "description": "The uniffi JSI player for React Native: one native module that loads any uniffi-bindgen-react-native library",
+  "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhugman/uniffi-bindgen-react-native.git",
+    "directory": "runtimes/jsi"
+  },
+  "license": "MPL-2.0",
+  "author": {
+    "name": "James Hugman",
+    "email": "james@hugman.tv"
+  },
+  "publishConfig": { "access": "public" },
+  "main": "typescript/dist/index.js",
+  "types": "typescript/dist/index.d.ts",
+  "react-native": "typescript/src/index.ts",
+  "files": [
+    "typescript/src/",
+    "typescript/dist/",
+    "cpp/*.cpp",
+    "cpp/*.h",
+    "include/",
+    "ios/",
+    "android/",
+    "!android/build/",
+    "prebuilt/",
+    "UbjsReactNative.podspec",
+    "Package.swift",
+    "README.md"
+  ],
+  "codegenConfig": {
+    "name": "UniffiPlayerSpec",
+    "type": "modules",
+    "jsSrcsDir": "typescript/src",
+    "android": {
+      "javaPackageName": "dev.ubjs.reactnative"
+    }
+  },
+  "peerDependencies": {
+    "@ubjs/core": "^0.31.0-5",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.6",
+    "react": "^18.2.0",
+    "react-native": "^0.77.0",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "build": "tsc -p typescript",
+    "prepare": "npm run build",
+    "test": "node --test tests/pack.test.mjs",
+    "test:prebuilt": "node --test tests/prebuilt.test.mjs",
+    "prebuilt": "scripts/build-prebuilt.sh && scripts/assemble-prebuilt.sh"
+  }
+}

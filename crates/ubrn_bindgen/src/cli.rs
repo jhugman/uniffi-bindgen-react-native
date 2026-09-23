@@ -335,7 +335,7 @@ fn generate_ffi_from_pipeline(
             AbiFlavor::Napi | AbiFlavor::Jsi2 => {
                 let lib_resolution = lib_resolution.clone().ok_or_else(|| {
                     anyhow::anyhow!(
-                        "player codegen requires a LibResolution; pass --lib-colocated, --lib-absolute, or --lib-package-base"
+                        "player codegen requires a LibResolution; pass --lib-colocated, --lib-absolute, --lib-package-base, or --lib-name"
                     )
                 })?;
                 let crate_name = namespace.crate_name.clone();

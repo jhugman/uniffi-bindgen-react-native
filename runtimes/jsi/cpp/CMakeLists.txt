@@ -29,16 +29,20 @@ endif ()
 include_directories("${HERMES_SRC_DIR}/API")
 include_directories("${HERMES_SRC_DIR}/API/jsi")
 include_directories("${HERMES_SRC_DIR}/public")
-# ../stubs supplies ReactCommon/CallInvoker.h for host builds. The player needs
-# nothing from ../includes: those headers are the gen_cpp per-library bridge, which
-# the player exists to replace.
-include_directories("../stubs")
+# cpp/stubs supplies ReactCommon/CallInvoker.h for host builds. The player needs
+# nothing from cpp/includes: those headers are the gen_cpp per-library bridge,
+# which the player exists to replace.
+include_directories("../../../cpp/stubs")
 include_directories("${UBRN_JSI_INCLUDE_DIR}")
 
 link_directories("${HERMES_BUILD_DIR}/jsi${HERMES_CONFIG_SUBDIR}")
 link_libraries(jsi)
 
-find_library(UBRN_JSI_LIB NAMES uniffi_runtime_jsi PATHS "${RUST_TARGET_DIR}" NO_DEFAULT_PATH)
+# The archive by name, not the crate name: the crate also builds a cdylib for
+# device distribution, CMake's default suffix order would pick it, and its
+# absolute target/.../deps install name breaks the fixture suite the moment
+# that directory is cleaned. The test-runner's shim wants to be self-contained.
+find_library(UBRN_JSI_LIB NAMES libuniffi_runtime_jsi.a uniffi_runtime_jsi.lib PATHS "${RUST_TARGET_DIR}" NO_DEFAULT_PATH)
 if (NOT UBRN_JSI_LIB)
     message(FATAL_ERROR "Could not find uniffi_runtime_jsi staticlib in ${RUST_TARGET_DIR}")
 endif ()

@@ -1,0 +1,115 @@
+name: Publish @ubjs/react-native
+
+on:
+  release:
+    types: [published]
+  # A pull request dry-runs the whole pipeline: every slice, the assembly,
+  # the pack tests and `npm publish --dry-run`. Nothing reaches npm.
+  pull_request:
+    paths:
+      - "runtimes/jsi/**"
+      - ".github/workflows/npm-react-native.yml"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run without publishing to npm"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-ios
+            runner: macos-15
+          - target: aarch64-apple-ios-sim
+            runner: macos-15
+          - target: x86_64-apple-ios
+            runner: macos-15
+          - target: aarch64-linux-android
+            runner: ubuntu-latest
+          - target: x86_64-linux-android
+            runner: ubuntu-latest
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install NDK and cargo-ndk
+        if: contains(matrix.target, 'android')
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - name: Install cargo-ndk
+        if: contains(matrix.target, 'android')
+        run: cargo install cargo-ndk
+      - name: Build the Rust half
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: runtimes/jsi/scripts/build-prebuilt.sh ${{ matrix.target }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: prebuilt-${{ matrix.target }}
+          path: runtimes/jsi/artifacts/${{ matrix.target }}/libuniffi_runtime_jsi.*
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: build
+    # xcodebuild -create-xcframework needs macOS.
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: runtimes/jsi
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Clear stale local build state
+        run: rm -rf artifacts prebuilt
+      - name: Download all slices
+        uses: actions/download-artifact@v8
+        with:
+          path: runtimes/jsi/artifacts
+          pattern: prebuilt-*
+      - name: Rename artifact dirs to cargo targets
+        run: |
+          cd artifacts
+          for d in prebuilt-*/; do mv "$d" "${d#prebuilt-}"; done
+          ls -R .
+      - name: Assemble prebuilt/
+        run: scripts/assemble-prebuilt.sh
+      - name: Install and build TypeScript
+        run: npm ci --ignore-scripts && npm run build
+      - name: Pack test
+        run: npm test
+      - name: Prebuilt completeness test
+        run: npm run test:prebuilt
+      - name: "📦 npm publish: @ubjs/react-native (dry-run)"
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.dry-run) }}
+        run: |
+          echo "::notice::DRY RUN — not publishing to npm"
+          npm publish --dry-run --access public --tag latest
+      - name: "📦 npm publish: @ubjs/react-native"
+        # Only a release, or an explicit dry-run=false dispatch, publishes:
+        # any other event has no inputs, and `!inputs.dry-run` would be true.
+        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry-run) }}
+        run: npm publish --provenance --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
