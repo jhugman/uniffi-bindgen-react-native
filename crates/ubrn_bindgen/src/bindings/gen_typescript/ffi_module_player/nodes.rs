@@ -47,6 +47,36 @@ impl TripleStyle {
     }
 }
 
+/// Where the generated player obtains its native module + FfiType.
+///
+/// Exposed `pub` (but doc-hidden) only because `render_minimal_for_test` takes
+/// it as a parameter for snapshot tests; not part of the supported API.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlayerHostSource {
+    /// Import `UniffiNativeModule`, `FfiType`, `resolveLibPath` from `@ubjs/node`.
+    NapiPackage,
+    /// Use `globalThis.uniffi.open(...)` (installed by the JSI shim) and import
+    /// `FfiType` from `@ubjs/core`.
+    JsiGlobal,
+    /// Import `FfiType` from the environment-neutral `@ubjs/wasm/core`, and
+    /// take the module from a generated entrypoint via `setNativeModule`.
+    WasmCore,
+}
+
+impl PlayerHostSource {
+    /// The host source implied by a player flavor.
+    pub(crate) fn for_flavor(flavor: &crate::AbiFlavor) -> Self {
+        if flavor.is_wasm2() {
+            Self::WasmCore
+        } else if flavor.supports_globalthis_native_module() {
+            Self::JsiGlobal
+        } else {
+            Self::NapiPackage
+        }
+    }
+}
+
 /// IR for the player-style `{namespace}-ffi.ts`.
 ///
 /// Generates a `DEFINITIONS` object for the napi player's `register()` call,
@@ -54,15 +84,15 @@ impl TripleStyle {
 pub(crate) struct PlayerFfiModule {
     /// Whether to suppress `@ts-nocheck` for strict type checking.
     pub strict_type_checking: bool,
-    /// The ABI flavor this module targets (Napi, Wasm2, etc.).
-    pub flavor: crate::AbiFlavor,
     /// The crate name. For napi, passed to `resolveLibPath` so error messages
     /// name it. For wasm2, used to build the URL for the side-by-side `.wasm`
     /// file.
     pub crate_name: String,
-    /// How the napi player should locate the library at runtime.
-    /// `None` for non-napi flavors (e.g. wasm2).
+    /// How the player should locate the library at runtime.
+    /// `None` for flavors with nothing to resolve (e.g. wasm2).
     pub lib_resolution: Option<LibResolution>,
+    /// Where to source the native module + FfiType at runtime.
+    pub host_source: PlayerHostSource,
     /// Rustbuffer management symbol names.
     pub symbols: PlayerSymbols,
     /// FFI function registrations for `register({ functions: { ... } })`.
@@ -85,7 +115,7 @@ pub(crate) struct PlayerSymbols {
 }
 
 pub(crate) struct PlayerFunctionDef {
-    /// The raw FFI symbol name (e.g. "uniffi_arithmetical_fn_func_add").
+    /// The raw FFI symbol name (e.g. "uniffi_hello_world_fn_func_add").
     pub name: String,
     /// Player FfiType expressions for arguments (e.g. "FfiType.UInt32").
     pub args: Vec<String>,
@@ -127,11 +157,12 @@ impl PlayerFfiModule {
     /// branches without needing to materialize a full `general::Namespace`.
     #[doc(hidden)]
     pub fn empty_for_test(flavor: crate::AbiFlavor) -> Self {
+        let host_source = PlayerHostSource::for_flavor(&flavor);
         Self {
             strict_type_checking: true,
-            flavor,
             crate_name: "ubrn_test_crate".into(),
             lib_resolution: None,
+            host_source,
             symbols: PlayerSymbols {
                 rustbuffer_alloc: "ubrn_test_rb_alloc".into(),
                 rustbuffer_free: "ubrn_test_rb_free".into(),

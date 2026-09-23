@@ -24,7 +24,14 @@ pub fn prepare_for_jsi(
     let stem = test_script.file_stem().unwrap_or("test");
     let tsc_dir = out_dir.join("tsc");
 
-    // Generate tsconfig.json
+    // Generate tsconfig.json.
+    //
+    // es5 is not just a conservative default, it is the only target this
+    // Hermes can compile: async arrow functions are rejected outright by
+    // IRGen (no flag to enable them), and ES6 classes need ES6Class in the
+    // runner's RuntimeConfig, which is off. So anything at ES2015 or above
+    // fails to parse. Downlevelling async into state machines is a real cost
+    // on the async benchmarks, but it is not currently avoidable.
     let tsconfig = prepare_tsconfig(&tsc_dir, "es5", test_script, generated_dir);
 
     // Compile with tsc
@@ -283,6 +290,9 @@ module.exports = {{
     );
     std::fs::write(&metro_config_path, metro_config).expect("failed to write metro.config.js");
 
+    // Minification is not an option here: it rewrites Metro's module
+    // bootstrap into a form the test runner cannot start
+    // ("Cannot read property 'nativeRequire' of undefined").
     run_cmd_quietly(
         command(&metro)
             .arg("build")

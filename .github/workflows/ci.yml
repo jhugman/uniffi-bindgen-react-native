@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: ["main"]
 
+# A stacked PR is evaluated as if it targets main, and a stack sync that
+# pushes a PR's base right after its head fires a second `pull_request`
+# event for it. Keep one run per PR: the newer cancels the older.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   WASM_BINDGEN_VERSION: "0.2.114"
@@ -62,10 +69,30 @@ jobs:
       - name: Installing hermes and test-runner
         run: |
           cargo xtask bootstrap hermes --branch rn/0.77-stable
-          cargo xtask bootstrap
+          cargo xtask bootstrap test-runner
+          cargo xtask bootstrap yarn
 
       - name: Run tests of generated JSI bindings
         run: "cargo test -- jsi::"
+
+  integration-tests-jsi2-bindings:
+    name: 🧩 Integration tests (JSI2 player bindings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install tooling for building C++
+        run: sudo apt-get install -y cmake ninja-build
+
+      - name: Installing hermes, test-runner and the player shim
+        run: |
+          cargo xtask bootstrap hermes --branch rn/0.77-stable
+          cargo xtask bootstrap test-runner
+          cargo xtask bootstrap jsi-player-shim
+          cargo xtask bootstrap yarn
+
+      - name: Run tests of generated JSI2 bindings
+        run: "cargo test -- jsi2::"
 
   integration-tests-wasm-bindings:
     name: 🧩 Integration tests (WASM bindings)

@@ -4,7 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 use expect_test::expect;
-use ubrn_bindgen::__player_template_test::{render_minimal_for_test, LibResolution, TripleStyle};
+use ubrn_bindgen::__player_template_test::{
+    render_minimal_for_test, LibResolution, PlayerHostSource, TripleStyle,
+};
 
 fn extract_getter_block(rendered: &str) -> String {
     let start = rendered
@@ -18,7 +20,11 @@ fn extract_getter_block(rendered: &str) -> String {
 
 #[test]
 fn template_colocated() {
-    let rendered = render_minimal_for_test(LibResolution::Colocated, "my_crate");
+    let rendered = render_minimal_for_test(
+        LibResolution::Colocated,
+        "my_crate",
+        PlayerHostSource::NapiPackage,
+    );
     expect![[r#"
         let _nativeModule: NativeModuleInterface | undefined;
         const getter: () => NativeModuleInterface = () => {
@@ -41,6 +47,7 @@ fn template_absolute() {
     let rendered = render_minimal_for_test(
         LibResolution::Absolute(camino::Utf8PathBuf::from("/abs/lib.so")),
         "my_crate",
+        PlayerHostSource::NapiPackage,
     );
     expect![[r#"
         let _nativeModule: NativeModuleInterface | undefined;
@@ -68,6 +75,7 @@ fn template_require_cargo() {
             triple_style: TripleStyle::Cargo,
         },
         "my_crate",
+        PlayerHostSource::NapiPackage,
     );
     expect![[r#"
         let _nativeModule: NativeModuleInterface | undefined;
@@ -96,6 +104,7 @@ fn template_require_node() {
             triple_style: TripleStyle::Node,
         },
         "my_crate",
+        PlayerHostSource::NapiPackage,
     );
     expect![[r#"
         let _nativeModule: NativeModuleInterface | undefined;
@@ -125,6 +134,7 @@ fn template_require_preserves_non_hyphen_separator() {
             triple_style: TripleStyle::Cargo,
         },
         "my_crate",
+        PlayerHostSource::NapiPackage,
     );
     let block = extract_getter_block(&rendered);
     assert!(
@@ -141,6 +151,7 @@ fn template_absolute_with_windows_path_uses_forward_slashes() {
     let rendered = render_minimal_for_test(
         LibResolution::Absolute(camino::Utf8PathBuf::from("C:/Users/foo/lib.dll")),
         "my_crate",
+        PlayerHostSource::NapiPackage,
     );
     let block = extract_getter_block(&rendered);
     assert!(
@@ -149,4 +160,61 @@ fn template_absolute_with_windows_path_uses_forward_slashes() {
     );
     // No backslash should appear in the rendered string literal.
     assert!(!block.contains('\\'), "backslash leaked: {block}");
+}
+
+#[test]
+fn template_jsi_global_colocated() {
+    // JsiGlobal source: FfiType comes from `@ubjs/core` (no `@ubjs/node`), and
+    // the getter uses `globalThis.uniffi.open(...).register(DEFINITIONS)`.
+    // For a Colocated lib_resolution the libPath is just the crate name.
+    let rendered = render_minimal_for_test(
+        LibResolution::Colocated,
+        "my_crate",
+        PlayerHostSource::JsiGlobal,
+    );
+    // The host import must be `@ubjs/core`, not `@ubjs/node`.
+    assert!(
+        rendered.contains(r#"import { FfiType } from "@ubjs/core";"#),
+        "expected @ubjs/core FfiType import, got:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains("@ubjs/node"),
+        "JsiGlobal output must not import @ubjs/node, got:\n{rendered}"
+    );
+    expect![[r#"
+        let _nativeModule: NativeModuleInterface | undefined;
+        const getter: () => NativeModuleInterface = () => {
+          if (!_nativeModule) {
+            const libPath = "my_crate";
+            const uniffi = (globalThis as any).uniffi;
+            const mod_ = uniffi.open(libPath);
+            _nativeModule = mod_.register(DEFINITIONS) as unknown as NativeModuleInterface;
+          }
+          return _nativeModule;
+        };
+        export default getter;"#]]
+    .assert_eq(&extract_getter_block(&rendered));
+}
+
+#[test]
+fn template_jsi_global_absolute() {
+    // For an Absolute lib_resolution the libPath is the verbatim path.
+    let rendered = render_minimal_for_test(
+        LibResolution::Absolute(camino::Utf8PathBuf::from("/abs/lib.so")),
+        "my_crate",
+        PlayerHostSource::JsiGlobal,
+    );
+    expect![[r#"
+        let _nativeModule: NativeModuleInterface | undefined;
+        const getter: () => NativeModuleInterface = () => {
+          if (!_nativeModule) {
+            const libPath = "/abs/lib.so";
+            const uniffi = (globalThis as any).uniffi;
+            const mod_ = uniffi.open(libPath);
+            _nativeModule = mod_.register(DEFINITIONS) as unknown as NativeModuleInterface;
+          }
+          return _nativeModule;
+        };
+        export default getter;"#]]
+    .assert_eq(&extract_getter_block(&rendered));
 }

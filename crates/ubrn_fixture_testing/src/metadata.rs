@@ -17,6 +17,24 @@ pub(crate) fn workspace_metadata() -> &'static Metadata {
     &METADATA
 }
 
+/// The cargo profile fixture crates are built with, and the `target/` subdir
+/// their artifacts land in.
+///
+/// Defaults to `debug` to keep the normal test loop fast. Set
+/// `UBRN_PROFILE=release` to measure against optimized Rust, which matters for
+/// the benchmark fixture: at ~1µs/call, an unoptimized fixture crate and FFI
+/// runtime are a large fraction of what's being measured.
+pub(crate) fn cargo_profile() -> &'static str {
+    let is_release = std::env::var("UBRN_PROFILE")
+        .map(|v| v == "release")
+        .unwrap_or(false);
+    if is_release {
+        "release"
+    } else {
+        "debug"
+    }
+}
+
 fn find_package(crate_name: &str) -> &'static cargo_metadata::Package {
     let meta = workspace_metadata();
     meta.packages
@@ -71,6 +89,6 @@ pub(crate) fn find_cdylib_from_name(lib_name: &str) -> Utf8PathBuf {
         "lib"
     };
     target_dir
-        .join("debug")
+        .join(cargo_profile())
         .join(format!("{prefix}{lib_name}.{}", shared_lib_ext()))
 }

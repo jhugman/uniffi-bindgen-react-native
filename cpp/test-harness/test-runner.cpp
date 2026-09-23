@@ -4,6 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+#include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -11,6 +13,7 @@
 #include <thread>
 #ifndef _WIN32
 #include <dlfcn.h>
+#include <unistd.h>
 #else
 #include <windows.h>
 #endif
@@ -94,9 +97,20 @@ static RegisterNativesFN loadRegisterNatives(const char *libraryPath) {
 #endif
 
 static std::shared_ptr<facebook::jsi::Runtime> createRuntime() {
+  // Cap the GC heap well below Hermes' 3 GB default. A real RN host runs Hermes
+  // with a bounded heap so the GC collects under memory pressure; with the
+  // default 3 GB cap a tight *synchronous* loop (e.g. lifting a deep recursive
+  // structure x100) lets transient garbage balloon for seconds before Hermes
+  // collects — and the OS can SIGKILL the process first. The event-loop GC
+  // can't help a sync loop (it never yields), so the bound has to live here.
+  // 1 GB is ample headroom over any fixture's legitimate live set.
+  auto gcConfig = ::hermes::vm::GCConfig::Builder()
+                      .withMaxHeapSize(1u << 30) // 1 GB
+                      .build();
   auto runtimeConfig = ::hermes::vm::RuntimeConfig::Builder()
                            .withIntl(false)
                            .withMicrotaskQueue(true)
+                           .withGCConfig(gcConfig)
                            .build();
   return facebook::hermes::makeHermesRuntime(runtimeConfig);
 }
@@ -196,6 +210,24 @@ static int runEventLoop(facebook::jsi::Runtime &runtime,
     runtime.drainMicrotasks();
 
     double nextTimeMs;
+    // As the React Native *host* stand-in, the test-runner owns GC scheduling.
+    // A real RN Hermes collects during async work (idle callbacks / heap
+    // pressure); this bare event loop does not, so transient per-await garbage
+    // (promises, closures, handle-map churn) accumulates unbounded inside a
+    // tight `for (await ...)` loop — allocation cost then grows linearly until
+    // nothing ever collects it. Collect when the live heap has grown past a
+    // threshold since the last collection: cheap when async is idle, and only
+    // fires under real allocation pressure — a proxy for production GC
+    // behaviour.
+    auto allocatedBytes = [&runtime]() -> int64_t {
+      const auto info =
+          runtime.instrumentation().getHeapInfo(/*includeExpensive=*/false);
+      const auto it = info.find("hermes_allocatedBytes");
+      return it != info.end() ? it->second : 0;
+    };
+    constexpr int64_t kGcGrowthThreshold = 4 * 1024 * 1024; // 4 MB
+    int64_t lastGcBytes = allocatedBytes();
+    uint64_t loopCount = 0;
     while ((nextTimeMs = peekMacroTask.call(runtime).getNumber()) >= 0) {
       double duration = nextTimeMs - currentTimeMillis();
       if (duration > 0) {
@@ -205,6 +237,12 @@ static int runEventLoop(facebook::jsi::Runtime &runtime,
       runtime.drainMicrotasks();
       runMacroTask.call(runtime, currentTimeMillis());
       runtime.drainMicrotasks();
+      // Check growth periodically (getHeapInfo is cheap but not free).
+      if ((++loopCount & 0x3F) == 0 &&
+          allocatedBytes() - lastGcBytes > kGcGrowthThreshold) {
+        runtime.instrumentation().collectGarbage("test-runner: heap growth");
+        lastGcBytes = allocatedBytes();
+      }
     }
     return 0;
   } catch (facebook::jsi::JSError &e) {
@@ -213,7 +251,33 @@ static int runEventLoop(facebook::jsi::Runtime &runtime,
   }
 }
 
+// Exit if our parent process dies. The test-runner is spawned by the Rust test
+// harness and can run for many minutes (e.g. the benchmark fixture). If the
+// harness is interrupted (Ctrl-C, SIGKILL, an IDE stopping the run), the child
+// is reparented to init/launchd and keeps grinding at ~100% CPU as an orphan —
+// repeated interrupted runs then pile up CPU-pegged orphans that starve later
+// runs. A background watchdog polls getppid(): once it changes, the original
+// launcher is gone, so we _Exit immediately. This runs on its own thread, so it
+// fires even while the JS thread is blocked in a long synchronous evaluate.
+static void startParentDeathWatchdog() {
+#ifndef _WIN32
+  const pid_t initialParent = getppid();
+  std::thread([initialParent]() {
+    for (;;) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(250));
+      if (getppid() != initialParent) {
+        // Orphaned: skip all teardown (another thread may be mid-Hermes) and
+        // go.
+        std::_Exit(2);
+      }
+    }
+  }).detach();
+#endif
+}
+
 int main(int argc, char **argv) {
+  startParentDeathWatchdog();
+
   // If no argument is provided, print usage and exit.
   if (argc < 2) {
     std::cout << "Usage: " << argv[0] << " <path-to-js-file> [<shared-lib>...]"

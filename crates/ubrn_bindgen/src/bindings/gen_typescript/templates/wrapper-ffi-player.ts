@@ -7,15 +7,18 @@
 // @ts-nocheck
 {%- endif %}
 
-{%- if module.flavor.is_wasm2() %}
+{%- match module.host_source %}
+{%- when PlayerHostSource::NapiPackage %}
+import lib from "@ubjs/node";
+const { UniffiNativeModule, FfiType, resolveLibPath } = lib;
+{%- when PlayerHostSource::JsiGlobal %}
+import { FfiType } from "@ubjs/core";
+{%- when PlayerHostSource::WasmCore %}
 // Only `/core`, which is environment-neutral. Opening the `.wasm` is the
 // generated `index.ts`'s job, so this module
 // bundles for node, browsers and React Native alike.
 import { FfiType, type ModuleDefinitions } from "@ubjs/wasm/core";
-{%- else %}
-import lib from "@ubjs/node";
-const { UniffiNativeModule, FfiType, resolveLibPath } = lib;
-{%- endif %}
+{%- endmatch %}
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
@@ -63,7 +66,7 @@ const DEFINITIONS = {
     ],
     {%- endfor %}
   },
-}{% if module.flavor.is_wasm2() %} satisfies ModuleDefinitions{% endif %};
+}{% if module.host_source == PlayerHostSource::WasmCore %} satisfies ModuleDefinitions{% endif %};
 
 interface NativeModuleInterface {
     {%- for func in module.typed_functions %}
@@ -81,8 +84,9 @@ interface NativeModuleInterface {
     rustbuffer_free(view: Uint8Array): void;
 }
 
-{%- if module.flavor.is_wasm2() %}
 let _nativeModule: NativeModuleInterface | undefined;
+{%- match module.host_source %}
+{%- when PlayerHostSource::WasmCore %}
 const getter: () => NativeModuleInterface = () => {
   if (!_nativeModule) {
     throw new Error(
@@ -99,8 +103,7 @@ export const PLAYER_DEFINITIONS = DEFINITIONS;
 export function setNativeModule(m: Record<string, (...args: any[]) => any>) {
   _nativeModule = m as unknown as NativeModuleInterface;
 }
-{%- else %}
-let _nativeModule: NativeModuleInterface | undefined;
+{%- when PlayerHostSource::NapiPackage %}
 const getter: () => NativeModuleInterface = () => {
   if (!_nativeModule) {
     const libPath = resolveLibPath({
@@ -124,7 +127,30 @@ const getter: () => NativeModuleInterface = () => {
   }
   return _nativeModule;
 };
-{%- endif %}
+{%- when PlayerHostSource::JsiGlobal %}
+const getter: () => NativeModuleInterface = () => {
+  if (!_nativeModule) {
+    {#- Keep this lib_resolution match in sync with the NapiPackage arm above when a new LibResolution variant is added. #}
+    {%- match module.lib_resolution %}
+    {%- when Some with (resolution) %}
+      {%- match resolution %}
+      {%- when LibResolution::Absolute with (path) %}
+    const libPath = "{{ path }}";
+      {%- when LibResolution::Colocated %}
+    const libPath = "{{ module.crate_name }}";
+      {%- when LibResolution::Require { base, triple_style } %}
+    const libPath = "{{ base }}";
+      {%- endmatch %}
+    {%- when None %}
+    const libPath = "{{ module.crate_name }}";
+    {%- endmatch %}
+    const uniffi = (globalThis as any).uniffi;
+    const mod_ = uniffi.open(libPath);
+    _nativeModule = mod_.register(DEFINITIONS) as unknown as NativeModuleInterface;
+  }
+  return _nativeModule;
+};
+{%- endmatch %}
 export default getter;
 
 // Structs and function types for calling back into Typescript from Rust.

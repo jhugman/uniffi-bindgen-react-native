@@ -135,7 +135,7 @@ impl TsFfiModule {
         }
     }
 
-    fn synthetic_string_functions() -> Vec<FfiFunctionDecl> {
+    pub(crate) fn synthetic_string_functions() -> Vec<FfiFunctionDecl> {
         vec![
             FfiFunctionDecl {
                 name: "ubrn_uniffi_internal_fn_func_ffi__string_to_byte_length".into(),

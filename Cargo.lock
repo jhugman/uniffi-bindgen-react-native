@@ -2259,6 +2259,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "uniffi-fixture-hello-world"
+version = "0.1.0"
+dependencies = [
+ "ubrn_fixture_testing",
+ "ubrn_macros",
+ "uniffi",
+]
+
+[[package]]
 name = "uniffi-fixture-simple"
 version = "0.1.0"
 dependencies = [
@@ -2337,6 +2346,13 @@ version = "0.31.0-5"
 dependencies = [
  "uniffi_core",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "uniffi-runtime-jsi"
+version = "0.1.0"
+dependencies = [
+ "uniffi-runtime-core",
 ]
 
 [[package]]

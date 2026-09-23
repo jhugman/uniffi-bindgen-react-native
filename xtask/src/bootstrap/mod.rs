@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 mod hermes;
+mod jsi_player_shim;
 mod test_runner;
 mod yarn;
 
@@ -14,6 +15,7 @@ use clap::{Args, Subcommand};
 use crate::clean::CleanCmd;
 
 pub(crate) use self::hermes::HermesCmd;
+pub(crate) use self::jsi_player_shim::JsiPlayerShimCmd;
 pub(crate) use self::test_runner::TestRunnerCmd;
 pub(crate) use self::yarn::YarnCmd;
 
@@ -35,6 +37,7 @@ impl BootstrapCmd {
             match cmd {
                 SubsystemCmd::Hermes(c) => c.bootstrap(clean)?,
                 SubsystemCmd::TestRunner(c) => c.bootstrap(clean)?,
+                SubsystemCmd::JsiPlayerShim(c) => c.bootstrap(clean)?,
                 SubsystemCmd::Yarn(c) => c.bootstrap(clean)?,
             }
         } else {
@@ -49,12 +52,14 @@ impl BootstrapCmd {
     pub(crate) fn prepare_all() -> Result<()> {
         HermesCmd::default().bootstrap(false)?;
         TestRunnerCmd.bootstrap(false)?;
+        JsiPlayerShimCmd.bootstrap(false)?;
         YarnCmd.bootstrap(false)?;
         Ok(())
     }
 
     pub(crate) fn clean_all() -> Result<()> {
         YarnCmd::clean()?;
+        JsiPlayerShimCmd::clean()?;
         TestRunnerCmd::clean()?;
         HermesCmd::clean()?;
         Ok(())
@@ -71,6 +76,9 @@ enum SubsystemCmd {
     /// The C++ test runner that takes Javascript and .so libraries and runs them against
     /// Hermes.
     TestRunner(TestRunnerCmd),
+
+    /// The generic JSI player shim (libubrn_jsi_player) used by the Jsi2 flavor.
+    JsiPlayerShim(JsiPlayerShimCmd),
     /// Install nodejs tooling
     #[clap(aliases = ["npm", "js", "ts"])]
     Yarn(YarnCmd),

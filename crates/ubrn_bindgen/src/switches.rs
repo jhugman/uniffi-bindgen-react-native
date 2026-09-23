@@ -30,6 +30,7 @@ impl SwitchArgs {
 #[derive(Clone, Debug, ValueEnum, PartialEq)]
 pub enum AbiFlavor {
     Jsi,
+    Jsi2,
     Napi,
     #[cfg(feature = "wasm")]
     Wasm,
@@ -41,6 +42,7 @@ impl AbiFlavor {
     pub fn entrypoint(&self) -> &str {
         match self {
             Self::Jsi => "Entrypoint.cpp",
+            Self::Jsi2 => "", // No native entrypoint; the player shim is generic
             Self::Napi => "", // No native entrypoint needed
             #[cfg(feature = "wasm")]
             Self::Wasm => "src/lib.rs",
@@ -55,7 +57,7 @@ impl AbiFlavor {
 
     /// Whether the native module is found on globalThis (JSI installs it there).
     pub fn supports_globalthis_native_module(&self) -> bool {
-        matches!(self, Self::Jsi)
+        matches!(self, Self::Jsi | Self::Jsi2)
     }
 
     /// Whether the runtime uses a player (dlopen + register) rather than
@@ -63,24 +65,25 @@ impl AbiFlavor {
     pub fn supports_player(&self) -> bool {
         #[cfg(feature = "wasm")]
         {
-            matches!(self, Self::Napi | Self::Wasm2)
+            matches!(self, Self::Napi | Self::Jsi2 | Self::Wasm2)
         }
         #[cfg(not(feature = "wasm"))]
         {
-            matches!(self, Self::Napi)
+            matches!(self, Self::Napi | Self::Jsi2)
         }
     }
 
     /// Whether FFI function names on the native module use the `ubrn_` prefix.
-    /// JSI and WASM both use this prefix; the Napi player uses raw symbol names.
+    /// JSI and WASM both use this prefix; the player flavors (Napi, Jsi2) use
+    /// raw symbol names.
     pub fn supports_ubrn_prefix(&self) -> bool {
         #[cfg(feature = "wasm")]
         {
-            !matches!(self, Self::Napi | Self::Wasm2)
+            !matches!(self, Self::Napi | Self::Jsi2 | Self::Wasm2)
         }
         #[cfg(not(feature = "wasm"))]
         {
-            !matches!(self, Self::Napi)
+            !matches!(self, Self::Napi | Self::Jsi2)
         }
     }
 
@@ -88,16 +91,16 @@ impl AbiFlavor {
     pub fn supports_plain_call_status(&self) -> bool {
         #[cfg(feature = "wasm")]
         {
-            matches!(self, Self::Jsi | Self::Napi | Self::Wasm2)
+            matches!(self, Self::Jsi | Self::Jsi2 | Self::Napi | Self::Wasm2)
         }
         #[cfg(not(feature = "wasm"))]
         {
-            matches!(self, Self::Jsi | Self::Napi)
+            matches!(self, Self::Jsi | Self::Jsi2 | Self::Napi)
         }
     }
 
     pub fn supports_text_encoder(&self) -> bool {
-        !matches!(self, Self::Jsi)
+        !matches!(self, Self::Jsi | Self::Jsi2)
     }
 
     pub fn supports_rust_backtrace(&self) -> bool {
@@ -121,7 +124,7 @@ impl AbiFlavor {
     /// level and treat `uniffiInitAsync` as a no-op for parity. Async
     /// flavors (Wasm) defer all initialization into `uniffiInitAsync`.
     pub fn supports_sync_initialization(&self) -> bool {
-        matches!(self, Self::Jsi | Self::Napi)
+        matches!(self, Self::Jsi | Self::Jsi2 | Self::Napi)
     }
 
     /// Whether the bindgen emits an `index.ts` beside the per-module wrappers.
