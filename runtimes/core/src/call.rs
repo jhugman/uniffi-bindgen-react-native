@@ -11,7 +11,8 @@
 //! 1. **Layout** ([`ArgLayout`] / [`SlotLayout`]) — precomputed byte offsets
 //!    and sizes for each argument, so the bridge layer can write values directly
 //!    into a flat buffer without per-call allocation.
-//! 2. **Buffer** ([`PreparedCall`]) — a zeroed byte vec sized for one call, with
+//! 2. **Buffer** ([`PreparedCall`]) — a zeroed byte buffer sized for one call,
+//!    inline for ordinary signatures and heap-backed only for wide ones, with
 //!    accessor methods that hand out correctly-sized mutable slices per argument.
 //! 3. **Invocation** ([`Module::call`]) — builds libffi `Arg` references from
 //!    the buffer, calls the resolved symbol, and writes the return value's
@@ -132,7 +133,50 @@ impl ArgLayout {
 /// error out-parameter), then passes the buffer to [`Module::call`].
 pub struct PreparedCall<'m> {
     function: &'m ResolvedFunction,
-    bytes: Vec<u8>,
+    bytes: ArgBytes,
+}
+
+/// Inline capacity of [`ArgBytes`]: eight 8-byte slots, enough for uniffi's
+/// ordinary signatures plus the trailing `RustCallStatus` pointer.
+const INLINE_ARG_BYTES: usize = 64;
+
+/// Slot offsets are aligned relative to the buffer start, so the start must be
+/// at least as aligned as the widest slot.
+#[repr(C, align(16))]
+struct InlineArgs([u8; INLINE_ARG_BYTES]);
+
+/// A call's argument buffer. Every FFI crossing needs one, so ordinary
+/// signatures use inline storage and only wide ones reach the heap.
+enum ArgBytes {
+    Inline { buf: InlineArgs, len: usize },
+    Heap(Vec<u8>),
+}
+
+impl ArgBytes {
+    fn zeroed(len: usize) -> Self {
+        if len <= INLINE_ARG_BYTES {
+            Self::Inline {
+                buf: InlineArgs([0u8; INLINE_ARG_BYTES]),
+                len,
+            }
+        } else {
+            Self::Heap(vec![0u8; len])
+        }
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Inline { buf, len } => &buf.0[..*len],
+            Self::Heap(v) => v,
+        }
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        match self {
+            Self::Inline { buf, len } => &mut buf.0[..*len],
+            Self::Heap(v) => v,
+        }
+    }
 }
 
 impl<'m> PreparedCall<'m> {
@@ -147,20 +191,20 @@ impl<'m> PreparedCall<'m> {
             .arg_slots
             .get(idx)
             .ok_or_else(|| Error::Other(format!("arg slot {idx} out of range")))?;
-        Ok(&mut self.bytes[slot.offset..slot.offset + slot.size])
+        Ok(&mut self.bytes.as_mut_slice()[slot.offset..slot.offset + slot.size])
     }
 
     /// Return a mutable slice for the trailing `*mut RustCallStatus` slot,
     /// or `None` if this function doesn't use one.
     pub fn rust_call_status_slot(&mut self) -> Option<&mut [u8]> {
         let slot = self.function.arg_layout.rust_call_status_slot.as_ref()?;
-        Some(&mut self.bytes[slot.offset..slot.offset + slot.size])
+        Some(&mut self.bytes.as_mut_slice()[slot.offset..slot.offset + slot.size])
     }
 
     /// Consume the buffer, invoke the resolved function, and write the return
     /// value's native-endian bytes into `out`.
     pub(crate) fn invoke(self, out: &mut [u8]) -> Result<usize> {
-        self.function.invoke(&self.bytes, out)
+        self.function.invoke(self.bytes.as_slice(), out)
     }
 }
 
@@ -179,7 +223,7 @@ impl Module {
             .ok_or_else(|| Error::UnknownFunction(fn_name.to_string()))?;
         Ok(PreparedCall {
             function,
-            bytes: vec![0u8; function.arg_layout.total_size],
+            bytes: ArgBytes::zeroed(function.arg_layout.total_size),
         })
     }
 
@@ -366,6 +410,35 @@ mod tests {
     fn layout_with_rust_call_status() {
         let lay = ArgLayout::compute(&[FfiTypeDesc::Int32], true).unwrap();
         assert!(lay.rust_call_status_slot.is_some());
+    }
+
+    #[test]
+    fn arg_bytes_inline_up_to_capacity_then_heap() {
+        for len in [0, 1, INLINE_ARG_BYTES] {
+            let bytes = ArgBytes::zeroed(len);
+            assert!(matches!(bytes, ArgBytes::Inline { .. }), "len {len}");
+            assert_eq!(bytes.as_slice(), vec![0u8; len]);
+        }
+        let len = INLINE_ARG_BYTES + 1;
+        let bytes = ArgBytes::zeroed(len);
+        assert!(matches!(bytes, ArgBytes::Heap(_)));
+        assert_eq!(bytes.as_slice(), vec![0u8; len]);
+    }
+
+    /// Slot offsets are relative to the buffer start, so an unaligned start
+    /// would misalign every 8-byte slot.
+    #[test]
+    fn inline_args_are_aligned_for_every_slot() {
+        let widest = [
+            align_of::<u64>(),
+            align_of::<f64>(),
+            align_of::<*const c_void>(),
+            align_of::<RustBufferC>(),
+        ]
+        .into_iter()
+        .max()
+        .unwrap();
+        assert!(align_of::<InlineArgs>() >= widest);
     }
 
     /// Build the `hello-world` fixture cdylib and load it as a `Module` wired only
