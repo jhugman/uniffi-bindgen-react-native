@@ -10,6 +10,6 @@
   "author": "James <noop@nomail.com>",
   "license": "MIT",
   "dependencies": {
-    "@ubjs/core": "^0.31.0-5"
+    "@ubjs/core": "^0.31.0-6"
   }
 }

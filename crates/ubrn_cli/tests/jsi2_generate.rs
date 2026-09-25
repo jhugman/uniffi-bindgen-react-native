@@ -28,6 +28,9 @@ fn generate_all_emits_an_assets_only_library() -> Result<()> {
         );
 
         run_cli("ubrn generate jsi2 all --config ubrn.config.yaml libarithmetical.dylib")?;
+        // The generator pins the player to ubrn's own version; the fixture's
+        // @ubjs/core is bumped alongside it at release.
+        let range = format!("^{}", env!("CARGO_PKG_VERSION"));
 
         assert_files(&[
             // The entrypoint: player first, then the guard, then the generated
@@ -62,8 +65,8 @@ fn generate_all_emits_an_assets_only_library() -> Result<()> {
             // package.json gains the peer and the devDependency; @ubjs/core
             // was already there.
             File::new("package.json")
-                .contains("\"@ubjs/react-native\": \"^0.31.0-5\"")
-                .contains("\"@ubjs/core\": \"^0.31.0-5\"")
+                .contains(&format!("\"@ubjs/react-native\": \"{range}\""))
+                .contains(&format!("\"@ubjs/core\": \"{range}\""))
                 .contains("\"devDependencies\""),
         ]);
 
@@ -74,8 +77,14 @@ fn generate_all_emits_an_assets_only_library() -> Result<()> {
             .find(|f| f.path.ends_with("package.json"))
             .expect("package.json was recorded");
         let json: serde_json::Value = serde_json::from_str(&package_json.content)?;
-        assert_eq!(json["peerDependencies"]["@ubjs/react-native"], "^0.31.0-5");
-        assert_eq!(json["devDependencies"]["@ubjs/react-native"], "^0.31.0-5");
+        assert_eq!(
+            json["peerDependencies"]["@ubjs/react-native"],
+            range.as_str()
+        );
+        assert_eq!(
+            json["devDependencies"]["@ubjs/react-native"],
+            range.as_str()
+        );
 
         // Nothing native: no C++, no Kotlin, no CMake, no codegen spec.
         // Matched against the path within the library and the file name, never
