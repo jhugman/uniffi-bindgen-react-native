@@ -113,9 +113,18 @@ export class SenderCore {
     if (this.closed) return;
     this.closed = true;
     this.port.removeEventListener("message", this.listener);
+    if (this.pending.size > 0) this.port.unref?.();
     for (const p of this.pending.values()) p.reject(new ChannelClosedError());
     this.pending.clear();
     this.port.close?.();
+  }
+
+  private settle(id: number): PendingCall | undefined {
+    const p = this.pending.get(id);
+    if (!p) return undefined;
+    this.pending.delete(id);
+    if (this.pending.size === 0) this.port.unref?.();
+    return p;
   }
 
   private lookup(fn: string): FunctionPlan {
@@ -138,6 +147,9 @@ export class SenderCore {
     );
     const id = this.nextId++;
     this.pending.set(id, { ...settle, plan, status });
+    // An unref'd node port drops queued replies at exit; hold the loop
+    // only while something is waiting on one.
+    if (this.pending.size === 1) this.port.ref?.();
     this.port.postMessage(
       { kind: "call", id, fn: plan.name, args: wire },
       transfer,
@@ -164,9 +176,8 @@ export class SenderCore {
   }
 
   private onReturn(msg: Extract<ChannelMessage, { kind: "return" }>): void {
-    const p = this.pending.get(msg.id);
+    const p = this.settle(msg.id);
     if (!p) return; // normal after close()
-    this.pending.delete(msg.id);
     if (!msg.ok) return p.reject(fromWireError(msg.error));
     if (p.status && msg.status) {
       p.status.code = msg.status.code;
