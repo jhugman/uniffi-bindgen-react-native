@@ -29,12 +29,74 @@ namespace {
 // (ubrn_cb::RustCallStatus) and is shared with the Rust->JS vtable path.
 using ubrn_cb::RustCallStatus;
 
+// One call's marshalled args. Every FFI crossing needs one, so signatures that
+// fit use stack slots and only wide ones reach the heap.
+class ArgSlots {
+public:
+  static constexpr size_t kInlineArgs = 8;
+  static constexpr size_t kInlineSlot = sizeof(UbrnRustBuffer);
+
+  static bool fitsInline(const std::vector<ArgDesc> &args) {
+    if (args.size() > kInlineArgs)
+      return false;
+    for (const auto &a : args)
+      if (a.size > kInlineSlot)
+        return false;
+    return true;
+  }
+
+  ArgSlots(size_t n, bool fitsInline) : inline_(fitsInline) {
+    if (!inline_) {
+      heapBytes_.resize(n);
+      heapPtrs_.resize(n);
+      heapSizes_.resize(n);
+    }
+  }
+  ArgSlots(const ArgSlots &) = delete;
+  ArgSlots &operator=(const ArgSlots &) = delete;
+
+  // A zeroed slot of `size` bytes for arg `i`, recorded in ptrs()/sizes().
+  uint8_t *slot(size_t i, size_t size) {
+    uint8_t *p;
+    if (inline_) {
+      p = inlineBytes_[i];
+      memset(p, 0, size);
+      inlinePtrs_[i] = p;
+      inlineSizes_[i] = size;
+    } else {
+      heapBytes_[i].assign(size, 0);
+      p = heapBytes_[i].data();
+      heapPtrs_[i] = p;
+      heapSizes_[i] = size;
+    }
+    return p;
+  }
+
+  const void *const *ptrs() const {
+    return inline_ ? inlinePtrs_ : heapPtrs_.data();
+  }
+  const size_t *sizes() const {
+    return inline_ ? inlineSizes_ : heapSizes_.data();
+  }
+
+private:
+  bool inline_;
+  uint8_t inlineBytes_[kInlineArgs][kInlineSlot];
+  const void *inlinePtrs_[kInlineArgs];
+  size_t inlineSizes_[kInlineArgs];
+  std::vector<std::vector<uint8_t>> heapBytes_;
+  std::vector<const void *> heapPtrs_;
+  std::vector<size_t> heapSizes_;
+};
+
 // One registered function: its symbol name, the arg/ret type descs, and whether
 // it carries a RustCallStatus. Captured by the JSI host function closure. The
 // arg descs carry the struct name for Reference(Struct) (vtable-pointer) args.
 struct FnInfo {
   std::string name;
   std::vector<ArgDesc> args;
+  // ArgSlots::fitsInline(args), decided once at registration.
+  bool argsFitInline;
   uint8_t retTag;
   // Core's slot width for retTag, resolved at registration (0 for void).
   size_t retSize;
@@ -127,20 +189,17 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
                                        " args, got " + std::to_string(count));
           }
 
-          // Marshal args into contiguous backing storage. Scalars are written
-          // as native bytes; a RustBuffer arg is a JS Uint8Array that we copy
-          // into a Rust-owned buffer (via rustbuffer_from_bytes) whose repr(C)
-          // layout (size target-dependent) is then stored as the arg payload.
-          std::vector<std::vector<uint8_t>> backing(nDeclared);
-          std::vector<const void *> argPtrs(nDeclared);
-          std::vector<size_t> argSizes(nDeclared);
+          // Marshal args into per-call slots. Scalars are written as native
+          // bytes; a RustBuffer arg is a JS Uint8Array that we copy into a
+          // Rust-owned buffer (via rustbuffer_from_bytes) whose repr(C) layout
+          // (size target-dependent) is then stored as the arg payload.
+          ArgSlots slots(nDeclared, info.argsFitInline);
           for (size_t i = 0; i < nDeclared; i++) {
             uint8_t tag = info.args[i].tag;
-            size_t sz = info.args[i].size;
-            backing[i].resize(sz);
+            uint8_t *slot = slots.slot(i, info.args[i].size);
             if (tag == UBRN_TY_RUSTBUFFER) {
               UbrnRustBuffer rb = rustBufferForArg(rt, handle, args[i]);
-              memcpy(backing[i].data(), &rb, sizeof(rb));
+              memcpy(slot, &rb, sizeof(rb));
             } else if (tag == UBRN_TY_REFERENCE) {
               // A vtable-pointer arg: the JS value is a plain object whose
               // properties are the struct's methods. Build the C vtable and
@@ -148,7 +207,7 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
               auto jsObj = args[i].asObject(rt);
               const void *vtable = ubrn_cb::buildVTableStruct(
                   rt, handle, *cbInfo, info.args[i].name, jsObj);
-              memcpy(backing[i].data(), &vtable, sizeof(vtable));
+              memcpy(slot, &vtable, sizeof(vtable));
             } else if (tag == UBRN_TY_CALLBACK) {
               // A plain Callback-typed fn-ptr arg (e.g. the rust_future_poll_*
               // continuation). Single-callback analogue of buildVTableStruct:
@@ -167,12 +226,10 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
               const void *fnPtr = ubrn_cb::trampolineForJsFn(
                   rt, handle, *cbInfo, cbName, args[i],
                   info.name + " callback arg '" + cbName + "'");
-              memcpy(backing[i].data(), &fnPtr, sizeof(fnPtr));
+              memcpy(slot, &fnPtr, sizeof(fnPtr));
             } else {
-              scalarToBytes(rt, tag, args[i], backing[i].data());
+              scalarToBytes(rt, tag, args[i], slot);
             }
-            argPtrs[i] = backing[i].data();
-            argSizes[i] = sz;
           }
 
           RustCallStatus status{};
@@ -189,9 +246,9 @@ buildModuleObject(jsi::Runtime &rt, UbrnJsiModule *handle,
                         info.name);
           }
 
-          int rc = ubrn_jsi_call(handle, info.name.c_str(), argPtrs.data(),
-                                 argSizes.data(), nDeclared, statusPtr, out,
-                                 retSize);
+          int rc =
+              ubrn_jsi_call(handle, info.name.c_str(), slots.ptrs(),
+                            slots.sizes(), nDeclared, statusPtr, out, retSize);
           if (rc != 0) {
             throw jsi::JSError(
                 rt, "uniffi jsi player: ubrn_jsi_call failed, code " +
@@ -627,6 +684,7 @@ jsi::Value makeRegister(jsi::Runtime &rt, std::string libPath,
               supported = false;
           }
           info.args = argDescs;
+          info.argsFitInline = ArgSlots::fitsInline(argDescs);
           ArgDesc retDesc =
               argDescFromDefObject(rt, f.getProperty(rt, "ret").asObject(rt));
           info.retTag = retDesc.tag;
