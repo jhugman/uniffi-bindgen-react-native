@@ -5,6 +5,12 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-6...main
+
+---
+
+# 0.31.0-6
+
 ## ✨ What's New ✨
 
 ### 🎮 JSI Player (`Jsi2` flavour) — host-side fixture parity
@@ -15,14 +21,14 @@ applicable fixtures pass, covering scalars, RustBuffer / strings / errors,
 object handles, callback interfaces and vtables, async functions, and async
 callbacks / traits with struct-by-value completers. A compile-time ABI drift
 guard (`runtimes/jsi/cpp/abi_assert.cpp`) ensures the C and Rust struct
-layouts stay in sync.
+layouts stay in sync ([#461](https://github.com/jhugman/uniffi-bindgen-react-native/pull/461), [#462](https://github.com/jhugman/uniffi-bindgen-react-native/pull/462)).
 
 Three fixtures are intentionally excluded from `Jsi2` (each marked with an
 inline `// Jsi2: <reason>` comment): the `benchmark` fixture (run separately
 for performance measurement), `examples/arithmetic` (a pre-existing cdylib-name
 collision that breaks all flavours equally), and `ext-types/index-bundle`
-(N-API-only `tsconfig` setup). Distribution packaging and the `gen_cpp` cutover
-are separate later plans and are out of scope for this runtime layer.
+(N-API-only `tsconfig` setup). The existing `jsi` flavour and its generated C++
+are unchanged.
 
 ### 📦 `@ubjs/react-native` — the JSI player as an npm package
 
@@ -38,8 +44,7 @@ embedded `<name>.framework` (iOS). Generated bindings gain `--lib-name <name>`
 for this, where `<name>` is the built library's name; the two-argument
 `registerNatives` entry the Hermes test-runner uses is unchanged, and the new
 `ubrnRegisterPlayer` carries the resolver. A CI gate builds a fresh React
-Native app with the package installed on both platforms. Generating libraries
-that ship through the player is the next release's work.
+Native app with the package installed on both platforms ([#463](https://github.com/jhugman/uniffi-bindgen-react-native/pull/463)).
 
 ### 🛠 `ubrn build jsi2` and `ubrn generate jsi2 all`
 
@@ -54,19 +59,22 @@ empty `ReactPackage` so Android autolinking keeps the library. Two runtime
 lanes prove it: a fresh app importing the player logs `globalThis.uniffi`, and
 a library generated from `examples/arithmetic` calls `add(2, 3)` on the iOS
 simulator in CI and on an Android emulator locally. See the new
-[`jsi2` reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/jsi2.html).
+[`jsi2` reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/jsi2.html) ([#464](https://github.com/jhugman/uniffi-bindgen-react-native/pull/464)).
 
 ## 🦊 What's Changed
 
 - A callback interface or foreign trait object that survives a hot reload no longer crashes the app when Rust next calls it. `FfiConverterObjectWithCallbacks.lift` told foreign handles from Rust `Arc` pointers by asking the handle map; after a reload the map is fresh and empty, so the old runtime's handle fell through to the pointer path and `clone_*` incremented a strong count on a number that was never an address. `lift` now decides by the low bit — odd is foreign, even is a pointer, as `lower` has always minted them — and a stale foreign handle throws `UnexpectedStaleHandle`, the error the handle map has carried for exactly this case ([#458](https://github.com/jhugman/uniffi-bindgen-react-native/pull/458)).
 - `wasm-bindgen` runs as a command again, at whatever version your project provides, and this workspace pins none of its own. 0.31.0-5 linked `wasm-bindgen-cli-support` and ran the rewrite in-process, which made our pin a third party to an agreement between your crate and its dependencies: `js-sys` and `web-sys` pin `wasm-bindgen` exactly, so a lock file moving — a `matrix-rust-sdk` bump raising its `web-sys` floor, carrying `wasm-bindgen` from 0.2.114 to 0.2.127 with it — could not build until we released a matching version. Both the `web` and `wasm2` flavors shell out now. When the binary is missing or refuses, the version read out of the module's own descriptor section names the one to install, which beats wasm-bindgen's schema-mismatch text; `UBRN_WASM_BINDGEN` points at a specific binary on a machine carrying several ([#454](https://github.com/jhugman/uniffi-bindgen-react-native/pull/454)).
 - `web.wasmBindgenExtras` in `ubrn.config.yaml` reaches `wasm-bindgen` verbatim. The in-process path had to map each flag onto a `Bindgen` method and failed the build on any it did not know; every flag the installed binary accepts now works ([#454](https://github.com/jhugman/uniffi-bindgen-react-native/pull/454)).
+- `wasm2` bindings pass `tsc` in projects that typecheck them. The generated `index.ts` now typechecks cleanly and carries `// @ts-nocheck` only when `strictTypeChecking` is off, like the other generated files, and a `<lib>_bg.d.ts` declares the staged wasm-bindgen glue that `index.ts` imports ([#452](https://github.com/jhugman/uniffi-bindgen-react-native/pull/452)).
+- `ubrn_bindgen`'s `BindingsArgs` carries its flavour switches with or without the `wasm` feature, so a binary crate of your own can drive the bindgen ([#453](https://github.com/jhugman/uniffi-bindgen-react-native/pull/453)).
+- The `wasm2` flavour is documented in the book: an overview, a reference, a cookbook, the player internals, and a guide to migrating from the `web` flavour ([#429](https://github.com/jhugman/uniffi-bindgen-react-native/pull/429)).
 
 ## ⚠️ Breaking Changes
 
 - Building the `web` flavor needs `wasm-bindgen` on `PATH` again, at the version your `Cargo.lock` resolves for the `wasm-bindgen` crate: `cargo install wasm-bindgen-cli --version <that version>`. If you dropped that install after 0.31.0-5, put it back. `wasm2` needs the command only when your crate's dependency tree reaches `wasm-bindgen` — `js-sys`, `web-sys`, `getrandom`'s wasm backend, an HTTP client — and says so, with the version, if it is missing ([#454](https://github.com/jhugman/uniffi-bindgen-react-native/pull/454)).
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-5...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-5...0.31.0-6
 
 ---
 
