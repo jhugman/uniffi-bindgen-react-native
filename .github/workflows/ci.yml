@@ -157,10 +157,10 @@ jobs:
       - name: Run tests of generated WASM2 bindings
         run: "cargo test -- wasm2::"
 
-      - name: Run unit tests of the message channel
-        run: cd channels/messagechannel && npm ci && npm test && npm run typecheck
+      - name: Run unit tests of @ubjs/worker
+        run: cd channels/worker && npm ci && npm test && npm run typecheck
 
-      - name: Run tests of generated WASM2 bindings through the message channel
+      - name: Run tests of generated WASM2 bindings through @ubjs/worker
         run: "cargo test -- channel::"
 
       # Named separately: this test covers the CLI path a consuming project

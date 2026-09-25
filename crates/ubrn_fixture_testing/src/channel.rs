@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-//! Run a fixture through `@ubjs/message-channel`: the wasm2 player behind a
+//! Run a fixture through `@ubjs/worker`: the wasm2 player behind a
 //! receiver, the generated code in front of a synchronous player shim, both
 //! in one Node process over an in-process synchronous port.
 
@@ -43,9 +43,9 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
     let glue = ts_dir.join(format!("{lib_stem}_bg.js")).exists();
     let mut src = String::new();
     src.push_str("import { openWasm } from \"@ubjs/wasm\";\n");
-    src.push_str("import { createReceiver } from \"@ubjs/message-channel\";\n");
+    src.push_str("import { createReceiver } from \"@ubjs/worker\";\n");
     src.push_str(
-        "import { createSyncPortPair, createSyncPlayer } from \"@ubjs/message-channel/testing\";\n",
+        "import { createSyncPortPair, createSyncPlayer } from \"@ubjs/worker/testing\";\n",
     );
     if glue {
         src.push_str(&format!("import * as glue from \"./{lib_stem}_bg.js\";\n"));

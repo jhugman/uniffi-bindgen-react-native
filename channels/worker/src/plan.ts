@@ -62,7 +62,7 @@ interface Site {
 }
 
 function fail(site: Site, what: string): never {
-  throw new Error(`message-channel: ${site.where}: ${what}`);
+  throw new Error(`worker: ${site.where}: ${what}`);
 }
 
 function planValue(t: FfiTypeDesc, site: Site): ValuePlan {

@@ -115,10 +115,7 @@ export class ReceiverCore {
 
   private onMessage(data: unknown): void {
     if (!isChannelMessage(data)) {
-      console.warn(
-        "message-channel: receiver dropped a malformed message",
-        data,
-      );
+      console.warn("worker: receiver dropped a malformed message", data);
       return;
     }
     switch (data.kind) {
@@ -143,8 +140,7 @@ export class ReceiverCore {
     const transfer: Transferable[] = [];
     try {
       const plan = this.plan.functions.get(msg.fn);
-      if (!plan)
-        throw new Error(`message-channel: unknown function "${msg.fn}"`);
+      if (!plan) throw new Error(`worker: unknown function "${msg.fn}"`);
       const args = plan.args.map((p, i) => this.inboundArg(p, msg.args[i]));
       let status: { code: number; errorBuf?: Uint8Array } | undefined;
       if (plan.hasRustCallStatus) {
@@ -296,7 +292,7 @@ export class ReceiverCore {
     const logFailure: Settle = (m) => {
       if (!m.ok)
         console.error(
-          `message-channel: callback "${plan.name}" failed on the client: ${m.error.name}: ${m.error.message}`,
+          `worker: callback "${plan.name}" failed on the client: ${m.error.name}: ${m.error.message}`,
         );
     };
 
@@ -335,7 +331,7 @@ export class ReceiverCore {
       this.releaseIfInvocation(id, lifetime);
       if (!reply) {
         throw new Error(
-          `message-channel: callback "${plan.name}" needs a synchronous reply; ` +
+          `worker: callback "${plan.name}" needs a synchronous reply; ` +
             "synchronous callback-interface methods are not supported over an asynchronous channel, " +
             "enable forceAsync for this interface",
         );
