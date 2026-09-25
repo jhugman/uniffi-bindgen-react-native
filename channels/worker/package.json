@@ -1,12 +1,12 @@
 {
-  "name": "@ubjs/message-channel",
+  "name": "@ubjs/worker",
   "version": "0.31.0-5",
   "description": "MessagePort channel that drives a uniffi-bindgen-react-native player from another JavaScript context.",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jhugman/uniffi-bindgen-react-native.git",
-    "directory": "channels/messagechannel"
+    "directory": "channels/worker"
   },
   "license": "MPL-2.0",
   "author": { "name": "James Hugman", "email": "james@hugman.tv" },
