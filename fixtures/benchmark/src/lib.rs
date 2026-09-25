@@ -80,6 +80,28 @@ impl Counter {
     }
 }
 
+/// Constructors are `new` on sync flavors and `create()` under async
+/// delivery; a factory function lets one script build a Counter on both.
+#[uniffi::export]
+pub fn make_counter() -> Arc<Counter> {
+    Counter::new()
+}
+
+const BURN_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
+
+/// Deterministic compute loop; the checksum keeps the optimiser honest.
+/// wasm32 has no clock, so the script calibrates `iterations` to a wall time.
+#[uniffi::export]
+pub fn burn(iterations: u64) -> u64 {
+    let mut x = BURN_SEED;
+    for i in 0..iterations {
+        x ^= i;
+        x = x.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        x ^= x >> 31;
+    }
+    x
+}
+
 // ---------------------------------------------------------------------------
 // Wide record — many fields, mixed types
 // ---------------------------------------------------------------------------
@@ -220,6 +242,45 @@ pub async fn get_string_array_async(repeats: u32, s: String) -> Vec<String> {
 #[uniffi::export]
 pub async fn take_string_array_async(strings: Vec<String>) {
     let _ = strings;
+}
+
+// ---------------------------------------------------------------------------
+// Callback round trips
+// ---------------------------------------------------------------------------
+
+/// Async-only: async delivery forbids sync callback methods, and the sync
+/// flavors can drive an async callback too.
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait Ping: Send + Sync {
+    async fn ping(&self, n: u32) -> u32;
+}
+
+/// Calls `cb.ping` `times` times in sequence and returns the sum.
+#[uniffi::export]
+pub async fn call_ping(cb: Arc<dyn Ping>, times: u32) -> u32 {
+    let mut sum = 0u32;
+    for i in 0..times {
+        sum = sum.wrapping_add(cb.ping(i).await);
+    }
+    sum
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn burn_is_deterministic_and_depends_on_count() {
+        assert_eq!(burn(0), BURN_SEED);
+        assert_eq!(burn(1000), burn(1000));
+        assert_ne!(burn(1000), burn(1001));
+    }
+
+    #[test]
+    fn make_counter_starts_at_zero() {
+        assert_eq!(make_counter().increment(), 1);
+    }
 }
 
 uniffi::setup_scaffolding!();

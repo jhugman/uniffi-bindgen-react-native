@@ -11,6 +11,7 @@ name = "uniffi_benchmark"
 
 [dependencies]
 uniffi = { workspace = true, features = ["tokio"] }
+async-trait = "0.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uniffi-runtime-wasm = { workspace = true }
