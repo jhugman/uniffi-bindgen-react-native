@@ -54,7 +54,7 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*lowerString:*/ FfiConverterString.lower,
                 /*alloc:*/ nativeModule().rustbuffer_alloc,
             )
             {%- when Some(error_type) %}
@@ -64,7 +64,7 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type.decl_type_name }}.instanceOf,
                 /*lowerError:*/ {{ error_type.lower_error_fn }},
-                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*lowerString:*/ FfiConverterString.lower,
                 /*alloc:*/ nativeModule().rustbuffer_alloc,
             );
             {%- endmatch %}
@@ -115,7 +115,7 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*makeCall:*/ uniffiMakeCall,
                 /*handleSuccess:*/ uniffiHandleSuccess,
                 /*handleError:*/ uniffiHandleError,
-                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*lowerString:*/ FfiConverterString.lower,
                 /*alloc:*/ nativeModule().rustbuffer_alloc,
             );
             {%- when Some(error_type) %}
@@ -125,7 +125,7 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
                 /*handleError:*/ uniffiHandleError,
                 /*isErrorType:*/ {{ error_type.decl_type_name }}.instanceOf,
                 /*lowerError:*/ {{ error_type.lower_error_fn }},
-                /*lowerString:*/ FfiConverterString.lower.bind(FfiConverterString),
+                /*lowerString:*/ FfiConverterString.lower,
                 /*alloc:*/ nativeModule().rustbuffer_alloc,
             );
             {%- endmatch %}
