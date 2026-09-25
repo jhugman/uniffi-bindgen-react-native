@@ -40,9 +40,7 @@ export function marshalOut(
       return ctx.handleOut(value as bigint);
     case "buffer": {
       if (!(value instanceof Uint8Array)) {
-        throw new Error(
-          `message-channel: expected a Uint8Array, got ${typeof value}`,
-        );
+        throw new Error(`worker: expected a Uint8Array, got ${typeof value}`);
       }
       const w = ctx.bufferOut(value);
       if (!transfer.includes(w.buffer)) transfer.push(w.buffer as ArrayBuffer);
@@ -51,7 +49,7 @@ export function marshalOut(
     case "callback": {
       if (typeof value !== "function") {
         throw new Error(
-          `message-channel: expected a function for callback "${plan.name}", got ${typeof value}`,
+          `worker: expected a function for callback "${plan.name}", got ${typeof value}`,
         );
       }
       return ctx.registry.register(value, ctx.callbacks.get(plan.name)!);
@@ -81,7 +79,7 @@ export function marshalIn(
     case "callback": {
       if (typeof value !== "number") {
         throw new Error(
-          `message-channel: expected a callback id for "${plan.name}", got ${typeof value}`,
+          `worker: expected a callback id for "${plan.name}", got ${typeof value}`,
         );
       }
       const cbPlan = ctx.callbacks.get(plan.name)!;

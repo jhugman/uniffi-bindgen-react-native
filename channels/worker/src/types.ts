@@ -66,7 +66,7 @@ export interface Receiver {
 }
 
 export class ChannelClosedError extends Error {
-  constructor(message = "message-channel: the channel is closed") {
+  constructor(message = "worker: the channel is closed") {
     super(message);
     this.name = "ChannelClosedError";
   }

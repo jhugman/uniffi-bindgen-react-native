@@ -96,7 +96,7 @@ export class SenderCore {
     });
     if (!done)
       throw new Error(
-        `message-channel: "${fn}" did not return synchronously; the port is not synchronous`,
+        `worker: "${fn}" did not return synchronously; the port is not synchronous`,
       );
     if (error) throw error;
     return value;
@@ -120,7 +120,7 @@ export class SenderCore {
 
   private lookup(fn: string): FunctionPlan {
     const plan = this.plan.functions.get(fn);
-    if (!plan) throw new Error(`message-channel: unknown function "${fn}"`);
+    if (!plan) throw new Error(`worker: unknown function "${fn}"`);
     return plan;
   }
 
@@ -146,7 +146,7 @@ export class SenderCore {
 
   private onMessage(data: unknown): void {
     if (!isChannelMessage(data)) {
-      console.warn("message-channel: sender dropped a malformed message", data);
+      console.warn("worker: sender dropped a malformed message", data);
       return;
     }
     switch (data.kind) {
@@ -234,7 +234,7 @@ export class SenderCore {
   ): void {
     if (!msg.ok)
       console.error(
-        `message-channel: forwarded callback ${msg.id} failed: ${msg.error.name}: ${msg.error.message}`,
+        `worker: forwarded callback ${msg.id} failed: ${msg.error.name}: ${msg.error.message}`,
       );
   }
 
@@ -246,7 +246,7 @@ export class SenderCore {
     if (cbPlan.retTag !== "Void") {
       return () => {
         throw new Error(
-          `message-channel: callback "${cbPlan.name}" returning ${cbPlan.retTag} cannot be forwarded from the sender`,
+          `worker: callback "${cbPlan.name}" returning ${cbPlan.retTag} cannot be forwarded from the sender`,
         );
       };
     }

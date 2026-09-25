@@ -83,7 +83,7 @@ test("call: unknown function and throwing player become ok:false", async () => {
     ok: false,
     error: {
       name: "Error",
-      message: 'message-channel: unknown function "nope"',
+      message: 'worker: unknown function "nope"',
     },
   });
   s.post({ kind: "call", id: 2, fn: "boom", args: [] });
