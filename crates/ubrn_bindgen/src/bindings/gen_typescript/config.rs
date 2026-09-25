@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use heck::ToUpperCamelCase;
 use serde::{Deserialize, Serialize};
 
+use crate::switches::SwitchArgs;
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct TsConfig {
@@ -33,6 +35,10 @@ pub(crate) struct TsConfig {
     /// thread.
     #[serde(default)]
     pub(crate) force_async: ForceAsync,
+    /// Generate call bodies that `await` the player. For a player behind a
+    /// message port. Implies `forceAsync = true`.
+    #[serde(default)]
+    pub(crate) async_delivery: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -59,6 +65,31 @@ impl TsConfig {
     }
     pub(crate) fn is_debug(&self) -> bool {
         self.log_level.is_debug()
+    }
+
+    /// Fold the command line into the config: `--async` sets `asyncDelivery`,
+    /// and `asyncDelivery` needs a flavor that awaits its player at load, and
+    /// forces every surface async.
+    pub(crate) fn apply_switches(&mut self, switches: &SwitchArgs) -> anyhow::Result<()> {
+        if switches.async_delivery {
+            self.async_delivery = true;
+        }
+        if !self.async_delivery {
+            return Ok(());
+        }
+        if !switches.flavor.supports_async_delivery() {
+            anyhow::bail!(
+                "asyncDelivery needs a flavor that awaits a player at load; `{}` does not",
+                switches.flavor.as_str()
+            );
+        }
+        match &self.force_async {
+            ForceAsync::Named(_) => anyhow::bail!(
+                "asyncDelivery makes every type async; remove the forceAsync list or set it to true"
+            ),
+            ForceAsync::All(_) => self.force_async = ForceAsync::All(true),
+        }
+        Ok(())
     }
 }
 
@@ -117,8 +148,9 @@ impl CustomTypeConfig {
 }
 
 #[cfg(test)]
-mod force_async_tests {
+mod config_tests {
     use super::*;
+    use crate::switches::{AbiFlavor, SwitchArgs};
 
     #[test]
     fn all_true_forces_everything() {
@@ -159,5 +191,93 @@ mod force_async_tests {
 
         let default: TsConfig = toml::from_str("").unwrap();
         assert!(!default.force_async.is_forced("Whatever"));
+    }
+
+    fn switches(flavor: AbiFlavor, async_delivery: bool) -> SwitchArgs {
+        SwitchArgs {
+            flavor,
+            async_delivery,
+        }
+    }
+
+    #[test]
+    fn async_delivery_deserializes() {
+        let cfg: TsConfig = toml::from_str("asyncDelivery = true").unwrap();
+        assert!(cfg.async_delivery);
+        let cfg: TsConfig = toml::from_str("").unwrap();
+        assert!(!cfg.async_delivery);
+    }
+
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn async_delivery_forces_everything_async() {
+        let mut cfg: TsConfig = toml::from_str("asyncDelivery = true").unwrap();
+        cfg.apply_switches(&switches(AbiFlavor::Wasm2, false))
+            .unwrap();
+        assert!(cfg.async_delivery);
+        assert!(cfg.force_async.is_forced("Anything"));
+    }
+
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn cli_async_overrides_config() {
+        let mut cfg: TsConfig = toml::from_str("").unwrap();
+        cfg.apply_switches(&switches(AbiFlavor::Wasm2, true))
+            .unwrap();
+        assert!(cfg.async_delivery);
+        assert!(cfg.force_async.is_forced("Anything"));
+    }
+
+    #[cfg(feature = "wasm")]
+    #[test]
+    fn async_delivery_rejects_a_force_async_list() {
+        let mut cfg: TsConfig =
+            toml::from_str("asyncDelivery = true\nforceAsync = [\"Widget\"]").unwrap();
+        let err = cfg
+            .apply_switches(&switches(AbiFlavor::Wasm2, false))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("forceAsync"), "{err}");
+    }
+
+    #[test]
+    fn async_delivery_rejects_a_flavor_without_a_player() {
+        let mut cfg: TsConfig = toml::from_str("asyncDelivery = true").unwrap();
+        let err = cfg
+            .apply_switches(&switches(AbiFlavor::Jsi, false))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("jsi"), "{err}");
+    }
+
+    #[test]
+    fn async_delivery_rejects_napi_despite_its_player() {
+        // Napi's index initializes at module load, where nothing can await.
+        let mut cfg: TsConfig = toml::from_str("asyncDelivery = true").unwrap();
+        let err = cfg
+            .apply_switches(&switches(AbiFlavor::Napi, false))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("napi"), "{err}");
+    }
+
+    #[test]
+    fn cli_async_switch_is_rejected_on_napi_too() {
+        let mut cfg: TsConfig = toml::from_str("").unwrap();
+        let err = cfg
+            .apply_switches(&switches(AbiFlavor::Napi, true))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("napi"), "{err}");
+    }
+
+    #[test]
+    fn no_switch_leaves_config_alone() {
+        let mut cfg: TsConfig = toml::from_str("forceAsync = [\"Widget\"]").unwrap();
+        cfg.apply_switches(&switches(AbiFlavor::Jsi, false))
+            .unwrap();
+        assert!(!cfg.async_delivery);
+        assert!(cfg.force_async.is_forced("Widget"));
+        assert!(!cfg.force_async.is_forced("Other"));
     }
 }

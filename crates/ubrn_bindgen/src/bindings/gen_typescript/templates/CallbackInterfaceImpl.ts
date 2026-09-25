@@ -2,7 +2,7 @@
 {%- macro callback_interface_impl(vtable, ffi_converter_name, trait_impl) %}
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
-const {{ trait_impl }}: { vtable: any; register: () => void; } = {
+const {{ trait_impl }}: { vtable: any; register: () => {% if module.async_delivery %}Promise<void>{% else %}void{% endif %}; } = {
     // Create the VTable using a series of closures.
     // ts automatically converts these into C callback functions.
     vtable: {
@@ -144,7 +144,8 @@ const {{ trait_impl }}: { vtable: any; register: () => void; } = {
         }
     },
     register: () => {
-        {%- call cb::native_method_handle(vtable.ffi_init_fn) %}(
+        {#- Under async delivery the init call is the player's promise, which the async initializer awaits. -#}
+        {%- if module.async_delivery %}return {% endif %}{%- call cb::native_method_handle(vtable.ffi_init_fn) %}(
             {{ trait_impl }}.vtable
         );
     },

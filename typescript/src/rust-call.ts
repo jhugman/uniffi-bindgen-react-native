@@ -19,6 +19,24 @@ export type UniffiRustCallStatus = {
   code: number;
   errorBuf?: UniffiByteArray;
 };
+
+/**
+ * Drop the result of a call nothing is waiting on.
+ *
+ * A player over a port answers even a void call with a promise; a closed
+ * channel rejects it, and nothing else would hear it.
+ */
+export function uniffiIgnoreVoidResult(
+  result: unknown,
+  what: string,
+  onFulfilled?: (value: any) => void,
+): void {
+  if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+    (result as Promise<any>).then(onFulfilled, (e: unknown) =>
+      console.error(`${what} failed`, e),
+    );
+  }
+}
 export class UniffiRustCaller<Status extends UniffiRustCallStatus> {
   constructor(private statusConstructor: () => Status) {}
 
@@ -58,6 +76,35 @@ export class UniffiRustCaller<Status extends UniffiRustCallStatus> {
     uniffiCheckCallStatus(callStatus, liftString, errorHandler);
     return returnedVal;
   }
+
+  // The async twins exist for players that answer over a message port: the
+  // status object is filled in when the reply lands, so it is checked after
+  // the caller's promise resolves rather than after it returns.
+  rustCallAsync<T>(
+    caller: AsyncRustCallFn<Status, T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): Promise<T> {
+    return this.makeRustCallAsync(caller, liftString);
+  }
+
+  rustCallWithErrorAsync<T>(
+    errorHandler: UniffiErrorHandler,
+    caller: AsyncRustCallFn<Status, T>,
+    liftString: StringLifter = emptyStringLifter,
+  ): Promise<T> {
+    return this.makeRustCallAsync(caller, liftString, errorHandler);
+  }
+
+  async makeRustCallAsync<T>(
+    caller: AsyncRustCallFn<Status, T>,
+    liftString: StringLifter,
+    errorHandler?: UniffiErrorHandler,
+  ): Promise<T> {
+    const callStatus = this.statusConstructor();
+    const returnedVal = await caller(callStatus);
+    uniffiCheckCallStatus(callStatus, liftString, errorHandler);
+    return returnedVal;
+  }
 }
 
 function uniffiCreateCallStatus(): UniffiRustCallStatus {
@@ -66,6 +113,7 @@ function uniffiCreateCallStatus(): UniffiRustCallStatus {
 
 export type UniffiErrorHandler = (buffer: UniffiByteArray) => Error;
 type RustCallFn<S, T> = (status: S) => T;
+type AsyncRustCallFn<S, T> = (status: S) => T | Promise<T>;
 
 function uniffiCheckCallStatus(
   callStatus: UniffiRustCallStatus,

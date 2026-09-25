@@ -68,6 +68,8 @@ const DEFINITIONS = {
   },
 }{% if module.host_source == PlayerHostSource::WasmCore %} satisfies ModuleDefinitions{% endif %};
 
+{% if module.async_delivery %}// Async delivery: the player answers over a port, so every function below returns a Promise.
+{% endif -%}
 interface NativeModuleInterface {
     {%- for func in module.typed_functions %}
     {{ func.name }}(
@@ -75,7 +77,9 @@ interface NativeModuleInterface {
         {{- arg.name }}: {{ arg.type_name }}
         {%- if !loop.last %}, {% endif %}
       {%- endfor %}):
-      {%- match func.return_type %}{% when Some with (rt) %} {{ rt }}{% when None %} void{% endmatch %};
+      {%- if module.async_delivery %} Promise<{% else %} {% endif -%}
+      {%- match func.return_type %}{% when Some with (rt) %}{{ rt }}{% when None %}void{% endmatch %}
+      {%- if module.async_delivery %}>{% endif %};
   {%- endfor %}
     // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
     // and `nativeModule().rustbuffer_free(...)`. The runtime's registered

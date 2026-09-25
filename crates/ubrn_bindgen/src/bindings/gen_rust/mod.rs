@@ -820,6 +820,7 @@ mod unit_tests {
             &Config {},
             &SwitchArgs {
                 flavor: crate::AbiFlavor::Wasm,
+                async_delivery: false,
             },
         )
     }

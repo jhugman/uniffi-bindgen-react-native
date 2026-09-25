@@ -91,6 +91,9 @@ impl PlayerHostSource {
 pub(crate) struct PlayerFfiModule {
     /// Whether to suppress `@ts-nocheck` for strict type checking.
     pub strict_type_checking: bool,
+    /// Whether the player answers over a port, so the interface's functions
+    /// return `Promise<T>` instead of `T`.
+    pub async_delivery: bool,
     /// The crate name. For napi, passed to `resolveLibPath` so error messages
     /// name it. For wasm2, used to build the URL for the side-by-side `.wasm`
     /// file.
@@ -159,14 +162,17 @@ pub(crate) struct PlayerFieldDef {
 }
 
 impl PlayerFfiModule {
-    /// Construct a minimal `PlayerFfiModule` with empty collections and the
-    /// given flavor. Used by codegen snapshot tests to exercise the template
-    /// branches without needing to materialize a full `general::Namespace`.
+    /// Construct a minimal `PlayerFfiModule` with the given flavor: one typed
+    /// function, so the rendered interface has a return type to check, and
+    /// empty collections otherwise. Used by codegen snapshot tests to exercise
+    /// the template branches without needing to materialize a full
+    /// `general::Namespace`.
     #[doc(hidden)]
-    pub fn empty_for_test(flavor: crate::AbiFlavor) -> Self {
+    pub fn minimal_for_test(flavor: crate::AbiFlavor, async_delivery: bool) -> Self {
         let host_source = PlayerHostSource::for_flavor(&flavor);
         Self {
             strict_type_checking: true,
+            async_delivery,
             crate_name: "ubrn_test_crate".into(),
             lib_resolution: None,
             host_source,
@@ -178,7 +184,14 @@ impl PlayerFfiModule {
             functions: Vec::new(),
             callbacks: Vec::new(),
             structs: Vec::new(),
-            typed_functions: Vec::new(),
+            typed_functions: vec![super::super::ffi_module::FfiFunctionDecl {
+                name: "ubrn_uniffi_test_fn_func_add".into(),
+                arguments: vec![super::super::ffi_module::FfiArgDecl {
+                    name: "lhs".into(),
+                    type_name: "number".into(),
+                }],
+                return_type: Some("number".into()),
+            }],
             typed_definitions: Vec::new(),
         }
     }

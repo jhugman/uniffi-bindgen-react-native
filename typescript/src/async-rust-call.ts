@@ -10,6 +10,7 @@ import {
   type UniffiErrorHandler,
   type UniffiRustCallStatus,
   UniffiRustCaller,
+  uniffiIgnoreVoidResult,
 } from "./rust-call.ts";
 
 const UNIFFI_RUST_FUTURE_POLL_READY = 0;
@@ -33,7 +34,7 @@ type PollFunc = (
   rustFuture: bigint,
   cb: UniffiRustFutureContinuationCallback,
   handle: UniffiHandle,
-) => void;
+) => void | Promise<void>;
 
 /**
  * This method calls an asynchronous method on the Rust side.
@@ -52,11 +53,11 @@ type PollFunc = (
  */
 export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   rustCaller: UniffiRustCaller<S>,
-  rustFutureFunc: () => bigint,
+  rustFutureFunc: () => bigint | Promise<bigint>,
   pollFunc: PollFunc,
-  cancelFunc: (rustFuture: bigint) => void,
-  completeFunc: (rustFuture: bigint, status: S) => F,
-  freeFunc: (rustFuture: bigint) => void,
+  cancelFunc: (rustFuture: bigint) => void | Promise<void>,
+  completeFunc: (rustFuture: bigint, status: S) => F | Promise<F>,
+  freeFunc: (rustFuture: bigint) => void | Promise<void>,
   liftFunc: (lower: F) => T,
   liftString: (bytes: UniffiByteArray) => string,
   asyncOpts?: { signal: AbortSignal },
@@ -74,8 +75,8 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
     return Promise.reject(new UniffiInternalError.AbortError());
   }
 
-  // This actually calls into the client rust method.
-  const rustFuture = rustFutureFunc();
+  // A player over a port answers with a promise; a local one with the handle.
+  const rustFuture = await rustFutureFunc();
 
   const abortFunc = createAbortFunction(rustFuture, cancelFunc);
   asyncOpts?.signal.addEventListener("abort", abortFunc);
@@ -96,18 +97,28 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
+    // Events don't replay, so no listener catches an abort that landed during
+    // the await above; the flag does, and inside the try a throwing cancelFunc
+    // still frees the future via the `finally` below.
+    if (asyncOpts?.signal.aborted) {
+      abortFunc();
+    }
+
     let pollResult: number | undefined;
     do {
       // Calling pollFunc with a callback that resolves the promise that pollRust
       // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
       pollResult = await pollRust((handle) => {
-        pollFunc(rustFuture, uniffiFutureContinuationCallback, handle);
+        uniffiIgnoreVoidResult(
+          pollFunc(rustFuture, uniffiFutureContinuationCallback, handle),
+          "rust future poll",
+        );
       });
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
 
     // Now it's ready, all we need to do is pick up the result (and error).
     return liftFunc(
-      rustCaller.makeRustCall(
+      await rustCaller.makeRustCallAsync(
         (status) => completeFunc(rustFuture, status),
         liftString,
         errorHandler,
@@ -118,7 +129,7 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
     // We remove the abortFunc now so we don't trigger a use-after-free
     // panic.
     asyncOpts?.signal.removeEventListener("abort", abortFunc);
-    freeFunc(rustFuture);
+    uniffiIgnoreVoidResult(freeFunc(rustFuture), "rust future free");
   }
 }
 
@@ -141,12 +152,14 @@ async function pollRust(
 
 function createAbortFunction(
   rustFuture: bigint,
-  cancelFunc: (rustFuture: bigint) => void,
+  cancelFunc: (rustFuture: bigint) => void | Promise<void>,
 ): () => void {
   // We don't do anything other than call cancel.
   // This will cause pollFunc to come back with a POLL_READY,
   // then the makeRustCall will throw an AbortError.
-  return () => cancelFunc(rustFuture);
+  return () => {
+    uniffiIgnoreVoidResult(cancelFunc(rustFuture), "rust future cancel");
+  };
 }
 
 // Rust calls this callback, which resolves the promise returned by pollRust.

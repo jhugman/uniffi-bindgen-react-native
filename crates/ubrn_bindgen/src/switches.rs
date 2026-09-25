@@ -11,12 +11,19 @@ pub struct SwitchArgs {
     /// The flavor of bindings to produce.
     #[clap(long, default_value = "jsi")]
     pub flavor: AbiFlavor,
+
+    /// Generate call bodies that `await` the player, for a player that
+    /// answers over a message port. Same as `asyncDelivery = true` in
+    /// `uniffi.toml`, and overrides it.
+    #[clap(long = "async")]
+    pub async_delivery: bool,
 }
 
 impl Default for SwitchArgs {
     fn default() -> Self {
         Self {
             flavor: AbiFlavor::Jsi,
+            async_delivery: false,
         }
     }
 }
@@ -142,6 +149,30 @@ impl AbiFlavor {
         #[cfg(not(feature = "wasm"))]
         {
             matches!(self, Self::Napi | Self::Jsi2)
+        }
+    }
+
+    /// Whether the generated code can `await` the player everywhere it calls it:
+    /// only a player can sit behind a port, nothing awaits at module load, and
+    /// the `TextEncoder`-less and `FinalizationRegistry`-less branches of
+    /// `StringHelperTemplate.ts` and `ObjectTemplate.ts` call it synchronously.
+    pub fn supports_async_delivery(&self) -> bool {
+        self.supports_player()
+            && !self.supports_sync_initialization()
+            && self.supports_text_encoder()
+            && self.supports_finalization_registry()
+    }
+
+    /// The `--flavor` spelling, for error messages.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Jsi => "jsi",
+            Self::Jsi2 => "jsi2",
+            Self::Napi => "napi",
+            #[cfg(feature = "wasm")]
+            Self::Wasm => "wasm",
+            #[cfg(feature = "wasm")]
+            Self::Wasm2 => "wasm2",
         }
     }
 
