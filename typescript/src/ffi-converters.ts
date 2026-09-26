@@ -352,6 +352,8 @@ type StringConverter = {
 export function uniffiCreateFfiConverterString(
   converter: StringConverter,
 ): FfiConverter<UniffiByteArray, string> {
+  // Generated calls pass `lift` and `lower` unbound, to avoid a `bind` per
+  // call, so these methods must not use `this`.
   class FFIConverter implements FfiConverter<UniffiByteArray, string> {
     lift(value: UniffiByteArray): string {
       return converter.bytesToString(value);
