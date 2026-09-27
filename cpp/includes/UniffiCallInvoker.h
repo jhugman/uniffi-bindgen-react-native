@@ -61,12 +61,7 @@ public:
     } else {
       std::promise<void> promise;
       auto future = promise.get_future();
-      // The runtime argument was added to CallFunc in
-      // https://github.com/facebook/react-native/pull/43375
-      //
-      // This can be changed once that change is released.
-      // react::CallFunc wrapper = [&func, &promise](jsi::Runtime &rt) {
-      std::function<void()> wrapper = [&func, &promise, &rt]() {
+      react::CallFunc wrapper = [&func, &promise](jsi::Runtime &rt) {
         func(rt);
         promise.set_value();
       };
@@ -79,9 +74,8 @@ public:
    * Invokes the given function on the JS thread, by adding to
    * the event queue.
    */
-  void invokeNonBlocking(jsi::Runtime &rt, UniffiCallFunc func) {
-    // react::CallFunc wrapper = [func](jsi::Runtime &rt) {
-    std::function<void()> wrapper = [func, &rt]() { func(rt); };
+  void invokeNonBlocking(jsi::Runtime &, UniffiCallFunc func) {
+    react::CallFunc wrapper = [func](jsi::Runtime &rt) { func(rt); };
     callInvoker_->invokeAsync(std::move(wrapper));
   }
 };
