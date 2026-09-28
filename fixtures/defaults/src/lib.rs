@@ -206,4 +206,31 @@ pub fn echo_set_defaults(value: SetDefaults) -> SetDefaults {
     value
 }
 
+// Regression test: a crate type named `Cursor` must not collide with the
+// generated module's import of the runtime's own `Cursor` class. This one
+// is a plain `String` wrapper and should come out as `string` in the
+// generated bindings, both as a record field and as a function arg/return.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Cursor(pub String);
+
+uniffi::custom_type!(Cursor, String, {
+    try_lift: |val| Ok(Cursor(val)),
+    lower: |obj| obj.0,
+});
+
+#[derive(uniffi::Record, Debug, PartialEq, Eq, Clone)]
+pub struct CursorHolder {
+    pub cursor: Cursor,
+}
+
+#[uniffi::export]
+pub fn echo_cursor(value: Cursor) -> Cursor {
+    value
+}
+
+#[uniffi::export]
+pub fn echo_cursor_holder(value: CursorHolder) -> CursorHolder {
+    value
+}
+
 uniffi::setup_scaffolding!();
