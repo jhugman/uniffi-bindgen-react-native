@@ -19,6 +19,8 @@ import theModule, {
   echoBareRecordArg,
   echoBool,
   echoColor,
+  echoCursor,
+  echoCursorHolder,
   echoI32,
   echoOptionNone,
   echoOptionSome,
@@ -162,4 +164,17 @@ test("trait method default (callback from JS)", (t) => {
     },
   };
   t.assertEqual("0007", useFormatter(f));
+});
+
+// Regression test: a crate type named `Cursor` must not collide with the
+// generated module's import of the runtime's own `Cursor` class. It is a
+// plain `String` wrapper, so every value below is a `string`, plain
+// literals go in, and the same literals come back out.
+test("Cursor custom type does not collide with the runtime's Cursor class", (t) => {
+  const cursor: string = echoCursor("a-cursor");
+  t.assertEqual("a-cursor", cursor);
+
+  const holder = echoCursorHolder({ cursor: "in-a-holder" });
+  const holderCursor: string = holder.cursor;
+  t.assertEqual("in-a-holder", holderCursor);
 });

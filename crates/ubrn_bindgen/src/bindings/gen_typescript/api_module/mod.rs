@@ -86,6 +86,14 @@ impl ImportAccumulator {
             .insert(ImportedItem::Type(name.into()));
     }
 
+    /// The runtime's `Cursor` class, which the converters name only in type position. It is
+    /// imported as `UniffiCursor` so that a Rust type called `Cursor` does not collide with it:
+    /// both would otherwise share one name in the generated module, and every `Cursor` in that
+    /// module, the user's type included, would resolve to the runtime class.
+    pub fn add_runtime_cursor(&mut self) {
+        self.add_infra_type("Cursor as UniffiCursor");
+    }
+
     pub fn add_ext_value(&mut self, name: &str, namespace: &str) {
         self.imports
             .entry(format!("./{namespace}"))
@@ -175,7 +183,7 @@ impl ImportAccumulator {
     fn collect_custom(&mut self, c: &TsCustomType) {
         self.add_infra_type("FfiConverter");
         self.add_infra_type("RustBufferAllocator");
-        self.add_infra_value("Cursor");
+        self.add_runtime_cursor();
         self.add_infra_value("uniffiTypeNameSymbol");
         if let Some(cfg) = &c.custom_config {
             for (name, from) in &cfg.imports {
@@ -196,7 +204,7 @@ impl ImportAccumulator {
 
     fn collect_enum(&mut self, e: &TsEnum) {
         self.add_infra_value("AbstractFfiConverterByteArray");
-        self.add_infra_value("Cursor");
+        self.add_runtime_cursor();
         self.add_infra_value("UniffiInternalError");
         if !e.is_flat {
             self.add_infra_value("uniffiTypeNameSymbol");
@@ -228,7 +236,7 @@ impl ImportAccumulator {
     fn collect_record(&mut self, r: &TsRecord) {
         self.add_infra_value("uniffiCreateRecord");
         self.add_infra_value("AbstractFfiConverterByteArray");
-        self.add_infra_value("Cursor");
+        self.add_runtime_cursor();
         self.add_exported_converter(&r.ffi_converter_name);
 
         if r.has_callables() {
