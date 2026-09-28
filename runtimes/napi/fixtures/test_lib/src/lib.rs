@@ -973,3 +973,137 @@ pub extern "C" fn uniffi_test_fn_call_buffer_returning_callback(
     free_buffer(rb);
     len
 }
+
+// --- A callback made while holding a lock the JS thread also takes ---
+//
+// Models uniffi's rust_future continuation: uniffi invokes it while holding the
+// future's scheduler mutex, and the JS thread, inside rust_future_poll, may be
+// waiting on that same mutex. A callback with nothing to hand back must not
+// make its thread wait for the JS thread, or the two block on each other.
+
+static SCHEDULER_LOCK: Mutex<()> = Mutex::new(());
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_notify_from_thread_holding_lock(
+    handle: u64,
+    status: &mut RustCallStatus,
+) {
+    status.code = 0;
+    let notify = STORED_NOTIFY_VTABLE
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|vt| vt.notify);
+    let Some(notify) = notify else {
+        return;
+    };
+    let (locked_tx, locked_rx) = std::sync::mpsc::sync_channel(0);
+    std::thread::spawn(move || {
+        let _held = SCHEDULER_LOCK.lock().unwrap();
+        locked_tx.send(()).unwrap();
+        (notify)(handle);
+    });
+    // Return once the thread holds the lock, so the caller's next call contends.
+    locked_rx.recv().unwrap();
+}
+
+/// 1 if the lock was taken within `timeout_ms`, else 0.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_try_lock_within(
+    timeout_ms: u32,
+    status: &mut RustCallStatus,
+) -> i8 {
+    status.code = 0;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64);
+    loop {
+        if !matches!(
+            SCHEDULER_LOCK.try_lock(),
+            Err(std::sync::TryLockError::WouldBlock)
+        ) {
+            return 1;
+        }
+        if std::time::Instant::now() >= deadline {
+            return 0;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+// --- Cross-thread callbacks that must still wait for the JS thread ---
+//
+// A void callback with a RustCallStatus, and an out-return callback without
+// one, both have the JS thread write into the caller's frame.
+
+#[repr(C)]
+pub struct WaitingVTable {
+    pub report: extern "C" fn(u64, &mut RustCallStatus),
+    pub produce: extern "C" fn(u64, &mut u32),
+}
+
+static STORED_WAITING_VTABLE: Mutex<Option<WaitingVTable>> = Mutex::new(None);
+static WAITING_THREAD_RESULT: AtomicI32 = AtomicI32::new(0);
+static WAITING_THREAD_DONE: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_init_waiting_vtable(
+    vtable: &WaitingVTable,
+    status: &mut RustCallStatus,
+) {
+    status.code = 0;
+    *STORED_WAITING_VTABLE.lock().unwrap() = Some(WaitingVTable {
+        report: vtable.report,
+        produce: vtable.produce,
+    });
+}
+
+/// The status code `report` wrote, observed on another thread.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_report_from_thread(handle: u64, status: &mut RustCallStatus) {
+    status.code = 0;
+    WAITING_THREAD_DONE.store(false, Ordering::SeqCst);
+    let report = STORED_WAITING_VTABLE
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|vt| vt.report);
+    if let Some(report) = report {
+        std::thread::spawn(move || {
+            let mut cb_status = new_cb_status();
+            (report)(handle, &mut cb_status);
+            WAITING_THREAD_RESULT.store(cb_status.code as i32, Ordering::SeqCst);
+            WAITING_THREAD_DONE.store(true, Ordering::SeqCst);
+        });
+    }
+}
+
+/// The value `produce` wrote through its out-pointer, observed on another thread.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_produce_from_thread(handle: u64, status: &mut RustCallStatus) {
+    status.code = 0;
+    WAITING_THREAD_DONE.store(false, Ordering::SeqCst);
+    let produce = STORED_WAITING_VTABLE
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|vt| vt.produce);
+    if let Some(produce) = produce {
+        std::thread::spawn(move || {
+            let mut out: u32 = 0;
+            (produce)(handle, &mut out);
+            WAITING_THREAD_RESULT.store(out as i32, Ordering::SeqCst);
+            WAITING_THREAD_DONE.store(true, Ordering::SeqCst);
+        });
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_is_waiting_thread_done(status: &mut RustCallStatus) -> i8 {
+    status.code = 0;
+    WAITING_THREAD_DONE.load(Ordering::SeqCst) as i8
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_get_waiting_thread_result(status: &mut RustCallStatus) -> i32 {
+    status.code = 0;
+    WAITING_THREAD_RESULT.load(Ordering::SeqCst)
+}
