@@ -82,7 +82,7 @@ export const {{ rec.ts_name }} = (() => {
 const {{ rec.ffi_converter_name }} = (() => {
     type TypeName = {{ rec.ts_name }};
     class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
-        readFromCursor(c: Cursor): TypeName {
+        readFromCursor(c: UniffiCursor): TypeName {
             return {
             {%- for field in rec.fields %}
                 {{ field.name }}: {{ field.ffi_converter }}.readFromCursor(c)
@@ -90,7 +90,7 @@ const {{ rec.ffi_converter_name }} = (() => {
             {%- endfor %}
             };
         }
-        writeIntoCursor(value: TypeName, c: Cursor): void {
+        writeIntoCursor(value: TypeName, c: UniffiCursor): void {
             {%- for field in rec.fields %}
             {{ field.ffi_converter }}.writeIntoCursor(value.{{ field.name }}, c);
             {%- endfor %}
