@@ -40,6 +40,7 @@ pub(crate) fn generate_index_code(
     wasm_stem: String,
     has_wasm_bindgen_glue: bool,
     strict_type_checking: bool,
+    async_delivery: bool,
 ) -> Result<String> {
     IndexTsWrapper {
         modules,
@@ -47,6 +48,7 @@ pub(crate) fn generate_index_code(
         wasm_stem,
         has_wasm_bindgen_glue,
         strict_type_checking,
+        async_delivery,
     }
     .render()
     .context("generating index.ts from IR failed")
@@ -107,6 +109,9 @@ struct IndexTsWrapper {
     has_wasm_bindgen_glue: bool,
     /// Drops the `@ts-nocheck` header; set only when every namespace opts in.
     strict_type_checking: bool,
+    /// A namespace delivering over a port has a promise-returning
+    /// `initialize()`, so the index awaits it.
+    async_delivery: bool,
 }
 
 /// Test-only entry point: render the player lowlevel TS wrapper for a
@@ -114,7 +119,11 @@ struct IndexTsWrapper {
 /// integration tests to assert template branching without standing up a
 /// full `general::Namespace`.
 #[doc(hidden)]
-pub fn render_player_lowlevel_for_test(flavor: &crate::AbiFlavor) -> Result<String> {
-    let module = ffi_module_player::PlayerFfiModule::empty_for_test(flavor.clone());
+pub fn render_player_lowlevel_for_test(
+    flavor: &crate::AbiFlavor,
+    async_delivery: bool,
+) -> Result<String> {
+    let module =
+        ffi_module_player::PlayerFfiModule::minimal_for_test(flavor.clone(), async_delivery);
     generate_player_lowlevel_code(module)
 }
