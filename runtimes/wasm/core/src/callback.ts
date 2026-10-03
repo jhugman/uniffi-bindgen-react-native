@@ -19,6 +19,8 @@
 
 import type { FfiTypeDesc } from "./ffi-type.js";
 import type { Memory } from "./memory.js";
+import { type CallbackDef } from "@ubjs/core";
+export type { CallbackDef };
 import {
   RUST_BUFFER_SIZE,
   readRustBuffer,
@@ -341,13 +343,6 @@ function tagFor(t: FfiTypeDesc): number {
       // handled separately by `signatureKey`/`buildDescriptor`.)
       return TAG_I32;
   }
-}
-
-export interface CallbackDef {
-  args: FfiTypeDesc[];
-  ret: FfiTypeDesc;
-  hasRustCallStatus: boolean;
-  outReturn?: boolean;
 }
 
 interface ShapeCache {
