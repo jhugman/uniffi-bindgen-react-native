@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { FfiType } from "../src/ffi-type.js";
+import { FfiType as CoreFfiType, type ModuleDefinitions } from "@ubjs/core";
 
 test("scalar tags are stable references", () => {
   assert.strictEqual(FfiType.UInt32.tag, "UInt32");
@@ -30,4 +31,20 @@ test("Reference / MutReference / Struct builders compose", () => {
     tag: "MutReference",
     inner: FfiType.UInt8,
   });
+});
+
+test("FfiType and the table types come from @ubjs/core", () => {
+  // Same object: the wasm runtime re-exports, it does not redefine.
+  assert.strictEqual(FfiType, CoreFfiType);
+  const defs: ModuleDefinitions = {
+    symbols: {
+      rustbuffer_alloc: "a",
+      rustbuffer_free: "f",
+      rustbuffer_from_bytes: "b",
+    },
+    functions: {},
+    callbacks: {},
+    structs: {},
+  };
+  assert.ok(defs);
 });
