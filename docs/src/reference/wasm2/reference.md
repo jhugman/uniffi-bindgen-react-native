@@ -272,7 +272,7 @@ impl ReceiptStore {
 const total = await store.totalForMonth(3);
 ```
 
-The player registers the continuation as a wasm function and hands Rust its index in the module's function table; Rust calls it when the future can make progress. Each poll resolves one promise, and the loop runs until the future reports ready.
+The player registers the continuation as a wasm function and hands Rust its index in the module's function table; Rust calls it when the future can make progress. Each poll resolves one promise, and the loop runs until the future reports ready. Behind a `@ubjs/worker` receiver the worker re-polls a future that reports `MAYBE_READY` itself, on a microtask, so a wake is never separated from its next poll by a message round trip (an IndexedDB transaction would auto-commit in that gap); the page sees one continuation per await.
 
 Cancellation rides on `AbortSignal` where the Rust API supports it:
 

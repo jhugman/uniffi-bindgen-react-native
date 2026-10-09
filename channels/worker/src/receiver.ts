@@ -29,6 +29,10 @@ import {
 import { tagHandle, untagHandle } from "./handles.js";
 import type { Receiver, RegisteredPlayer } from "./types.js";
 
+// The callback type uniffi gives every `rust_future_poll_*` continuation.
+const RUST_FUTURE_CONTINUATION = "RustFutureContinuationCallback";
+const RUST_FUTURE_POLL_MAYBE_READY = 1;
+
 export interface ReceiverOptions {
   portId?: number;
 }
@@ -142,6 +146,7 @@ export class ReceiverCore {
       const plan = this.plan.functions.get(msg.fn);
       if (!plan) throw new Error(`worker: unknown function "${msg.fn}"`);
       const args = plan.args.map((p, i) => this.inboundArg(p, msg.args[i]));
+      this.driveFutureLocally(msg.fn, plan.args, args);
       let status: { code: number; errorBuf?: Uint8Array } | undefined;
       if (plan.hasRustCallStatus) {
         status = { code: 0 };
@@ -218,6 +223,31 @@ export class ReceiverCore {
         error: toWireError(e),
       });
     }
+  }
+
+  // A poll call carries UniFFI's continuation. Forwarding every wake to the
+  // client puts a message round trip between the wake and the next poll, and
+  // an IndexedDB transaction auto-commits in that gap. So the receiver polls
+  // again itself on a microtask while the future reports MAYBE_READY, and
+  // only READY reaches the client: one continuation per await, as uniffi's
+  // "not inside the callback, but soon after" rule requires.
+  private driveFutureLocally(
+    fn: string,
+    plans: ValuePlan[],
+    args: unknown[],
+  ): void {
+    const i = plans.findIndex(
+      (p) => p.kind === "callback" && p.name === RUST_FUTURE_CONTINUATION,
+    );
+    if (i < 0) return;
+    const forward = args[i] as (data: bigint, code: number) => void;
+    const cont = (data: bigint, code: number) => {
+      if (code !== RUST_FUTURE_POLL_MAYBE_READY) return forward(data, code);
+      queueMicrotask(() => {
+        if (!this.closed) this.player[fn](...args);
+      });
+    };
+    args[i] = cont;
   }
 
   private inboundArg(plan: ValuePlan, wire: unknown): unknown {
