@@ -255,7 +255,7 @@ const result = computation.value.toString();
 
 Next, we need to update the timing of App registration.
 
-We need to edit `example/input.js`:
+We need to edit `example/index.js`:
 
 ```diff
 import { AppRegistry } from 'react-native';
