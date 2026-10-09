@@ -302,7 +302,10 @@ export class UniffiNativeModule {
       alloc: this.alloc,
       free: this.free,
       installCallback: (fn, def) =>
-        this.callbacks.installCallbackFunction(fn, def),
+        this.callbacks.installCallbackFunction(fn, def, {
+          callbackDefs,
+          structs,
+        }),
       useJit,
     };
 
