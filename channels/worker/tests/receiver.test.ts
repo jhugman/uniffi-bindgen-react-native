@@ -242,6 +242,31 @@ test("an async method returns a local dropped-struct immediately and maps the cl
   port2.close();
 });
 
+test("a future woken MAYBE_READY is re-polled in the worker; the client hears one READY", async () => {
+  const { port1, port2 } = new MessageChannel();
+  const { player, state } = fakePlayer();
+  const r = createReceiver(DEFS, player, port1);
+  const s = senderSide(port2);
+  try {
+    // The continuation crosses as client callback id 7, the cookie as 42n.
+    s.post({
+      kind: "call",
+      id: 1,
+      fn: "rust_future_poll_u32",
+      args: [1n, 7, 42n],
+    });
+    assert.strictEqual((await s.next()).kind, "return");
+    const cb = (await s.next()) as any;
+    assert.strictEqual(cb.kind, "callback");
+    assert.strictEqual(cb.cb, 7);
+    assert.deepStrictEqual(cb.args, [42n, 0]);
+    assert.strictEqual(state.polls, 3);
+  } finally {
+    r.close();
+    port2.close();
+  }
+});
+
 test("a sync vtable method over an asynchronous port throws pointing at forceAsync", async () => {
   const { port1, port2 } = new MessageChannel();
   const { player } = fakePlayer();
