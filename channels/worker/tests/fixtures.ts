@@ -57,8 +57,23 @@ export const DEFS = {
       ret: FfiType.Void,
       hasRustCallStatus: false,
     },
+    // UniFFI's poll-style future ABI: (future, continuation, cookie).
+    rust_future_poll_u32: {
+      args: [
+        FfiType.Handle,
+        FfiType.Callback("RustFutureContinuationCallback"),
+        FfiType.Handle,
+      ],
+      ret: FfiType.Void,
+      hasRustCallStatus: false,
+    },
   },
   callbacks: {
+    RustFutureContinuationCallback: {
+      args: [FfiType.Handle, FfiType.Int8],
+      ret: FfiType.Void,
+      hasRustCallStatus: false,
+    },
     Free: {
       args: [FfiType.Handle],
       ret: FfiType.Void,
@@ -127,6 +142,8 @@ export function fakePlayer() {
     freed: [] as Uint8Array[],
     completions: [] as unknown[],
     dropped: undefined as any,
+    // Polls seen by rust_future_poll_u32; the future is ready on the third.
+    polls: 0,
   };
   const player: RegisteredPlayer = {
     rustbuffer_alloc: (n) => new Uint8Array(n),
@@ -172,6 +189,26 @@ export function fakePlayer() {
       state.vtable2.uniffi_free(h);
       state.vtable.uniffi_free(h);
       state.vtable.uniffi_free(h);
+    },
+    // Wakes the continuation from a later task, as an I/O event would, with
+    // MAYBE_READY (1) twice and then READY (0). uniffi forbids polling from
+    // inside the continuation, so a re-poll must not land while it runs.
+    rust_future_poll_u32: (
+      _future: bigint,
+      cont: (data: bigint, code: number) => void,
+      data: bigint,
+    ) => {
+      state.polls += 1;
+      const code = state.polls < 3 ? 1 : 0;
+      setImmediate(() => {
+        const before = state.polls;
+        cont(data, code);
+        assert.strictEqual(
+          state.polls,
+          before,
+          "re-polled inside the continuation",
+        );
+      });
     },
   };
   return { player, state };
