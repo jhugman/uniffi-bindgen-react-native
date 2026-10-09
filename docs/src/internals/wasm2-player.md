@@ -60,7 +60,7 @@ type FfiTypeDesc =
     | { tag: "MutReference"; inner: FfiTypeDesc };
 ```
 
-`Callback` and `Struct` name entries in the other two maps, so the table is self-contained. That is the whole interface between the bindgen and the runtime.
+`Callback` and `Struct` name entries in the other two maps, so the table is self-contained. That is the whole interface between the bindgen and the runtime; [The player `DEFINITIONS` table](player-definitions.md) specifies it field by field.
 
 The same shape already served the [Node.js target](../reference/nodejs.md), which drives a native `cdylib` through libffi from an equivalent table. `wasm2` is the second consumer, and the two share the bindgen's IR:
 

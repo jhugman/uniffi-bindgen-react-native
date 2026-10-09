@@ -157,6 +157,12 @@ jobs:
       - name: Run tests of generated WASM2 bindings
         run: "cargo test -- wasm2::"
 
+      - name: Run unit tests of @ubjs/worker
+        run: cd channels/worker && npm ci && npm test && npm run typecheck
+
+      - name: Run tests of generated WASM2 bindings through @ubjs/worker
+        run: "cargo test -- channel::"
+
       # Named separately: this test covers the CLI path a consuming project
       # runs rather than the fixture harness, so its name does not match the
       # `wasm2::` filter above. It is `#[ignore]`d so the workspace-wide

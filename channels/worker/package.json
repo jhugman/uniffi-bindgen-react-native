@@ -1,0 +1,34 @@
+{
+  "name": "@ubjs/worker",
+  "version": "0.31.0-5",
+  "description": "MessagePort channel that drives a uniffi-bindgen-react-native player from another JavaScript context.",
+  "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/uniffi-bindgen-react-native.git",
+    "directory": "channels/worker"
+  },
+  "license": "MPL-2.0",
+  "author": { "name": "James Hugman", "email": "james@hugman.tv" },
+  "keywords": ["uniffi", "ffi", "rust", "wasm", "worker", "messageport", "typescript"],
+  "type": "module",
+  "exports": {
+    ".": "./dist/src/index.js",
+    "./testing": "./dist/src/testing.js"
+  },
+  "files": ["dist/", "!dist/tsconfig.tsbuildinfo", "README.md"],
+  "scripts": {
+    "build": "tsc -b",
+    "prepare": "npm run build",
+    "test": "node --test --import tsx './tests/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.tests.json"
+  },
+  "peerDependencies": { "@ubjs/core": "^0.31.0-5" },
+  "devDependencies": {
+    "@ubjs/core": "file:../../typescript",
+    "@types/node": "^24",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "publishConfig": { "access": "public" }
+}
