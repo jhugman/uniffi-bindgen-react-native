@@ -36,6 +36,7 @@
     "abortcontroller-polyfill": "^1.7.5",
     "metro": "^0.80.8",
     "metro-core": "^0.80.8",
+    "pkg-pr-new": "^0.0.91",
     "prettier": "^3.2.5",
     "source-licenser": "^2.0.6",
     "tsc-alias": "^1.8.16",

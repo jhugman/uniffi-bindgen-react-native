@@ -1,0 +1,53 @@
+name: Preview packages
+
+# Publishes the TypeScript packages from the chosen branch to pkg.pr.new, so a
+# consumer can pin them by commit before they reach npm. Manual only: run it
+# from the Actions tab, picking the branch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install pkg-pr-new
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      # The other packages resolve `@ubjs/core` through `typescript/dist`.
+      - name: Build @ubjs/core
+        run: cd typescript && npm ci && npm run build
+
+      - name: Install @ubjs/wasm
+        run: cd runtimes/wasm && npm ci
+
+      - name: Install @ubjs/worker
+        if: hashFiles('channels/worker/package.json') != ''
+        run: cd channels/worker && npm ci
+
+      # pkg-pr-new skips a path that doesn't exist, so a branch without
+      # `channels/worker` publishes the other two.
+      - name: "📦 Publish to pkg.pr.new"
+        id: publish
+        run: yarn pkg-pr-new publish ./typescript ./runtimes/wasm ./channels/worker
+
+      # Yarn 2+ only treats a URL as a tarball when it ends in `.tgz`.
+      - name: List the install URLs
+        env:
+          PACKAGES: ${{ steps.publish.outputs.packages }}
+        run: |
+          {
+            echo "### Preview packages for \`$GITHUB_REF_NAME\`"
+            echo
+            for p in $PACKAGES; do
+              name="${p%%@https://*}"
+              echo "- \`$name\`: ${p#"$name@"}.tgz"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
