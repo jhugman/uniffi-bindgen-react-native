@@ -41,9 +41,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios-sim, x86_64-apple-ios
+      # The toolchain is pinned by rust-toolchain.toml; this adds targets to it.
+      - run: rustup target add aarch64-apple-ios-sim x86_64-apple-ios
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"

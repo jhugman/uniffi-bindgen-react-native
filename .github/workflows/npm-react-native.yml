@@ -43,10 +43,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+      # The toolchain is pinned by rust-toolchain.toml; this adds the target to it.
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
       - name: Install NDK and cargo-ndk
         if: contains(matrix.target, 'android')
         uses: nttld/setup-ndk@v1

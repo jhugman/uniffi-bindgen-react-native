@@ -1,0 +1,7 @@
+# CI and local builds share this toolchain, so new lints arrive with a
+# deliberate bump rather than a runner image update. napi-publish.yml needs
+# 1.97.1 for its aarch64 linker (see there); a bump past it moves that job too.
+[toolchain]
+channel = "1.97.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"
