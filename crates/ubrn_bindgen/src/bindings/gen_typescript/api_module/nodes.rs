@@ -140,6 +140,8 @@ pub(crate) struct TsCallable {
     /// `forceAsync` names this callable's owning type or function: give it an
     /// async signature over a synchronous FFI body.
     pub force_async: bool,
+    /// `asyncDelivery`: every call reaches the player over a port.
+    pub async_delivery: bool,
 }
 
 impl TsCallable {
@@ -154,6 +156,11 @@ impl TsCallable {
     /// async, and so does `forceAsync` — over an unchanged synchronous body.
     pub fn renders_async(&self) -> bool {
         self.ffi_async.is_some() || self.force_async
+    }
+    /// True when the call body hands back the FFI call. A void call does too
+    /// under async delivery: its status is only filled when the reply lands.
+    pub fn returns_from_ffi_call(&self) -> bool {
+        self.return_type.is_some() || self.async_delivery
     }
     pub fn is_throwing(&self) -> bool {
         self.throws.is_some()
