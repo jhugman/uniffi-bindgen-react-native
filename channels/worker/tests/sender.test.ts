@@ -388,6 +388,62 @@ test("a forwarder for a non-Void callback throws instead of forwarding", async (
   port2.close();
 });
 
+test("the port is ref'd only while a call is outstanding", async () => {
+  const { port1, port2 } = new MessageChannel();
+  const events: string[] = [];
+  // Wrap port1 so ref/unref calls are recorded; a real node MessagePort
+  // already has both, but the test needs to observe when they're called.
+  const port = {
+    postMessage: (m: unknown, t?: readonly unknown[]) =>
+      port1.postMessage(m, t as NodeTransferable[]),
+    addEventListener: (type: "message", l: (ev: any) => void) =>
+      port1.addEventListener(type, l),
+    removeEventListener: (type: "message", l: (ev: any) => void) =>
+      port1.removeEventListener(type, l),
+    start: () => port1.start(),
+    close: () => port1.close(),
+    ref: () => events.push("ref"),
+    unref: () => events.push("unref"),
+  };
+  const calls: Extract<ChannelMessage, { kind: "call" }>[] = [];
+  peer(port2, (m) => {
+    if (m.kind === "call") calls.push(m);
+  });
+  const s = createSender(DEFS, port);
+  try {
+    const p1 = s.add(1, 2, { code: 0 });
+    const p2 = s.add(3, 4, { code: 0 });
+    assert.deepStrictEqual(events, ["ref"]);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.strictEqual(calls.length, 2);
+    port2.postMessage({
+      kind: "return",
+      id: calls[0].id,
+      ok: true,
+      value: 3,
+      status: { code: 0 },
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(events, ["ref"]);
+    port2.postMessage({
+      kind: "return",
+      id: calls[1].id,
+      ok: true,
+      value: 7,
+      status: { code: 0 },
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(events, ["ref", "unref"]);
+    await p1;
+    await p2;
+  } finally {
+    // A failed assertion above must not leave a real MessagePort open and
+    // hanging the test process (unref bugs aside, ports here always close).
+    s.close();
+    port2.close();
+  }
+});
+
 test("AsyncPlayer types the return and the trailing status", () => {
   const { port1, port2 } = new MessageChannel();
   const s = createSender(DEFS, port1);

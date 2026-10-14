@@ -1846,6 +1846,7 @@ name = "ubrn_macros"
 version = "0.1.0"
 dependencies = [
  "glob",
+ "heck",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2220,6 +2221,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
