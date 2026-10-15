@@ -93,6 +93,45 @@ test("async method: completion and drop flow end to end", async () => {
   c.done();
 });
 
+test("two async futures in flight sharing one free: the client's free runs for both", async () => {
+  const c = pair();
+  const futures: any[] = [];
+  (c.player as any).start_async = (h: bigint) => {
+    futures.push(c.state.vtable.async_m(h, () => {}, 42n));
+  };
+  (c.player as any).drop_async = () => {
+    const f = futures.shift();
+    f.free(f.handle);
+  };
+  const clientFreed: bigint[] = [];
+  // Generated bindings hand every future the same free function.
+  const free = (h: bigint) => clientFreed.push(h);
+  let next = 70n;
+  const errors: string[] = [];
+  const orig = console.error;
+  console.error = (...a: unknown[]) => errors.push(a.join(" "));
+  try {
+    await c.sender.init_vtable({
+      uniffi_free: () => {},
+      uniffi_clone: (h: bigint) => h,
+      notify: () => {},
+      sync_m: () => ({ pointee: 1 }),
+      async_m: () => ({ handle: next++, free }),
+    });
+    await c.sender.start_async(5n);
+    await c.sender.start_async(6n);
+    await new Promise((r) => setTimeout(r, 10));
+    await c.sender.drop_async();
+    await c.sender.drop_async();
+    await new Promise((r) => setTimeout(r, 10));
+  } finally {
+    console.error = orig;
+    c.done();
+  }
+  assert.deepStrictEqual(errors, []);
+  assert.deepStrictEqual(clientFreed, [70n, 71n]);
+});
+
 test("a client callback that throws surfaces as a receiver-side console error, not a hang", async () => {
   const c = pair();
   const errors: string[] = [];
