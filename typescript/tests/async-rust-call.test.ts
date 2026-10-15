@@ -8,6 +8,7 @@ import { asyncTest } from "../testing/asserts";
 import {
   UniffiRustCaller,
   uniffiRustCallAsync,
+  uniffiRustFutureHandleCount,
   type UniffiRustCallStatus,
   type UniffiHandle,
 } from "../src/index";
@@ -138,4 +139,47 @@ const liftString = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
       t.end();
     },
   );
+
+  await asyncTest("a poll that rejects rejects the call", async (t) => {
+    const calls: string[] = [];
+    const consoleError = console.error;
+    console.error = () => {};
+    const handlesBefore = uniffiRustFutureHandleCount();
+    let outcome: string;
+    try {
+      const promise = uniffiRustCallAsync(
+        caller,
+        /*rustFutureFunc:*/ async () => BigInt(9),
+        // A player over a port answers a poll that trapped with a rejection,
+        // and never fires the continuation.
+        /*pollFunc:*/ () => Promise.reject(new Error("unreachable")),
+        /*cancelFunc:*/ () => {},
+        /*completeFunc:*/ async (rustFuture, status) => {
+          calls.push(`complete ${rustFuture}`);
+          status.code = 0;
+          return 1;
+        },
+        /*freeFunc:*/ (rustFuture) => {
+          calls.push(`free ${rustFuture}`);
+        },
+        /*liftFunc:*/ (n: number) => n,
+        liftString,
+      );
+      outcome = await Promise.race([
+        promise.then(
+          () => "resolved",
+          (e: any) => `rejected: ${e.message}`,
+        ),
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve("still pending"), 100),
+        ),
+      ]);
+    } finally {
+      console.error = consoleError;
+    }
+    t.assertEqual(outcome, "rejected: unreachable");
+    t.assertEqual(calls.join(","), "free 9");
+    t.assertEqual(uniffiRustFutureHandleCount(), handlesBefore);
+    t.end();
+  });
 })();
