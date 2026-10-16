@@ -8,6 +8,7 @@
 #include "Bridging.h"
 #include "UniffiCallInvoker.h"
 #include <jsi/jsi.h>
+#include <limits>
 
 namespace uniffi_jsi {
 using namespace facebook;
@@ -18,6 +19,10 @@ template <> struct Bridging<int8_t> {
                        const jsi::Value &value) {
     try {
       auto v = value.getNumber();
+      if (v < std::numeric_limits<int8_t>::min() ||
+          v > std::numeric_limits<int8_t>::max()) {
+        throw jsi::JSError(rt, "Value out of range for int8_t");
+      }
       return static_cast<int8_t>(v);
     } catch (const std::logic_error &e) {
       throw jsi::JSError(rt, e.what());
