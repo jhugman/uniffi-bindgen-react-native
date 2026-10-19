@@ -385,11 +385,7 @@ test("npmPackageBase: defaults to cargo when tripleStyle omitted", () => {
   });
   try {
     const libFile = platformLibFile();
-    buildSyntheticPackageNamed(
-      dir,
-      "@scope/foo-aarch64-apple-darwin",
-      libFile,
-    );
+    buildSyntheticPackageNamed(dir, "@scope/foo-aarch64-apple-darwin", libFile);
     const callerUrl = pathToFileURL(join(dir, "caller.js")).toString();
     resolveLibPath({
       crateName: "foo",
@@ -489,4 +485,109 @@ test("public API: lib.js re-exports resolveLibPath and ResolveLibPathError", asy
   }
   assert.equal(typeof lib.resolveLibPath, "function");
   assert.equal(typeof lib.ResolveLibPathError, "function");
+});
+
+/*
+ * Electron packages application code into an `app.asar` archive, with
+ * unpacked files written to a sibling `app.asar.unpacked` directory. `fs` is
+ * redirected into the archive, but `dlopen` is not, so a native library that
+ * is only present as an unpacked file has to be addressed by its on-disk path.
+ */
+
+/** Build `<root>/app.asar/...` and `<root>/app.asar.unpacked/...` fixtures. */
+function buildAsarFixture(rootDir, { withUnpacked = true } = {}) {
+  const asarDir = join(rootDir, "app.asar");
+  const unpackedDir = join(rootDir, "app.asar.unpacked");
+  mkdirSync(asarDir, { recursive: true });
+  writeFileSync(join(asarDir, "caller.js"), "");
+  if (withUnpacked) mkdirSync(unpackedDir, { recursive: true });
+  return { asarDir, unpackedDir };
+}
+
+test("colocated: library inside an app.asar resolves to the unpacked copy", () => {
+  const { dir, cleanup } = makeTempDir();
+  try {
+    const libFile = platformLibFile();
+    const { asarDir, unpackedDir } = buildAsarFixture(dir);
+    const unpackedLib = join(unpackedDir, libFile);
+    writeFileSync(unpackedLib, "");
+
+    const got = resolveLibPath({
+      crateName: "foo",
+      callerUrl: pathToFileURL(join(asarDir, "caller.js")).toString(),
+    });
+    assert.equal(got, unpackedLib);
+  } finally {
+    cleanup();
+  }
+});
+
+test("colocated: app.asar path without an unpacked counterpart is left alone", () => {
+  const { dir, cleanup } = makeTempDir();
+  try {
+    const libFile = platformLibFile();
+    const { asarDir } = buildAsarFixture(dir, { withUnpacked: false });
+    const inArchive = join(asarDir, libFile);
+    writeFileSync(inArchive, "");
+
+    const got = resolveLibPath({
+      crateName: "foo",
+      callerUrl: pathToFileURL(join(asarDir, "caller.js")).toString(),
+    });
+    assert.equal(got, inArchive);
+  } finally {
+    cleanup();
+  }
+});
+
+test("npmPackageBase: platform package inside an app.asar resolves to the unpacked copy", () => {
+  const { dir, cleanup } = makeTempDir();
+  const restore = setDetectTripleForTesting(() => "darwin-arm64");
+  try {
+    const libFile = platformLibFile();
+    const { asarDir, unpackedDir } = buildAsarFixture(dir);
+
+    // The package metadata lives in the archive; the native library is
+    // unpacked, exactly as electron-builder lays it out.
+    const pkgName = "@scope/foo-darwin-arm64";
+    const archivedPkg = join(asarDir, "node_modules", pkgName);
+    mkdirSync(archivedPkg, { recursive: true });
+    writeFileSync(
+      join(archivedPkg, "package.json"),
+      JSON.stringify({ name: pkgName, version: "0.0.0" }),
+    );
+    const unpackedPkg = join(unpackedDir, "node_modules", pkgName);
+    mkdirSync(unpackedPkg, { recursive: true });
+    writeFileSync(join(unpackedPkg, libFile), "");
+
+    const got = resolveLibPath({
+      crateName: "foo",
+      callerUrl: pathToFileURL(join(asarDir, "caller.js")).toString(),
+      npmPackageBase: "@scope/foo-",
+      tripleStyle: "node",
+    });
+    assert.equal(got, join(realpathSync(unpackedPkg), libFile));
+  } finally {
+    setDetectTripleForTesting(restore);
+    cleanup();
+  }
+});
+
+test("override: path inside an app.asar resolves to the unpacked copy", () => {
+  const { dir, cleanup } = makeTempDir();
+  try {
+    const libFile = platformLibFile();
+    const { asarDir, unpackedDir } = buildAsarFixture(dir);
+    const unpackedLib = join(unpackedDir, libFile);
+    writeFileSync(unpackedLib, "");
+
+    const got = resolveLibPath({
+      crateName: "foo",
+      callerUrl: pathToFileURL(join(asarDir, "caller.js")).toString(),
+      override: join(asarDir, libFile),
+    });
+    assert.equal(got, unpackedLib);
+  } finally {
+    cleanup();
+  }
 });
