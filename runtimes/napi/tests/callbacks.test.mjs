@@ -297,6 +297,152 @@ test("VTable: non-blocking callback invoked from another thread (fire-and-forget
   assert.strictEqual(notifiedHandle, 42n);
 });
 
+// uniffi calls a rust_future continuation while holding the future's scheduler
+// mutex, and the JS thread may be waiting on that mutex inside rust_future_poll.
+test("VTable: a void callback from a thread holding a lock does not wait for the JS thread", async () => {
+  const lib = openLib();
+  let notifiedHandle = null;
+
+  const nm = lib.register({
+    symbols: SYMBOLS,
+    structs: {
+      NotifyVTable: [
+        { name: "notify", type: FfiType.Callback("vtable_notify") },
+      ],
+    },
+    callbacks: {
+      vtable_notify: {
+        args: [FfiType.UInt64],
+        ret: FfiType.Void,
+        hasRustCallStatus: false,
+      },
+    },
+    functions: {
+      uniffi_test_fn_init_notify_vtable: {
+        args: [FfiType.Reference(FfiType.Struct("NotifyVTable"))],
+        ret: FfiType.Void,
+        hasRustCallStatus: true,
+      },
+      uniffi_test_fn_notify_from_thread_holding_lock: {
+        args: [FfiType.UInt64],
+        ret: FfiType.Void,
+        hasRustCallStatus: true,
+      },
+      uniffi_test_fn_try_lock_within: {
+        args: [FfiType.UInt32],
+        ret: FfiType.Int8,
+        hasRustCallStatus: true,
+      },
+    },
+  });
+
+  nm.uniffi_test_fn_init_notify_vtable(
+    {
+      notify: (handle) => {
+        notifiedHandle = handle;
+      },
+    },
+    { code: 0 },
+  );
+
+  // Returns once the other thread holds the lock and is calling notify.
+  nm.uniffi_test_fn_notify_from_thread_holding_lock(42n, { code: 0 });
+
+  // Still on the JS thread, without yielding: the lock is only free if that
+  // thread did not wait for the JS thread to run notify.
+  const acquired = nm.uniffi_test_fn_try_lock_within(2000, { code: 0 });
+  assert.strictEqual(acquired, 1, "the calling thread waited for the JS thread");
+
+  await pollUntil(
+    () => notifiedHandle !== null,
+    "Timed out waiting for the posted callback to run",
+  );
+  assert.strictEqual(notifiedHandle, 42n);
+});
+
+const WAITING_REGISTRATION = {
+  symbols: SYMBOLS,
+  structs: {
+    WaitingVTable: [
+      { name: "report", type: FfiType.Callback("vtable_report") },
+      { name: "produce", type: FfiType.Callback("vtable_produce") },
+    ],
+  },
+  callbacks: {
+    vtable_report: {
+      args: [FfiType.UInt64],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    vtable_produce: {
+      args: [FfiType.UInt64],
+      ret: FfiType.UInt32,
+      hasRustCallStatus: false,
+      outReturn: true,
+    },
+  },
+  functions: {
+    uniffi_test_fn_init_waiting_vtable: {
+      args: [FfiType.Reference(FfiType.Struct("WaitingVTable"))],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_test_fn_report_from_thread: {
+      args: [FfiType.UInt64],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_test_fn_produce_from_thread: {
+      args: [FfiType.UInt64],
+      ret: FfiType.Void,
+      hasRustCallStatus: true,
+    },
+    uniffi_test_fn_is_waiting_thread_done: {
+      args: [],
+      ret: FfiType.Int8,
+      hasRustCallStatus: true,
+    },
+    uniffi_test_fn_get_waiting_thread_result: {
+      args: [],
+      ret: FfiType.Int32,
+      hasRustCallStatus: true,
+    },
+  },
+};
+
+const WAITING_VTABLE_JS = {
+  report: (handle, callStatus) => {
+    callStatus.code = 2;
+  },
+  produce: (handle) => Number(handle) + 1,
+};
+
+test("VTable: a void callback with a RustCallStatus from another thread hands back its status", async () => {
+  const nm = openLib().register(WAITING_REGISTRATION);
+  nm.uniffi_test_fn_init_waiting_vtable(WAITING_VTABLE_JS, { code: 0 });
+
+  nm.uniffi_test_fn_report_from_thread(7n, { code: 0 });
+  await pollUntil(
+    () => nm.uniffi_test_fn_is_waiting_thread_done({ code: 0 }) === 1,
+    "Timed out waiting for the report callback",
+  );
+
+  assert.strictEqual(nm.uniffi_test_fn_get_waiting_thread_result({ code: 0 }), 2);
+});
+
+test("VTable: an out-return callback from another thread hands back its value", async () => {
+  const nm = openLib().register(WAITING_REGISTRATION);
+  nm.uniffi_test_fn_init_waiting_vtable(WAITING_VTABLE_JS, { code: 0 });
+
+  nm.uniffi_test_fn_produce_from_thread(41n, { code: 0 });
+  await pollUntil(
+    () => nm.uniffi_test_fn_is_waiting_thread_done({ code: 0 }) === 1,
+    "Timed out waiting for the produce callback",
+  );
+
+  assert.strictEqual(nm.uniffi_test_fn_get_waiting_thread_result({ code: 0 }), 42);
+});
+
 test("VTable: callback receives RustBuffer arg (same-thread)", () => {
   const lib = openLib();
   const nm = lib.register({
