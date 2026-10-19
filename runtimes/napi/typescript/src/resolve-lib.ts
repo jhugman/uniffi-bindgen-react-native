@@ -126,6 +126,34 @@ function libFileName(crateName: string, platform: NodeJS.Platform): string {
   return `lib${crateName}.${ext}`;
 }
 
+/**
+ * Matches an `app.asar` path segment, e.g. `/opt/app/app.asar/node_modules`.
+ *
+ * The trailing separator is required so that an already-unpacked path
+ * (`app.asar.unpacked`) is not rewritten a second time.
+ */
+const ASAR_SEGMENT = /(^|[\\/])app\.asar([\\/])/;
+
+/**
+ * Redirect a path that lands inside an Electron `app.asar` archive to the
+ * matching file in the sibling `app.asar.unpacked` directory.
+ *
+ * Electron packages application code into `app.asar`, and unpacked files are
+ * written to a sibling `app.asar.unpacked` directory. `fs` calls are
+ * transparently redirected into the archive, but `dlopen` is not: the dynamic
+ * loader opens the file directly and cannot read through the archive. A
+ * native library that is only present as an unpacked file therefore has to be
+ * addressed by its on-disk path, not by its in-archive path.
+ */
+function unwrapAsarPath(candidate: string): string {
+  if (!ASAR_SEGMENT.test(candidate)) return candidate;
+  const unpacked = candidate.replace(ASAR_SEGMENT, "$1app.asar.unpacked$2");
+  // Only prefer the unpacked copy when it is really there. Outside Electron
+  // — a plain `npm install`, for instance — the original path is the correct
+  // one and there is no `app.asar.unpacked` directory to redirect to.
+  return existsSync(unpacked) ? unpacked : candidate;
+}
+
 export function resolveLibPath(opts: ResolveLibPathOptions): string {
   if ("override" in opts && opts.override !== undefined) {
     return resolveOverride(opts.crateName, opts.override);
@@ -142,9 +170,8 @@ export function resolveLibPath(opts: ResolveLibPathOptions): string {
 }
 
 function resolveColocated(crateName: string, callerUrl: string): string {
-  const candidate = join(
-    callerDir(callerUrl),
-    libFileName(crateName, process.platform),
+  const candidate = unwrapAsarPath(
+    join(callerDir(callerUrl), libFileName(crateName, process.platform)),
   );
   if (!existsSync(candidate)) {
     throw new ResolveLibPathError({
@@ -166,15 +193,16 @@ function resolveOverride(crateName: string, path: string): string {
       attempted: [path],
     });
   }
-  if (!existsSync(path)) {
+  const resolved = unwrapAsarPath(path);
+  if (!existsSync(resolved)) {
     throw new ResolveLibPathError({
-      message: `Override path "${path}" for crate "${crateName}" does not exist.`,
+      message: `Override path "${resolved}" for crate "${crateName}" does not exist.`,
       mode: "override",
       crateName,
-      attempted: [path],
+      attempted: [resolved],
     });
   }
-  return path;
+  return resolved;
 }
 
 let _detectTripleImpl: (style: TripleStyle) => string = (style) =>
@@ -217,9 +245,8 @@ function resolveNpmPackage(
     });
   }
 
-  const binaryPath = join(
-    dirname(pkgJsonPath),
-    libFileName(crateName, process.platform),
+  const binaryPath = unwrapAsarPath(
+    join(dirname(pkgJsonPath), libFileName(crateName, process.platform)),
   );
   if (!existsSync(binaryPath)) {
     throw new ResolveLibPathError({
