@@ -68,7 +68,10 @@ export function uniffiInitAsync(source: WasmSource): Promise<void> {
       setNativeModule_{{ m.ts() }}(wasmModule.registerSync(PLAYER_DEFINITIONS_{{ m.ts() }}));
       {{ m.ts() }}.default.initialize();
       {%- endfor %}
-    })();
+    })().catch((error) => {
+     initPromise = undefined;
+      throw error;
+    });
   }
   return initPromise;
 }
