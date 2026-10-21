@@ -316,21 +316,38 @@ test("MEM: heap + wasm-memory profile", (_t) => {
 
   // Node's `external` includes WebAssembly.Memory linear memory + ArrayBuffer
   // backing stores, so we can use it as a proxy for wasm + off-heap growth.
+  // Cumulative bytes allocated since runtime start. Differencing this is the
+  // only sound way to measure allocation rate: the GC runs whenever it likes
+  // during the loop, so differencing current occupancy (`heapUsed`) reports
+  // which side of a collection the loop happened to end on. Hermes exposes it;
+  // Node does not, so churn degrades to "n/a" there rather than lying.
+  type MemWithChurn = ReturnType<typeof process.memoryUsage> & {
+    totalAllocated?: number;
+    numCollections?: number;
+  };
+  const churnAvailable =
+    (process.memoryUsage() as MemWithChurn).totalAllocated !== undefined;
+
   function probe(label: string, iters: number, fn: () => void) {
     settle();
-    const before = process.memoryUsage();
-    // Allocation-rate run (NO GC mid-loop).
+    const before = process.memoryUsage() as MemWithChurn;
     for (let i = 0; i < iters; i++) fn();
-    const peak = process.memoryUsage();
+    const peak = process.memoryUsage() as MemWithChurn;
     settle();
-    const after = process.memoryUsage();
-    const allocPerCallKB = (peak.heapUsed - before.heapUsed) / iters / 1024;
+    const after = process.memoryUsage() as MemWithChurn;
+
+    const churn = (peak.totalAllocated ?? 0) - (before.totalAllocated ?? 0);
+    const gcs = (peak.numCollections ?? 0) - (before.numCollections ?? 0);
+    const churnPerCall = churn / iters;
     const extPerCallKB = (peak.external - before.external) / iters / 1024;
+
     console.log(
       `  ${label.padEnd(24)} N=${String(iters).padStart(7)}  ` +
-        `heap Δalloc=${mb(peak.heapUsed - before.heapUsed).padStart(9)}  ` +
+        (churnAvailable
+          ? `churn=${mb(churn).padStart(9)} (~${churnPerCall.toFixed(1).padStart(8)} B/call)  ` +
+            `GCs=${String(gcs).padStart(4)}  `
+          : `churn=      n/a  `) +
         `Δretained=${mb(after.heapUsed - before.heapUsed).padStart(9)}  ` +
-        `~${allocPerCallKB.toFixed(2).padStart(7)} KB/call heap, ` +
         `${extPerCallKB.toFixed(2).padStart(6)} KB/call ext`,
     );
   }

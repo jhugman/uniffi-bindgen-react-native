@@ -66,18 +66,29 @@ R"((function() {
         globalThis.process = {
             memoryUsage: function() {
                 var info = hostHeapInfo();
+                // `allocatedBytes` is CURRENT occupancy: live objects plus any
+                // garbage a collection hasn't reclaimed yet. Differencing it
+                // across a loop measures where the GC happened to be, not how
+                // much was allocated — use `totalAllocated` for that.
                 var heapUsed = info.hermes_allocatedBytes || 0;
                 var heapTotal = info.hermes_heapSize || 0;
-                // Hermes' mallocSizeEstimate covers off-heap memory it knows
-                // about (e.g. ArrayBuffer backing stores registered with the
-                // GC). It's the closest analog to Node's `external`.
-                var external = info.hermes_mallocSizeEstimate || 0;
+                // `externalBytes` is off-heap memory the GC has been told
+                // about (e.g. ArrayBuffer backing stores), and unlike
+                // mallocSizeEstimate it is populated without the expensive
+                // heap walk. Closest analog to Node's `external`.
+                var external = info.hermes_externalBytes ||
+                    info.hermes_mallocSizeEstimate || 0;
                 return {
                     rss: heapTotal,
                     heapTotal: heapTotal,
                     heapUsed: heapUsed,
                     external: external,
                     arrayBuffers: 0,
+                    // Beyond Node's shape, and the only sound basis for an
+                    // allocation-rate measurement: cumulative bytes allocated
+                    // since runtime creation, immune to GC timing.
+                    totalAllocated: info.hermes_totalAllocatedBytes || 0,
+                    numCollections: info.hermes_numCollections || 0,
                 };
             },
         };
