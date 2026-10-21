@@ -13,7 +13,6 @@ use crate::{metadata, paths, run_cmd_quietly, Flavor};
 /// The outputs of [`prepare`]: everything a flavor needs to write its own
 /// bootstrap and hand off to `run_tsx_with_preload`.
 pub(crate) struct Prepared {
-    pub(crate) fixture_dir: Utf8PathBuf,
     pub(crate) ts_dir: Utf8PathBuf,
     pub(crate) lib_stem: String,
 }
@@ -57,11 +56,7 @@ pub(crate) fn prepare(crate_name: &str, target_tmpdir: &str, flavor: Flavor) -> 
     ubrn_common::stage_wasm(&wasm_file, &ts_dir, &lib_stem, true)
         .unwrap_or_else(|e| panic!("staging {wasm_file}: {e:#}"));
 
-    Prepared {
-        fixture_dir,
-        ts_dir,
-        lib_stem,
-    }
+    Prepared { ts_dir, lib_stem }
 }
 
 /// Run a fixture test under the Wasm2 (player-based) flavor.
@@ -76,9 +71,13 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // never call `uniffiInitAsync`.
     let bootstrap = write_node_bootstrap(&p.ts_dir, &p.lib_stem);
 
-    let _tsconfig_guard =
-        crate::CleanupFile::new(crate::write_fixture_tsconfig(&p.fixture_dir, Flavor::Wasm2));
-    crate::run_tsx_with_preload(test_script, &bootstrap);
+    // Check the generated API, bootstrap, and test before executing them.
+    let out_dir = Utf8Path::new(target_tmpdir).join(format!(
+        "ubrn-tests/{crate_name}-{}-wasm2",
+        test_script.file_stem().unwrap_or("test")
+    ));
+    let tsconfig = crate::prepare_tsx(test_script, &out_dir, Some(&p.ts_dir), Flavor::Wasm2);
+    crate::run_tsx_with_preload(test_script, &bootstrap, &tsconfig);
 }
 
 /// Write the preload that initialises the generated bindings, and return its

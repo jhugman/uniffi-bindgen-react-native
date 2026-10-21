@@ -218,6 +218,31 @@ test("Variant with Option fields accepts omitted keys and undefined", (t) => {
   }
 });
 
+test("Tuple variant with Option fields roundtrips undefined", (t) => {
+  const value = OptionalFields.Tuple.new(undefined, undefined);
+  t.assertEqual(value, new OptionalFields.Tuple(undefined, undefined));
+  const out = identityOptionalFields(value);
+  if (OptionalFields.Tuple.instanceOf(out)) {
+    t.assertEqual(out.inner[0], undefined);
+    t.assertEqual(out.inner[1], undefined);
+  } else {
+    t.fail("expected Tuple");
+  }
+});
+
+test("Tuple variant with Option fields roundtrips populated values", (t) => {
+  const record = AnimalRecord.create({ value: 7 });
+  const value = OptionalFields.Tuple.new("hello", record);
+  t.assertEqual(value, new OptionalFields.Tuple("hello", record));
+  const out = identityOptionalFields(value);
+  if (OptionalFields.Tuple.instanceOf(out)) {
+    t.assertEqual(out.inner[0], "hello");
+    t.assertEqual(out.inner[1]?.value, 7);
+  } else {
+    t.fail("expected Tuple");
+  }
+});
+
 // This tests the generated Typescript and serves as an example of how to
 // to use enums with values.
 //

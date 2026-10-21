@@ -9,14 +9,14 @@ use std::sync::Once;
 
 use camino::Utf8Path;
 
-use crate::{metadata, paths, run_cmd, run_cmd_quietly};
+use crate::{metadata, paths, run_cmd_quietly};
 
 static BUILD_NAPI_RUNTIME: Once = Once::new();
 
 /// Run a fixture test under the Napi (Node.js player) flavor.
 ///
 /// Called from proc-macro-generated `#[test]` functions.
-pub fn run_test(crate_name: &str, test_script: &str, _target_tmpdir: &str) {
+pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // Serialize with other flavors for this fixture (they share generated/).
     let _lock = crate::lock_fixture();
 
@@ -37,12 +37,13 @@ pub fn run_test(crate_name: &str, test_script: &str, _target_tmpdir: &str) {
     let ts_dir = generated_napi.join("ts");
     generate_bindings(&cdylib_path, &ts_dir);
 
-    // Step 3: Write fixture tsconfig, then run tsx.
-    let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
-        &fixture_dir,
-        crate::Flavor::Napi,
+    // Check the generated API and test before executing either.
+    let out_dir = Utf8Path::new(target_tmpdir).join(format!(
+        "ubrn-tests/{crate_name}-{}-napi",
+        test_script.file_stem().unwrap_or("test")
     ));
-    run_test_runner(test_script);
+    let tsconfig = crate::prepare_tsx(test_script, &out_dir, Some(&ts_dir), crate::Flavor::Napi);
+    crate::run_tsx(test_script, &tsconfig);
 }
 
 /// Build the N-API runtime (debug mode) if not already built.
@@ -75,10 +76,4 @@ fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path) {
             .arg(ts_dir.as_str())
             .arg(cdylib_path.as_str()),
     );
-}
-
-/// Run tsx to execute the test script.
-fn run_test_runner(test_script: &Utf8Path) {
-    let tsx = paths::node_modules_bin().join("tsx");
-    run_cmd(crate::command(tsx.as_str()).arg(test_script.as_str()));
 }
