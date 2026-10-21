@@ -98,7 +98,7 @@ console.debug(`-- {{ ffi_name }}`);
                 {%- call arg_list_lowered(callable) %}
                 callStatus);
             },
-            /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+            /*liftString:*/ FfiConverterString.lift,
     )
 {%- endmacro -%}
 
@@ -119,7 +119,7 @@ console.debug(`-- {{ ffi_name }}`);
                 {%- call arg_list_lowered(callable) %}
                 callStatus);
             },
-            /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+            /*liftString:*/ FfiConverterString.lift,
     )
 {%- endmacro -%}
 
@@ -143,7 +143,7 @@ console.debug(`-- {{ ffi_name }}`);
                 {%- call arg_list_lowered(callable) %}
                 callStatus);
             },
-            /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+            /*liftString:*/ FfiConverterString.lift,
     )
     {%- else -%}
     {#- unreachable -#}
@@ -284,7 +284,7 @@ console.debug(`-- {{ ffi_name }}`);
             {%- when None %}
             /*liftFunc:*/ (_v) => {},
             {%- endmatch %}
-            /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+            /*liftString:*/ FfiConverterString.lift,
             /*asyncOpts:*/ asyncOpts_,
             {%- match callable.throws %}
             {%- when Some with (e) %}
