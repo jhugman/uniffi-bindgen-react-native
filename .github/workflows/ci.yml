@@ -24,6 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.88.0
+
+      - name: Install Rust Fmt and Clippy
+        shell: bash
+        run: rustup component add rustfmt clippy
+
       - name: Install clang-format
         run: sudo apt-get install -y clang-format
 
