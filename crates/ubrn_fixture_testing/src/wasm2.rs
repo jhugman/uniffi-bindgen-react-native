@@ -54,12 +54,13 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // directly and never call `uniffiInitAsync`.
     let bootstrap = write_node_bootstrap(&ts_dir, &lib_stem);
 
-    // Step 5: Write fixture tsconfig + run tsx.
-    let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
-        &fixture_dir,
-        crate::Flavor::Wasm2,
+    // Check the generated API, bootstrap, and test before executing them.
+    let out_dir = Utf8Path::new(target_tmpdir).join(format!(
+        "ubrn-tests/{crate_name}-{}-wasm2",
+        test_script.file_stem().unwrap_or("test")
     ));
-    crate::run_tsx_with_preload(test_script, &bootstrap);
+    let tsconfig = crate::prepare_tsx(test_script, &out_dir, Some(&ts_dir), crate::Flavor::Wasm2);
+    crate::run_tsx_with_preload(test_script, &bootstrap, &tsconfig);
 }
 
 /// Write the preload that initialises the generated bindings, and return its
