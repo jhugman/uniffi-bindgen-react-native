@@ -1,6 +1,6 @@
 # Cutting a Release
 
-A release publishes eight artifacts to three registries, through seven
+A release publishes nine artifacts to three registries, through eight
 workflows. All of them are triggered automatically when a GitHub Release is
 _published_, so the bulk of cutting a release is: get the version numbers
 right, land the bump, then draft the release.
@@ -13,6 +13,7 @@ right, land the bump, then draft the release.
 | `@ubjs/core` | npm | [`npm-core.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-core.yml) | `typescript` | `typescript/package.json` |
 | `@ubjs/node` + `@ubjs/node-<platform>` | npm | [`napi-publish.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/napi-publish.yml) | `runtimes/napi` | `runtimes/napi/package.json` |
 | `@ubjs/wasm` | npm | [`npm-wasm.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-wasm.yml) | `runtimes/wasm` | `runtimes/wasm/package.json` |
+| `@ubjs/worker` | npm | [`npm-worker.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-worker.yml) | `channels/worker` | `channels/worker/package.json` |
 | `@ubjs/react-native` | npm | [`npm-react-native.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-react-native.yml) | `runtimes/jsi` | `runtimes/jsi/package.json` |
 | `uniffi-runtime-javascript` | crates.io | [`crates-io.yaml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/crates-io.yaml) | `crates/uniffi-runtime-javascript` | `crates/uniffi-runtime-javascript/Cargo.toml` |
 | `uniffi-runtime-wasm` | crates.io | [`crates-io.yaml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/crates-io.yaml) | `runtimes/wasm/helper-crate` | `runtimes/wasm/helper-crate/Cargo.toml` |
@@ -33,6 +34,10 @@ build matrix fails for any target, the publish job does not run.
 helper crate a consuming cdylib links. `@ubjs/wasm` declares `@ubjs/core` as a
 `peerDependency`, so that range has to move with the version too.
 
+`@ubjs/worker` is the channel that drives a player from another JavaScript
+context, such as a page driving wasm2 in a Web Worker. It has the same
+`@ubjs/core` `peerDependency`.
+
 `@ubjs/react-native` is the JSI player. Its workflow builds the Rust half for
 each iOS and Android slice, assembles them into `prebuilt/`, then publishes. It
 also declares `@ubjs/core` as a `peerDependency` whose range moves with the
@@ -42,19 +47,21 @@ npm.
 
 ## Steps
 
-1. Increment the version number, keeping all eight files in sync:
+1. Increment the version number, keeping all nine files in sync:
    - [`package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/package.json#L3) (also drives the CocoaPod)
    - [`crates/ubrn_cli/Cargo.toml`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_cli/Cargo.toml#L3)
    - [`crates/uniffi-runtime-javascript/Cargo.toml`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/uniffi-runtime-javascript/Cargo.toml#L3)
    - [`typescript/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/typescript/package.json#L3) (the `@ubjs/core` runtime)
    - [`runtimes/napi/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/napi/package.json#L3) (the `@ubjs/node` runtime)
    - [`runtimes/wasm/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/wasm/package.json#L3) (the `@ubjs/wasm` runtime — also its `@ubjs/core` `peerDependency` range)
+   - [`channels/worker/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/channels/worker/package.json#L3) (the `@ubjs/worker` channel — also its `@ubjs/core` `peerDependency` range)
    - [`runtimes/jsi/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/jsi/package.json#L3) (the `@ubjs/react-native` player — also its `@ubjs/core` `peerDependency` range)
    - [`runtimes/wasm/helper-crate/Cargo.toml`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/wasm/helper-crate/Cargo.toml#L3) (the `uniffi-runtime-wasm` crate)
 1. Update the lockfiles to follow, rather than editing them by hand:
    - `cargo metadata --offline > /dev/null` refreshes `Cargo.lock`
    - `npm install --package-lock-only --ignore-scripts` in each of
-     `typescript`, `runtimes/napi`, `runtimes/wasm` and `runtimes/jsi`. Without
+     `typescript`, `runtimes/napi`, `runtimes/wasm`, `channels/worker` and
+     `runtimes/jsi`. Without
      `--ignore-scripts`, npm runs each package's build scripts, which need
      tools such as the `napi` CLI.
 1. Update the version references outside the manifests:
@@ -83,12 +90,13 @@ npm.
 1. Use that same version with a `v` prepended for the release *title*:
    `v${VERSION_NUMBER}`. The `v` belongs to the title only, never the tag.
 1. Publish the release.
-1. Wait for the seven publish workflows to go green:
+1. Wait for the eight publish workflows to go green:
    - [CocoaPods](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/cocoapods.yml)
    - [npm — `uniffi-bindgen-react-native`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm.yml)
    - [npm — `@ubjs/core`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-core.yml)
    - [npm — `@ubjs/node`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/napi-publish.yml)
    - [npm — `@ubjs/wasm`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-wasm.yml)
+   - [npm — `@ubjs/worker`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-worker.yml)
    - [npm — `@ubjs/react-native`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-react-native.yml)
    - [crates.io](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/crates-io.yaml) — both crates
 1. [Verify the release landed](#after-publishing).
@@ -96,7 +104,7 @@ npm.
 
 ## Testing a release before tagging
 
-Six of the seven publish workflows can be run manually from the Actions tab
+Seven of the eight publish workflows can be run manually from the Actions tab
 (`workflow_dispatch`) with a **dry-run** input that defaults to `true`. Use this
 to validate packaging — `cargo publish --dry-run`, `npm publish --dry-run` —
 without pushing anything to a registry:
@@ -104,6 +112,7 @@ without pushing anything to a registry:
 - [`npm.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm.yml) — `dry-run` input
 - [`npm-core.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-core.yml) — `dry-run` input
 - [`npm-wasm.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-wasm.yml) — `dry-run` input
+- [`npm-worker.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-worker.yml) — `dry-run` input
 - [`crates-io.yaml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/crates-io.yaml) — `dry_run` input
 - [`napi-publish.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/napi-publish.yml) — `dry-run` input
 - [`npm-react-native.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/npm-react-native.yml) — `dry-run` input; it also dry-runs on any pull request touching `runtimes/jsi`
@@ -124,7 +133,7 @@ request for `npm-react-native.yml`.
 Confirm each artifact actually went out:
 
 - npm: `npm view <pkg> version` for `uniffi-bindgen-react-native`, `@ubjs/core`,
-  `@ubjs/node`, `@ubjs/wasm` and `@ubjs/react-native`
+  `@ubjs/node`, `@ubjs/wasm`, `@ubjs/worker` and `@ubjs/react-native`
 - crates.io: <https://crates.io/crates/uniffi-runtime-javascript/versions> and
   <https://crates.io/crates/uniffi-runtime-wasm/versions>
 - CocoaPods: `pod trunk info uniffi-bindgen-react-native`
@@ -182,7 +191,7 @@ ever cut is, to npm and cargo, a prerelease. Two consequences:
 
 - **`npm publish` must pass `--tag latest`.** npm 11 (bundled with node 24)
   refuses to publish a prerelease without an explicit dist-tag, rather than
-  silently moving `latest` onto it. All four npm publish workflows pass it on
+  silently moving `latest` onto it. Every npm publish workflow passes it on
   every `npm publish` invocation, dry-run included; a new one must too.
 - **Consumers need an explicit version.** `npm install uniffi-bindgen-react-native`
   resolves via the `latest` dist-tag, which we set — but a bare semver range
