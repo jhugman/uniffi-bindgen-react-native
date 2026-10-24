@@ -42,6 +42,8 @@ export interface DispatchContext {
   // `new Function`. `module.ts` decides once at register time; when false,
   // `specializeFunction` always takes the interpreted path.
   useJit: boolean;
+  // This registration's dispatchers, by export name; see `specializeExport`.
+  specialized: Map<string, (...jsArgs: any[]) => any>;
 }
 
 // How much of the reserved scratch region a value needs. This is all
@@ -212,6 +214,18 @@ function copyAndFreeRustBuffer(
     ctx.free(rb.dataPtr, cap, 1);
   }
   return bytes;
+}
+
+// The same for a view `viewRustBufferHandoff` returned, for a RustBuffer
+// result that must outlive the next wasm memory growth.
+export function copyAndFreeRustBufferView(
+  ctx: DispatchContext,
+  view: Uint8Array,
+): Uint8Array {
+  const copy = view.slice();
+  const cap = getCapacityHint(view) ?? view.byteLength;
+  if (cap > 0) ctx.free(view.byteOffset, cap, 1);
+  return copy;
 }
 
 // Records a view's Rust-side `capacity`, which `rustbuffer_free` must pass
@@ -633,4 +647,28 @@ export function specializeFunction(
     if (jit) return jit as (...jsArgs: any[]) => any;
   }
   return buildInterpretedDispatcher(ctx, exportFn, def);
+}
+
+/**
+ * Specializes the wasm export `name` to `shape` once per registration. A
+ * name fixes its shape, so one dispatcher serves every caller: async
+ * functions with the same return type share their `rust_future_*` exports,
+ * and each specialization reserves scratch for good.
+ */
+export function specializeExport(
+  ctx: DispatchContext,
+  exports: WebAssembly.Exports,
+  name: string,
+  shape: FunctionDef,
+): (...jsArgs: any[]) => any {
+  let fn = ctx.specialized.get(name);
+  if (fn === undefined) {
+    const exportFn = exports[name];
+    if (typeof exportFn !== "function") {
+      throw new Error(`register: wasm export "${name}" not found`);
+    }
+    fn = specializeFunction(ctx, exportFn, shape, name);
+    ctx.specialized.set(name, fn);
+  }
+  return fn;
 }
