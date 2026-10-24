@@ -32,6 +32,24 @@ test("a sync player returns values synchronously through a real receiver", () =>
   receiver.close();
 });
 
+test("a sync player routes an async entry through a promise", async () => {
+  const [rx, tx] = createSyncPortPair();
+  const { player } = fakePlayer();
+  const receiver = createReceiver(DEFS, player, rx);
+  const sync = createSyncPlayer(DEFS, tx);
+  try {
+    const status = { code: 0 };
+    assert.strictEqual(
+      await (sync.sleep(2, status, undefined) as Promise<number>),
+      4,
+    );
+    assert.strictEqual(status.code, 0);
+  } finally {
+    sync.close();
+    receiver.close();
+  }
+});
+
 test("a sync vtable method works over the sync port", () => {
   const [rx, tx] = createSyncPortPair();
   const { player } = fakePlayer();
