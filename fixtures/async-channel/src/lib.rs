@@ -62,6 +62,13 @@ impl Counter {
     pub fn sum_with(&self, a: Arc<Counter>, b: Arc<Counter>) -> i64 {
         self.value() + a.value() + b.value()
     }
+
+    /// Resolves to this counter's value after `ms`: an async method, so the
+    /// call carries a cloned receiver.
+    pub async fn value_after(&self, ms: u16) -> i64 {
+        let _guard = guarded_sleep(Duration::from_millis(ms.into())).await;
+        self.value()
+    }
 }
 
 #[derive(uniffi::Record)]
@@ -142,16 +149,65 @@ pub async fn greet_via(greeter: Arc<dyn Greeter>, name: String) -> String {
     greeter.greet(name).await
 }
 
+static LIVE_FUTURES: AtomicI32 = AtomicI32::new(0);
+
+/// Futures whose body has started and not yet been dropped: a future never
+/// freed stays counted.
+#[uniffi::export]
+pub fn live_futures() -> i32 {
+    LIVE_FUTURES.load(Ordering::SeqCst)
+}
+
+/// Held by an async body from its first poll until the future is dropped.
+struct FutureGuard;
+
+impl FutureGuard {
+    fn new() -> Self {
+        LIVE_FUTURES.fetch_add(1, Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for FutureGuard {
+    fn drop(&mut self) {
+        LIVE_FUTURES.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Sleeps for `d` holding a `FutureGuard` and returns it, so the caller holds
+/// it until its own future drops. Each async body awaits this first, so the
+/// guard exists from that body's first poll.
+async fn guarded_sleep(d: Duration) -> FutureGuard {
+    let guard = FutureGuard::new();
+    TimerFuture::sleep(d).await;
+    guard
+}
+
 /// Resolves after `ms`.
 #[uniffi::export]
 pub async fn sleep_ms(ms: u16) -> u16 {
-    TimerFuture::sleep(Duration::from_millis(ms.into())).await;
+    let _guard = guarded_sleep(Duration::from_millis(ms.into())).await;
     ms
+}
+
+/// Takes an argument named like the abort signal the generated call site
+/// hands the player: a call site that shadowed it would lower the wrong value.
+#[uniffi::export]
+pub async fn echo_signal(signal: u8) -> u8 {
+    let _guard = guarded_sleep(Duration::from_millis((signal % 2).into())).await;
+    signal
 }
 
 /// Sleeps for a long time; the test cancels it.
 #[uniffi::export]
 pub async fn sleep_forever() -> bool {
-    TimerFuture::sleep(Duration::from_secs(60)).await;
+    let _guard = guarded_sleep(Duration::from_secs(60)).await;
     true
+}
+
+/// Fails after `ms`, so the error comes from a future that was pending.
+#[uniffi::export]
+pub async fn fail_later(ms: u16) -> Result<(), ChannelError> {
+    let _guard = guarded_sleep(Duration::from_millis(ms.into())).await;
+    Err(ChannelError::Flat("later".to_string()))
 }

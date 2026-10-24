@@ -13,10 +13,13 @@ import {
   ChannelError,
   checksum,
   echoBytes,
+  echoSignal,
   failFlat,
+  failLater,
   failRich,
   greetVia,
   liveCounters,
+  liveFutures,
   makeLedger,
   sleepForever,
   sleepMs,
@@ -29,6 +32,27 @@ import "@/polyfills";
 // Every surface is a Promise under async delivery, including the constructor.
 const mk = async (n: number): Promise<Counter> =>
   (await Counter.create(BigInt(n))) as Counter;
+
+// Wraps the current module so every call reaching the player is counted by
+// export name; `original` is what to restore afterwards.
+function countingModule() {
+  const original = ffi() as unknown as Record<string, Function>;
+  const calls = new Map<string, number>();
+  const nm = new Proxy(original, {
+    get(target, key, receiver) {
+      const v = Reflect.get(target, key, receiver);
+      if (typeof key !== "string" || typeof v !== "function") return v;
+      return (...args: unknown[]) => {
+        calls.set(key, (calls.get(key) ?? 0) + 1);
+        return v.apply(target, args);
+      };
+    },
+  });
+  return { original, nm, calls, reset: () => calls.clear() };
+}
+
+const totalCalls = (calls: Map<string, number>): number =>
+  [...calls.values()].reduce((a, b) => a + b, 0);
 
 (async () => {
   await asyncTest("methods and constructors resolve", async (t) => {
@@ -124,31 +148,87 @@ const mk = async (n: number): Promise<Counter> =>
   );
 
   await asyncTest(
-    "the worker drives the poll loop: one page-side poll per await",
+    "the worker drives the future: one player call per await",
     async (t) => {
-      // sleep_ms is pending on its first poll and woken by a timer later. The
-      // receiver re-polls in the worker, so the page's loop polls exactly once.
-      const nm = ffi() as unknown as Record<string, Function>;
-      const pollName = "ffi_uniffi_async_channel_rust_future_poll_u16";
-      let polls = 0;
-      setNativeModule(
-        new Proxy(nm, {
-          get(target, key, receiver) {
-            const v = Reflect.get(target, key, receiver);
-            if (key !== pollName) return v;
-            return (...args: unknown[]) => {
-              polls += 1;
-              return v.apply(target, args);
-            };
-          },
-        }) as any,
-      );
+      const { original, nm, calls, reset } = countingModule();
+      setNativeModule(nm as any);
       try {
         t.assertEqual(await sleepMs(20), 20);
-        t.assertEqual(polls, 1);
+        t.assertEqual(totalCalls(calls), 1);
+        t.assertEqual(
+          calls.get("uniffi_uniffi_async_channel_fn_func_sleep_ms"),
+          1,
+        );
+
+        reset();
+        await t.assertThrowsAsync(
+          (e) => ChannelError.Flat.instanceOf(e),
+          () => failLater(5),
+        );
+        t.assertEqual(totalCalls(calls), 1);
+
+        reset();
+        const controller = new AbortController();
+        const p = sleepForever({ signal: controller.signal });
+        setTimeout(() => controller.abort(), 20);
+        await t.assertThrowsAsync(
+          (e) => e instanceof Error && e.name === "AbortError",
+          () => p,
+        );
+        // The cancel crosses as a message, not a player call.
+        t.assertEqual(totalCalls(calls), 1);
+
+        const c = await mk(3);
+        reset();
+        t.assertEqual(await c.valueAfter(5), 3n);
+        t.assertEqual(
+          calls.get(
+            "uniffi_uniffi_async_channel_fn_method_counter_value_after",
+          ),
+          1,
+        );
+        // The entry, plus the receiver's clone. Counted before the destroy,
+        // whose free also reaches the player.
+        t.assertEqual(totalCalls(calls), 2);
+        c.uniffiDestroy();
       } finally {
-        setNativeModule(nm as any);
+        setNativeModule(original as any);
       }
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "nothing is left behind after many awaits, cancelled and errored ones included",
+    async (t) => {
+      for (let i = 0; i < 20; i++) {
+        await sleepMs(1);
+        await t.assertThrowsAsync(
+          (e) => ChannelError.Flat.instanceOf(e),
+          () => failLater(1),
+        );
+        const controller = new AbortController();
+        const p = sleepForever({ signal: controller.signal });
+        setTimeout(() => controller.abort(), 1);
+        await t.assertThrowsAsync(
+          (e) => e instanceof Error && e.name === "AbortError",
+          () => p,
+        );
+        const c = await mk(i);
+        await c.valueAfter(1);
+        c.uniffiDestroy();
+      }
+      // Every future was freed in the worker, not just settled on the page.
+      t.assertEqual(await liveFutures(), 0);
+      t.assertEqual(await liveCounters(), 0);
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "an argument named like the entry's signal reaches Rust",
+    async (t) => {
+      t.assertEqual(await echoSignal(7), 7);
       t.end();
     },
   );
