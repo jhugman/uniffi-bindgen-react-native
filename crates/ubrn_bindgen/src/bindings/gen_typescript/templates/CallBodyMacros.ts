@@ -215,7 +215,7 @@ console.debug(`-- {{ ffi_name }}`);
 {%- endif %}
 {%- endmacro %}
 
-{#- Async call body: wraps uniffiRustCallAsync with optional stack trace capture. -#}
+{#- Async call body: wraps the async rust call with optional stack trace capture. -#}
 {%- macro call_body_async(callable, obj_factory) %}
 {%- if module.supports_rust_backtrace %}
     return {# space #}{%- call to_ffi_async_call(callable, obj_factory) %};
@@ -232,10 +232,28 @@ console.debug(`-- {{ ffi_name }}`);
 {%- endif %}
 {%- endmacro %}
 
-{#- Generates the uniffiRustCallAsync(...) invocation. -#}
+{#- Generates the async rust call. When the player runs the poll loop, it is
+   one awaited entry that takes the status and abort signal after the lowered
+   args; otherwise uniffiRustCallAsync polls the future from here. The user's
+   arguments are lowered inside the entry, so its parameters take the leading
+   double underscore that no camelCased argument name has. -#}
 {%- macro to_ffi_async_call(callable, obj_factory) %}
 {%- match callable.ffi_async %}
 {%- when Some with (ffi_async) -%}
+{%- if callable.low_level_async_polling -%}
+        await uniffiRustCallAsyncEntry(
+            /*rustCaller:*/ uniffiCaller,
+            /*entry:*/ (__status, __signal) => {
+                return {% call native_method_handle(callable.ffi_name) %}(
+                    {%- if callable.receiver.is_some() %}
+                    {{ obj_factory }}.clonePointer(this),
+                    {%- endif %}
+                    {%- call arg_list_lowered(callable) %}
+                    __status,
+                    __signal,
+                );
+            },
+{%- else -%}
         await uniffiRustCallAsync(
             /*rustCaller:*/ uniffiCaller,
             /*rustFutureFunc:*/ () => {
@@ -252,13 +270,29 @@ console.debug(`-- {{ ffi_name }}`);
             /*cancelFunc:*/ {% call native_method_handle_cancel(ffi_async.cancel) %},
             /*completeFunc:*/ {% call native_method_handle_complete(ffi_async.complete) %},
             /*freeFunc:*/ {% call native_method_handle_free(ffi_async.free) %},
-            {%- match callable.return_type %}
-            {%- when Some(return_type) %}
+{%- endif %}
+            {%- call async_lift_func(callable) %}
+            /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
+            /*asyncOpts:*/ asyncOpts_,
+            {%- match callable.throws %}
+            {%- when Some with (e) %}
+            /*errorHandler:*/ {{ e.lift_error_fn }}
+            {%- else %}
+            {% endmatch %}
+        )
+{%- when None %}
+{#- unreachable: caller guards with is_ffi_async() -#}
+{%- endmatch %}
+{%- endmacro %}
+
+{#- The liftFunc argument of both async call shapes: each hands it the
+   value of the completed future. -#}
+{%- macro async_lift_func(callable) %}
+{%- match callable.return_type %}
+{%- when Some(return_type) %}
             // Async returns always go through the JS-side converter: the
-            // FFI symbol returns the future handle (u64), and the user-level
-            // RustBuffer comes back via the shared `rust_future_complete_*`
-            // export. The bytes the runtime hands back must be deserialized
-            // here using the per-callable return-type converter.
+            // completed future's value is deserialized here by the
+            // per-callable return-type converter.
             {%- if return_type.is_rust_buffer %}
             // Borrowed view over foreign memory: the call site owns the free,
             // as on the sync paths. Unconditional — a no-op where buffers are
@@ -273,19 +307,8 @@ console.debug(`-- {{ ffi_name }}`);
             {%- else %}
             /*liftFunc:*/ {{ return_type.ffi_converter }}.lift.bind({{ return_type.ffi_converter }}),
             {%- endif %}
-            {%- when None %}
-            /*liftFunc:*/ (_v) => {},
-            {%- endmatch %}
-            /*liftString:*/ FfiConverterString.lift.bind(FfiConverterString),
-            /*asyncOpts:*/ asyncOpts_,
-            {%- match callable.throws %}
-            {%- when Some with (e) %}
-            /*errorHandler:*/ {{ e.lift_error_fn }}
-            {%- else %}
-            {% endmatch %}
-        )
 {%- when None %}
-{#- unreachable: caller guards with is_ffi_async() -#}
+            /*liftFunc:*/ (_v) => {},
 {%- endmatch %}
 {%- endmacro %}
 

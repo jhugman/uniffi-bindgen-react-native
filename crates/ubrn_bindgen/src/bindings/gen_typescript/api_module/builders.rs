@@ -477,6 +477,7 @@ pub(super) fn build_callable(
         receiver,
         force_async,
         async_delivery: config.async_delivery,
+        low_level_async_polling: flavor.low_level_async_polling(),
     }
 }
 

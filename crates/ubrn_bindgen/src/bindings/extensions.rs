@@ -269,7 +269,7 @@ pub(crate) impl FfiCallbackFunction {
 }
 
 fn is_continuation(nm: &str) -> bool {
-    nm == "RustFutureContinuationCallback"
+    nm == crate::bindings::gen_typescript::ffi_module::RUST_FUTURE_CONTINUATION
 }
 
 fn is_free(nm: &str) -> bool {

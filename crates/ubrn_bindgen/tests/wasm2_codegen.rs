@@ -132,9 +132,40 @@ fn wasm2_player_ffi_promises_returns_under_async_delivery() {
         sync.contains("ubrn_uniffi_test_fn_func_add(lhs: number): number;"),
         "without async delivery the same function returns plainly:\n{sync}"
     );
-    assert!(
-        !sync.contains("Promise<"),
-        "nothing in the sync interface returns a promise:\n{sync}"
+    // The async entry's Promise comes from the player's poll loop, not from
+    // delivery, so it is the only one.
+    assert_eq!(
+        sync.matches("Promise<").count(),
+        1,
+        "only the async entry returns a promise without async delivery:\n{sync}"
     );
     assert!(!sync.contains("returns a Promise"));
+}
+
+#[test]
+fn wasm2_player_table_renders_an_async_entry() {
+    let rendered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, false)
+        .expect("rendering wasm2 player wrapper-ffi.ts should succeed");
+    assert!(
+        rendered.contains(
+            r#"async: { poll: "ubrn_test_poll", cancel: "ubrn_test_cancel", complete: "ubrn_test_complete", free: "ubrn_test_free", ret: FfiType.UInt32 },"#
+        ),
+        "expected the table entry to name its future exports:\n{rendered}"
+    );
+    let entry = "ubrn_uniffi_test_fn_func_sleep(ms: number, uniffi_out_err: UniffiRustCallStatus, uniffi_signal: AbortSignal | undefined): Promise<number>;";
+    assert!(
+        rendered.contains(entry),
+        "expected the async entry to return a promise of the completed value:\n{rendered}"
+    );
+
+    // Async delivery already promises every return; the entry is not wrapped twice.
+    let delivered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, true).unwrap();
+    assert!(
+        delivered.contains(entry),
+        "expected the same entry under async delivery:\n{delivered}"
+    );
+    assert!(
+        !delivered.contains("Promise<Promise<"),
+        "the async entry must not be wrapped in two promises:\n{delivered}"
+    );
 }
