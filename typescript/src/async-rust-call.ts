@@ -36,6 +36,13 @@ type PollFunc = (
   handle: UniffiHandle,
 ) => void | Promise<void>;
 
+export interface UniffiRustFutureFns<F, S extends UniffiRustCallStatus> {
+  poll: PollFunc;
+  cancel: (rustFuture: bigint) => void | Promise<void>;
+  complete: (rustFuture: bigint, status: S) => F | Promise<F>;
+  free: (rustFuture: bigint) => void | Promise<void>;
+}
+
 /**
  * This method calls an asynchronous method on the Rust side.
  *
@@ -50,8 +57,11 @@ type PollFunc = (
  *  the result and any errors that were encountered.
  * @param freeFunc is finally called with the Rust future handle to drop the now complete Rust
  *  future.
+ *
+ * The poll loop runs here, behind the same call site as a player that runs it
+ * itself.
  */
-export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
+export function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   rustCaller: UniffiRustCaller<S>,
   rustFutureFunc: () => bigint | Promise<bigint>,
   pollFunc: PollFunc,
@@ -63,23 +73,79 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   asyncOpts?: { signal: AbortSignal },
   errorHandler?: UniffiErrorHandler,
 ): Promise<T> {
-  // If the underlying Rust API supports task cancellation, then we should
-  // check if should bail early.
-  //
-  // However, it's unlikely that the Rust API does; so this maybe the
-  // only support we're giving that abort is supported.
-  //
-  // We'd like to use signal.throwIfAborted(), but the polyfill we use during
-  // testing does not implement this method.
+  return uniffiRustCallAsyncEntry(
+    rustCaller,
+    // A player over a port answers with a promise; a local one with the handle.
+    async (status, signal) =>
+      uniffiDriveRustFuture(
+        await rustFutureFunc(),
+        {
+          poll: pollFunc,
+          cancel: cancelFunc,
+          complete: completeFunc,
+          free: freeFunc,
+        },
+        status,
+        signal,
+      ),
+    liftFunc,
+    liftString,
+    asyncOpts,
+    errorHandler,
+  );
+}
+
+/**
+ * The call site for a player that runs the poll loop itself: one awaited
+ * entry, then lift. The pre-abort check and the status-to-throw stay here.
+ */
+export async function uniffiRustCallAsyncEntry<
+  F,
+  S extends UniffiRustCallStatus,
+  T,
+>(
+  rustCaller: UniffiRustCaller<S>,
+  entry: (status: S, signal: AbortSignal | undefined) => F | Promise<F>,
+  liftFunc: (lower: F) => T,
+  liftString: (bytes: UniffiByteArray) => string,
+  asyncOpts?: { signal: AbortSignal },
+  errorHandler?: UniffiErrorHandler,
+): Promise<T> {
+  // The entry cannot see a signal that was aborted before the call. Not
+  // `signal.throwIfAborted()`: the polyfill used in testing lacks it.
   if (asyncOpts?.signal.aborted === true) {
     return Promise.reject(new UniffiInternalError.AbortError());
   }
+  return liftFunc(
+    await rustCaller.makeRustCallAsync(
+      (status) => {
+        const result: any = entry(status, asyncOpts?.signal);
+        // A player that predates async entries starts the future and
+        // returns its handle, which must not be lifted as the value.
+        if (!(result && typeof result.then === "function")) {
+          throw new UniffiInternalError.IncompatiblePlayer();
+        }
+        return result as Promise<F>;
+      },
+      liftString,
+      errorHandler,
+    ),
+  );
+}
 
-  // A player over a port answers with a promise; a local one with the handle.
-  const rustFuture = await rustFutureFunc();
-
-  const abortFunc = createAbortFunction(rustFuture, cancelFunc);
-  asyncOpts?.signal.addEventListener("abort", abortFunc);
+/**
+ * Polls an already-started future to READY, completes it into `status` and
+ * frees it. Never throws on a non-zero status: the caller reads it.
+ */
+export async function uniffiDriveRustFuture<F, S extends UniffiRustCallStatus>(
+  rustFuture: bigint,
+  fns: UniffiRustFutureFns<F, S>,
+  status: S,
+  signal?: AbortSignal,
+): Promise<F> {
+  // Without a signal nothing can abort the call, so it needs no closure.
+  const abortFunc = signal && createAbortFunction(rustFuture, fns.cancel);
+  if (abortFunc) signal?.addEventListener("abort", abortFunc);
 
   // Keep the Node.js event loop alive while polling the Rust future.
   // The napi runtime's callback TSFNs are deliberately unref'd (so leaked TSFNs
@@ -97,36 +163,30 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
-    // Events don't replay, so no listener catches an abort that landed during
-    // the await above; the flag does, and inside the try a throwing cancelFunc
+    // Events don't replay, so no listener catches an abort that landed before
+    // the listener existed; the flag does, and inside the try a throwing cancel
     // still frees the future via the `finally` below.
-    if (asyncOpts?.signal.aborted) {
-      abortFunc();
+    if (signal?.aborted) {
+      abortFunc?.();
     }
 
     let pollResult: number | undefined;
     do {
-      // Calling pollFunc with a callback that resolves the promise that pollRust
+      // Calling poll with a callback that resolves the promise that pollRust
       // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
       pollResult = await pollRust((handle) =>
-        pollFunc(rustFuture, uniffiFutureContinuationCallback, handle),
+        fns.poll(rustFuture, uniffiFutureContinuationCallback, handle),
       );
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
 
     // Now it's ready, all we need to do is pick up the result (and error).
-    return liftFunc(
-      await rustCaller.makeRustCallAsync(
-        (status) => completeFunc(rustFuture, status),
-        liftString,
-        errorHandler,
-      ),
-    );
+    return await fns.complete(rustFuture, status);
   } finally {
     if (keepAlive !== undefined) clearTimeout(keepAlive);
     // We remove the abortFunc now so we don't trigger a use-after-free
     // panic.
-    asyncOpts?.signal.removeEventListener("abort", abortFunc);
-    uniffiIgnoreVoidResult(freeFunc(rustFuture), "rust future free");
+    if (abortFunc) signal?.removeEventListener("abort", abortFunc);
+    uniffiIgnoreVoidResult(fns.free(rustFuture), "rust future free");
   }
 }
 

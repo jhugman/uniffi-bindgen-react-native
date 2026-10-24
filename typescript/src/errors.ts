@@ -148,6 +148,13 @@ export const UniffiInternalError = (() => {
       );
     }
   }
+  class IncompatiblePlayer extends Error {
+    constructor() {
+      super(
+        "The registered player does not run the async poll loop: @ubjs/wasm is too old for these bindings",
+      );
+    }
+  }
   class RustPanic extends Error {
     constructor(message: string) {
       super(message);
@@ -164,6 +171,7 @@ export const UniffiInternalError = (() => {
     DateTimeOverflow,
     BufferOverflow,
     ContractVersionMismatch,
+    IncompatiblePlayer,
     IncompleteData,
     AbortError,
     UnexpectedEnumCase,
