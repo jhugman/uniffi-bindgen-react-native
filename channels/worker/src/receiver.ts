@@ -3,7 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import type { ModuleDefinitions } from "@ubjs/core";
+import {
+  UniffiInternalError,
+  type ModuleDefinitions,
+  type UniffiRustCallStatus,
+} from "@ubjs/core";
 import type { ChannelListener, ChannelPort } from "./port.js";
 import {
   fromWireError,
@@ -16,6 +20,7 @@ import {
   compilePlan,
   type CallbackLifetime,
   type CallbackPlan,
+  type FunctionPlan,
   type ModulePlan,
   type ValuePlan,
 } from "./plan.js";
@@ -28,10 +33,6 @@ import {
 } from "./marshal.js";
 import { tagHandle, untagHandle } from "./handles.js";
 import type { Receiver, RegisteredPlayer } from "./types.js";
-
-// The callback type uniffi gives every `rust_future_poll_*` continuation.
-const RUST_FUTURE_CONTINUATION = "RustFutureContinuationCallback";
-const RUST_FUTURE_POLL_MAYBE_READY = 1;
 
 export interface ReceiverOptions {
   portId?: number;
@@ -48,6 +49,8 @@ export class ReceiverCore {
   private registry = new CallbackRegistry();
   private forwarders = new ForwarderCache();
   private pendingCallbacks = new Map<number, Settle>();
+  // The signal handed to each async entry still running, by call id.
+  private inflight = new Map<number, AbortController>();
   private nextId = 1;
   private nextLocalHandle = 1n;
   private dropped = new Map<bigint, DroppedClient>();
@@ -85,8 +88,9 @@ export class ReceiverCore {
       handleIn: (h: bigint) => tagHandle(h, portId),
       handleOut: (h: bigint) => untagHandle(h, portId),
     };
-    // Views the player returns alias wasm memory and are ours to free; views
-    // it passes into a callback are JS-owned copies already.
+    // Views the player returns from a synchronous call alias wasm memory and
+    // are ours to free; an async entry's result and the views the player
+    // passes into a callback are JS-owned copies already.
     this.returnCtx = {
       ...shared,
       bufferOut: (v) => {
@@ -114,6 +118,10 @@ export class ReceiverCore {
     this.closed = true;
     this.port.removeEventListener("message", this.listener);
     this.pendingCallbacks.clear();
+    // No reply can be read once closed, so cancel each entry still running:
+    // its driver then completes, frees the future and settles unposted.
+    for (const controller of this.inflight.values()) controller.abort();
+    this.inflight.clear();
     this.port.close?.();
   }
 
@@ -135,40 +143,93 @@ export class ReceiverCore {
       }
       case "release":
         return this.registry.release(data.cb);
+      case "cancel":
+        // A call that already settled has nothing left to abort.
+        return this.inflight.get(data.id)?.abort();
       default:
         return;
     }
   }
 
   private onCall(msg: Extract<ChannelMessage, { kind: "call" }>): void {
-    const transfer: Transferable[] = [];
+    const id = msg.id;
+    const plan = this.plan.functions.get(msg.fn);
+    const isAsync = plan?.isAsync === true;
     try {
-      const plan = this.plan.functions.get(msg.fn);
       if (!plan) throw new Error(`worker: unknown function "${msg.fn}"`);
       const args = plan.args.map((p, i) => this.inboundArg(p, msg.args[i]));
-      this.driveFutureLocally(msg.fn, plan.args, args);
-      let status: { code: number; errorBuf?: Uint8Array } | undefined;
+      let status: UniffiRustCallStatus | undefined;
       if (plan.hasRustCallStatus) {
         status = { code: 0 };
         args.push(status);
       }
-      const raw = this.player[msg.fn](...args);
-      const value =
-        status && status.code !== 0
-          ? undefined
-          : marshalOut(plan.ret, raw, this.returnCtx, transfer);
-      this.port.postMessage(
-        { kind: "return", id: msg.id, ok: true, value, status },
-        transfer,
-      );
+      if (isAsync) {
+        const controller = new AbortController();
+        this.inflight.set(id, controller);
+        args.push(controller.signal);
+      }
+      const raw: any = this.player[msg.fn](...args);
+      // Wait only on a thenable: a non-thenable result must reach postMessage synchronously so a sync port can answer.
+      if (raw && typeof raw.then === "function") {
+        raw.then(
+          (v: unknown) =>
+            this.settle(id, isAsync, () =>
+              this.postReturn(id, plan, v, status),
+            ),
+          (e: unknown) => this.settle(id, isAsync, () => this.postError(id, e)),
+        );
+        return;
+      }
+      // A player that predates async entries starts the future and returns
+      // its handle, which must not be posted as the value.
+      if (isAsync) throw new UniffiInternalError.IncompatiblePlayer();
+      this.settle(id, isAsync, () => this.postReturn(id, plan, raw, status));
     } catch (e) {
-      this.port.postMessage({
-        kind: "return",
-        id: msg.id,
-        ok: false,
-        error: toWireError(e),
-      });
+      this.settle(id, isAsync, () => this.postError(id, e));
     }
+  }
+
+  // Where a call's reply is posted: an async call leaves `inflight`, nothing
+  // is posted after close, and a reply that cannot be marshalled or posted
+  // goes back as an error instead.
+  private settle(id: number, isAsync: boolean, post: () => void): void {
+    if (isAsync) this.inflight.delete(id);
+    if (this.closed) return;
+    try {
+      post();
+    } catch (e) {
+      this.postError(id, e);
+    }
+  }
+
+  // An async entry writes the status as it settles, so it is read only here.
+  private postReturn(
+    id: number,
+    plan: FunctionPlan,
+    raw: unknown,
+    status: UniffiRustCallStatus | undefined,
+  ): void {
+    const transfer: Transferable[] = [];
+    // An async entry's RustBuffer result is already a JS-owned copy of exact
+    // length, so it is transferred as it is.
+    const ctx = plan.isAsync ? this.callbackCtx : this.returnCtx;
+    const value =
+      status && status.code !== 0
+        ? undefined
+        : marshalOut(plan.ret, raw, ctx, transfer);
+    this.port.postMessage(
+      { kind: "return", id, ok: true, value, status },
+      transfer,
+    );
+  }
+
+  private postError(id: number, e: unknown): void {
+    this.port.postMessage({
+      kind: "return",
+      id,
+      ok: false,
+      error: toWireError(e),
+    });
   }
 
   // Functions this receiver registered in its own CallbackRegistry (e.g. an
@@ -223,31 +284,6 @@ export class ReceiverCore {
         error: toWireError(e),
       });
     }
-  }
-
-  // A poll call carries UniFFI's continuation. Forwarding every wake to the
-  // client puts a message round trip between the wake and the next poll, and
-  // an IndexedDB transaction auto-commits in that gap. So the receiver polls
-  // again itself on a microtask while the future reports MAYBE_READY, and
-  // only READY reaches the client: one continuation per await, as uniffi's
-  // "not inside the callback, but soon after" rule requires.
-  private driveFutureLocally(
-    fn: string,
-    plans: ValuePlan[],
-    args: unknown[],
-  ): void {
-    const i = plans.findIndex(
-      (p) => p.kind === "callback" && p.name === RUST_FUTURE_CONTINUATION,
-    );
-    if (i < 0) return;
-    const forward = args[i] as (data: bigint, code: number) => void;
-    const cont = (data: bigint, code: number) => {
-      if (code !== RUST_FUTURE_POLL_MAYBE_READY) return forward(data, code);
-      queueMicrotask(() => {
-        if (!this.closed) this.player[fn](...args);
-      });
-    };
-    args[i] = cont;
   }
 
   private inboundArg(plan: ValuePlan, wire: unknown): unknown {

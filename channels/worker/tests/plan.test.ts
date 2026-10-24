@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { FfiType, type ModuleDefinitions } from "@ubjs/core";
 import { compilePlan } from "../src/plan.js";
+import { DEFS } from "./fixtures.js";
 
 const SYMBOLS = {
   rustbuffer_alloc: "a",
@@ -230,6 +231,17 @@ test("unsupported and unknown tags are registration errors", () => {
       ),
     /functions\.f ret: VoidPointer/,
   );
+});
+
+test("an async function plans the completed return type, a status, and is marked async", () => {
+  const p = compilePlan(DEFS).functions.get("sleep")!;
+  assert.deepStrictEqual(p.ret, { kind: "pass" });
+  assert.strictEqual(p.hasRustCallStatus, true);
+  assert.strictEqual(p.isAsync, true);
+  assert.deepStrictEqual(compilePlan(DEFS).functions.get("sleep_bytes")!.ret, {
+    kind: "buffer",
+  });
+  assert.strictEqual(compilePlan(DEFS).functions.get("add")!.isAsync, false);
 });
 
 test("VoidPointer is accepted only as a vtable method's void out-return", () => {

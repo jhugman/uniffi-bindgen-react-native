@@ -37,13 +37,24 @@ type WithStatus<Args extends unknown[], S> = S extends true
   ? [...Args, UniffiRustCallStatus]
   : Args;
 
+// An async function's entry resolves with the completed value, not the
+// future handle in `ret`, and always takes a status and then a signal.
+type RetOf<F> = F extends { async: { ret: infer R extends FfiTypeDesc } }
+  ? JsValueOf<R>
+  : F extends { ret: infer R extends FfiTypeDesc }
+    ? JsValueOf<R>
+    : never;
+
+type CallArgs<F> = F extends { async: object; args: infer A }
+  ? [...ArgsOf<A>, UniffiRustCallStatus, AbortSignal | undefined]
+  : F extends { args: infer A; hasRustCallStatus: infer S }
+    ? WithStatus<ArgsOf<A>, S>
+    : never;
+
 export type AsyncPlayer<D extends ModuleDefinitions> = {
   [K in keyof D["functions"]]: (
-    ...args: WithStatus<
-      ArgsOf<D["functions"][K]["args"]>,
-      D["functions"][K]["hasRustCallStatus"]
-    >
-  ) => Promise<JsValueOf<D["functions"][K]["ret"]>>;
+    ...args: CallArgs<D["functions"][K]>
+  ) => Promise<RetOf<D["functions"][K]>>;
 };
 
 // A type alias, not an interface: only an alias gets an implicit index
