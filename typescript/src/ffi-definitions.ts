@@ -58,11 +58,23 @@ export interface FieldDesc {
   type: FfiTypeDesc;
 }
 
+/** Present on a future-starting export when the player runs the poll loop
+ * itself. The registered entry then takes `(...args, status, signal)` and
+ * returns a Promise of the completed value, whose FFI type is `ret`. */
+export interface AsyncFunctionDef {
+  poll: string;
+  cancel: string;
+  complete: string;
+  free: string;
+  ret: FfiTypeDesc;
+}
+
 /** One FFI export. `hasRustCallStatus` adds a trailing status pointer. */
 export interface FunctionDef {
   args: FfiTypeDesc[];
   ret: FfiTypeDesc;
   hasRustCallStatus: boolean;
+  async?: AsyncFunctionDef;
 }
 
 /** One function Rust calls into JavaScript. `outReturn` means the C
