@@ -163,6 +163,20 @@ impl AbiFlavor {
             && self.supports_finalization_registry()
     }
 
+    /// Whether the player runs UniFFI's future poll loop itself: an async
+    /// function's registered entry returns a Promise of the completed value,
+    /// and the `rust_future_*` family never reaches the generated code.
+    pub fn low_level_async_polling(&self) -> bool {
+        #[cfg(feature = "wasm")]
+        {
+            matches!(self, Self::Wasm2)
+        }
+        #[cfg(not(feature = "wasm"))]
+        {
+            false
+        }
+    }
+
     /// The `--flavor` spelling, for error messages.
     pub fn as_str(&self) -> &'static str {
         match self {

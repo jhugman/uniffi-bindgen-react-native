@@ -42,7 +42,7 @@ impl TsFfiModule {
 
         let has_continuation_callback = definitions.iter().any(|d| {
             matches!(d,
-                FfiDefinitionDecl::Callback(cb) if cb.name == "UniffiRustFutureContinuationCallback"
+                FfiDefinitionDecl::Callback(cb) if cb.name == TS_RUST_FUTURE_CONTINUATION
             )
         });
         let has_foreign_future = definitions.iter().any(|d| {
@@ -132,6 +132,7 @@ impl TsFfiModule {
             name: format!("ubrn_{}", func.name.0),
             arguments,
             return_type,
+            returns_promise: false,
         }
     }
 
@@ -150,6 +151,7 @@ impl TsFfiModule {
                     },
                 ],
                 return_type: Some("number".into()),
+                returns_promise: false,
             },
             FfiFunctionDecl {
                 name: "ubrn_uniffi_internal_fn_func_ffi__string_to_buffer".into(),
@@ -164,6 +166,7 @@ impl TsFfiModule {
                     },
                 ],
                 return_type: Some("Uint8Array".into()),
+                returns_promise: false,
             },
             FfiFunctionDecl {
                 name: "ubrn_uniffi_internal_fn_func_ffi__string_from_buffer".into(),
@@ -178,6 +181,7 @@ impl TsFfiModule {
                     },
                 ],
                 return_type: Some("string".into()),
+                returns_promise: false,
             },
             FfiFunctionDecl {
                 name: "ubrn_uniffi_internal_fn_func_ffi__read_string_from_buffer".into(),
@@ -196,6 +200,7 @@ impl TsFfiModule {
                     },
                 ],
                 return_type: Some("string".into()),
+                returns_promise: false,
             },
         ]
     }
@@ -217,6 +222,7 @@ impl TsFfiModule {
                 },
             ],
             return_type: Some("UniffiGcObject".into()),
+            returns_promise: false,
         }
     }
 

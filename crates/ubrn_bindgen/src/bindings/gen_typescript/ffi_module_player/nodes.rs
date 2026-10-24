@@ -133,6 +133,21 @@ pub(crate) struct PlayerFunctionDef {
     pub ret: String,
     /// Whether this function has a trailing RustCallStatus argument.
     pub has_rust_call_status: bool,
+    /// Set on a future-starting function when the player runs the poll loop;
+    /// `args`, `ret` and `has_rust_call_status` still describe the export.
+    pub async_entry: Option<PlayerAsyncDef>,
+}
+
+/// The `rust_future_*` exports the player drives an async function's future
+/// with, and the FfiType its `complete` export returns.
+#[derive(Clone)]
+pub(crate) struct PlayerAsyncDef {
+    pub poll: String,
+    pub cancel: String,
+    pub complete: String,
+    pub free: String,
+    /// Player FfiType expression; "FfiType.Void" for a future with no value.
+    pub ret: String,
 }
 
 pub(crate) struct PlayerCallbackDef {
@@ -163,13 +178,59 @@ pub(crate) struct PlayerFieldDef {
 
 impl PlayerFfiModule {
     /// Construct a minimal `PlayerFfiModule` with the given flavor: one typed
-    /// function, so the rendered interface has a return type to check, and
+    /// function, so the rendered interface has a return type to check, plus
+    /// one async function when the flavor polls futures in the player, and
     /// empty collections otherwise. Used by codegen snapshot tests to exercise
     /// the template branches without needing to materialize a full
     /// `general::Namespace`.
     #[doc(hidden)]
     pub fn minimal_for_test(flavor: crate::AbiFlavor, async_delivery: bool) -> Self {
+        use super::super::ffi_module::{FfiArgDecl, FfiFunctionDecl};
         let host_source = PlayerHostSource::for_flavor(&flavor);
+        let mut functions = Vec::new();
+        let mut typed_functions = vec![FfiFunctionDecl {
+            name: "ubrn_uniffi_test_fn_func_add".into(),
+            arguments: vec![FfiArgDecl {
+                name: "lhs".into(),
+                type_name: "number".into(),
+            }],
+            return_type: Some("number".into()),
+            returns_promise: false,
+        }];
+        if flavor.low_level_async_polling() {
+            functions.push(PlayerFunctionDef {
+                name: "ubrn_uniffi_test_fn_func_sleep".into(),
+                args: vec!["FfiType.UInt32".into()],
+                ret: "FfiType.Handle".into(),
+                has_rust_call_status: false,
+                async_entry: Some(PlayerAsyncDef {
+                    poll: "ubrn_test_poll".into(),
+                    cancel: "ubrn_test_cancel".into(),
+                    complete: "ubrn_test_complete".into(),
+                    free: "ubrn_test_free".into(),
+                    ret: "FfiType.UInt32".into(),
+                }),
+            });
+            typed_functions.push(FfiFunctionDecl {
+                name: "ubrn_uniffi_test_fn_func_sleep".into(),
+                arguments: vec![
+                    FfiArgDecl {
+                        name: "ms".into(),
+                        type_name: "number".into(),
+                    },
+                    FfiArgDecl {
+                        name: "uniffi_out_err".into(),
+                        type_name: "UniffiRustCallStatus".into(),
+                    },
+                    FfiArgDecl {
+                        name: "uniffi_signal".into(),
+                        type_name: "AbortSignal | undefined".into(),
+                    },
+                ],
+                return_type: Some("number".into()),
+                returns_promise: true,
+            });
+        }
         Self {
             strict_type_checking: true,
             async_delivery,
@@ -181,17 +242,10 @@ impl PlayerFfiModule {
                 rustbuffer_free: "ubrn_test_rb_free".into(),
                 rustbuffer_from_bytes: "ubrn_test_rb_from_bytes".into(),
             },
-            functions: Vec::new(),
+            functions,
             callbacks: Vec::new(),
             structs: Vec::new(),
-            typed_functions: vec![super::super::ffi_module::FfiFunctionDecl {
-                name: "ubrn_uniffi_test_fn_func_add".into(),
-                arguments: vec![super::super::ffi_module::FfiArgDecl {
-                    name: "lhs".into(),
-                    type_name: "number".into(),
-                }],
-                return_type: Some("number".into()),
-            }],
+            typed_functions,
             typed_definitions: Vec::new(),
         }
     }
