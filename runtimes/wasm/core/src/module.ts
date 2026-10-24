@@ -7,13 +7,14 @@ import { Memory } from "./memory.js";
 import { Scratch } from "./scratch.js";
 import { compileStructLayout, type StructLayout } from "./marshal.js";
 import {
-  specializeFunction,
+  specializeExport,
   getCapacityHint,
   canUseFunctionConstructor,
   type DispatchContext,
 } from "./call.js";
 import { CallbackTable, type CallbackDef } from "./callback.js";
 import { FutureRegistry } from "./future.js";
+import { buildAsyncEntry, hasAsyncEntry } from "./async-entry.js";
 import { type ModuleDefinitions } from "@ubjs/core";
 export type { ModuleDefinitions };
 
@@ -307,16 +308,8 @@ export class UniffiNativeModule {
           structs,
         }),
       useJit,
+      specialized: new Map(),
     };
-
-    const result: NativeModuleInterface = Object.create(null);
-    for (const [fnName, def] of Object.entries(definitions.functions)) {
-      const exportFn = this.exports[fnName];
-      if (typeof exportFn !== "function") {
-        throw new Error(`register: wasm export "${fnName}" not found`);
-      }
-      result[fnName] = specializeFunction(ctx, exportFn, def, fnName);
-    }
 
     // JS-callable allocator pair, exposed alongside the per-function entries.
     // A converter handed `rustbuffer_alloc` as its `lower(value, alloc)`
@@ -344,18 +337,23 @@ export class UniffiNativeModule {
      * Rust-side. After detachment, the view's byteLength becomes 0 and
      * `rustbuffer_free(view)` will leak the original allocation.
      */
-    result.rustbuffer_alloc = (n: number): Uint8Array => {
+    const rustbufferAlloc = (n: number): Uint8Array => {
       if (n === 0) return new Uint8Array(0);
       const ptr = alloc(n, 1);
       return new Uint8Array(memory.buffer(), ptr, n);
     };
-    result.rustbuffer_free = (view: Uint8Array): void => {
+    const rustbufferFree = (view: Uint8Array): void => {
       const hint = getCapacityHint(view);
       if (view.byteLength === 0 && hint === undefined) return;
-      if ((view.buffer as ArrayBuffer).byteLength === 0) {
-        throw new Error(
-          "rustbuffer_free: view is detached (held across a wasm memory growth?)",
-        );
+      if (view.buffer !== memory.buffer()) {
+        if ((view.buffer as ArrayBuffer).byteLength === 0) {
+          throw new Error(
+            "rustbuffer_free: view is detached (held across a wasm memory growth?)",
+          );
+        }
+        // A copy on the JS heap, such as an async entry's RustBuffer result,
+        // whose wasm allocation is already freed.
+        return;
       }
       // Rust may over-allocate a returned RustBuffer, so its capacity can
       // exceed the view's byteLength. The handoff path stashes the real
@@ -365,6 +363,15 @@ export class UniffiNativeModule {
       if (cap === 0) return;
       free(view.byteOffset, cap, 1);
     };
+
+    const result: NativeModuleInterface = Object.create(null);
+    for (const [fnName, def] of Object.entries(definitions.functions)) {
+      result[fnName] = hasAsyncEntry(def)
+        ? buildAsyncEntry(ctx, this.exports, fnName, def)
+        : specializeExport(ctx, this.exports, fnName, def);
+    }
+    result.rustbuffer_alloc = rustbufferAlloc;
+    result.rustbuffer_free = rustbufferFree;
 
     return result;
   }
