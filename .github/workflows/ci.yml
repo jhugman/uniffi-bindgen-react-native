@@ -68,7 +68,7 @@ jobs:
 
       - name: Installing hermes and test-runner
         run: |
-          cargo xtask bootstrap hermes --branch rn/0.77-stable
+          cargo xtask bootstrap hermes --branch rn/0.84-stable
           cargo xtask bootstrap test-runner
           cargo xtask bootstrap yarn
 
@@ -86,7 +86,7 @@ jobs:
 
       - name: Installing hermes, test-runner and the player shim
         run: |
-          cargo xtask bootstrap hermes --branch rn/0.77-stable
+          cargo xtask bootstrap hermes --branch rn/0.84-stable
           cargo xtask bootstrap test-runner
           cargo xtask bootstrap jsi-player-shim
           cargo xtask bootstrap yarn
