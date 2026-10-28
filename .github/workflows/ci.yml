@@ -194,6 +194,9 @@ jobs:
       - name: Run bootstrap for N-API bindings
         run: cargo xtask bootstrap yarn
 
+      - name: Check strict TypeScript fixture gate
+        run: cargo test -p ubrn_fixture_testing strict_tsx_gate -- --ignored
+
       - name: Run tests of generated N-API bindings
         run: "cargo test -- napi::"
 

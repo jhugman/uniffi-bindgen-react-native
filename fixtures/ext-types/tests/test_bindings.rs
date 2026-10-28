@@ -8,5 +8,6 @@ ubrn_macros::build_foreign_language_testcases! {
     // This variant imports `@/generated` as a bare directory, which resolves
     // to the index.ts bindgen writes for the player flavors. Jsi is out: its
     // entrypoint is a turbo module, so there is no index.ts to import.
-    "tests/bindings/test_ext_types_with_index.ts" => [Jsi2, Napi, Wasm2],
+    "tests/bindings/test_ext_types_with_index.ts" => [Jsi2, Napi],
+    "tests/bindings/test_ext_types_with_index_wasm2.ts" => [Wasm2],
 }

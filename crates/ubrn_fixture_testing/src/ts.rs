@@ -36,15 +36,18 @@ pub fn run_test(test_script: &str, flavor: Flavor, target_tmpdir: &str) {
         Flavor::Wasm => {
             paths::assert_wasm_bootstrap();
             // WASM framework tests run directly via tsx
-            crate::run_tsx(test_script);
+            let tsconfig = crate::prepare_tsx(test_script, &out_dir, None, flavor);
+            crate::run_tsx(test_script, &tsconfig);
         }
         Flavor::Napi => {
             paths::assert_napi_bootstrap();
-            crate::run_tsx(test_script);
+            let tsconfig = crate::prepare_tsx(test_script, &out_dir, None, flavor);
+            crate::run_tsx(test_script, &tsconfig);
         }
         Flavor::Wasm2 => {
             paths::assert_wasm_bootstrap();
-            crate::run_tsx(test_script);
+            let tsconfig = crate::prepare_tsx(test_script, &out_dir, None, flavor);
+            crate::run_tsx(test_script, &tsconfig);
         }
     }
 }
