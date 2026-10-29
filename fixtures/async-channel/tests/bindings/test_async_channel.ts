@@ -22,6 +22,7 @@ import {
   sleepMs,
   total,
 } from "@/generated/uniffi_async_channel";
+import ffi, { setNativeModule } from "@/generated/uniffi_async_channel-ffi";
 import { asyncTest } from "@/asserts";
 import "@/polyfills";
 
@@ -118,6 +119,36 @@ const mk = async (n: number): Promise<Counter> =>
         }
       }
       t.assertEqual(await greetVia(new TsGreeter(), "chan"), "hi chan");
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "the worker drives the poll loop: one page-side poll per await",
+    async (t) => {
+      // sleep_ms is pending on its first poll and woken by a timer later. The
+      // receiver re-polls in the worker, so the page's loop polls exactly once.
+      const nm = ffi() as unknown as Record<string, Function>;
+      const pollName = "ffi_uniffi_async_channel_rust_future_poll_u16";
+      let polls = 0;
+      setNativeModule(
+        new Proxy(nm, {
+          get(target, key, receiver) {
+            const v = Reflect.get(target, key, receiver);
+            if (key !== pollName) return v;
+            return (...args: unknown[]) => {
+              polls += 1;
+              return v.apply(target, args);
+            };
+          },
+        }) as any,
+      );
+      try {
+        t.assertEqual(await sleepMs(20), 20);
+        t.assertEqual(polls, 1);
+      } finally {
+        setNativeModule(nm as any);
+      }
       t.end();
     },
   );

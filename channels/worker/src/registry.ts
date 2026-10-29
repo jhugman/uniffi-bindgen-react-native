@@ -10,18 +10,27 @@ export interface Registered {
   plan: CallbackPlan;
 }
 
-/** Functions this end owns, keyed by the id the other end sees. */
+/** Functions this end owns, keyed by the id the other end sees. A function
+ * handed over again shares its id, and each hand-over takes a reference: the
+ * generated bindings give every foreign future the same `free`, and the other
+ * end releases once per future. */
 export class CallbackRegistry {
   private ids = new WeakMap<Function, number>();
-  private entries = new Map<number, Registered>();
+  private entries = new Map<number, Registered & { refs: number }>();
   private next = 1;
 
   register(fn: Function, plan: CallbackPlan): number {
     const existing = this.ids.get(fn);
-    if (existing !== undefined && this.entries.has(existing)) return existing;
+    if (existing !== undefined) {
+      const entry = this.entries.get(existing);
+      if (entry) {
+        entry.refs++;
+        return existing;
+      }
+    }
     const id = this.next++;
     this.ids.set(fn, id);
-    this.entries.set(id, { fn, plan });
+    this.entries.set(id, { fn, plan, refs: 1 });
     return id;
   }
 
@@ -31,7 +40,7 @@ export class CallbackRegistry {
 
   release(id: number): void {
     const entry = this.entries.get(id);
-    if (!entry) return;
+    if (!entry || --entry.refs > 0) return;
     this.entries.delete(id);
     this.ids.delete(entry.fn);
   }

@@ -1,0 +1,41 @@
+name: Publish @ubjs/worker to npmjs
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run without publishing to npm"
+        type: boolean
+        default: true
+  workflow_call:
+
+jobs:
+  publish-worker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      # `@ubjs/core` is a peer dependency, satisfied here by the in-tree copy
+      # so `tsc -b` can resolve it. Building it first keeps that copy current.
+      - run: cd typescript && npm install && npm run build
+      - run: cd channels/worker && npm install && npm test && npm run typecheck
+
+      - name: "📦 npm publish: @ubjs/worker (dry-run)"
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+        run: |
+          echo "::notice::DRY RUN — not publishing to npm"
+          cd channels/worker && npm publish --dry-run --access public --tag latest
+
+      - name: "📦 npm publish: @ubjs/worker"
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_call' || !inputs.dry-run }}
+        run: cd channels/worker && npm publish --provenance --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
