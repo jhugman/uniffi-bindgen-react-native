@@ -244,7 +244,7 @@ fn generate_api_from_pipeline(
 ) -> Result<Vec<ModuleMetadata>> {
     let mut modules = Vec::new();
     for (name, namespace) in &general_root.namespaces {
-        let config = extract_ts_config(namespace)?;
+        let config = ts_config_for(namespace, switches)?;
         let module = ModuleMetadata::new(name);
         let ffi_module = gen_typescript::ffi_module::TsFfiModule::from_general(
             namespace,
@@ -287,8 +287,12 @@ fn generate_index_from_modules(
     let has_wasm_bindgen_glue = false;
     // Only when every namespace opts in; the index re-exports all of them.
     let mut strict_type_checking = !general_root.namespaces.is_empty();
+    // One namespace is enough: awaiting a sync namespace's void `initialize()` is harmless.
+    let mut async_delivery = false;
     for namespace in general_root.namespaces.values() {
-        strict_type_checking &= extract_ts_config(namespace)?.strict_type_checking;
+        let config = ts_config_for(namespace, switches)?;
+        strict_type_checking &= config.strict_type_checking;
+        async_delivery |= config.async_delivery;
     }
     let code = gen_typescript::generate_index_code(
         modules.to_vec(),
@@ -296,10 +300,21 @@ fn generate_index_from_modules(
         wasm_stem,
         has_wasm_bindgen_glue,
         strict_type_checking,
+        async_delivery,
     )?;
     let path = ts_dir.join("index.ts");
     ubrn_common::write_file(path, code)?;
     Ok(())
+}
+
+/// The per-namespace TypeScript config with the command line folded in.
+fn ts_config_for(
+    namespace: &general::Namespace,
+    switches: &SwitchArgs,
+) -> Result<gen_typescript::Config> {
+    let mut config = extract_ts_config(namespace)?;
+    config.apply_switches(switches)?;
+    Ok(config)
 }
 
 fn extract_ts_config(namespace: &general::Namespace) -> Result<gen_typescript::Config> {
@@ -330,7 +345,7 @@ fn generate_ffi_from_pipeline(
         let module = ModuleMetadata::new(name);
         let path = ts_dir.join(module.ts_ffi_filename());
 
-        let config = extract_ts_config(namespace)?;
+        let config = ts_config_for(namespace, switches)?;
         let code = match &switches.flavor {
             AbiFlavor::Napi | AbiFlavor::Jsi2 => {
                 let lib_resolution = lib_resolution.clone().ok_or_else(|| {

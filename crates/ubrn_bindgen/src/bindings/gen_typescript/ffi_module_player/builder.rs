@@ -58,6 +58,7 @@ impl PlayerFfiModule {
 
         Self {
             strict_type_checking: config.strict_type_checking,
+            async_delivery: config.async_delivery,
             crate_name,
             lib_resolution,
             host_source,
