@@ -53,16 +53,20 @@ export function createSyncPortPair(): [ChannelPort, ChannelPort] {
   return [a, b];
 }
 
-/** A player-shaped object whose every function returns synchronously. Only
+/** A player-shaped object whose every function returns synchronously, except
+ * an async entry, which returns a Promise as it does on the real player. Only
  * works over a port from `createSyncPortPair`; anything else throws. */
 export function createSyncPlayer(
   defs: ModuleDefinitions,
   port: ChannelPort,
 ): RegisteredPlayer & { close(): void } {
-  const core = new SenderCore(compilePlan(defs), port);
+  const plan = compilePlan(defs);
+  const core = new SenderCore(plan, port);
   const player: Record<string, unknown> = Object.create(null);
-  for (const name of Object.keys(defs.functions)) {
-    player[name] = (...args: unknown[]) => core.invokeSync(name, args);
+  for (const [name, fn] of plan.functions) {
+    player[name] = fn.isAsync
+      ? (...args: unknown[]) => core.invoke(name, args)
+      : (...args: unknown[]) => core.invokeSync(name, args);
   }
   player.rustbuffer_alloc = (n: number) => core.rustbuffer_alloc(n);
   player.rustbuffer_free = (v: Uint8Array) => core.rustbuffer_free(v);

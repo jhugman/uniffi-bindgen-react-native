@@ -338,7 +338,11 @@ impl ImportAccumulator {
 
     fn collect_callable(&mut self, callable: &TsCallable) {
         if callable.is_ffi_async() {
-            self.add_infra_value("uniffiRustCallAsync");
+            if callable.low_level_async_polling {
+                self.add_infra_value("uniffiRustCallAsyncEntry");
+            } else {
+                self.add_infra_value("uniffiRustCallAsync");
+            }
         }
     }
 
@@ -346,7 +350,7 @@ impl ImportAccumulator {
         self.add_infra_type("UniffiHandle");
         self.add_infra_type("UniffiRustCallStatus");
         if has_async {
-            self.add_infra_type("UniffiRustFutureContinuationCallback");
+            self.add_infra_type(ffi_module::TS_RUST_FUTURE_CONTINUATION);
         }
     }
 }
@@ -468,18 +472,21 @@ impl TsApiModule {
         }
 
         if self.is_verbose {
-            let has_async = self.functions.iter().any(|f| f.is_ffi_async())
-                || self.type_definitions.iter().any(|td| match td {
-                    TsTypeDefinition::Object(o) => {
-                        o.methods.iter().any(|m| m.is_ffi_async())
-                            || o.primary_constructor
-                                .as_ref()
-                                .is_some_and(|c| c.is_ffi_async())
-                            || o.alternate_constructors.iter().any(|c| c.is_ffi_async())
-                    }
-                    TsTypeDefinition::CallbackInterface(cbi) => cbi.has_async_methods,
-                    _ => false,
-                });
+            // Only the verbose poll wrappers name the continuation callback,
+            // and a player that runs the poll loop renders none.
+            let has_async = !self.flavor.low_level_async_polling()
+                && (self.functions.iter().any(|f| f.is_ffi_async())
+                    || self.type_definitions.iter().any(|td| match td {
+                        TsTypeDefinition::Object(o) => {
+                            o.methods.iter().any(|m| m.is_ffi_async())
+                                || o.primary_constructor
+                                    .as_ref()
+                                    .is_some_and(|c| c.is_ffi_async())
+                                || o.alternate_constructors.iter().any(|c| c.is_ffi_async())
+                        }
+                        TsTypeDefinition::CallbackInterface(cbi) => cbi.has_async_methods,
+                        _ => false,
+                    }));
             if has_async {
                 acc.collect_verbose_imports(true);
             } else {
@@ -543,13 +550,20 @@ impl TsApiModule {
         // Build file imports: FFI types first, then cross-module imports
         let mut file_imports = Vec::new();
 
-        if !ffi_exported_definitions.is_empty() {
+        // Only the poll loop generated here names the continuation callback.
+        let ffi_types: Vec<String> = ffi_exported_definitions
+            .iter()
+            .map(|def| def.name())
+            .filter(|name| {
+                !(module.flavor.low_level_async_polling()
+                    && *name == ffi_module::TS_RUST_FUTURE_CONTINUATION)
+            })
+            .map(str::to_string)
+            .collect();
+        if !ffi_types.is_empty() {
             file_imports.push(TsFileImport {
                 path: format!("./{}-ffi", module.module_name),
-                types: ffi_exported_definitions
-                    .iter()
-                    .map(|def| def.name().to_string())
-                    .collect(),
+                types: ffi_types,
                 values: Vec::new(),
             });
         }
@@ -654,7 +668,7 @@ fn force_async_error_block(kind: &str, name: &str, methods: &[TsCallable]) -> Op
 mod force_async_validation_tests {
     use super::*;
 
-    fn callable(name: &str, ffi_async: bool) -> TsCallable {
+    pub(super) fn callable(name: &str, ffi_async: bool) -> TsCallable {
         TsCallable {
             name: name.into(),
             docstring: None,
@@ -671,6 +685,7 @@ mod force_async_validation_tests {
             receiver: None,
             force_async: false,
             async_delivery: false,
+            low_level_async_polling: false,
         }
     }
 
@@ -729,5 +744,31 @@ mod force_async_validation_tests {
             vec![callable("log", true), callable("flush", true)],
         )];
         assert!(validate_force_async(&defs).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::force_async_validation_tests::callable;
+    use super::*;
+
+    #[test]
+    fn low_level_polling_imports_the_entry_helper_not_the_loop() {
+        let mut c = callable("sleep", true);
+        c.low_level_async_polling = true;
+        let mut acc = ImportAccumulator::new();
+        acc.collect_callable(&c);
+        let core = &acc.imports["@ubjs/core"];
+        assert!(core.contains(&ImportedItem::Value("uniffiRustCallAsyncEntry".into())));
+        assert!(!core.contains(&ImportedItem::Value("uniffiRustCallAsync".into())));
+    }
+
+    #[test]
+    fn the_high_level_loop_still_imports_uniffi_rust_call_async() {
+        let mut acc = ImportAccumulator::new();
+        acc.collect_callable(&callable("sleep", true));
+        assert!(
+            acc.imports["@ubjs/core"].contains(&ImportedItem::Value("uniffiRustCallAsync".into()))
+        );
     }
 }

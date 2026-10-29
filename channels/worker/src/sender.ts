@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import type { ModuleDefinitions } from "@ubjs/core";
+import type { ModuleDefinitions, UniffiRustCallStatus } from "@ubjs/core";
 import type { ChannelListener, ChannelPort } from "./port.js";
 import {
   fromWireError,
@@ -34,7 +34,9 @@ interface Settle {
 
 interface PendingCall extends Settle {
   plan: FunctionPlan;
-  status: { code: number; errorBuf?: Uint8Array } | undefined;
+  status: UniffiRustCallStatus | undefined;
+  /** Stops replaying the call's AbortSignal once nothing waits on it. */
+  detach: (() => void) | undefined;
 }
 
 export class SenderCore {
@@ -114,7 +116,10 @@ export class SenderCore {
     this.closed = true;
     this.port.removeEventListener("message", this.listener);
     if (this.pending.size > 0) this.port.unref?.();
-    for (const p of this.pending.values()) p.reject(new ChannelClosedError());
+    for (const p of this.pending.values()) {
+      p.detach?.();
+      p.reject(new ChannelClosedError());
+    }
     this.pending.clear();
     this.port.close?.();
   }
@@ -123,6 +128,7 @@ export class SenderCore {
     const p = this.pending.get(id);
     if (!p) return undefined;
     this.pending.delete(id);
+    p.detach?.();
     if (this.pending.size === 0) this.port.unref?.();
     return p;
   }
@@ -135,18 +141,20 @@ export class SenderCore {
 
   private dispatch(plan: FunctionPlan, args: unknown[], settle: Settle): void {
     if (this.closed) return settle.reject(new ChannelClosedError());
-    let status: PendingCall["status"];
-    let userArgs = args;
-    if (plan.hasRustCallStatus) {
-      status = args[args.length - 1] as PendingCall["status"];
-      userArgs = args.slice(0, -1);
-    }
+    const n = plan.args.length;
+    const status = plan.hasRustCallStatus
+      ? (args[n] as PendingCall["status"])
+      : undefined;
+    const signal = plan.isAsync
+      ? (args[n + 1] as AbortSignal | undefined)
+      : undefined;
     const transfer: Transferable[] = [];
     const wire = plan.args.map((p, i) =>
-      marshalOut(p, userArgs[i], this.ctx, transfer),
+      marshalOut(p, args[i], this.ctx, transfer),
     );
     const id = this.nextId++;
-    this.pending.set(id, { ...settle, plan, status });
+    const pending: PendingCall = { ...settle, plan, status, detach: undefined };
+    this.pending.set(id, pending);
     // An unref'd node port drops queued replies at exit; hold the loop
     // only while something is waiting on one.
     if (this.pending.size === 1) this.port.ref?.();
@@ -154,6 +162,24 @@ export class SenderCore {
       { kind: "call", id, fn: plan.name, args: wire },
       transfer,
     );
+    // A synchronous port may already have settled the call.
+    if (signal && this.pending.has(id))
+      pending.detach = this.replayAbort(id, signal);
+  }
+
+  // An AbortSignal cannot cross a port, so its abort crosses as a cancel
+  // for this call, posted after the call itself.
+  private replayAbort(
+    id: number,
+    signal: AbortSignal,
+  ): (() => void) | undefined {
+    const onAbort = () => this.port.postMessage({ kind: "cancel", id });
+    if (signal.aborted) {
+      onAbort();
+      return undefined;
+    }
+    signal.addEventListener("abort", onAbort);
+    return () => signal.removeEventListener("abort", onAbort);
   }
 
   private onMessage(data: unknown): void {
@@ -171,7 +197,7 @@ export class SenderCore {
       case "release":
         return this.registry.release(data.cb);
       default:
-        return; // "call" is not addressed to a sender
+        return; // "call" and "cancel" are not addressed to a sender
     }
   }
 

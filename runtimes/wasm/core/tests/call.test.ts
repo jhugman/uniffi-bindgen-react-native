@@ -131,6 +131,7 @@ test("buildJitDispatcher emits a body that calls fn + reads status (u32 → u32)
       throw new Error("not used");
     },
     useJit: true,
+    specialized: new Map(),
   };
 
   const def: FunctionDef = {
@@ -228,6 +229,7 @@ test("buildJitDispatcher error path: code != 0 populates statusObj.errorBuf", ()
       throw new Error("not used");
     },
     useJit: true,
+    specialized: new Map(),
   };
 
   const def: FunctionDef = {
@@ -286,6 +288,7 @@ test("buildJitDispatcher returns undefined for unsupported (callback) arg", () =
     free: () => {},
     installCallback: () => 0,
     useJit: true,
+    specialized: new Map(),
   };
   const def: FunctionDef = {
     args: [FfiType.Callback("cb")],

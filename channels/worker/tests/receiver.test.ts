@@ -36,6 +36,22 @@ function senderSide(port: MessagePort) {
   return { next, post };
 }
 
+/** A receiver over the fake player, driven by hand from the other port. */
+function receiverPair() {
+  const { port1, port2 } = new MessageChannel();
+  const { player, state } = fakePlayer();
+  const r = createReceiver(DEFS, player, port1);
+  const s = senderSide(port2);
+  return {
+    s,
+    state,
+    done: () => {
+      r.close();
+      port2.close();
+    },
+  };
+}
+
 test("call: status supplied, value returned, status copied", async () => {
   const { port1, port2 } = new MessageChannel();
   const { player } = fakePlayer();
@@ -242,25 +258,136 @@ test("an async method returns a local dropped-struct immediately and maps the cl
   port2.close();
 });
 
-test("a future woken MAYBE_READY is re-polled in the worker; the client hears one READY", async () => {
+test("an async entry is awaited; the status is copied after it settles", async () => {
+  const { s, done } = receiverPair();
+  try {
+    s.post({ kind: "call", id: 1, fn: "sleep", args: [5] });
+    assert.deepStrictEqual(await s.next(), {
+      kind: "return",
+      id: 1,
+      ok: true,
+      value: 10,
+      status: { code: 0 },
+    });
+  } finally {
+    done();
+  }
+});
+
+test("a cancel message aborts the in-flight call's signal", async () => {
+  const { s, state, done } = receiverPair();
+  try {
+    s.post({ kind: "call", id: 1, fn: "sleep", args: [10_000] });
+    s.post({ kind: "cancel", id: 1 });
+    const m = (await s.next()) as any;
+    assert.strictEqual(m.status.code, 3);
+    assert.strictEqual(m.value, undefined);
+    assert.strictEqual(state.cancelled, 1);
+  } finally {
+    done();
+  }
+});
+
+test("a cancel for an unknown or finished id is ignored", async () => {
+  const { s, state, done } = receiverPair();
+  try {
+    s.post({ kind: "cancel", id: 99 });
+    s.post({ kind: "call", id: 1, fn: "sleep", args: [1] });
+    assert.strictEqual(((await s.next()) as any).value, 2);
+    s.post({ kind: "cancel", id: 1 }); // finished
+    s.post({ kind: "call", id: 2, fn: "sleep", args: [1] });
+    assert.strictEqual(((await s.next()) as any).status.code, 0);
+    assert.strictEqual(state.cancelled, 0);
+  } finally {
+    done();
+  }
+});
+
+test("a stale cancel leaves a later call running until its own cancel arrives", async () => {
+  const { s, state, done } = receiverPair();
+  try {
+    s.post({ kind: "call", id: 1, fn: "sleep", args: [1] });
+    assert.strictEqual(((await s.next()) as any).value, 2);
+    s.post({ kind: "call", id: 2, fn: "sleep", args: [10_000] });
+    s.post({ kind: "cancel", id: 1 }); // call 1 has already returned
+    s.post({ kind: "cancel", id: 2 });
+    const m = (await s.next()) as any;
+    assert.strictEqual(m.id, 2);
+    assert.strictEqual(m.status.code, 3);
+    assert.strictEqual(state.cancelled, 1);
+  } finally {
+    done();
+  }
+});
+
+test("close cancels every async entry still running and posts nothing after", async () => {
+  // A port that records what is posted and hands the test its listener, so
+  // the call lands synchronously and nothing posted after close is lost.
+  const posted: unknown[] = [];
+  let deliver: ((ev: { data: unknown }) => void) | undefined;
+  const port = {
+    postMessage: (m: unknown) => void posted.push(m),
+    addEventListener: (_type: "message", l: (ev: any) => void) => {
+      deliver = l;
+    },
+    removeEventListener: () => {
+      deliver = undefined;
+    },
+  };
+  const { player, state } = fakePlayer();
+  const r = createReceiver(DEFS, player, port);
+  deliver!({ data: { kind: "call", id: 1, fn: "sleep", args: [10_000] } });
+  r.close();
+  assert.strictEqual(state.cancelled, 1);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepStrictEqual(posted, []);
+});
+
+test("an async entry that returns a future handle is an error naming the too-old player", async () => {
+  const { s, done } = receiverPair();
+  try {
+    s.post({ kind: "call", id: 1, fn: "sleep_unawaited", args: [] });
+    const m = (await s.next()) as any;
+    assert.strictEqual(m.id, 1);
+    assert.strictEqual(m.ok, false);
+    assert.match(m.error.message, /@ubjs\/wasm is too old/);
+  } finally {
+    done();
+  }
+});
+
+test("a rejecting entry becomes ok:false", async () => {
+  const { s, done } = receiverPair();
+  try {
+    s.post({ kind: "call", id: 1, fn: "sleep_boom", args: [] });
+    assert.deepStrictEqual(await s.next(), {
+      kind: "return",
+      id: 1,
+      ok: false,
+      error: { name: "RangeError", message: "boom" },
+    });
+  } finally {
+    done();
+  }
+});
+
+test("an async RustBuffer result is the player's own copy, transferred without another", async () => {
   const { port1, port2 } = new MessageChannel();
   const { player, state } = fakePlayer();
+  let resolved: Uint8Array | undefined;
+  const sleepBytes = player.sleep_bytes;
+  player.sleep_bytes = async (...args: unknown[]) =>
+    (resolved = await sleepBytes(...args));
   const r = createReceiver(DEFS, player, port1);
   const s = senderSide(port2);
   try {
-    // The continuation crosses as client callback id 7, the cookie as 42n.
-    s.post({
-      kind: "call",
-      id: 1,
-      fn: "rust_future_poll_u32",
-      args: [1n, 7, 42n],
-    });
-    assert.strictEqual((await s.next()).kind, "return");
-    const cb = (await s.next()) as any;
-    assert.strictEqual(cb.kind, "callback");
-    assert.strictEqual(cb.cb, 7);
-    assert.deepStrictEqual(cb.args, [42n, 0]);
-    assert.strictEqual(state.polls, 3);
+    s.post({ kind: "call", id: 1, fn: "sleep_bytes", args: [] });
+    const m = (await s.next()) as any;
+    assert.deepStrictEqual(Array.from(m.value), [4, 5]);
+    // The player freed its view; the receiver freed nothing more.
+    assert.strictEqual(state.freed.length, 1);
+    // Transferring the player's copy detached it, so it was not copied again.
+    assert.strictEqual(resolved!.byteLength, 0);
   } finally {
     r.close();
     port2.close();

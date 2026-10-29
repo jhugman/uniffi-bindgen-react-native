@@ -23,6 +23,8 @@ export interface FunctionPlan {
   args: ValuePlan[];
   ret: ValuePlan;
   hasRustCallStatus: boolean;
+  /** The player's entry takes a trailing AbortSignal and returns a Promise. */
+  isAsync: boolean;
 }
 
 export interface CallbackPlan {
@@ -133,13 +135,19 @@ export function compilePlan(defs: ModuleDefinitions): ModulePlan {
       asField: false,
       outReturn: false,
     });
+    // An async entry resolves with the completed value, not the future
+    // handle, and always reports through a status.
     functions.set(name, {
       name,
       args: def.args.map((t, i) =>
         planValue(t, site(`functions.${name} arg ${i}`)),
       ),
-      ret: planValue(def.ret, site(`functions.${name} ret`)),
-      hasRustCallStatus: def.hasRustCallStatus,
+      ret: planValue(
+        def.async ? def.async.ret : def.ret,
+        site(`functions.${name} ret`),
+      ),
+      hasRustCallStatus: def.hasRustCallStatus || def.async !== undefined,
+      isAsync: def.async !== undefined,
     });
   }
   const callbacks = new Map<string, CallbackPlan>();

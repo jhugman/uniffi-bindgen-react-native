@@ -4,8 +4,19 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import assert from "node:assert";
-import { FfiType, type ModuleDefinitions } from "@ubjs/core";
+import { FfiType, type FfiTypeDesc, type ModuleDefinitions } from "@ubjs/core";
 import type { RegisteredPlayer } from "../src/types.js";
+
+// A future-starting function: the player's entry is (...args, status,
+// signal) and resolves with the completed value.
+function asyncDef(args: FfiTypeDesc[], ret: FfiTypeDesc) {
+  return {
+    args,
+    ret: FfiType.Handle,
+    hasRustCallStatus: false,
+    async: { poll: "p", cancel: "c", complete: "k", free: "f", ret },
+  };
+}
 
 export const DEFS = {
   symbols: {
@@ -57,23 +68,13 @@ export const DEFS = {
       ret: FfiType.Void,
       hasRustCallStatus: false,
     },
-    // UniFFI's poll-style future ABI: (future, continuation, cookie).
-    rust_future_poll_u32: {
-      args: [
-        FfiType.Handle,
-        FfiType.Callback("RustFutureContinuationCallback"),
-        FfiType.Handle,
-      ],
-      ret: FfiType.Void,
-      hasRustCallStatus: false,
-    },
+    sleep: asyncDef([FfiType.UInt32], FfiType.UInt32),
+    sleep_bytes: asyncDef([], FfiType.RustBuffer),
+    sleep_fail: asyncDef([], FfiType.Void),
+    sleep_boom: asyncDef([], FfiType.Void),
+    sleep_unawaited: asyncDef([], FfiType.UInt32),
   },
   callbacks: {
-    RustFutureContinuationCallback: {
-      args: [FfiType.Handle, FfiType.Int8],
-      ret: FfiType.Void,
-      hasRustCallStatus: false,
-    },
     Free: {
       args: [FfiType.Handle],
       ret: FfiType.Void,
@@ -142,8 +143,8 @@ export function fakePlayer() {
     freed: [] as Uint8Array[],
     completions: [] as unknown[],
     dropped: undefined as any,
-    // Polls seen by rust_future_poll_u32; the future is ready on the third.
-    polls: 0,
+    // Async entries whose signal was aborted before they finished.
+    cancelled: 0,
   };
   const player: RegisteredPlayer = {
     rustbuffer_alloc: (n) => new Uint8Array(n),
@@ -190,26 +191,50 @@ export function fakePlayer() {
       state.vtable.uniffi_free(h);
       state.vtable.uniffi_free(h);
     },
-    // Wakes the continuation from a later task, as an I/O event would, with
-    // MAYBE_READY (1) twice and then READY (0). uniffi forbids polling from
-    // inside the continuation, so a re-poll must not land while it runs.
-    rust_future_poll_u32: (
-      _future: bigint,
-      cont: (data: bigint, code: number) => void,
-      data: bigint,
-    ) => {
-      state.polls += 1;
-      const code = state.polls < 3 ? 1 : 0;
-      setImmediate(() => {
-        const before = state.polls;
-        cont(data, code);
-        assert.strictEqual(
-          state.polls,
-          before,
-          "re-polled inside the continuation",
-        );
-      });
-    },
+    // Resolves ms * 2 after ms; an abort settles it at once as cancelled (3).
+    sleep: (
+      ms: number,
+      status: { code: number },
+      signal: AbortSignal | undefined,
+    ) =>
+      new Promise((resolve) => {
+        const onAbort = () => {
+          clearTimeout(timer);
+          state.cancelled += 1;
+          status.code = 3;
+          resolve(undefined);
+        };
+        const timer = setTimeout(() => {
+          signal?.removeEventListener("abort", onAbort);
+          status.code = 0;
+          resolve(ms * 2);
+        }, ms);
+        signal?.addEventListener("abort", onAbort);
+      }),
+    // As the real player does: copies the result off wasm memory and frees
+    // its view before resolving.
+    sleep_bytes: (status: { code: number }) =>
+      new Promise((resolve) =>
+        setTimeout(() => {
+          status.code = 0;
+          const view = new Uint8Array([4, 5]);
+          state.freed.push(view);
+          resolve(view.slice());
+        }, 1),
+      ),
+    // A panic, as `complete` reports it: code 2 and the message in errorBuf.
+    sleep_fail: (status: { code: number; errorBuf?: Uint8Array }) =>
+      new Promise((resolve) =>
+        setTimeout(() => {
+          status.code = 2;
+          status.errorBuf = new Uint8Array([112, 97, 110, 105, 99]); // "panic"
+          resolve(undefined);
+        }, 1),
+      ),
+    sleep_boom: () => Promise.reject(new RangeError("boom")),
+    // A player that predates async entries starts the future and returns
+    // its handle.
+    sleep_unawaited: () => 7n,
   };
   return { player, state };
 }

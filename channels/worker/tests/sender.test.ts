@@ -18,6 +18,7 @@ import { createSender, SenderCore } from "../src/sender.js";
 import { ChannelClosedError } from "../src/types.js";
 import { compilePlan } from "../src/plan.js";
 import type { ChannelMessage } from "../src/messages.js";
+import type { ChannelPort } from "../src/port.js";
 
 const DEFS = {
   symbols: {
@@ -52,6 +53,18 @@ const DEFS = {
       args: [FfiType.Callback("WithNonVoidInner")],
       ret: FfiType.Void,
       hasRustCallStatus: false,
+    },
+    sleep: {
+      args: [FfiType.UInt32],
+      ret: FfiType.Handle,
+      hasRustCallStatus: false,
+      async: {
+        poll: "p",
+        cancel: "c",
+        complete: "k",
+        free: "f",
+        ret: FfiType.UInt32,
+      },
     },
   },
   callbacks: {
@@ -93,6 +106,17 @@ function peer(
       port.postMessage(m, t ?? []),
     ),
   );
+}
+
+/** A port that records what the sender posts and never replies. */
+function silentPort() {
+  const posted: unknown[] = [];
+  const port: ChannelPort = {
+    postMessage: (m) => posted.push(m),
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+  return { port, posted };
 }
 
 test("a call posts args, and the return resolves the promise", async () => {
@@ -451,11 +475,142 @@ test("AsyncPlayer types the return and the trailing status", () => {
   const p1: Promise<number> = s.add(1, 2, { code: 0 });
   const p2: Promise<Uint8Array> = s.echo(new Uint8Array(0));
   const p3: Promise<void> = s.take_cb(() => {});
+  // An async function resolves with its completed value, not the future handle.
+  const p4: Promise<number> = s.sleep(1, { code: 0 }, undefined);
   // @ts-expect-error add takes a trailing status
   const bad: Promise<number> = s.add(1, 2);
-  // No peer is listening; close() below rejects all four. Swallow so the
+  // @ts-expect-error an async function takes a trailing status and signal
+  const bad2: Promise<number> = s.sleep(1, { code: 0 });
+  // No peer is listening; close() below rejects them all. Swallow so the
   // rejections don't surface as unhandled (this test only checks types).
-  for (const p of [p1, p2, p3, bad]) p.catch(() => {});
+  for (const p of [p1, p2, p3, p4, bad, bad2]) p.catch(() => {});
   s.close();
   port2.close();
+});
+
+test("the signal is stripped from the wire and an abort posts one cancel for the call", async () => {
+  const { port1, port2 } = new MessageChannel();
+  const seen: ChannelMessage[] = [];
+  // Replies to the call only once it has seen the cancel.
+  peer(port2, (m, reply) => {
+    seen.push(m);
+    if (m.kind === "cancel")
+      reply({
+        kind: "return",
+        id: m.id,
+        ok: true,
+        value: undefined,
+        status: { code: 3 },
+      });
+  });
+  const s = createSender(DEFS, port1);
+  try {
+    const c = new AbortController();
+    const status: UniffiRustCallStatus = { code: 0 };
+    const p = s.sleep(5, status, c.signal);
+    c.abort();
+    c.abort();
+    assert.strictEqual(await p, undefined);
+    assert.strictEqual(status.code, 3);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(seen, [
+      { kind: "call", id: 1, fn: "sleep", args: [5] },
+      { kind: "cancel", id: 1 },
+    ]);
+  } finally {
+    s.close();
+    port2.close();
+  }
+});
+
+test("a signal already aborted at dispatch still posts the call and then one cancel", async () => {
+  const { port1, port2 } = new MessageChannel();
+  const seen: ChannelMessage[] = [];
+  peer(port2, (m, reply) => {
+    seen.push(m);
+    if (m.kind === "cancel")
+      reply({
+        kind: "return",
+        id: m.id,
+        ok: true,
+        value: undefined,
+        status: { code: 3 },
+      });
+  });
+  const s = createSender(DEFS, port1);
+  try {
+    const c = new AbortController();
+    c.abort();
+    const status: UniffiRustCallStatus = { code: 0 };
+    await s.sleep(5, status, c.signal);
+    assert.strictEqual(status.code, 3);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(seen, [
+      { kind: "call", id: 1, fn: "sleep", args: [5] },
+      { kind: "cancel", id: 1 },
+    ]);
+  } finally {
+    s.close();
+    port2.close();
+  }
+});
+
+test("no cancel is posted for an abort after the call has returned", async () => {
+  const { port1, port2 } = new MessageChannel();
+  const seen: ChannelMessage[] = [];
+  peer(port2, (m, reply) => {
+    seen.push(m);
+    if (m.kind === "call")
+      reply({
+        kind: "return",
+        id: m.id,
+        ok: true,
+        value: 10,
+        status: { code: 0 },
+      });
+  });
+  const s = createSender(DEFS, port1);
+  try {
+    const c = new AbortController();
+    assert.strictEqual(await s.sleep(5, { code: 0 }, c.signal), 10);
+    c.abort();
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(
+      seen.map((m) => m.kind),
+      ["call"],
+    );
+  } finally {
+    s.close();
+    port2.close();
+  }
+});
+
+test("close() while an async call is in flight rejects it and detaches the signal", async () => {
+  const { port, posted } = silentPort();
+  const s = createSender(DEFS, port);
+  const c = new AbortController();
+  const p = s.sleep(5, { code: 0 }, c.signal);
+  s.close();
+  await assert.rejects(p, ChannelClosedError);
+  c.abort();
+  assert.deepStrictEqual(posted, [
+    { kind: "call", id: 1, fn: "sleep", args: [5] },
+  ]);
+});
+
+test("an inbound cancel is not addressed to a sender and is ignored", async () => {
+  const { port1, port2 } = new MessageChannel();
+  const warnings: unknown[] = [];
+  const orig = console.warn;
+  console.warn = (...a: unknown[]) => warnings.push(a);
+  const s = createSender(DEFS, port1);
+  try {
+    port2.postMessage({ kind: "cancel", id: 1 });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(warnings, []);
+  } finally {
+    console.warn = orig;
+    s.close();
+    port2.close();
+  }
 });
