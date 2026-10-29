@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use heck::ToSnakeCase;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
@@ -126,9 +127,9 @@ fn build_foreign_language_testcases_impl(input: TokenStream2) -> syn::Result<Tok
         let sanitized = sanitize_name(&path_str);
 
         for flavor in &entry.flavors {
-            let flavor_lower = flavor.to_string().to_lowercase();
+            let flavor_mod = flavor.to_string().to_snake_case();
             let test_name = format_ident!("{sanitized}");
-            let runner_mod = format_ident!("{}", flavor_lower);
+            let runner_mod = format_ident!("{}", flavor_mod);
 
             let test_fn = quote! {
                 #[test]
@@ -141,7 +142,7 @@ fn build_foreign_language_testcases_impl(input: TokenStream2) -> syn::Result<Tok
                 }
             };
 
-            flavor_tests.entry(flavor_lower).or_default().push(test_fn);
+            flavor_tests.entry(flavor_mod).or_default().push(test_fn);
         }
     }
 
@@ -178,7 +179,7 @@ fn build_typescript_testcases_impl(input: TokenStream2) -> syn::Result<TokenStre
         let path_str = path.to_str().unwrap_or_default();
 
         for flavor in &entry.flavors {
-            let flavor_lower = flavor.to_string().to_lowercase();
+            let flavor_mod = flavor.to_string().to_snake_case();
             let test_name = format_ident!("{sanitized}");
             let flavor_variant = format_ident!("{}", flavor);
 
@@ -193,7 +194,7 @@ fn build_typescript_testcases_impl(input: TokenStream2) -> syn::Result<TokenStre
                 }
             };
 
-            flavor_tests.entry(flavor_lower).or_default().push(test_fn);
+            flavor_tests.entry(flavor_mod).or_default().push(test_fn);
         }
     }
 
