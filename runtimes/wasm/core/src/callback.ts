@@ -19,6 +19,8 @@
 
 import type { FfiTypeDesc } from "./ffi-type.js";
 import type { Memory } from "./memory.js";
+import { type CallbackDef } from "@ubjs/core";
+export type { CallbackDef };
 import {
   RUST_BUFFER_SIZE,
   readRustBuffer,
@@ -54,6 +56,11 @@ function liftCallbackArg(ctx: LiftContext, t: FfiTypeDesc, raw: any): any {
     return wrapWasmCallback(ctx, t.name, raw as number);
   }
   return raw;
+}
+
+export interface RegistrationContext {
+  callbackDefs: Map<string, CallbackDef>;
+  structs: Map<string, StructLayout>;
 }
 
 interface LiftContext {
@@ -343,13 +350,6 @@ function tagFor(t: FfiTypeDesc): number {
   }
 }
 
-export interface CallbackDef {
-  args: FfiTypeDesc[];
-  ret: FfiTypeDesc;
-  hasRustCallStatus: boolean;
-  outReturn?: boolean;
-}
-
 interface ShapeCache {
   signature: string;
   shapeId: number;
@@ -378,10 +378,7 @@ export class CallbackTable {
    * can resolve `Callback`-typed args (function-table indices) into JS
    * callables that re-lower their args and dispatch through the indirect
    * function table. */
-  private registrationContext?: {
-    callbackDefs: Map<string, CallbackDef>;
-    structs: Map<string, StructLayout>;
-  };
+  private registrationContext?: RegistrationContext;
 
   constructor(
     private memory: Memory,
@@ -390,10 +387,7 @@ export class CallbackTable {
     private compileSync: boolean = true,
   ) {}
 
-  setRegistrationContext(ctx: {
-    callbackDefs: Map<string, CallbackDef>;
-    structs: Map<string, StructLayout>;
-  }): void {
+  setRegistrationContext(ctx: RegistrationContext): void {
     this.registrationContext = ctx;
   }
 
@@ -455,9 +449,13 @@ export class CallbackTable {
   // signatures needs two slots, or Rust's `call_indirect` traps.
   private fnSlotCache = new WeakMap<Function, Map<string, number>>();
 
+  // `regCtx` is the registering crate's tables: a callback's Callback-typed
+  // args and struct returns resolve against them, not against whichever
+  // crate registered last on a module hosting several.
   installCallbackFunction(
     fn: (...args: any[]) => any,
     def: CallbackDef,
+    regCtx: RegistrationContext | undefined = this.registrationContext,
   ): number {
     const sigKey = this.signatureKey(def);
     let bySig = this.fnSlotCache.get(fn);
@@ -491,7 +489,7 @@ export class CallbackTable {
     // dispatcher unwraps the result and writes it back through those
     // pointers. Free/clone (no `outReturn`/`hasRustCallStatus`) and the
     // future continuation route through unchanged.
-    const route = this.makeDispatchRoute(fn, def);
+    const route = this.makeDispatchRoute(fn, def, regCtx);
     // Routed through the continuation path so all wasm args (including the
     // u64 instance handle in vtable methods) are forwarded verbatim — the JS
     // closure does its own handle-to-instance lift.
@@ -520,6 +518,7 @@ export class CallbackTable {
   private makeDispatchRoute(
     fn: (...args: any[]) => any,
     def: CallbackDef,
+    regCtx: RegistrationContext | undefined,
   ): (...args: any[]) => any {
     const userArgCount = def.args.length;
     const memory = this.memory;
@@ -551,11 +550,11 @@ export class CallbackTable {
     const installCallback = (
       cbFn: (...args: any[]) => any,
       cbDef: CallbackDef,
-    ) => this.installCallbackFunction(cbFn, cbDef);
-    const writeRetCtx = this.registrationContext
+    ) => this.installCallbackFunction(cbFn, cbDef, regCtx);
+    const writeRetCtx = regCtx
       ? {
-          structs: this.registrationContext.structs,
-          callbackDefs: this.registrationContext.callbackDefs,
+          structs: regCtx.structs,
+          callbackDefs: regCtx.callbackDefs,
           installCallback,
         }
       : undefined;
@@ -566,8 +565,8 @@ export class CallbackTable {
       table: this.hostExports.__indirect_function_table as
         | WebAssembly.Table
         | undefined,
-      callbackDefs: this.registrationContext?.callbackDefs,
-      structs: this.registrationContext?.structs,
+      callbackDefs: regCtx?.callbackDefs,
+      structs: regCtx?.structs,
     };
     // `hasStatus` also decides where the FFI return value lives: sync vtable
     // methods wrap it in a `UniffiResult` (`result.pointee`), async ones
