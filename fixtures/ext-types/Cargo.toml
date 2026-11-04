@@ -6,15 +6,6 @@ authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
 license = "MPL-2.0"
 publish = false
 
-[package.metadata.uniffi.testing]
-external-crates = [
-    "uniffi-fixture-ext-types-custom-types",
-    "uniffi-fixture-ext-types-lib-one",
-    "uniffi-fixture-ext-types-external-crate",
-    "uniffi-fixture-ext-types-sub-lib",
-    "uniffi-example-custom-types",
-]
-
 [lib]
 crate-type = ["lib", "cdylib"]
 name = "uniffi_ext_types_lib"

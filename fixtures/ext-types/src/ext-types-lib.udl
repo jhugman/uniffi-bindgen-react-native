@@ -9,7 +9,6 @@ namespace imported_types_lib {
     UniffiOneType get_uniffi_one_type(UniffiOneType t);
     sequence<UniffiOneType> get_uniffi_one_types(sequence<UniffiOneType> ts);
     UniffiOneType? get_maybe_uniffi_one_type(UniffiOneType? t);
-    sequence<UniffiOneType?> get_maybe_uniffi_one_types(sequence<UniffiOneType?> ts);
 
     UniffiOneEnum get_uniffi_one_enum(UniffiOneEnum e);
     sequence<UniffiOneEnum> get_uniffi_one_enums(sequence<UniffiOneEnum> es);
@@ -19,7 +18,6 @@ namespace imported_types_lib {
     UniffiOneInterface get_uniffi_one_interface();
     ExternalCrateInterface get_external_crate_interface(string val);
     UniffiOneProcMacroType get_uniffi_one_proc_macro_type(UniffiOneProcMacroType t);
-    UniffiOneUDLTrait? get_uniffi_one_udl_trait(UniffiOneUDLTrait? t);
 };
 
 // A type defined in a .udl file in the `uniffi-one` crate (ie, in
@@ -34,10 +32,6 @@ typedef enum UniffiOneEnum;
 // An interface in the same crate
 [External="uniffi_one"]
 typedef interface UniffiOneInterface;
-
-// An UDL defined trait
-[External="uniffi_one"]
-typedef trait UniffiOneUDLTrait;
 
 // A type defined via procmacros in an external crate
 [External="uniffi_one"]

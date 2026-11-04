@@ -14,8 +14,3 @@ interface UniffiOneInterface {
 
     i32 increment();
 };
-
-[Trait, WithForeign]
-interface UniffiOneUDLTrait {
-    string hello();
-};

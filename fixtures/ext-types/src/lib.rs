@@ -15,7 +15,6 @@ use ext_types_external_crate::{
 use std::sync::Arc;
 use uniffi_one::{
     UniffiOneEnum, UniffiOneInterface, UniffiOneProcMacroType, UniffiOneTrait, UniffiOneType,
-    UniffiOneUDLTrait,
 };
 use uniffi_sublib::SubLibType;
 use url::Url;
@@ -110,11 +109,6 @@ fn get_maybe_urls(urls: Vec<Option<Url>>) -> Vec<Option<Url>> {
 }
 
 #[uniffi::export]
-fn get_imported_guid(guid: Guid) -> Guid {
-    guid
-}
-
-#[uniffi::export]
 fn get_imported_ouid(ouid: Ouid) -> Ouid {
     ouid
 }
@@ -124,19 +118,6 @@ fn get_imported_ouid(ouid: Ouid) -> Ouid {
 fn get_imported_nested_guid(guid: Option<ANestedGuid>) -> ANestedGuid {
     guid.unwrap_or_else(|| ANestedGuid(Guid("nested".to_string())))
 }
-
-#[uniffi::export]
-fn get_imported_nested_ouid(guid: Option<ANestedGuid>) -> ANestedGuid {
-    guid.unwrap_or_else(|| ANestedGuid(Guid("nested".to_string())))
-}
-
-pub struct NestedExternalGuid(pub Guid);
-
-#[uniffi::export]
-fn get_nested_external_guid(nguid: Option<NestedExternalGuid>) -> NestedExternalGuid {
-    nguid.unwrap_or_else(|| NestedExternalGuid(Guid("nested-external".to_string())))
-}
-uniffi::custom_newtype!(NestedExternalGuid, Guid);
 
 // A local custom type wrapping an external imported procmacro type
 pub struct NestedExternalOuid(pub Ouid);
@@ -158,10 +139,6 @@ fn get_uniffi_one_types(ts: Vec<UniffiOneType>) -> Vec<UniffiOneType> {
 
 fn get_maybe_uniffi_one_type(t: Option<UniffiOneType>) -> Option<UniffiOneType> {
     t
-}
-
-fn get_maybe_uniffi_one_types(ts: Vec<Option<UniffiOneType>>) -> Vec<Option<UniffiOneType>> {
-    ts
 }
 
 // An enum
@@ -196,12 +173,6 @@ fn get_uniffi_one_proc_macro_type(t: UniffiOneProcMacroType) -> UniffiOneProcMac
 
 fn get_external_crate_interface(val: String) -> Arc<ExternalCrateInterface> {
     Arc::new(ExternalCrateInterface::new(val))
-}
-
-fn get_uniffi_one_udl_trait(
-    t: Option<Arc<dyn UniffiOneUDLTrait>>,
-) -> Option<Arc<dyn UniffiOneUDLTrait>> {
-    t
 }
 
 uniffi::include_scaffolding!("ext-types-lib");

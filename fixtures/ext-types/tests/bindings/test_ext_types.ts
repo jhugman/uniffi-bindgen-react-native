@@ -31,6 +31,7 @@ import module3, {
   getObjectsType,
   getUniffiOneEnum,
   getUniffiOneEnums,
+  getUniffiOneInterface,
   getUniffiOneProcMacroType,
   getUniffiOneTrait,
   getUniffiOneType,
@@ -76,6 +77,24 @@ test("combinedType from lib", (t) => {
 
   const ct2 = getCombinedType(ct);
   t.assertEqual(ct, ct2);
+
+  // Every Option set and every Vec non-empty, so the external converters
+  // run inside Option and Vec.
+  const full: CombinedType = {
+    ...ct,
+    maybeUot: UniffiOneType.create({ sval: "maybe" }),
+    urls: [new URL("http://example.com/a"), new URL("http://example.com/b")],
+    maybeUrl: new URL("http://example.com/maybe"),
+    maybeGuid: "maybe-guid",
+    maybeHandle: BigInt(42),
+  };
+  t.assertEqual(getCombinedType(full), full);
+});
+
+test("UniffiOneInterface object from uniffi-one-ns, made by lib", (t) => {
+  const o = getUniffiOneInterface();
+  t.assertEqual(o.increment(), 1);
+  t.assertEqual(o.increment(), 2);
 });
 
 test("Getting a UniffiOneTrait from uniffi-one-ns, from getTraitImpl function in sublib", (t) => {
