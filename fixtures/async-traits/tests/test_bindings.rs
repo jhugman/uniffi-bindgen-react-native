@@ -5,4 +5,5 @@
  */
 ubrn_macros::build_foreign_language_testcases! {
     "tests/bindings/test_async_traits.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2, Channel],
+    "tests/bindings/test_async_traits_async.ts" => [AsyncWasm],
 }

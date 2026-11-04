@@ -5,4 +5,5 @@
  */
 ubrn_macros::build_foreign_language_testcases! {
     "tests/bindings/test_enum_types.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2, Channel],
+    "tests/bindings/test_enum_types_async.ts" => [AsyncWasm],
 }
