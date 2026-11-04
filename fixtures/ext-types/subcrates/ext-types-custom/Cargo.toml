@@ -16,6 +16,3 @@ url = "2.2"
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
-
-[dev-dependencies]
-uniffi = { workspace = true, features = ["bindgen-tests"] }

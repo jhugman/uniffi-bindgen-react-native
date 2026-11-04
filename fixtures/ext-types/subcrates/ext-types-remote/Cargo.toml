@@ -12,7 +12,3 @@ name = "ext_types_remote"
 
 [dependencies]
 # NOTE: This crate should never depend on UniFFI - see README.md for more.
-
-[build-dependencies]
-
-[dev-dependencies]

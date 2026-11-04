@@ -18,8 +18,6 @@ uniffi-fixture-ext-types-shared = {path = "subcrates/ext-types-shared"}
 uniffi-fixture-ext-types-custom = {path = "subcrates/ext-types-custom"}
 uniffi-fixture-ext-types-consumer = {path = "subcrates/ext-types-consumer"}
 
-url = "2.2"
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uniffi-runtime-wasm = { workspace = true }
 uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }

@@ -28,11 +28,12 @@ asyncTest("uniffiInitAsync is idempotent", async (t) => {
 });
 
 test("namespaced default exposes all 4 namespaces", (t) => {
-  t.assertEqual((bindings as Record<string, unknown>).custom_types, undefined);
-  t.assertNotNull(bindings.ext_types);
-  t.assertNotNull(bindings.ext_types_custom);
-  t.assertNotNull(bindings.ext_types_consumer);
-  t.assertNotNull(bindings.ext_types_shared);
+  t.assertEqual(Object.keys(bindings).sort(), [
+    "ext_types",
+    "ext_types_consumer",
+    "ext_types_custom",
+    "ext_types_shared",
+  ]);
 });
 
 test("call a function via the namespaced default", (t) => {
@@ -47,7 +48,7 @@ test("call a function via re-exported name (export * across 4 namespaces)", (t) 
   t.assertEqual(ct.sharedRecord.sval, "hello");
 
   // Pull a value from a different namespace (ext_types_shared) via re-export
-  // to prove all 5 namespaces flatten without collision.
+  // to prove all 4 namespaces flatten without collision.
   t.assertEqual(getSharedEnum(SharedEnum.One), SharedEnum.One);
 });
 

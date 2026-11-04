@@ -14,9 +14,8 @@ import customNs, {
   getNestedOuid,
   getOuid,
 } from "@/generated/ext_types_custom";
-import extTypes, {
+import extTypesNs, {
   CombinedType,
-  RemoteObjectInterface,
   getCombinedType,
   getRemoteObject,
   getImportedNestedGuid,
@@ -50,6 +49,7 @@ import sharedNs, {
   getProcMacroRecord,
   SharedEnum,
   SharedError,
+  SharedObject,
   SharedProcMacroRecord,
   SharedTrait,
   SharedRecord,
@@ -59,7 +59,7 @@ import "@/polyfills";
 import { URL } from "@/converters";
 
 customNs.initialize();
-extTypes.initialize();
+extTypesNs.initialize();
 consumerNs.initialize();
 sharedNs.initialize();
 
@@ -91,6 +91,32 @@ test("SharedObject from ext_types_shared, made by ext_types", (t) => {
   t.assertEqual(o.increment(), 2);
 });
 
+test("SharedObject made in TypeScript, held by ext_types_consumer and ext_types", (t) => {
+  const obj = new SharedObject();
+  t.assertEqual(obj.increment(), 1);
+
+  const consumer = getConsumerRecord(
+    ConsumerRecord.create({
+      maybeEnum: undefined,
+      maybeTrait: undefined,
+      maybeObject: obj,
+    }),
+  );
+  t.assertNotNull(consumer.maybeObject);
+  t.assertEqual(consumer.maybeObject!.increment(), 2);
+
+  const ob = getObjectsType(
+    ObjectsType.create({
+      maybeTrait: undefined,
+      maybeObject: obj,
+      consumer,
+    }),
+  );
+  t.assertNotNull(ob.maybeObject);
+  t.assertEqual(ob.maybeObject!.increment(), 3);
+  t.assertEqual(obj.increment(), 4);
+});
+
 test("SharedTrait from ext_types_shared, ObjectsType from ext_types, ConsumerRecord from ext_types_consumer passing a consumer object", (t) => {
   const ti = getTraitImpl();
   const consumer = ConsumerRecord.create({
@@ -119,7 +145,7 @@ test("Url from ext_types_custom round-trips through ext_types", (t) => {
   t.assertEqual(getMaybeUrls([url, undefined]), [url, undefined]);
 });
 
-test("Guid and Ouid from ext_types_custom, and the customs ext_types wraps", (t) => {
+test("Guid and Ouid from ext_types_custom, and the custom types ext_types builds on them", (t) => {
   t.assertEqual(getGuid("guid"), "guid");
   t.assertEqual(getOuid("ouid"), "ouid");
   t.assertEqual(getImportedOuid("ouid"), "ouid");
@@ -163,7 +189,6 @@ test("SharedEnum from ext_types_shared round-trips through ext_types", (t) => {
 });
 
 test("RemoteObject from ext_types_remote, made by ext_types", (t) => {
-  const foo: RemoteObjectInterface = getRemoteObject("foo");
   t.assertEqual(getRemoteObject("foo").value(), "foo");
 });
 
@@ -190,7 +215,28 @@ test("SharedError from ext_types_shared is thrown by ext_types_consumer", (t) =>
         maybeTrait: ti,
         maybeObject: undefined,
       });
-      t.assertNotNull(getConsumerRecord(consumer).maybeTrait);
+      const fromConsumer = getConsumerRecord(consumer).maybeTrait;
+      t.assertNotNull(fromConsumer);
+      t.assertEqual(
+        await fromConsumer!.hello(),
+        "consumer trait impl says hello",
+      );
+
+      const ob = ObjectsType.create({
+        maybeTrait: ti,
+        maybeObject: undefined,
+        consumer,
+      });
+      const fromObjects = getObjectsType(ob).maybeTrait;
+      t.assertNotNull(fromObjects);
+      t.assertEqual(
+        await fromObjects!.hello(),
+        "consumer trait impl says hello",
+      );
+
+      const viaShared = getSharedTrait(ti);
+      t.assertNotNull(viaShared);
+      t.assertEqual(await viaShared!.hello(), "consumer trait impl says hello");
       t.end();
     },
   );

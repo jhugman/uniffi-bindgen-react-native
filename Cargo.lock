@@ -2192,7 +2192,6 @@ dependencies = [
  "uniffi-fixture-ext-types-shared",
  "uniffi-runtime-wasm",
  "uniffi_core",
- "url",
 ]
 
 [[package]]

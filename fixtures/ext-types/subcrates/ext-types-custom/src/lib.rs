@@ -22,17 +22,7 @@ uniffi::custom_type!(Url, String, {
 });
 
 pub fn get_guid(guid: Option<Guid>) -> Guid {
-    // This function doesn't return a Result, so all conversion errors are panics
-    match guid {
-        Some(guid) => {
-            assert!(
-                !guid.0.is_empty(),
-                "our custom type converter already checked!"
-            );
-            guid
-        }
-        None => Guid("NewGuid".to_string()),
-    }
+    guid.unwrap_or_else(|| Guid("NewGuid".to_string()))
 }
 
 #[uniffi::export]

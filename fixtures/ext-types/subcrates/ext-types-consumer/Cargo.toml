@@ -14,9 +14,3 @@ name = "ext_types_consumer"
 async-trait = "0.1"
 uniffi = { workspace = true }
 uniffi-fixture-ext-types-shared = {path = "../ext-types-shared"}
-
-[build-dependencies]
-uniffi = { workspace = true, features = ["build"] }
-
-[dev-dependencies]
-uniffi = { workspace = true, features = ["bindgen-tests"] }
