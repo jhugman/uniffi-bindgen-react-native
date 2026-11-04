@@ -11,10 +11,9 @@ crate-type = ["lib", "cdylib"]
 name = "ext_types_custom"
 
 [dependencies]
-anyhow = "1"
 bytes = "1.3"
-thiserror = "1.0"
 uniffi = { workspace = true }
+url = "2.2"
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }

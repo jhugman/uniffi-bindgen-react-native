@@ -6,7 +6,5 @@ typedef string Guid;
 typedef Guid ANestedGuid;
 
 namespace ext_types_custom {
-    // Note this intentionally does not throw an error - uniffi will panic if
-    // a Guid can't be converted.
     Guid get_guid(optional Guid? value);
 };

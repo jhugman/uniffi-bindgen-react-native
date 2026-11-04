@@ -2188,7 +2188,6 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
- "uniffi-example-custom-types",
  "uniffi-fixture-ext-types-custom-types",
  "uniffi-fixture-ext-types-external-crate",
  "uniffi-fixture-ext-types-lib-one",
@@ -2202,10 +2201,9 @@ dependencies = [
 name = "uniffi-fixture-ext-types-custom-types"
 version = "0.22.0"
 dependencies = [
- "anyhow",
  "bytes",
- "thiserror 1.0.69",
  "uniffi",
+ "url",
 ]
 
 [[package]]

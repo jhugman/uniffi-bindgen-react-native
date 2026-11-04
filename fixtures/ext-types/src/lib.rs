@@ -7,8 +7,7 @@
 #[cfg(target_arch = "wasm32")]
 extern crate uniffi_runtime_wasm as _;
 
-use custom_types::Handle;
-use ext_types_custom::{ANestedGuid, Guid, Ouid};
+use ext_types_custom::{ANestedGuid, Guid, Ouid, Url};
 use ext_types_external_crate::{
     ExternalCrateDictionary, ExternalCrateInterface, ExternalCrateNonExhaustiveEnum,
 };
@@ -17,10 +16,9 @@ use uniffi_one::{
     UniffiOneEnum, UniffiOneInterface, UniffiOneProcMacroType, UniffiOneTrait, UniffiOneType,
 };
 use uniffi_sublib::SubLibType;
-use url::Url;
 
 // Remote types require a macro call in the Rust source
-uniffi::use_remote_type!(custom_types::Url);
+uniffi::use_remote_type!(ext_types_custom::Url);
 
 pub struct CombinedType {
     pub uoe: UniffiOneEnum,
@@ -35,10 +33,6 @@ pub struct CombinedType {
     pub url: Url,
     pub urls: Vec<Url>,
     pub maybe_url: Option<Url>,
-
-    pub handle: Handle,
-    pub handles: Vec<Handle>,
-    pub maybe_handle: Option<Handle>,
 
     pub ecd: ExternalCrateDictionary,
     pub ecnee: ExternalCrateNonExhaustiveEnum,
@@ -67,10 +61,6 @@ fn get_combined_type(existing: Option<CombinedType>) -> CombinedType {
         url: Url::parse("http://example.com/").unwrap(),
         urls: vec![],
         maybe_url: None,
-
-        handle: Handle(123),
-        handles: vec![Handle(1), Handle(2), Handle(3)],
-        maybe_handle: Some(Handle(4)),
 
         ecd: ExternalCrateDictionary { sval: "ecd".into() },
         ecnee: ExternalCrateNonExhaustiveEnum::One,

@@ -12,6 +12,15 @@ uniffi::custom_newtype!(Guid, String);
 pub struct Ouid(pub String);
 uniffi::custom_newtype!(Ouid, String);
 
+pub use url::Url;
+
+// `Url` crosses the FFI as a `String`; `remote` as it comes from another crate.
+uniffi::custom_type!(Url, String, {
+    remote,
+    try_lift: |val| Ok(Url::parse(&val)?),
+    lower: |obj| obj.into(),
+});
+
 pub fn get_guid(guid: Option<Guid>) -> Guid {
     // This function doesn't return a Result, so all conversion errors are panics
     match guid {

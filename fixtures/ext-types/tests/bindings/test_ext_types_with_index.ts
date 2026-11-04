@@ -27,8 +27,8 @@ asyncTest("uniffiInitAsync is idempotent", async (t) => {
   t.end();
 });
 
-test("namespaced default exposes all 5 namespaces", (t) => {
-  t.assertNotNull(bindings.custom_types);
+test("namespaced default exposes all 4 namespaces", (t) => {
+  t.assertEqual((bindings as Record<string, unknown>).custom_types, undefined);
   t.assertNotNull(bindings.ext_types_custom);
   t.assertNotNull(bindings.imported_types_lib);
   t.assertNotNull(bindings.imported_types_sublib);

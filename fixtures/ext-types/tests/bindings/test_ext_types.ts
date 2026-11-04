@@ -9,7 +9,6 @@
 
 import { asyncTest, test } from "@/asserts";
 
-import module1 from "@/generated/custom_types";
 import module2, {
   getGuid,
   getNestedOuid,
@@ -59,7 +58,6 @@ import module5, {
 import "@/polyfills";
 import { URL } from "@/converters";
 
-module1.initialize();
 module2.initialize();
 module3.initialize();
 module4.initialize();
@@ -86,7 +84,6 @@ test("combinedType from lib", (t) => {
     urls: [new URL("http://example.com/a"), new URL("http://example.com/b")],
     maybeUrl: new URL("http://example.com/maybe"),
     maybeGuid: "maybe-guid",
-    maybeHandle: BigInt(42),
   };
   t.assertEqual(getCombinedType(full), full);
 });
