@@ -9,12 +9,14 @@ extern crate uniffi_runtime_wasm as _;
 
 mod async_fn_callback;
 mod bytes;
+mod gc;
 mod getters;
 mod listeners;
 mod trait_getters;
 
 pub use async_fn_callback::*;
 pub use bytes::*;
+pub use gc::*;
 pub use getters::*;
 pub use listeners::*;
 pub use trait_getters::*;
