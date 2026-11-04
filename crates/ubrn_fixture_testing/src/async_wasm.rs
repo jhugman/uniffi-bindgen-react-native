@@ -119,7 +119,8 @@ fn write_worker_bootstrap(ts_dir: &Utf8Path) {
 }
 
 /// The Worker entry: open the wasm and put a receiver on each port it was
-/// handed. Mirrors the receiver half of `wasm2::write_player_bootstrap`.
+/// handed. Mirrors the init sequence in the generated index template
+/// (`gen_typescript/templates/index.ts`): openWasm, resolveModule, registerSync.
 fn write_worker(ts_dir: &Utf8Path, lib_stem: &str, namespaces: &[String]) {
     let glue = ts_dir.join(format!("{lib_stem}_bg.js")).exists();
     let mut src = String::from(

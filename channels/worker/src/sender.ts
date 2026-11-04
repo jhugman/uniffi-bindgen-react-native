@@ -79,29 +79,6 @@ export class SenderCore {
     );
   }
 
-  invokeSync(fn: string, args: unknown[]): unknown {
-    const plan = this.lookup(fn);
-    let done = false,
-      value: unknown,
-      error: Error | undefined;
-    this.dispatch(plan, args, {
-      resolve: (v) => {
-        done = true;
-        value = v;
-      },
-      reject: (e) => {
-        done = true;
-        error = e;
-      },
-    });
-    if (!done)
-      throw new Error(
-        `worker: "${fn}" did not return synchronously; the port is not synchronous`,
-      );
-    if (error) throw error;
-    return value;
-  }
-
   rustbuffer_alloc(n: number): Uint8Array {
     return new Uint8Array(n);
   }

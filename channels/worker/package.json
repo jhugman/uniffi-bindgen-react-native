@@ -13,8 +13,7 @@
   "keywords": ["uniffi", "ffi", "rust", "wasm", "worker", "messageport", "typescript"],
   "type": "module",
   "exports": {
-    ".": "./dist/src/index.js",
-    "./testing": "./dist/src/testing.js"
+    ".": "./dist/src/index.js"
   },
   "files": ["dist/", "!dist/tsconfig.tsbuildinfo", "README.md"],
   "scripts": {
