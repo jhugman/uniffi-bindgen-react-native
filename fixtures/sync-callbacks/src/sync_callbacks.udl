@@ -1,4 +1,9 @@
-namespace sync_callbacks {};
+namespace sync_callbacks {
+  Getters make_rust_getters();
+  void test_getters(Getters g);
+  Getters test_round_trip_through_rust(Getters getters);
+  void test_round_trip_through_foreign(Getters getters);
+};
 
 [Error]
 enum SimpleError {
@@ -68,4 +73,34 @@ callback interface StoredForeignStringifier {
 interface RustStringifier {
   constructor(StoredForeignStringifier callback);
   string from_simple_type(i32 value);
+};
+
+[Error]
+enum GettersError {
+  "TooManyHoles",
+};
+
+[Error]
+interface GettersComplexError {
+  OsError(i16 code, i16 extended_code);
+  PermissionDenied(string reason);
+  UnknownError();
+};
+
+interface Payload {
+  constructor(string name);
+  string get_name();
+};
+
+// Trait interface implemented in Rust or the foreign language; tests every arg, return and error type.
+[Trait, WithForeign]
+interface Getters {
+  boolean get_bool(boolean v, boolean arg2);
+  [Throws=GettersError]
+  string get_string(string v, boolean arg2);
+  [Throws=GettersComplexError]
+  string? get_option(string v, boolean arg2);
+  sequence<i32> get_list(sequence<i32> v, boolean arg2);
+  void get_nothing(string v);
+  Payload round_trip_object(Payload payload);
 };

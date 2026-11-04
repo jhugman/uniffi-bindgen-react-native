@@ -9,8 +9,10 @@ extern crate uniffi_runtime_wasm as _;
 
 mod getters;
 mod listeners;
+mod trait_getters;
 
 pub use getters::*;
 pub use listeners::*;
+pub use trait_getters::*;
 
 uniffi::include_scaffolding!("sync_callbacks");

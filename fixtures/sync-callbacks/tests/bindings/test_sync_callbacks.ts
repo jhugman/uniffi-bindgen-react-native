@@ -12,12 +12,20 @@ import syncCallbacks, {
   ComplexError,
   EventListener,
   EventSource,
+  Getters,
+  GettersComplexError,
+  GettersError,
+  makeRustGetters,
+  PayloadInterface,
   ForeignGetters,
   KeywordListener,
   RustGetters,
   RustStringifier,
   SimpleError,
   StoredForeignStringifier,
+  testGetters,
+  testRoundTripThroughForeign,
+  testRoundTripThroughRust,
 } from "@/generated/sync_callbacks";
 import { asyncTest, AsyncAsserts, test } from "@/asserts";
 import "@/polyfills";
@@ -243,6 +251,73 @@ async function testToMax(max: number, t: AsyncAsserts) {
 test("Reserved C++ keyword callback methods work end-to-end", (t) => {
   const listener = new KeywordListenerImpl();
   t.assertEqual(callDelete(listener, "abc"), "deleted:abc");
+});
+
+// A TypeScript implementation of the Getters trait, exercising the foreign implementation path.
+class TypeScriptTraitGetters implements Getters {
+  getBool(v: boolean, arg2: boolean): boolean {
+    return v !== arg2;
+  }
+
+  getString(v: string, arg2: boolean): string /*throws*/ {
+    if (v === "too-many-holes") {
+      throw new GettersError.TooManyHoles("too many holes");
+    } else if (v === "unexpected-error") {
+      throw new Error("unexpected error");
+    }
+    return arg2 ? v.toUpperCase() : v;
+  }
+
+  getOption(v: string, arg2: boolean): string | undefined /*throws*/ {
+    if (v === "os-error") {
+      throw new GettersComplexError.OsError({ code: 100, extendedCode: 200 });
+    } else if (v === "unknown-error") {
+      throw new GettersComplexError.UnknownError();
+    } else if (arg2) {
+      return v.length > 0 ? v.toUpperCase() : undefined;
+    } else {
+      return v;
+    }
+  }
+
+  getList(v: Array<number>, arg2: boolean): Array<number> {
+    return arg2 ? v : [];
+  }
+
+  getNothing(_v: string): void {
+    // do nothing
+  }
+
+  roundTripObject(payload: PayloadInterface): PayloadInterface {
+    return payload;
+  }
+}
+
+test("Rust getters: testGetters with a Rust implementation", (t) => {
+  const rustGetters = makeRustGetters();
+  testGetters(rustGetters);
+  // makeRustGetters returns a GettersImpl (Rust object); no explicit destroy available
+  // via the Getters interface, so just let it go out of scope.
+});
+
+test("TypeScript getters: testGetters with a TypeScript implementation", (t) => {
+  const tsGetters = new TypeScriptTraitGetters();
+  testGetters(tsGetters);
+});
+
+test("Round trip through Rust: TypeScript object is returned unchanged", (t) => {
+  const tsGetters = new TypeScriptTraitGetters();
+  const returned = testRoundTripThroughRust(tsGetters);
+  // The returned object should still work as a Getters implementation.
+  t.assertTrue(returned.getBool(true, false));
+  t.assertFalse(returned.getBool(true, true));
+});
+
+test("Round trip through foreign: Rust calls roundTripObject on TypeScript implementation", (t) => {
+  const tsGetters = new TypeScriptTraitGetters();
+  // This calls tsGetters.roundTripObject(payload) inside Rust and asserts the result.
+  // It will throw if roundTripObject returns the wrong object.
+  testRoundTripThroughForeign(tsGetters);
 });
 
 (async () => {
