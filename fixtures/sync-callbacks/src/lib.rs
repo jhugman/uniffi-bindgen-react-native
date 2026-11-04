@@ -7,10 +7,12 @@
 #[cfg(target_arch = "wasm32")]
 extern crate uniffi_runtime_wasm as _;
 
+mod bytes;
 mod getters;
 mod listeners;
 mod trait_getters;
 
+pub use bytes::*;
 pub use getters::*;
 pub use listeners::*;
 pub use trait_getters::*;
