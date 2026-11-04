@@ -64,10 +64,10 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
     }
     // No-op today (this file only ever runs on the main thread), but keeps a
     // future execArgv change from making the Worker spawn a Worker.
-    src.push_str("if (isMainThread) {\n");
-    src.push_str("const t0 = performance.now();\n");
     src.push_str(&format!(
-        "const ch = new MessageChannel();\n\
+        "if (isMainThread) {{\n\
+         const t0 = performance.now();\n\
+         const ch = new MessageChannel();\n\
          const worker = new Worker(new URL(\"./{WORKER_BOOTSTRAP_FILE}\", import.meta.url), {{\n\
          \x20 workerData: {{ port: ch.port1 }},\n\
          \x20 transferList: [ch.port1],\n\
@@ -92,12 +92,19 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
              await mod_{ns}.default.initialize();\n"
         ));
     }
-    src.push_str("(globalThis as any).__ubrnStartupMs = performance.now() - t0;\n");
-    src.push_str("worker.unref();\n");
-    src.push_str("ch.port2.unref();\n");
-    src.push_str("}\n");
+    src.push_str(
+        "(globalThis as any).__ubrnStartupMs = performance.now() - t0;\n\
+         worker.unref();\n\
+         ch.port2.unref();\n\
+         }\n",
+    );
 
-    let path = ts_dir.join("uniffi-bootstrap.async-wasm.ts");
+    write_generated(ts_dir, "uniffi-bootstrap.async-wasm.ts", src)
+}
+
+/// Writes one generated module into `ts_dir` and returns its path.
+fn write_generated(ts_dir: &Utf8Path, name: &str, src: String) -> Utf8PathBuf {
+    let path = ts_dir.join(name);
     std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
     path
 }
@@ -141,8 +148,7 @@ fn write_definitions(ts_dir: &Utf8Path, namespaces: &[String]) {
          }};\n",
         all.join(", ")
     ));
-    let path = ts_dir.join(format!("{DEFINITIONS_MODULE}.ts"));
-    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
+    write_generated(ts_dir, &format!("{DEFINITIONS_MODULE}.ts"), src);
 }
 
 /// Plain-JS shim the Worker actually loads (given `execArgv: []`, it starts
@@ -155,8 +161,7 @@ fn write_worker_bootstrap(ts_dir: &Utf8Path) {
          register();\n\
          await import(new URL(\"./{WORKER_FILE}\", import.meta.url));\n"
     );
-    let path = ts_dir.join(WORKER_BOOTSTRAP_FILE);
-    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
+    write_generated(ts_dir, WORKER_BOOTSTRAP_FILE, src);
 }
 
 /// The Worker entry: open the wasm and put the one receiver on the port it was
@@ -182,6 +187,5 @@ fn write_worker(ts_dir: &Utf8Path, lib_stem: &str) {
             String::new()
         }
     ));
-    let path = ts_dir.join(WORKER_FILE);
-    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
+    write_generated(ts_dir, WORKER_FILE, src);
 }

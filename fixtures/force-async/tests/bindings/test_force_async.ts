@@ -236,22 +236,14 @@ myModule.initialize();
     async (t) => {
       await t.assertThrowsAsync(FlatError.Oops.instanceOf, () => failFlat());
       // `EchoError.instanceOf` also accepts `Unexpected`, so pin the variant and payload.
-      for (const [label, call, code] of [
-        ["failRichAsync", () => failRichAsync(3), 3],
-        ["failVia", () => failVia(new TsEcho(), 4), 4],
-      ] as const) {
-        let caught: unknown;
-        try {
-          await call();
-        } catch (e) {
-          caught = e;
-        }
-        if (EchoError.Code.instanceOf(caught)) {
-          t.assertEqual(EchoError.Code.getInner(caught).code, code, label);
-        } else {
-          t.fail(`${label}: expected EchoError.Code, got ${caught}`);
-        }
-      }
+      const rich = await t.assertThrowsAsync(EchoError.Code.instanceOf, () =>
+        failRichAsync(3),
+      );
+      t.assertEqual(EchoError.Code.getInner(rich).code, 3, "failRichAsync");
+      const via = await t.assertThrowsAsync(EchoError.Code.instanceOf, () =>
+        failVia(new TsEcho(), 4),
+      );
+      t.assertEqual(EchoError.Code.getInner(via).code, 4, "failVia");
       t.end();
     },
   );

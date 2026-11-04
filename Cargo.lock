@@ -2303,7 +2303,6 @@ dependencies = [
  "uniffi",
  "uniffi-runtime-wasm",
  "uniffi_core",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
