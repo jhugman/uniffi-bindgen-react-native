@@ -1,4 +1,4 @@
-namespace callbacks {};
+namespace sync_callbacks {};
 
 [Error]
 enum SimpleError {

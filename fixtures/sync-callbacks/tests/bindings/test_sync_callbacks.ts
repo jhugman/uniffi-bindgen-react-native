@@ -4,22 +4,27 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 // To run:
-//   cargo test -p uniffi-fixture-callbacks -- jsi
-//   cargo test -p uniffi-fixture-callbacks -- wasm
+//   cargo test -p uniffi-fixture-sync-callbacks -- jsi
+//   cargo test -p uniffi-fixture-sync-callbacks -- wasm
 
-import myModule, {
+import syncCallbacks, {
+  callDelete,
   ComplexError,
+  EventListener,
+  EventSource,
   ForeignGetters,
-  SimpleError,
-  RustStringifier,
+  KeywordListener,
   RustGetters,
+  RustStringifier,
+  SimpleError,
   StoredForeignStringifier,
-} from "@/generated/callbacks";
-import { test } from "@/asserts";
+} from "@/generated/sync_callbacks";
+import { asyncTest, AsyncAsserts, test } from "@/asserts";
+import "@/polyfills";
 
 // Initialize the callbacks for the module.
 // This will be hidden in the installation process.
-myModule.initialize();
+syncCallbacks.initialize();
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";
@@ -207,3 +212,44 @@ test("A callback passed into the constructor is not destroyed", (t) => {
   // If the jsi::Runtime has been destroyed already, then this will cause a
   // crash at the end of the run. This should be prevented.
 });
+
+class EventListenerImpl implements EventListener {
+  constructor(
+    private t: AsyncAsserts,
+    private max: number,
+  ) {}
+  onEvent(message: string, number: number): void {
+    // console.log("--", message, number);
+    if (number === this.max - 1) {
+      console.log("-- Done!", this.max);
+      this.t.end();
+    }
+  }
+}
+
+class KeywordListenerImpl implements KeywordListener {
+  delete_(value: string): string {
+    console.log("delete_", value);
+    return `deleted:${value}`;
+  }
+}
+
+async function testToMax(max: number, t: AsyncAsserts) {
+  const listener = new EventListenerImpl(t, max);
+  const source = new EventSource(listener);
+  source.start(`Going to ${max}, now at:`, max);
+}
+
+test("Reserved C++ keyword callback methods work end-to-end", (t) => {
+  const listener = new KeywordListenerImpl();
+  t.assertEqual(callDelete(listener, "abc"), "deleted:abc");
+});
+
+(async () => {
+  for (let i = 1; i <= 4096; i *= 2) {
+    await asyncTest(
+      `Full tilt test up to ${i}`,
+      async (t) => await testToMax(i, t),
+    );
+  }
+})();

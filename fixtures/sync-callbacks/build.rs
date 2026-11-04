@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-ubrn_macros::build_foreign_language_testcases! {
-    "tests/bindings/test_callbacks_regression.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2, Channel],
+
+fn main() {
+    uniffi::generate_scaffolding("src/sync_callbacks.udl").unwrap();
 }

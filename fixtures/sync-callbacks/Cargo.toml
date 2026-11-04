@@ -1,5 +1,5 @@
 [package]
-name = "uniffi-fixture-callbacks"
+name = "uniffi-fixture-sync-callbacks"
 version = "0.22.0"
 authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
 edition = "2021"
@@ -8,13 +8,15 @@ publish = false
 
 [lib]
 crate-type = ["lib", "cdylib"]
-name = "uniffi_fixture_callbacks"
+name = "uniffi_sync_callbacks"
 
 [dependencies]
-uniffi = { workspace = true, features=[] }
+uniffi = { workspace = true, features = [] }
+ubrn_testing = { path = "../../crates/ubrn_testing" }
 thiserror = "1.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
 uniffi-runtime-wasm = { workspace = true }
 uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
 

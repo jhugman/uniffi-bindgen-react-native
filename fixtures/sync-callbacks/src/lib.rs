@@ -4,6 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-fn main() {
-    uniffi::generate_scaffolding("src/callbacks.udl").unwrap();
-}
+#[cfg(target_arch = "wasm32")]
+extern crate uniffi_runtime_wasm as _;
+
+mod getters;
+mod listeners;
+
+pub use getters::*;
+pub use listeners::*;
+
+uniffi::include_scaffolding!("sync_callbacks");

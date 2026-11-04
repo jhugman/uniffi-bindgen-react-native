@@ -414,13 +414,13 @@ fn trampoline_reuse_is_keyed_on_name_and_identity() {
 #[test]
 fn register_function_with_reference_struct_arg() {
     let lib = CString::new(fixture_cdylib_for(
-        "uniffi-fixture-callbacks",
-        "uniffi_fixture_callbacks",
+        "uniffi-fixture-sync-callbacks",
+        "uniffi_sync_callbacks",
     ))
     .unwrap();
-    let alloc = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_alloc").unwrap();
-    let free = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_free").unwrap();
-    let from_bytes = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_from_bytes").unwrap();
+    let alloc = CString::new("ffi_uniffi_sync_callbacks_rustbuffer_alloc").unwrap();
+    let free = CString::new("ffi_uniffi_sync_callbacks_rustbuffer_free").unwrap();
+    let from_bytes = CString::new("ffi_uniffi_sync_callbacks_rustbuffer_from_bytes").unwrap();
 
     // The callback method the vtable struct references.
     let cb_name = CString::new("TestCallbackMethod").unwrap();
@@ -457,7 +457,7 @@ fn register_function_with_reference_struct_arg() {
     // A vtable-init function: fn(Reference(Struct("TestVTable"))) -> void.
     // The arg type name (in the parallel arg_type_names array) is the struct name.
     let fn_name =
-        CString::new("uniffi_uniffi_fixture_callbacks_fn_init_callback_vtable_foreigngetters")
+        CString::new("uniffi_uniffi_sync_callbacks_fn_init_callback_vtable_foreigngetters")
             .unwrap();
     let reference_tag = CString::new(TAG_REFERENCE).unwrap();
     let fn_arg_tag_names = [reference_tag.as_ptr()];

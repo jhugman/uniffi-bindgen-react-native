@@ -4,13 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-#[cfg(target_arch = "wasm32")]
-extern crate uniffi_runtime_wasm as _;
-
 use std::sync::Arc;
 use ubrn_testing::thread::spawn_task;
-
-uniffi::setup_scaffolding!();
 
 #[uniffi::export(with_foreign)]
 pub trait EventListener: Send + Sync {

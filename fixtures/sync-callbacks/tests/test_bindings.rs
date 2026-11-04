@@ -3,5 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-
-fn main() {}
+ubrn_macros::build_foreign_language_testcases! {
+    "tests/bindings/test_sync_callbacks.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2, Channel],
+}

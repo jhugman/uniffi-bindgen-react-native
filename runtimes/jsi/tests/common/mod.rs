@@ -113,7 +113,7 @@ pub struct CallbacksFixture {
     pub struct_arg_cb_name: CString,
 }
 
-/// Register the `uniffi-fixture-callbacks` fixture with TWO callback methods —
+/// Register the `uniffi-fixture-sync-callbacks` fixture with TWO callback methods —
 /// `TestCallbackMethod` (`fn(i32) -> void` with a RustCallStatus out-param) and
 /// `TestCallbackWithStructArg` (`fn(handle, TestVTable) -> void`, a struct
 /// passed BY VALUE) — and ONE vtable struct (`TestVTable`, one Callback field
@@ -126,13 +126,13 @@ pub struct CallbacksFixture {
 #[allow(dead_code)]
 pub fn register_callbacks_fixture() -> CallbacksFixture {
     let lib = CString::new(fixture_cdylib_for(
-        "uniffi-fixture-callbacks",
-        "uniffi_fixture_callbacks",
+        "uniffi-fixture-sync-callbacks",
+        "uniffi_sync_callbacks",
     ))
     .unwrap();
-    let alloc = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_alloc").unwrap();
-    let free = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_free").unwrap();
-    let from_bytes = CString::new("ffi_uniffi_fixture_callbacks_rustbuffer_from_bytes").unwrap();
+    let alloc = CString::new("ffi_uniffi_sync_callbacks_rustbuffer_alloc").unwrap();
+    let free = CString::new("ffi_uniffi_sync_callbacks_rustbuffer_free").unwrap();
+    let from_bytes = CString::new("ffi_uniffi_sync_callbacks_rustbuffer_from_bytes").unwrap();
 
     let void_tag = CString::new(TAG_VOID).unwrap();
 
