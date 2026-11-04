@@ -8,17 +8,15 @@ publish = false
 
 [lib]
 crate-type = ["lib", "cdylib"]
-name = "uniffi_ext_types_lib"
+name = "ext_types"
 
 [dependencies]
-anyhow = "1"
-bytes = "1.3"
 uniffi = { workspace = true }
 
-uniffi-fixture-ext-types-external-crate = {path = "subcrates/external-crate"}
-uniffi-fixture-ext-types-lib-one = {path = "subcrates/uniffi-one"}
-uniffi-fixture-ext-types-custom-types = {path = "subcrates/custom-types"}
-uniffi-fixture-ext-types-sub-lib = {path = "subcrates/sub-lib"}
+uniffi-fixture-ext-types-remote = {path = "subcrates/ext-types-remote"}
+uniffi-fixture-ext-types-shared = {path = "subcrates/ext-types-shared"}
+uniffi-fixture-ext-types-custom = {path = "subcrates/ext-types-custom"}
+uniffi-fixture-ext-types-consumer = {path = "subcrates/ext-types-consumer"}
 
 url = "2.2"
 

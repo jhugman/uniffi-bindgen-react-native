@@ -1,0 +1,16 @@
+namespace ext_types_shared {};
+
+dictionary SharedRecord {
+    string sval;
+};
+
+enum SharedEnum {
+    "One",
+    "Two",
+};
+
+interface SharedObject {
+    constructor();
+
+    i32 increment();
+};

@@ -8,37 +8,37 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-pub struct UniffiOneType {
+pub struct SharedRecord {
     pub sval: String,
 }
 
-pub enum UniffiOneEnum {
+pub enum SharedEnum {
     One,
     Two,
 }
 
 #[derive(Debug, uniffi::Error)]
-pub enum UniffiOneError {
+pub enum SharedError {
     TheError,
 }
 
-impl Display for UniffiOneError {
+impl Display for SharedError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{self:?}"))
     }
 }
 
 #[derive(uniffi::Record)]
-pub struct UniffiOneProcMacroType {
+pub struct SharedProcMacroRecord {
     pub sval: String,
 }
 
 #[derive(Default)]
-pub struct UniffiOneInterface {
+pub struct SharedObject {
     current: AtomicI32,
 }
 
-impl UniffiOneInterface {
+impl SharedObject {
     pub fn new() -> Self {
         Self::default()
     }
@@ -49,14 +49,14 @@ impl UniffiOneInterface {
 }
 
 #[uniffi::export]
-fn get_my_proc_macro_type(t: UniffiOneProcMacroType) -> UniffiOneProcMacroType {
+fn get_proc_macro_record(t: SharedProcMacroRecord) -> SharedProcMacroRecord {
     t
 }
 
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
-pub trait UniffiOneTrait: Send + Sync {
+pub trait SharedTrait: Send + Sync {
     async fn hello(&self) -> String;
 }
 
-uniffi::include_scaffolding!("uniffi-one");
+uniffi::include_scaffolding!("ext_types_shared");

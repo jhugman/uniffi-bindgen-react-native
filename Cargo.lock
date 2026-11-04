@@ -2183,51 +2183,45 @@ dependencies = [
 name = "uniffi-fixture-ext-types"
 version = "0.22.0"
 dependencies = [
- "anyhow",
- "bytes",
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
- "uniffi-fixture-ext-types-custom-types",
- "uniffi-fixture-ext-types-external-crate",
- "uniffi-fixture-ext-types-lib-one",
- "uniffi-fixture-ext-types-sub-lib",
+ "uniffi-fixture-ext-types-consumer",
+ "uniffi-fixture-ext-types-custom",
+ "uniffi-fixture-ext-types-remote",
+ "uniffi-fixture-ext-types-shared",
  "uniffi-runtime-wasm",
  "uniffi_core",
  "url",
 ]
 
 [[package]]
-name = "uniffi-fixture-ext-types-custom-types"
+name = "uniffi-fixture-ext-types-consumer"
 version = "0.22.0"
 dependencies = [
- "bytes",
+ "async-trait",
+ "uniffi",
+ "uniffi-fixture-ext-types-shared",
+]
+
+[[package]]
+name = "uniffi-fixture-ext-types-custom"
+version = "0.22.0"
+dependencies = [
  "uniffi",
  "url",
 ]
 
 [[package]]
-name = "uniffi-fixture-ext-types-external-crate"
+name = "uniffi-fixture-ext-types-remote"
 version = "0.22.0"
 
 [[package]]
-name = "uniffi-fixture-ext-types-lib-one"
+name = "uniffi-fixture-ext-types-shared"
 version = "0.22.0"
 dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "uniffi",
-]
-
-[[package]]
-name = "uniffi-fixture-ext-types-sub-lib"
-version = "0.22.0"
-dependencies = [
- "anyhow",
  "async-trait",
  "uniffi",
- "uniffi-fixture-ext-types-lib-one",
 ]
 
 [[package]]

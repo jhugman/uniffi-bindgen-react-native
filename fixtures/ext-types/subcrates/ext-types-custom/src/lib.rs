@@ -54,4 +54,4 @@ fn get_nested_ouid(nouid: Option<ANestedOuid>) -> ANestedOuid {
     nouid.unwrap_or_else(|| ANestedOuid(Ouid("ANestedOuid".to_string())))
 }
 
-uniffi::include_scaffolding!("custom_types");
+uniffi::include_scaffolding!("ext_types_custom");

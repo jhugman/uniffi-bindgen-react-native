@@ -1,0 +1,83 @@
+namespace ext_types {
+    CombinedType get_combined_type(optional CombinedType? value);
+
+    Url get_url(Url url);
+    sequence<Url> get_urls(sequence<Url> urls);
+    Url? get_maybe_url(Url? url);
+    sequence<Url?> get_maybe_urls(sequence<Url?> urls);
+
+    SharedRecord get_shared_record(SharedRecord t);
+    sequence<SharedRecord> get_shared_records(sequence<SharedRecord> ts);
+    SharedRecord? get_maybe_shared_record(SharedRecord? t);
+
+    SharedEnum get_shared_enum(SharedEnum e);
+    sequence<SharedEnum> get_shared_enums(sequence<SharedEnum> es);
+    SharedEnum? get_maybe_shared_enum(SharedEnum? e);
+    sequence<SharedEnum?> get_maybe_shared_enums(sequence<SharedEnum?> es);
+
+    SharedObject get_shared_object();
+    RemoteObject get_remote_object(string val);
+    SharedProcMacroRecord get_shared_proc_macro_record(SharedProcMacroRecord t);
+};
+
+// A type defined in a .udl file in the `ext_types_shared` crate.
+[External="ext_types_shared"]
+typedef dictionary SharedRecord;
+
+// An enum in the same crate
+[External="ext_types_shared"]
+typedef enum SharedEnum;
+
+// An interface in the same crate
+[External="ext_types_shared"]
+typedef interface SharedObject;
+
+// A type defined via procmacros in an external crate
+[External="ext_types_shared"]
+typedef dictionary SharedProcMacroRecord;
+
+// A Custom (ie, "wrapped") type defined in the `ext_types_custom` crate.
+[Custom="ext_types_custom"]
+typedef string Guid;
+
+// `Url` is defined in the `ext_types_custom` crate, with its TypeScript conversion.
+[Custom="ext_types_custom"]
+typedef string Url;
+
+// Here are some different kinds of remote types - the types are described
+// in this UDL, but the types themselves are defined in a different crate.
+
+[Remote]
+dictionary RemoteRecord {
+    string sval;
+};
+
+[Remote]
+interface RemoteObject {
+    string value();
+};
+
+[Remote, NonExhaustive]
+enum RemoteEnum {
+    "One",
+    "Two",
+};
+
+// And a new type here to tie them all together.
+dictionary CombinedType {
+    SharedEnum shared_enum;
+    SharedRecord shared_record;
+    sequence<SharedRecord> shared_records;
+    SharedRecord? maybe_shared_record;
+
+    Guid guid;
+    sequence<Guid> guids;
+    Guid? maybe_guid;
+
+    Url url;
+    sequence<Url> urls;
+    Url? maybe_url;
+
+    RemoteRecord remote_record;
+    RemoteEnum remote_enum;
+};
