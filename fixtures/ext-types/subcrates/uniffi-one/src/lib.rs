@@ -54,8 +54,9 @@ fn get_my_proc_macro_type(t: UniffiOneProcMacroType) -> UniffiOneProcMacroType {
 }
 
 #[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
 pub trait UniffiOneTrait: Send + Sync {
-    fn hello(&self) -> String;
+    async fn hello(&self) -> String;
 }
 
 uniffi::include_scaffolding!("uniffi-one");

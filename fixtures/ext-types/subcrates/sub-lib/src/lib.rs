@@ -20,8 +20,9 @@ fn get_sub_type(existing: Option<SubLibType>) -> SubLibType {
 
 struct OneImpl;
 
+#[async_trait::async_trait]
 impl UniffiOneTrait for OneImpl {
-    fn hello(&self) -> String {
+    async fn hello(&self) -> String {
         "sub-lib trait impl says hello".to_string()
     }
 }
@@ -32,8 +33,8 @@ fn get_trait_impl() -> Arc<dyn UniffiOneTrait> {
 }
 
 #[uniffi::export]
-fn call_trait_impl(t: Arc<dyn UniffiOneTrait>) -> String {
-    t.hello()
+async fn call_trait_impl(t: Arc<dyn UniffiOneTrait>) -> String {
+    t.hello().await
 }
 
 #[uniffi::export]

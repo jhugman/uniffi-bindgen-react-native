@@ -7,7 +7,7 @@
 //   cargo test -p uniffi-fixture-ext-types -- jsi
 //   cargo test -p uniffi-fixture-ext-types -- wasm
 
-import { test } from "@/asserts";
+import { asyncTest, test } from "@/asserts";
 
 import module1 from "@/generated/custom_types";
 import module2, {
@@ -95,17 +95,6 @@ test("UniffiOneInterface object from uniffi-one-ns, made by lib", (t) => {
   const o = getUniffiOneInterface();
   t.assertEqual(o.increment(), 1);
   t.assertEqual(o.increment(), 2);
-});
-
-test("Getting a UniffiOneTrait from uniffi-one-ns, from getTraitImpl function in sublib", (t) => {
-  const ti: UniffiOneTrait = getTraitImpl();
-  t.assertEqual(ti.hello(), "sub-lib trait impl says hello");
-  const sub = SubLibType.create({
-    maybeEnum: undefined,
-    maybeTrait: ti,
-    maybeInterface: undefined,
-  });
-  t.assertNotNull(getSubType(sub).maybeTrait);
 });
 
 test("UniffiOneTrait from uniffi-one-ns, ObjectsType record from lib, SubLibType record from sublib passing sublib object", (t) => {
@@ -196,14 +185,35 @@ test("an error from uniffi one is used by another crate", (t) => {
   });
 });
 
-test("TypeScript implementing an external trait works", (t) => {
-  const tsImpl: UniffiOneTrait = {
-    hello(): string {
-      return "hello from TypeScript implementing external trait";
+(async () => {
+  await asyncTest(
+    "Getting a UniffiOneTrait from uniffi-one-ns, from getTraitImpl function in sublib",
+    async (t) => {
+      const ti: UniffiOneTrait = getTraitImpl();
+      t.assertEqual(await ti.hello(), "sub-lib trait impl says hello");
+      const sub = SubLibType.create({
+        maybeEnum: undefined,
+        maybeTrait: ti,
+        maybeInterface: undefined,
+      });
+      t.assertNotNull(getSubType(sub).maybeTrait);
+      t.end();
     },
-  };
-  t.assertEqual(
-    callTraitImpl(tsImpl),
-    "hello from TypeScript implementing external trait",
   );
-});
+
+  await asyncTest(
+    "TypeScript implementing an external trait works",
+    async (t) => {
+      const tsImpl: UniffiOneTrait = {
+        async hello(): Promise<string> {
+          return "hello from TypeScript implementing external trait";
+        },
+      };
+      t.assertEqual(
+        await callTraitImpl(tsImpl),
+        "hello from TypeScript implementing external trait",
+      );
+      t.end();
+    },
+  );
+})();
