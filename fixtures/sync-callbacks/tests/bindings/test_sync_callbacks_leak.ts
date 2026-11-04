@@ -32,7 +32,7 @@ test("buffer returned from a foreign callback is not leaked", (t) => {
   // adopting it, the original allocation is orphaned — nothing frees a lowered
   // return value — and the live count climbs by exactly one per call.
   const producer: BytesProducer = {
-    produce: (size: number) => new ArrayBuffer(size),
+    produce: (size: number) => new Uint8Array(size),
   };
 
   // Warm up so one-time allocations are inside the `before` snapshot.
