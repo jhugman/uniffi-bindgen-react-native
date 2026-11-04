@@ -17,6 +17,7 @@ async fn simple_callback(callback: Arc<dyn SimpleCallback>) -> Arc<dyn SimpleCal
     callback
 }
 
+/// An object that holds a foreign callback and reports every update through it.
 #[derive(uniffi::Object)]
 pub struct CallbackObject {
     inner: Mutex<String>,

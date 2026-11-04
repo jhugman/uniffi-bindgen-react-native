@@ -6,6 +6,7 @@
 // To run:
 //   cargo test -p uniffi-fixture-coverall -- async_wasm
 
+import "@/polyfills";
 import {
   CoverallError,
   ComplexError,
@@ -302,7 +303,7 @@ const almostEquals = (this_: number, that: number): boolean =>
   await asyncTest(
     "Dummy coveralls implement the Coveralls interface",
     async (t) => {
-      // We're testing only whether this is compilable.
+      // Documents the interface a hand-written implementation must satisfy.
       class DummyCoveralls implements CoverallsInterface {
         async addPatch(patch: PatchInterface): Promise<void> {
           throw new Error("Method not implemented.");

@@ -269,9 +269,12 @@ import { UniffiThrownObject } from "../../../../typescript/src/errors";
         caught = e;
       }
       // The thrown object's message is not asserted: it is built from an async toDebugString(), so it reads "[object Promise]".
-      t.assertTrue(RichError.hasInner(caught));
-      const inner = RichError.getInner(caught);
-      t.assertEqual(`RichError: "${message}"`, await inner.asyncToString());
+      if (RichError.hasInner(caught)) {
+        const inner = RichError.getInner(caught);
+        t.assertEqual(`RichError: "${message}"`, await inner.asyncToString());
+      } else {
+        t.fail(`expected RichError, got ${caught}`);
+      }
       t.end();
     },
   );

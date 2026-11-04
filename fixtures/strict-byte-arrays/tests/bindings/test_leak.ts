@@ -11,11 +11,11 @@
 //
 // `measureBytes` takes a byte array (lowered via `rustbuffer_alloc`) and
 // returns a scalar, so only the *argument* direction allocates a big buffer.
-// The fixture's counting allocator (see src/lib.rs) tracks live allocations >= 64 KiB, and we
-// assert the live count is unchanged across a loop of calls. If the runtime
-// copies the lowered view instead of adopting it, the allocation from
-// `rustbuffer_alloc` is orphaned — codegen never frees a lowered argument — and
-// the count climbs by exactly one per call.
+// The fixture's counting allocator (see src/lib.rs) tracks live allocations
+// >= 64 KiB, and we assert the live count is unchanged across a loop of calls.
+// If the runtime copies the lowered view instead of adopting it, the allocation
+// from `rustbuffer_alloc` is orphaned — codegen never frees a lowered
+// argument — and the count climbs by exactly one per call.
 import myModule, {
   measureBytes,
   liveBigAllocCount,

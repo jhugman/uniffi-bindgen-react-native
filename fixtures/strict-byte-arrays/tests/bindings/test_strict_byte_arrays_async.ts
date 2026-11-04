@@ -82,6 +82,7 @@ import "@/polyfills";
       }
       t.end();
     },
+    // Headroom for 32 MB copies through the Worker on slow CI.
     120000,
   );
 })();

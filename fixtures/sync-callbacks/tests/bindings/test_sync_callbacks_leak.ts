@@ -3,12 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-// Proves a buffer returned from a foreign callback is adopted, not copied and orphaned.
+// Proves a buffer returned from a foreign callback is adopted, not copied and
+// orphaned.
 //
 // To run:
 //   cargo test -p uniffi-fixture-sync-callbacks -- jsi::test_sync_callbacks_leak
 //
-// The fixture's counting allocator (see src/bytes.rs) tracks live allocations >= 64 KiB.
+// The fixture's counting allocator (see src/bytes.rs) tracks live allocations
+// >= 64 KiB.
 import myModule, {
   consumeProducedBytes,
   liveBigAllocCount,
@@ -27,10 +29,11 @@ const PAYLOAD = 256 * 1024;
 const ITERATIONS = 64;
 
 test("buffer returned from a foreign callback is not leaked", (t) => {
-  // The foreign side lowers `produce`'s return value through `rustbuffer_alloc`,
-  // and Rust owns what comes back. If the runtime copies that view instead of
-  // adopting it, the original allocation is orphaned — nothing frees a lowered
-  // return value — and the live count climbs by exactly one per call.
+  // The foreign side lowers `produce`'s return value through
+  // `rustbuffer_alloc`, and Rust owns what comes back. If the runtime copies
+  // that view instead of adopting it, the original allocation is orphaned —
+  // nothing frees a lowered return value — and the live count climbs by
+  // exactly one per call.
   const producer: BytesProducer = {
     produce: (size: number) => new Uint8Array(size),
   };

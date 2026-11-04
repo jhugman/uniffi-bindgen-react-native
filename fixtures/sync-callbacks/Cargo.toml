@@ -11,7 +11,7 @@ crate-type = ["lib", "cdylib"]
 name = "uniffi_sync_callbacks"
 
 [dependencies]
-uniffi = { workspace = true, features = [] }
+uniffi = { workspace = true }
 ubrn_testing = { path = "../../crates/ubrn_testing" }
 thiserror = "1.0"
 

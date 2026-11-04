@@ -24,6 +24,7 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
 
 const WORKER_FILE: &str = "uniffi-worker.async-wasm.ts";
 const WORKER_BOOTSTRAP_FILE: &str = "uniffi-worker-bootstrap.async-wasm.mjs";
+const DEFINITIONS_MODULE: &str = "uniffi-definitions.async-wasm";
 
 /// The preload: on the main thread, one `MessageChannel` for the whole
 /// library, its receiver end transferred into a Worker, one sender in front of
@@ -83,11 +84,11 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
          worker.on(\"exit\", (code) => {{\n\
          \x20 if (code !== 0) throw new Error(`uniffi worker exited with ${{code}}`);\n\
          }});\n\
-         const sender = createSender(DEFINITIONS as any, ch.port2);\n"
+         const sender = createSender(DEFINITIONS, ch.port2);\n"
     ));
     for ns in &namespaces {
         src.push_str(&format!(
-            "set_{ns}(sender as any);\n\
+            "set_{ns}(sender);\n\
              await mod_{ns}.default.initialize();\n"
         ));
     }
@@ -101,12 +102,12 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
     path
 }
 
-const DEFINITIONS_MODULE: &str = "uniffi-definitions.async-wasm";
-
 /// One definitions object for the whole library, imported by both sides of the
-/// channel. Names are namespace-prefixed, and a name shared between namespaces
-/// (an external type's functions) has an identical definition in each, so the
-/// merge is order-independent.
+/// channel. Function and callback names are crate-prefixed; the only names
+/// shared between namespaces are uniffi's fixed generic shapes (e.g.
+/// `ForeignFutureDroppedCallback`), identical by construction. The generated
+/// module throws if a shared name's definitions ever differ, so the merge is
+/// order-independent.
 fn write_definitions(ts_dir: &Utf8Path, namespaces: &[String]) {
     let mut src = String::new();
     for ns in namespaces {
@@ -117,11 +118,26 @@ fn write_definitions(ts_dir: &Utf8Path, namespaces: &[String]) {
     let all: Vec<String> = namespaces.iter().map(|ns| format!("defs_{ns}")).collect();
     src.push_str(&format!(
         "const all = [{}];\n\
+         function merge(key: \"functions\" | \"callbacks\" | \"structs\") {{\n\
+         \x20 const out: Record<string, any> = {{}};\n\
+         \x20 for (const d of all) {{\n\
+         \x20   for (const [k, v] of Object.entries(d[key])) {{\n\
+         \x20     if (k in out && JSON.stringify(out[k]) !== JSON.stringify(v)) {{\n\
+         \x20       throw new Error(`definition ${{k}} differs between namespaces`);\n\
+         \x20     }}\n\
+         \x20     out[k] = v;\n\
+         \x20   }}\n\
+         \x20 }}\n\
+         \x20 return out;\n\
+         }}\n\
+         // One table, so the whole library shares one port.\n\
+         // One cdylib has one uniffi_core allocator: any crate's\n\
+         // `ffi_<crate>_rustbuffer_*` serves every namespace.\n\
          export const DEFINITIONS = {{\n\
          \x20 symbols: all[0].symbols,\n\
-         \x20 functions: Object.assign({{}}, ...all.map((d) => d.functions)),\n\
-         \x20 callbacks: Object.assign({{}}, ...all.map((d) => d.callbacks)),\n\
-         \x20 structs: Object.assign({{}}, ...all.map((d) => d.structs)),\n\
+         \x20 functions: merge(\"functions\"),\n\
+         \x20 callbacks: merge(\"callbacks\"),\n\
+         \x20 structs: merge(\"structs\"),\n\
          }};\n",
         all.join(", ")
     ));

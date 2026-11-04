@@ -145,7 +145,7 @@ export class SenderCore {
       this.settle(id);
       throw e;
     }
-    // A synchronous port may already have settled the call.
+    // The call may already have settled by now; only then is there nothing to detach.
     if (signal && this.pending.has(id))
       pending.detach = this.replayAbort(id, signal);
   }
@@ -214,7 +214,7 @@ export class SenderCore {
       const args = entry.plan.args.map((p, i) =>
         marshalIn(p, msg.args[i], this.ctx),
       );
-      // Await only a thenable: a non-thenable result must reach postMessage synchronously so a sync port can answer a sync vtable method.
+      // Await only a thenable, so a non-thenable result is posted without an extra tick.
       let result: any = entry.fn(...args);
       if (result && typeof result.then === "function") result = await result;
       let value: unknown;

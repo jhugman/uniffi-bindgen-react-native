@@ -234,11 +234,24 @@ myModule.initialize();
   await asyncTest(
     "errors cross from sync Rust, async Rust and an async foreign trait",
     async (t) => {
-      await t.assertThrowsAsync(FlatError.instanceOf, () => failFlat());
-      await t.assertThrowsAsync(EchoError.instanceOf, () => failRichAsync(3));
-      await t.assertThrowsAsync(EchoError.instanceOf, () =>
-        failVia(new TsEcho(), 4),
-      );
+      await t.assertThrowsAsync(FlatError.Oops.instanceOf, () => failFlat());
+      // `EchoError.instanceOf` also accepts `Unexpected`, so pin the variant and payload.
+      for (const [label, call, code] of [
+        ["failRichAsync", () => failRichAsync(3), 3],
+        ["failVia", () => failVia(new TsEcho(), 4), 4],
+      ] as const) {
+        let caught: unknown;
+        try {
+          await call();
+        } catch (e) {
+          caught = e;
+        }
+        if (EchoError.Code.instanceOf(caught)) {
+          t.assertEqual(EchoError.Code.getInner(caught).code, code, label);
+        } else {
+          t.fail(`${label}: expected EchoError.Code, got ${caught}`);
+        }
+      }
       t.end();
     },
   );

@@ -243,7 +243,7 @@ import {
   await asyncTest(
     "Variant with Option fields accepts omitted keys and undefined",
     async (t) => {
-      // Omitting optional keys is a compile-time check (would fail tsc if `?:` was lost).
+      // Omitting optional keys type-checks only while the keys stay `?:`.
       const v1 = OptionalFields.Named.new({ required: "hello" });
       t.assertEqual(v1.tag, OptionalFields_Tags.Named);
       if (OptionalFields.Named.instanceOf(v1)) {
@@ -284,14 +284,12 @@ import {
   );
 })();
 
-// This tests the generated Typescript and serves as an example of how to
-// to use enums with values.
+// An example of how to use enums with values; nothing calls it.
 //
 // In each of the variants, we switch match on the `variant.tag`. Typescript then
 // infers the type of `variant.inner`.
 //
 // In this particular example, each of the variants has a tuple value, of length 1.
-// If the types aren't inferred correctly, then Typescript would error at compile time.
 function testPatternMatching(variant: CollidingVariants) {
   switch (variant.tag) {
     case CollidingVariants_Tags.AnimalRecord: {
@@ -313,8 +311,7 @@ function testPatternMatching(variant: CollidingVariants) {
   }
 }
 
-// This tests the generated Typescript and serves as an example of how to
-// to use enums with values.
+// An example of how to use enums with values; nothing calls it.
 //
 // In each of the variants, we switch match on the `variant.tag`. Typescript then
 // infers the type of `variant.inner`.
@@ -334,8 +331,7 @@ function testPatternMatching3(variant: AnimalAssociatedType) {
   }
 }
 
-// This tests the generated Typescript and serves as an example of how to
-// to use enums with values.
+// An example of how to use enums with values; nothing calls it.
 //
 // In each of the variants, we switch match on the `variant.tag`. Typescript then
 // infers the type of `variant.inner`.

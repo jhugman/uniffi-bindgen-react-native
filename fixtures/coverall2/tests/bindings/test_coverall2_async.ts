@@ -78,6 +78,7 @@ import "@/polyfills";
       }
       t.end();
     },
+    // Headroom for 32 MB copies through the Worker on slow CI.
     120000,
   );
   await asyncTest("array buffer roundtrip with ArrayBufferView", async (t) => {
