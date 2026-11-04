@@ -174,9 +174,14 @@ myModule.initialize();
     handle: BigInt(7),
   });
   async function check(t: AsyncAsserts, got: Everything, want: Everything) {
-    const { widget: gw, tagged: gt, ...g } = got;
-    const { widget: ww, tagged: wt, ...w } = want;
+    const { widget: gw, tagged: gt, bytes: gb, ...g } = got;
+    const { widget: ww, tagged: wt, bytes: wb, ...w } = want;
     t.assertEqual(g, w);
+    // An ArrayBuffer stringifies to a constant, so compare its contents.
+    t.assertEqual(
+      Array.from(new Uint8Array(gb)),
+      Array.from(new Uint8Array(wb)),
+    );
     t.assertEqual(await (gw as Widget).label(), await (ww as Widget).label());
     t.assertTrue(await gt.equals(wt));
   }
