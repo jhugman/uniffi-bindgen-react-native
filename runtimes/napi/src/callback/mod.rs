@@ -12,7 +12,7 @@
 //!   converts to JS values, calls the JS function, and writes the return value.
 //! - [`dispatch_to_js_thread`]: runs off the JS thread, copies the arg buffer,
 //!   sends it to the JS thread via a ThreadsafeFunction, and blocks on a
-//!   sync_channel for the return value.
+//!   sync_channel for the return value, unless the callback has none to hand back.
 //! - [`is_js_thread`]: returns whether the current thread is the one that registered the
 //!   callback, and so may touch its napi values directly.
 //!
@@ -381,6 +381,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
 
 /// Cross-thread path: copies the arg buffer, dispatches to the JS thread via
 /// ThreadsafeFunction, and blocks until the JS thread sends back the return bytes.
+/// A callback with no return value, out-return or RustCallStatus is not waited for.
 ///
 /// # Safety
 ///
@@ -432,6 +433,16 @@ pub extern "C" fn dispatch_to_js_thread(
             return;
         };
         tsfn.call(payload, ThreadsafeFunctionCallMode::Blocking);
+    }
+
+    // A callback with nothing to hand back -- the rust_future continuation and
+    // vtable free -- is posted and not waited for. uniffi invokes the
+    // continuation while holding the future's scheduler mutex, so waiting here
+    // deadlocks whenever the JS thread is inside rust_future_poll and the poll
+    // wakes another future: it blocks on the mutex this thread holds while this
+    // thread blocks on it. The handler's reply then goes to a dropped receiver.
+    if ret_len == 0 && !ud.has_rust_call_status && !ud.out_return {
+        return;
     }
 
     // Block until the JS thread sends back the return bytes.

@@ -5,6 +5,10 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+## 🦊 What's Changed
+
+- The N-API player no longer deadlocks on future continuations: callbacks with nothing to hand back are posted without waiting, as in the JSI player ([#492](https://github.com/jhugman/uniffi-bindgen-react-native/pull/492)).
+
 **Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-6...main
 
 ---
