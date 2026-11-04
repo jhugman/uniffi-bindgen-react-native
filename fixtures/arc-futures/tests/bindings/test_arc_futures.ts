@@ -12,10 +12,7 @@ import myModule, {
   AsyncCallback,
   makeObject,
   makeObjectWithAsyncCallback,
-  makeObjectWithCallback,
   rustCallback,
-  simpleCallback,
-  SimpleCallback,
   SimpleObject,
   throwObject,
 } from "@/generated/arc_futures";
@@ -56,42 +53,6 @@ function checkRemainingFutures(t: Asserts) {
       t.end();
     },
   );
-
-  await asyncTest("Updater actually calls the update callback", async (t) => {
-    let previousValue: string | undefined;
-    let updated = 0;
-    class Updater implements SimpleCallback {
-      onUpdate(old: string, new_: string): void {
-        previousValue = old;
-        updated++;
-      }
-      reset(): void {
-        previousValue = undefined;
-        updated = 0;
-      }
-    }
-
-    const cbJs = new Updater();
-    const cbRs = await simpleCallback(cbJs);
-    cbRs.onUpdate("old", "new");
-    t.assertEqual(previousValue, "old");
-    t.assertEqual(updated, 1);
-    cbJs.reset();
-
-    const obj = await makeObjectWithCallback(cbJs);
-    t.assertNotNull(obj);
-
-    await obj.update("alice");
-    t.assertEqual(previousValue, "key");
-    t.assertEqual(updated, 1);
-
-    await obj.update("bob");
-    t.assertEqual(previousValue, "alice");
-    t.assertEqual(updated, 2);
-
-    checkRemainingFutures(t);
-    t.end();
-  });
 
   await asyncTest("Updater actually calls the async callback", async (t) => {
     let updated = 0;

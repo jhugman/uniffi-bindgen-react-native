@@ -15,19 +15,26 @@ import syncCallbacks, {
   Getters,
   GettersComplexError,
   GettersError,
+  makeObjectWithCallback,
   makeRustGetters,
   PayloadInterface,
   ForeignGetters,
   KeywordListener,
   RustGetters,
   RustStringifier,
+  SimpleCallback,
+  simpleCallback,
   SimpleError,
   StoredForeignStringifier,
   testGetters,
   testRoundTripThroughForeign,
   testRoundTripThroughRust,
 } from "@/generated/sync_callbacks";
-import { asyncTest, AsyncAsserts, test } from "@/asserts";
+import { asyncTest, Asserts, AsyncAsserts, test } from "@/asserts";
+import {
+  uniffiRustFutureHandleCount,
+  uniffiForeignFutureHandleCount,
+} from "@ubjs/core";
 import "@/polyfills";
 
 // Initialize the callbacks for the module.
@@ -320,6 +327,19 @@ test("Round trip through foreign: Rust calls roundTripObject on TypeScript imple
   testRoundTripThroughForeign(tsGetters);
 });
 
+function checkRemainingFutures(t: Asserts) {
+  t.assertEqual(
+    0,
+    uniffiRustFutureHandleCount(),
+    "Number of remaining futures should be zero",
+  );
+  t.assertEqual(
+    0,
+    uniffiForeignFutureHandleCount(),
+    "Number of remaining foreign futures should be zero",
+  );
+}
+
 (async () => {
   for (let i = 1; i <= 4096; i *= 2) {
     await asyncTest(
@@ -327,4 +347,40 @@ test("Round trip through foreign: Rust calls roundTripObject on TypeScript imple
       async (t) => await testToMax(i, t),
     );
   }
+
+  await asyncTest("Updater actually calls the update callback", async (t) => {
+    let previousValue: string | undefined;
+    let updated = 0;
+    class Updater implements SimpleCallback {
+      onUpdate(old: string, new_: string): void {
+        previousValue = old;
+        updated++;
+      }
+      reset(): void {
+        previousValue = undefined;
+        updated = 0;
+      }
+    }
+
+    const cbJs = new Updater();
+    const cbRs = await simpleCallback(cbJs);
+    cbRs.onUpdate("old", "new");
+    t.assertEqual(previousValue, "old");
+    t.assertEqual(updated, 1);
+    cbJs.reset();
+
+    const obj = await makeObjectWithCallback(cbJs);
+    t.assertNotNull(obj);
+
+    await obj.update("alice");
+    t.assertEqual(previousValue, "key");
+    t.assertEqual(updated, 1);
+
+    await obj.update("bob");
+    t.assertEqual(previousValue, "alice");
+    t.assertEqual(updated, 2);
+
+    checkRemainingFutures(t);
+    t.end();
+  });
 })();
