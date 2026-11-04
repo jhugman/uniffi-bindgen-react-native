@@ -9,6 +9,9 @@ extern crate uniffi_runtime_wasm as _;
 
 use std::sync::Arc;
 
+mod types;
+pub use types::*;
+
 // Object with a primary constructor, a plain method, and all five traits.
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord, uniffi::Object)]
 #[uniffi::export(Debug, Display, Eq, Hash, Ord)]

@@ -10,6 +10,8 @@ crate-type = ["lib", "cdylib"]
 name = "uniffi_force_async"
 
 [dependencies]
+async-trait = "0.1"
+thiserror = "1.0"
 uniffi = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -2201,6 +2201,8 @@ dependencies = [
 name = "uniffi-fixture-force-async"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "thiserror 1.0.69",
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
@@ -2215,6 +2217,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
