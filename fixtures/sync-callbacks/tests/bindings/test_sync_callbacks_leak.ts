@@ -4,7 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 // Proves a buffer returned from a foreign callback is adopted, not copied and
-// orphaned.
+// orphaned, and that a buffer passed to a foreign callback is freed after it is
+// lifted.
 //
 // To run:
 //   cargo test -p uniffi-fixture-sync-callbacks -- jsi::test_sync_callbacks_leak
@@ -13,9 +14,11 @@
 // >= 64 KiB.
 import myModule, {
   consumeProducedBytes,
+  sendBytesToConsumer,
   liveBigAllocCount,
   liveBigAllocBytes,
   type BytesProducer,
+  type BytesConsumer,
 } from "@/generated/sync_callbacks";
 import { test } from "@/asserts";
 
@@ -61,5 +64,39 @@ test("buffer returned from a foreign callback is not leaked", (t) => {
     beforeBytes,
     afterBytes,
     `leaked ${afterBytes - beforeBytes} bytes over ${ITERATIONS} callback returns`,
+  );
+});
+
+test("buffer passed to a foreign callback is not leaked", (t) => {
+  // Rust lowers `consume`'s argument into a `RustBuffer` and hands it to the
+  // foreign side, which owns it. If the runtime never frees it after lifting,
+  // the live count climbs by exactly one per call.
+  const consumer: BytesConsumer = {
+    consume: (bytes: Uint8Array) => bytes.length,
+  };
+
+  // Warm up so one-time allocations are inside the `before` snapshot.
+  sendBytesToConsumer(consumer, PAYLOAD);
+
+  const beforeCount = liveBigAllocCount();
+  const beforeBytes = Number(liveBigAllocBytes());
+
+  for (let i = 0; i < ITERATIONS; i++) {
+    const len = sendBytesToConsumer(consumer, PAYLOAD);
+    t.assertEqual(len, PAYLOAD);
+  }
+
+  const afterCount = liveBigAllocCount();
+  const afterBytes = Number(liveBigAllocBytes());
+
+  t.assertEqual(
+    beforeCount,
+    afterCount,
+    `leaked ${afterCount - beforeCount} big buffers over ${ITERATIONS} callback arguments`,
+  );
+  t.assertEqual(
+    beforeBytes,
+    afterBytes,
+    `leaked ${afterBytes - beforeBytes} bytes over ${ITERATIONS} callback arguments`,
   );
 });

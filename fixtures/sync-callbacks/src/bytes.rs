@@ -77,3 +77,22 @@ pub fn consume_produced_bytes(producer: Arc<dyn BytesProducer>, size: u32) -> u3
     let bytes = producer.produce(size);
     bytes.len() as u32
 }
+
+// --- RustBuffer-argument leak probe (callback direction) ---------------------
+//
+// Rust lowers a buffer and passes it as an *argument* to a foreign callback. The
+// foreign side owns that buffer and must free it once it has lifted it, or the
+// live count climbs by one per call.
+#[uniffi::export(with_foreign)]
+pub trait BytesConsumer: Send + Sync {
+    /// Receives a byte array that Rust lowered into a `RustBuffer`.
+    fn consume(&self, bytes: Vec<u8>) -> u32;
+}
+
+#[uniffi::export]
+/// Passes a `size`-byte array to `consume` and returns what it reports. Any growth
+/// in `live_big_alloc_count` across a loop of these is a callback argument the
+/// foreign side never freed.
+pub fn send_bytes_to_consumer(consumer: Arc<dyn BytesConsumer>, size: u32) -> u32 {
+    consumer.consume(vec![0; size as usize])
+}

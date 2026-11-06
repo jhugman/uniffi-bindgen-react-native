@@ -59,6 +59,14 @@ namespace {{ ns }} {
         {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
         {%-   let arg_t = arg.type_().borrow()|ffi_type_name_from_js %}
         {%-   let arg_nm = arg.name()|var_name|fmt("js_{}") %}
+        {%-   if arg_t == "RustBuffer" %}
+        // Rust hands this buffer over to us, and `toJs` only gives JS a view of it.
+        // The JS side lifts (copies) it during the call, so free it when `body` exits.
+        struct Free_{{ arg_nm_rs }} {
+            RustBuffer buf;
+            ~Free_{{ arg_nm_rs }}() { {{ arg.type_().borrow()|bridging_class(ci) }}::rustbuffer_free(buf); }
+        } free_{{ arg_nm_rs }} { {{ arg_nm_rs }} };
+        {%-   endif %}
         auto {{ arg_nm }} = {{ arg.type_().borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, {{ arg_nm_rs }});
         {%- endfor %}
 
