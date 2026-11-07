@@ -145,9 +145,7 @@ export class SenderCore {
       this.settle(id);
       throw e;
     }
-    // The call may already have settled by now; only then is there nothing to detach.
-    if (signal && this.pending.has(id))
-      pending.detach = this.replayAbort(id, signal);
+    if (signal) pending.detach = this.replayAbort(id, signal);
   }
 
   // An AbortSignal cannot cross a port, so its abort crosses as a cancel
@@ -217,22 +215,7 @@ export class SenderCore {
       // Await only a thenable, so a non-thenable result is posted without an extra tick.
       let result: any = entry.fn(...args);
       if (result && typeof result.then === "function") result = await result;
-      let value: unknown;
-      if (entry.plan.hasRustCallStatus) {
-        value =
-          "pointee" in result
-            ? {
-                pointee: marshalOut(
-                  entry.plan.ret,
-                  result.pointee,
-                  this.ctx,
-                  transfer,
-                ),
-              }
-            : { code: result.code, errorBuf: result.errorBuf };
-      } else {
-        value = marshalOut(entry.plan.ret, result, this.ctx, transfer);
-      }
+      const value = marshalOut(entry.plan.ret, result, this.ctx, transfer);
       this.port.postMessage(
         { kind: "callback-return", id: msg.id, ok: true, value },
         transfer,

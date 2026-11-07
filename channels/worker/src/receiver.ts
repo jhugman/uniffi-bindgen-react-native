@@ -10,7 +10,6 @@ import {
 } from "@ubjs/core";
 import type { ChannelListener, ChannelPort } from "./port.js";
 import {
-  fromWireError,
   isChannelMessage,
   toWireError,
   type ChannelMessage,
@@ -253,22 +252,12 @@ export class ReceiverCore {
       // Await only a thenable, so a non-thenable result is posted without an extra tick.
       let result: any = entry.fn(...args);
       if (result && typeof result.then === "function") result = await result;
-      let value: unknown;
-      if (entry.plan.hasRustCallStatus) {
-        value =
-          "pointee" in result
-            ? {
-                pointee: marshalOut(
-                  entry.plan.ret,
-                  result.pointee,
-                  this.callbackCtx,
-                  transfer,
-                ),
-              }
-            : { code: result.code, errorBuf: result.errorBuf };
-      } else {
-        value = marshalOut(entry.plan.ret, result, this.callbackCtx, transfer);
-      }
+      const value = marshalOut(
+        entry.plan.ret,
+        result,
+        this.callbackCtx,
+        transfer,
+      );
       this.port.postMessage(
         { kind: "callback-return", id: msg.id, ok: true, value },
         transfer,
@@ -383,33 +372,13 @@ export class ReceiverCore {
       };
     }
 
-    // Anything that must hand Rust a value now: the reply is read straight after posting,
-    // so it is only there if the transport answered inline.
-    return (...args: unknown[]) => {
-      let reply: CallbackReturnMessage | undefined;
-      this.postCallback(id, plan, args, (m) => {
-        reply = m;
-      });
+    // Rust wants a value now, and a port can only answer later.
+    return () => {
       this.releaseIfInvocation(id, lifetime);
-      if (!reply) {
-        throw new Error(
-          `worker: callback "${plan.name}" needs a synchronous reply; ` +
-            "synchronous callback-interface methods are not supported over an asynchronous channel, " +
-            "enable forceAsync for this interface",
-        );
-      }
-      if (!reply.ok) throw fromWireError(reply.error);
-      if (plan.hasRustCallStatus) {
-        const v = reply.value as {
-          pointee?: unknown;
-          code?: number;
-          errorBuf?: Uint8Array;
-        };
-        return "pointee" in v
-          ? { pointee: marshalIn(plan.ret, v.pointee, this.callbackCtx) }
-          : v;
-      }
-      return marshalIn(plan.ret, reply.value, this.callbackCtx);
+      throw new Error(
+        `worker: callback "${plan.name}" needs a synchronous reply, which a channel cannot give; ` +
+          "make the method `async fn` in Rust",
+      );
     };
   }
 }
