@@ -242,6 +242,46 @@ test("an async method returns a local dropped-struct immediately and maps the cl
   port2.close();
 });
 
+for (const order of ["free before the reply", "free after the reply"]) {
+  test(`a failed async method leaves no dropped-struct state: ${order}`, async (t) => {
+    t.mock.method(console, "error", () => {});
+    const { port1, port2 } = new MessageChannel();
+    const { player, state } = fakePlayer();
+    const core = new ReceiverCore(compilePlan(DEFS), player, port1);
+    const s = senderSide(port2);
+    try {
+      s.post({
+        kind: "call",
+        id: 1,
+        fn: "init_vtable",
+        args: [
+          { uniffi_free: 1, uniffi_clone: 2, notify: 3, async_m: 4, sync_m: 5 },
+        ],
+      });
+      await s.next();
+      s.post({ kind: "call", id: 2, fn: "start_async", args: [5n] });
+      const msgs = [await s.next(), await s.next()];
+      const cb = msgs.find((m) => m.kind === "callback") as any;
+      const rustFrees = () => state.dropped.free(state.dropped.handle);
+
+      if (order === "free before the reply") rustFrees();
+      s.post({
+        kind: "callback-return",
+        id: cb.id,
+        ok: false,
+        error: { name: "Error", message: "client failed" },
+      });
+      await new Promise((r) => setTimeout(r, 10));
+      if (order === "free after the reply") rustFrees();
+
+      assert.strictEqual(core.droppedCount, 0);
+    } finally {
+      core.close();
+      port2.close();
+    }
+  });
+}
+
 test("a sync vtable method over an asynchronous port throws pointing at forceAsync", async () => {
   const { port1, port2 } = new MessageChannel();
   const { player } = fakePlayer();

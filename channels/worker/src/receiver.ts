@@ -35,6 +35,8 @@ interface DroppedClient {
   free: (h: bigint) => void;
 }
 
+const NOTHING_TO_FREE: DroppedClient = { handle: 0n, free: () => {} };
+
 export class ReceiverCore {
   private registry = new CallbackRegistry();
   private forwarders = new ForwarderCache();
@@ -95,6 +97,9 @@ export class ReceiverCore {
   }
   get forwarderCount(): number {
     return this.forwarders.size;
+  }
+  get droppedCount(): number {
+    return this.dropped.size + this.freeRequested.size;
   }
 
   close(): void {
@@ -300,12 +305,10 @@ export class ReceiverCore {
         const local = this.nextLocalHandle++;
         this.postCallback(id, plan, args, (m) => {
           logFailure(m);
-          if (!m.ok) return;
-          const client = marshalIn(
-            plan.ret,
-            m.value,
-            this.callbackCtx,
-          ) as DroppedClient;
+          // Rust frees what it was handed whether or not the client replied.
+          const client = m.ok
+            ? (marshalIn(plan.ret, m.value, this.callbackCtx) as DroppedClient)
+            : NOTHING_TO_FREE;
           this.dropped.set(local, client);
           if (this.freeRequested.delete(local)) this.localFree(local);
         });
