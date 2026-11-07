@@ -250,6 +250,11 @@ impl TryFrom<&GenerateAllArgs> for GenerateAllCommand {
     type Error = anyhow::Error;
 
     fn try_from(value: &GenerateAllArgs) -> Result<Self> {
+        #[cfg(feature = "wasm")]
+        anyhow::ensure!(
+            !value.switches.async_delivery,
+            "`generate all` cannot generate async bindings; use `generate wasm2 bindings --async`"
+        );
         let project_config = value.config.clone().try_into()?;
         let native_bindings = value.native_bindings;
         Ok(GenerateAllCommand::new(
@@ -257,5 +262,28 @@ impl TryFrom<&GenerateAllArgs> for GenerateAllCommand {
             project_config,
             native_bindings,
         ))
+    }
+}
+
+#[cfg(all(test, feature = "wasm"))]
+mod tests {
+    use clap::Parser;
+
+    use super::*;
+
+    #[derive(Parser)]
+    struct TestCli {
+        #[command(flatten)]
+        args: GenerateAllArgs,
+    }
+
+    #[test]
+    fn generate_all_refuses_async_and_names_the_command_that_takes_it() {
+        let cli =
+            TestCli::try_parse_from(["ubrn", "--async", "--config", "none.yaml", "lib.a"]).unwrap();
+        let err = GenerateAllCommand::try_from(&cli.args)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("generate wasm2 bindings"), "{err}");
     }
 }
