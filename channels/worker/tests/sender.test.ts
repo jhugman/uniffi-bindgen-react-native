@@ -388,6 +388,22 @@ test("a forwarder for a non-Void callback throws instead of forwarding", async (
   port2.close();
 });
 
+test("a call postMessage refuses rejects and lets the port go", async () => {
+  const events: string[] = [];
+  const port = {
+    postMessage: () => {
+      throw new DOMException("already detached", "DataCloneError");
+    },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    ref: () => events.push("ref"),
+    unref: () => events.push("unref"),
+  };
+  const s = createSender(DEFS, port);
+  await assert.rejects(s.add(1, 2, { code: 0 }), { name: "DataCloneError" });
+  assert.deepStrictEqual(events, ["ref", "unref"]);
+});
+
 test("the port is ref'd only while a call is outstanding", async () => {
   const { port1, port2 } = new MessageChannel();
   const events: string[] = [];

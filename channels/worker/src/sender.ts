@@ -148,10 +148,16 @@ export class SenderCore {
     // An unref'd node port drops queued replies at exit; hold the loop
     // only while something is waiting on one.
     if (this.pending.size === 1) this.port.ref?.();
-    this.port.postMessage(
-      { kind: "call", id, fn: plan.name, args: wire },
-      transfer,
-    );
+    try {
+      this.port.postMessage(
+        { kind: "call", id, fn: plan.name, args: wire },
+        transfer,
+      );
+    } catch (e) {
+      // Nothing was sent, so no reply will release the port.
+      this.settle(id);
+      throw e;
+    }
   }
 
   private onMessage(data: unknown): void {
