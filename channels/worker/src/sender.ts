@@ -56,8 +56,6 @@ export class SenderCore {
       callbacks: plan.callbacks,
       makeForwarder: (id, cbPlan, lifetime) =>
         this.makeForwarder(id, cbPlan, lifetime),
-      handleIn: (h) => h,
-      handleOut: (h) => h,
       bufferOut: wholeBuffer,
     };
     this.listener = (ev) => this.onMessage(ev.data);

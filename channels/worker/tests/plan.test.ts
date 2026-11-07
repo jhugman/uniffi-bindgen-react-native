@@ -45,7 +45,7 @@ test("scalars, handles, buffers and void map to their plan kinds", () => {
   const f = plan.functions.get("f")!;
   assert.deepStrictEqual(
     f.args.map((a) => a.kind),
-    ["pass", "pass", "pass", "handle", "buffer"],
+    ["pass", "pass", "pass", "pass", "buffer"],
   );
   assert.deepStrictEqual(f.ret, { kind: "pass" });
   assert.strictEqual(f.hasRustCallStatus, true);
@@ -109,7 +109,7 @@ test("a callback passed to a function is persistent; one inside a callback is pe
     kind: "struct",
     name: "Dropped",
     fields: [
-      { name: "handle", plan: { kind: "handle" } },
+      { name: "handle", plan: { kind: "pass" } },
       {
         name: "free",
         plan: { kind: "callback", name: "DroppedFree", lifetime: "invocation" },

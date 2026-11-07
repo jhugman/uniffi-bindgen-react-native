@@ -16,7 +16,7 @@ import type { CallbackPlan, ValuePlan } from "../src/plan.js";
 
 const CB: CallbackPlan = {
   name: "Cb",
-  args: [{ kind: "handle" }],
+  args: [{ kind: "pass" }],
   ret: { kind: "pass" },
   retTag: "Void",
   hasRustCallStatus: false,
@@ -36,8 +36,6 @@ function ctx(
       built.push(id);
       return (..._a: unknown[]) => `fwd${id}`;
     },
-    handleIn: (h) => h + 1000n,
-    handleOut: (h) => h - 1000n,
     bufferOut: wholeBuffer,
     ...over,
   };
@@ -49,12 +47,6 @@ test("scalars pass through both ways", () => {
     assert.strictEqual(marshalOut({ kind: "pass" }, v, c, []), v);
     assert.strictEqual(marshalIn({ kind: "pass" }, v, c), v);
   }
-});
-
-test("handles go through the context's policy", () => {
-  const c = ctx();
-  assert.strictEqual(marshalIn({ kind: "handle" }, 5n, c), 1005n);
-  assert.strictEqual(marshalOut({ kind: "handle" }, 1005n, c, []), 5n);
 });
 
 test("a whole-buffer view is transferred as is; a partial view is copied first", () => {
@@ -112,7 +104,7 @@ test("structs are walked field by field", () => {
     kind: "struct",
     name: "S",
     fields: [
-      { name: "handle", plan: { kind: "handle" } },
+      { name: "handle", plan: { kind: "pass" } },
       {
         name: "free",
         plan: { kind: "callback", name: "Cb", lifetime: "invocation" },
@@ -124,7 +116,7 @@ test("structs are walked field by field", () => {
   const t: Transferable[] = [];
   const wire = marshalOut(
     plan,
-    { handle: 1001n, free, bytes: new Uint8Array([7]) },
+    { handle: 1n, free, bytes: new Uint8Array([7]) },
     c,
     t,
   ) as any;
@@ -138,7 +130,7 @@ test("structs are walked field by field", () => {
     { handle: 1n, free: 1, bytes: new Uint8Array([7]) },
     c,
   ) as any;
-  assert.strictEqual(back.handle, 1001n);
+  assert.strictEqual(back.handle, 1n);
   assert.strictEqual(typeof back.free, "function");
 });
 

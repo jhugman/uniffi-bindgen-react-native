@@ -15,8 +15,6 @@ export interface MarshalContext {
     plan: CallbackPlan,
     lifetime: CallbackLifetime,
   ): Function;
-  handleIn(h: bigint): bigint;
-  handleOut(h: bigint): bigint;
   bufferOut(v: Uint8Array): Uint8Array;
 }
 
@@ -36,8 +34,6 @@ export function marshalOut(
   switch (plan.kind) {
     case "pass":
       return value;
-    case "handle":
-      return ctx.handleOut(value as bigint);
     case "buffer": {
       if (!(value instanceof Uint8Array)) {
         throw new Error(`worker: expected a Uint8Array, got ${typeof value}`);
@@ -72,8 +68,6 @@ export function marshalIn(
   switch (plan.kind) {
     case "pass":
       return value;
-    case "handle":
-      return ctx.handleIn(value as bigint);
     case "buffer":
       return value;
     case "callback": {

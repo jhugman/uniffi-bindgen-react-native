@@ -140,7 +140,7 @@ test("vtable init builds forwarders; a Void method posts a callback and returns 
 test("clone/free are refcounted on the receiver; free is forwarded once at zero", async () => {
   const { port1, port2 } = new MessageChannel();
   const { player } = fakePlayer();
-  const core = new ReceiverCore(compilePlan(DEFS), player, port1, 0);
+  const core = new ReceiverCore(compilePlan(DEFS), player, port1);
   const s = senderSide(port2);
   s.post({
     kind: "call",
@@ -165,7 +165,7 @@ test("clone/free are refcounted on the receiver; free is forwarded once at zero"
 test("vtable refcounts are keyed per interface: two interfaces sharing a handle number don't cross-decrement", async () => {
   const { port1, port2 } = new MessageChannel();
   const { player } = fakePlayer();
-  const core = new ReceiverCore(compilePlan(DEFS), player, port1, 0);
+  const core = new ReceiverCore(compilePlan(DEFS), player, port1);
   const s = senderSide(port2);
   s.post({
     kind: "call",
@@ -261,36 +261,6 @@ test("a sync vtable method over an asynchronous port throws pointing at forceAsy
   const ret = msgs.find((m) => m.kind === "return") as any;
   assert.strictEqual(ret.ok, false);
   assert.match(ret.error.message, /SyncM.*forceAsync/);
-  r.close();
-  port2.close();
-});
-
-test("handles are tagged with the port id on the way in and stripped on the way out", async () => {
-  const { port1, port2 } = new MessageChannel();
-  const { player, state } = fakePlayer();
-  const r = createReceiver(DEFS, player, port1, { portId: 3 });
-  const s = senderSide(port2);
-  s.post({
-    kind: "call",
-    id: 1,
-    fn: "init_vtable",
-    args: [
-      { uniffi_free: 1, uniffi_clone: 2, notify: 3, async_m: 4, sync_m: 5 },
-    ],
-  });
-  await s.next();
-  let seen: bigint | undefined;
-  const realFire = player.fire;
-  (player as any).fire = (h: bigint) => {
-    seen = h;
-    return realFire(h);
-  };
-  s.post({ kind: "call", id: 2, fn: "fire", args: [9n] });
-  const msgs = [await s.next(), await s.next()];
-  assert.strictEqual(seen, 9n | (3n << 48n));
-  const cb = msgs.find((m) => m.kind === "callback") as any;
-  assert.strictEqual(cb.args[0], 9n);
-  void state;
   r.close();
   port2.close();
 });

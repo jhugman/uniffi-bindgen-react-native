@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { MessageChannel } from "node:worker_threads";
+import { FfiType, type ModuleDefinitions } from "@ubjs/core";
 import { createSender } from "../src/sender.js";
 import { createReceiver } from "../src/receiver.js";
 import { DEFS, fakePlayer } from "./fixtures.js";
@@ -117,41 +118,29 @@ test("a client callback that throws surfaces as a receiver-side console error, n
   c.done();
 });
 
-test("two ports: each callback reaches the sender that registered it, untagged", async () => {
-  // v2 shape on v1 code: two receivers, two port ids, one fake player whose
-  // routing stands in for the receiver-side attach() to come.
-  const { player, state } = fakePlayer();
-  const vtables: any[] = [];
-  (player as any).init_vtable = (vt: any) => {
-    vtables.push(vt);
-  };
-  (player as any).fire = (h: bigint) =>
-    vtables[Number(h >> 48n)].notify(h, new Uint8Array(0));
-  const a = new MessageChannel();
-  const b = new MessageChannel();
-  const ra = createReceiver(DEFS, player, a.port1, { portId: 0 });
-  const rb = createReceiver(DEFS, player, b.port1, { portId: 1 });
-  const sa = createSender(DEFS, a.port2);
-  const sb = createSender(DEFS, b.port2);
-  const gotA: bigint[] = [],
-    gotB: bigint[] = [];
-  const vt = (sink: bigint[]) => ({
-    uniffi_free: () => {},
-    uniffi_clone: (h: bigint) => h,
-    notify: (h: bigint) => sink.push(h),
-    async_m: () => ({ handle: 0n, free: () => {} }),
-    sync_m: () => ({ pointee: 1 }),
-  });
-  await sa.init_vtable(vt(gotA));
-  await sb.init_vtable(vt(gotB));
-  await sa.fire(1n);
-  await sb.fire(1n);
-  await new Promise((r) => setTimeout(r, 10));
-  assert.deepStrictEqual(gotA, [1n]);
-  assert.deepStrictEqual(gotB, [1n]);
-  void state;
-  sa.close();
-  sb.close();
-  ra.close();
-  rb.close();
+test("a handle crosses unchanged both ways, whatever its bits", async () => {
+  const { player } = fakePlayer();
+  const defs = {
+    ...DEFS,
+    functions: {
+      echo_handle: {
+        args: [FfiType.Handle],
+        ret: FfiType.Handle,
+        hasRustCallStatus: false,
+      },
+    },
+  } satisfies ModuleDefinitions;
+  let seen: bigint | undefined;
+  (player as any).echo_handle = (h: bigint) => (seen = h);
+  const { port1, port2 } = new MessageChannel();
+  const r = createReceiver(defs, player, port1);
+  const s = createSender(defs, port2);
+  const wide = (0xabcdn << 48n) | 0x1000n;
+  try {
+    assert.strictEqual(await s.echo_handle(wide), wide);
+    assert.strictEqual(seen, wide);
+  } finally {
+    s.close();
+    r.close();
+  }
 });

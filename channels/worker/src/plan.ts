@@ -9,7 +9,6 @@ export type CallbackLifetime = "persistent" | "invocation";
 
 export type ValuePlan =
   | { kind: "pass" }
-  | { kind: "handle" }
   | { kind: "buffer" }
   | { kind: "callback"; name: string; lifetime: CallbackLifetime }
   | {
@@ -51,6 +50,7 @@ const SCALAR_TAGS = new Set([
   "Float32",
   "Float64",
   "Void",
+  "Handle",
 ]);
 
 interface Site {
@@ -70,8 +70,6 @@ function planValue(t: FfiTypeDesc, site: Site): ValuePlan {
   if (typeof tag !== "string") fail(site, `unknown tag ${JSON.stringify(tag)}`);
   if (SCALAR_TAGS.has(tag)) return { kind: "pass" };
   switch (t.tag) {
-    case "Handle":
-      return { kind: "handle" };
     case "RustBuffer":
       return { kind: "buffer" };
     case "RustCallStatus":

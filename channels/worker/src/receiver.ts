@@ -26,12 +26,7 @@ import {
   wholeBuffer,
   type MarshalContext,
 } from "./marshal.js";
-import { tagHandle, untagHandle } from "./handles.js";
 import type { Receiver, RegisteredPlayer } from "./types.js";
-
-export interface ReceiverOptions {
-  portId?: number;
-}
 
 type Settle = (msg: CallbackReturnMessage) => void;
 
@@ -70,7 +65,6 @@ export class ReceiverCore {
     private plan: ModulePlan,
     private player: RegisteredPlayer,
     private port: ChannelPort,
-    private portId: number,
   ) {
     const shared = {
       registry: this.registry,
@@ -78,8 +72,6 @@ export class ReceiverCore {
       callbacks: plan.callbacks,
       makeForwarder: (id: number, p: CallbackPlan, l: CallbackLifetime) =>
         this.makeForwarder(id, p, l),
-      handleIn: (h: bigint) => tagHandle(h, portId),
-      handleOut: (h: bigint) => untagHandle(h, portId),
     };
     // Views the player returns alias wasm memory and are ours to free; views
     // it passes into a callback are JS-owned copies already.
@@ -356,13 +348,7 @@ export function createReceiver(
   defs: ModuleDefinitions,
   player: RegisteredPlayer,
   port: ChannelPort,
-  opts: ReceiverOptions = {},
 ): Receiver {
-  const core = new ReceiverCore(
-    compilePlan(defs),
-    player,
-    port,
-    opts.portId ?? 0,
-  );
+  const core = new ReceiverCore(compilePlan(defs), player, port);
   return { close: () => core.close() };
 }
