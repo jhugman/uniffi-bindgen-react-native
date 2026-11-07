@@ -142,12 +142,10 @@ function checkRemainingFutures(t: Asserts) {
   });
 
   await asyncTest("Object with a fallible async ctor.", async (t) => {
-    try {
-      await FallibleMegaphone.create();
-      t.fail("Expected an error");
-    } catch (e: any) {
-      // OK
-    }
+    await t.assertThrowsAsync(
+      () => true,
+      () => FallibleMegaphone.create(),
+    );
     checkRemainingFutures(t);
     t.end();
   });
@@ -285,14 +283,10 @@ function checkRemainingFutures(t: Asserts) {
     "future method… which is cancelled after it is rejected",
     async (t) => {
       const abortController = new AbortController();
-      try {
-        await fallibleMe(true, {
-          signal: abortController.signal,
-        });
-        t.fail("We should have failed here. This is not the test.");
-      } catch (e: any) {
-        // OK
-      }
+      await t.assertThrowsAsync(
+        () => true,
+        () => fallibleMe(true, { signal: abortController.signal }),
+      );
       // Now we cancel, but after the task has been rejected.
       // This should do so cleanly.
       abortController.abort();
@@ -423,12 +417,10 @@ function checkRemainingFutures(t: Asserts) {
       // Second task should be able to acquire immediately
       const task2 = useSharedResource(options);
 
-      try {
-        await task1;
-        t.fail("Task 1 should have been cancelled");
-      } catch (e) {
-        // Expected
-      }
+      await t.assertThrowsAsync(
+        () => true,
+        () => task1,
+      );
 
       await task2; // Should succeed
       checkRemainingFutures(t);

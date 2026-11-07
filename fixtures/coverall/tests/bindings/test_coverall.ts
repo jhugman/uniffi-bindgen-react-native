@@ -216,14 +216,6 @@ test("Simple Errors", (t) => {
   // should not throw an error.
   coveralls.maybeThrow(false);
 
-  // Do the long hand way of catching errors.
-  try {
-    coveralls.maybeThrow(false);
-    t.fail("An error should've been thrown");
-  } catch (e: any) {
-    // OK
-  }
-  // Now the short hand.
   t.assertThrows(CoverallError.TooManyHoles.instanceOf, () =>
     coveralls.maybeThrow(true),
   );

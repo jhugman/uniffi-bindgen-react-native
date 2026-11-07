@@ -229,14 +229,6 @@ const almostEquals = (this_: number, that: number): boolean =>
     // should not throw an error.
     await coveralls.maybeThrow(false);
 
-    // Do the long hand way of catching errors.
-    try {
-      await coveralls.maybeThrow(false);
-      t.fail("An error should've been thrown");
-    } catch (e: any) {
-      // OK
-    }
-    // Now the short hand.
     await t.assertThrowsAsync(CoverallError.TooManyHoles.instanceOf, () =>
       coveralls.maybeThrow(true),
     );

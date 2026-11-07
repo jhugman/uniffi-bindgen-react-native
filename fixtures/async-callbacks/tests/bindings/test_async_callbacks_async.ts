@@ -136,12 +136,10 @@ function checkRemainingFutures(t: Asserts) {
         ),
     );
 
-    try {
-      await tryDelayUsingTrait(traitObj, "one");
-      t.fail("Expected previous statement to throw");
-    } catch (e: any) {
-      // Expected
-    }
+    await t.assertThrowsAsync(
+      () => true,
+      () => tryDelayUsingTrait(traitObj, "one"),
+    );
     checkRemainingFutures(t);
     t.end();
   });
