@@ -13,6 +13,7 @@ import {
 } from "@ubjs/core";
 import { createSender } from "../src/sender.js";
 import { createReceiver } from "../src/receiver.js";
+import { ChannelClosedError } from "../src/types.js";
 import { DEFS, fakePlayer } from "./fixtures.js";
 
 function pair() {
@@ -31,6 +32,21 @@ function pair() {
     },
   };
 }
+
+test("closing a sender cancels its async entry in the worker", async () => {
+  const c = pair();
+  try {
+    const p = c.sender.sleep(10_000, { code: 0 }, new AbortController().signal);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.strictEqual(c.state.cancelled, 0);
+    c.sender.close();
+    await assert.rejects(p, ChannelClosedError);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.strictEqual(c.state.cancelled, 1);
+  } finally {
+    c.done();
+  }
+});
 
 test("scalar call with status round-trips", async () => {
   const c = pair();

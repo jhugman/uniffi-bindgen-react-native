@@ -601,7 +601,7 @@ test("no cancel is posted for an abort after the call has returned", async () =>
   }
 });
 
-test("close() while an async call is in flight rejects it and detaches the signal", async () => {
+test("close() while an async call is in flight rejects it, cancels it once and detaches the signal", async () => {
   const { port, posted } = silentPort();
   const s = createSender(DEFS, port);
   const c = new AbortController();
@@ -611,6 +611,7 @@ test("close() while an async call is in flight rejects it and detaches the signa
   c.abort();
   assert.deepStrictEqual(posted, [
     { kind: "call", id: 1, fn: "sleep", args: [5] },
+    { kind: "cancel", id: 1 },
   ]);
 });
 

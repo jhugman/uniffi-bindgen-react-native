@@ -114,7 +114,9 @@ export class SenderCore {
     this.closed = true;
     this.port.removeEventListener("message", this.listener);
     if (this.pending.size > 0) this.port.unref?.();
-    for (const p of this.pending.values()) {
+    for (const [id, p] of this.pending) {
+      // Nothing on this side can cancel it once the port is gone.
+      if (p.plan.isAsync) this.port.postMessage({ kind: "cancel", id });
       p.detach?.();
       p.reject(new ChannelClosedError());
     }
