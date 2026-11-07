@@ -162,7 +162,10 @@ const {{ obj.obj_factory }}: UniffiObjectFactory<{{ obj.protocol_name }}> = (() 
         // uniffi's clone returns the handle it was given and the port delivers
         // in order, so the increment lands before the call that consumes it.
         uniffiIgnoreVoidResult(
-            nativeModule().{{ obj.ffi_clone }}(pointer, uniffiCaller.createCallStatus()),
+            uniffiCaller.rustCallAsync(
+                /*caller:*/ (callStatus) => nativeModule().{{ obj.ffi_clone }}(pointer, callStatus),
+                /*liftString:*/ FfiConverterString.lift
+            ),
             "{{ obj.impl_class_name }}: clone",
             (h: UniffiHandle) => {
                 if (h !== pointer) console.error("{{ obj.impl_class_name }}: clone returned a different handle");
