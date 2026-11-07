@@ -22,6 +22,7 @@ import {
   sleepMs,
   total,
 } from "@/generated/uniffi_async_channel";
+import ffi, { setNativeModule } from "@/generated/uniffi_async_channel-ffi";
 import { asyncTest } from "@/asserts";
 import "@/polyfills";
 
@@ -121,6 +122,44 @@ const mk = async (n: number): Promise<Counter> =>
       t.end();
     },
   );
+
+  await asyncTest("a clone that fails logs what Rust said", async (t) => {
+    const original = ffi() as unknown as Record<string, Function>;
+    const clone = "uniffi_uniffi_async_channel_fn_clone_counter";
+    // The clone still happens, so the counts stay right; only its status lies.
+    const failingClone = async (
+      h: bigint,
+      status: { code: number; errorBuf?: Uint8Array },
+    ) => {
+      await original[clone](h, { code: 0 });
+      status.code = 2;
+      status.errorBuf = new TextEncoder().encode("clone panicked");
+    };
+    const logged: string[] = [];
+    const consoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args.map(String).join(" "));
+    };
+    setNativeModule(
+      new Proxy(original, {
+        get: (target, key, receiver) =>
+          key === clone ? failingClone : Reflect.get(target, key, receiver),
+      }) as any,
+    );
+    try {
+      const c = await mk(5);
+      t.assertEqual(await c.sumWith(c, c), 15n);
+      c.uniffiDestroy();
+    } finally {
+      setNativeModule(original as any);
+      console.error = consoleError;
+    }
+    t.assertTrue(
+      logged.some((line) => line.includes("clone panicked")),
+      `logged: ${logged.join("; ")}`,
+    );
+    t.end();
+  });
 
   await asyncTest("async Rust resolves, and cancels mid-flight", async (t) => {
     t.assertEqual(await sleepMs(20), 20);
