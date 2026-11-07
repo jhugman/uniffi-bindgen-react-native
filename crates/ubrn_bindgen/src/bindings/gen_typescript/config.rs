@@ -220,7 +220,7 @@ mod config_tests {
 
     #[cfg(feature = "wasm")]
     #[test]
-    fn cli_async_overrides_config() {
+    fn cli_async_turns_delivery_on() {
         let mut cfg: TsConfig = toml::from_str("").unwrap();
         cfg.apply_switches(&switches(AbiFlavor::Wasm2, true))
             .unwrap();
@@ -259,6 +259,17 @@ mod config_tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("napi"), "{err}");
+    }
+
+    #[test]
+    fn async_delivery_rejects_jsi2_despite_its_player() {
+        // Jsi2 initializes at module load, and has no TextEncoder to await around.
+        let mut cfg: TsConfig = toml::from_str("asyncDelivery = true").unwrap();
+        let err = cfg
+            .apply_switches(&switches(AbiFlavor::Jsi2, false))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("jsi2"), "{err}");
     }
 
     #[test]

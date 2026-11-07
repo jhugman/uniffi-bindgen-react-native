@@ -14,7 +14,7 @@ pub struct SwitchArgs {
 
     /// Generate call bodies that `await` the player, for a player that
     /// answers over a message port. Same as `asyncDelivery = true` in
-    /// `uniffi.toml`, and overrides it.
+    /// `uniffi.toml`; it cannot turn that off.
     #[clap(long = "async")]
     pub async_delivery: bool,
 }

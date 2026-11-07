@@ -68,7 +68,7 @@ struct BindingsArgs {
     pub(crate) ts_dir: Utf8PathBuf,
 
     /// Generate call bodies that `await` the player. Same as
-    /// `asyncDelivery = true` in `uniffi.toml`, and overrides it.
+    /// `asyncDelivery = true` in `uniffi.toml`; it cannot turn that off.
     #[clap(long = "async")]
     pub(crate) async_delivery: bool,
 }
