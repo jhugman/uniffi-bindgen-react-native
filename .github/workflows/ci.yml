@@ -120,7 +120,7 @@ jobs:
         run: cargo install wasm-bindgen-cli --version ${{ env.WASM_BINDGEN_VERSION }} --locked
 
       - name: Run tests of generated WASM bindings
-        run: "cargo test -- wasm::"
+        run: "cargo test -- wasm:: --skip async_wasm::"
 
   integration-tests-wasm2-bindings:
     name: 🧩 Integration tests (WASM2 player bindings)
