@@ -75,7 +75,7 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
          \x20 // --import inside the Worker.\n\
          \x20 execArgv: [],\n\
          }});\n\
-         // A Rust panic in the Worker must fail the test, not hang it.\n\
+         // A Worker that fails to load or crashes must fail the test, not hang it.\n\
          worker.on(\"error\", (e) => {{\n\
          \x20 throw e;\n\
          }});\n\
