@@ -110,11 +110,11 @@ fn write_generated(ts_dir: &Utf8Path, name: &str, src: String) -> Utf8PathBuf {
 }
 
 /// One definitions object for the whole library, imported by both sides of the
-/// channel. Function and callback names are crate-prefixed; the only names
-/// shared between namespaces are uniffi's fixed generic shapes (e.g.
-/// `ForeignFutureDroppedCallback`), identical by construction. The generated
-/// module throws if a shared name's definitions ever differ, so the merge is
-/// order-independent.
+/// channel. Function names are crate-prefixed; callback and struct names are
+/// not, so namespaces share uniffi's generic shapes (e.g.
+/// `ForeignFutureDroppedCallback`), and two crates with a same-named foreign
+/// trait would collide. The generated module throws if a shared name's
+/// definitions ever differ, so the merge is order-independent.
 fn write_definitions(ts_dir: &Utf8Path, namespaces: &[String]) {
     let mut src = String::new();
     for ns in namespaces {
