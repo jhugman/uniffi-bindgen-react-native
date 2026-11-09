@@ -30,7 +30,9 @@
   "scripts": {
     "build": "cd typescript && npm install && npm run build",
     "prepare": "yarn build",
-    "test": "cargo test"
+    "test": "cargo test",
+    "test:js": "npm --prefix runtimes/wasm test && npm --prefix channels/worker test && npm --prefix channels/worker run typecheck && npm run test:napi",
+    "test:napi": "cargo build -p uniffi-napi-test-lib -p uniffi-fixture-simple -p uniffi-example-arithmetic && npm --prefix runtimes/napi test"
   },
   "devDependencies": {
     "abortcontroller-polyfill": "^1.7.5",

@@ -17,12 +17,8 @@ import {
 } from "./marshal.js";
 import type { FfiTypeDesc } from "./ffi-type.js";
 import type { CallbackDef } from "./callback.js";
-
-export interface FunctionDef {
-  args: FfiTypeDesc[];
-  ret: FfiTypeDesc;
-  hasRustCallStatus: boolean;
-}
+import { type FunctionDef } from "@ubjs/core";
+export type { FunctionDef };
 
 export interface DispatchContext {
   memory: Memory;

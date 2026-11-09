@@ -5,7 +5,8 @@
  */
 import { Memory } from "./memory.js";
 import type { FfiTypeDesc } from "./ffi-type.js";
-import { RustBuffer } from "@ubjs/core";
+import { RustBuffer, type FieldDesc } from "@ubjs/core";
+export type { FieldDesc };
 
 export const RUST_BUFFER_SIZE = 24; // capacity:u64, len:u64, dataPtr:u32 (+pad)
 export const RUST_CALL_STATUS_SIZE = 32; // code:i8 + pad + RustBuffer
@@ -136,11 +137,6 @@ export function writeForeignBytes(
 ) {
   m.writeI32(ptr + FB_LEN_OFF, fb.len);
   m.writeU32(ptr + FB_DATAPTR_OFF, fb.dataPtr);
-}
-
-export interface FieldDesc {
-  name: string;
-  type: FfiTypeDesc;
 }
 
 export interface CompiledField {

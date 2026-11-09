@@ -10,20 +10,27 @@ use camino::{Utf8Path, Utf8PathBuf};
 
 use crate::{metadata, paths, run_cmd_quietly};
 
-/// Run a fixture test under the Wasm2 (player-based) flavor.
+/// The outputs of [`prepare`]: everything a flavor needs to write its own
+/// bootstrap and hand off to `run_tsx_with_preload`.
+pub(crate) struct Prepared {
+    pub(crate) fixture_dir: Utf8PathBuf,
+    pub(crate) ts_dir: Utf8PathBuf,
+    pub(crate) lib_stem: String,
+}
+
+/// Build, generate bindings for, and stage a fixture crate for a
+/// player-based (wasm32) flavor, without running any test script.
 ///
 /// Builds the fixture crate once, for `wasm32-unknown-unknown` (the fixture
 /// itself depends on `uniffi-runtime-wasm` via a target-specific dep), and
 /// generates bindings from that same `.wasm` — `ubrn_bindgen` reads uniffi
 /// metadata out of its `UNIFFI_META_*` globals, so no native build is needed.
-pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
-    // Serialize with other flavors for this fixture (they share generated/).
-    let _lock = crate::lock_fixture();
-
+///
+/// `flavor_dir` names the `generated/<flavor_dir>` subdirectory, so Wasm2 and
+/// Channel keep separate generated trees despite sharing this code path.
+pub(crate) fn prepare(crate_name: &str, target_tmpdir: &str, flavor_dir: &str) -> Prepared {
     // Step 0: Check bootstrap
     paths::assert_wasm_bootstrap();
-
-    let test_script = Utf8Path::new(test_script);
 
     // Step 1: Build the fixture crate for wasm32 in a shared target dir.
     let lib_stem = metadata::find_cdylib_name(crate_name);
@@ -38,7 +45,7 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     // Step 2: Generate TS bindings from the *unstaged* wasm. Staging strips
     // the `UNIFFI_META_*` exports and may rewrite the module, so metadata has
     // to come off the raw cargo output.
-    let generated = fixture_dir.join("generated/wasm2");
+    let generated = fixture_dir.join("generated").join(flavor_dir);
     let _ = std::fs::remove_dir_all(&generated);
     let ts_dir = generated.join("ts");
     std::fs::create_dir_all(&ts_dir).expect("failed to create ts dir");
@@ -49,14 +56,27 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     ubrn_common::stage_wasm(&wasm_file, &ts_dir, &lib_stem, true)
         .unwrap_or_else(|e| panic!("staging {wasm_file}: {e:#}"));
 
-    // Step 4: Stand in for the entrypoint a real project would use. Test
-    // scripts are shared across flavors, so they import the API module
-    // directly and never call `uniffiInitAsync`.
-    let bootstrap = write_node_bootstrap(&ts_dir, &lib_stem);
+    Prepared {
+        fixture_dir,
+        ts_dir,
+        lib_stem,
+    }
+}
 
-    // Step 5: Write fixture tsconfig + run tsx.
+/// Run a fixture test under the Wasm2 (player-based) flavor.
+pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
+    // Serialize with other flavors for this fixture (they share generated/).
+    let _lock = crate::lock_fixture();
+    let p = prepare(crate_name, target_tmpdir, "wasm2");
+    let test_script = Utf8Path::new(test_script);
+
+    // Stand in for the entrypoint a real project would use. Test scripts are
+    // shared across flavors, so they import the API module directly and
+    // never call `uniffiInitAsync`.
+    let bootstrap = write_node_bootstrap(&p.ts_dir, &p.lib_stem);
+
     let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
-        &fixture_dir,
+        &p.fixture_dir,
         crate::Flavor::Wasm2,
     ));
     crate::run_tsx_with_preload(test_script, &bootstrap);

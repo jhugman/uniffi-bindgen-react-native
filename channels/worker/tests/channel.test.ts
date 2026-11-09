@@ -1,0 +1,146 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ */
+import { test } from "node:test";
+import assert from "node:assert";
+import { MessageChannel } from "node:worker_threads";
+import { FfiType, type ModuleDefinitions } from "@ubjs/core";
+import { createSender } from "../src/sender.js";
+import { createReceiver } from "../src/receiver.js";
+import { DEFS, fakePlayer } from "./fixtures.js";
+
+function pair() {
+  const { port1, port2 } = new MessageChannel();
+  const { player, state } = fakePlayer();
+  const receiver = createReceiver(DEFS, player, port1);
+  const sender = createSender(DEFS, port2);
+  return {
+    sender,
+    receiver,
+    player,
+    state,
+    done: () => {
+      sender.close();
+      receiver.close();
+    },
+  };
+}
+
+test("scalar call with status round-trips", async () => {
+  const c = pair();
+  const status = { code: 0 };
+  assert.strictEqual(await c.sender.add(20, 22, status), 42);
+  assert.strictEqual(status.code, 0);
+  c.done();
+});
+
+test("the vtable is delivered and a Void callback reaches the client", async () => {
+  const c = pair();
+  const notified: unknown[] = [];
+  await c.sender.init_vtable({
+    uniffi_free: () => {},
+    uniffi_clone: (h: bigint) => h,
+    notify: (h: bigint, b: Uint8Array) => notified.push([h, Array.from(b)]),
+    async_m: () => ({ handle: 0n, free: () => {} }),
+    sync_m: () => ({ pointee: 1 }),
+  });
+  await c.sender.fire(9n);
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepStrictEqual(notified, [[9n, [9]]]);
+  c.done();
+});
+
+test("clone/free: the client's free runs exactly once", async () => {
+  const c = pair();
+  const freed: bigint[] = [];
+  await c.sender.init_vtable({
+    uniffi_free: (h: bigint) => freed.push(h),
+    uniffi_clone: (h: bigint) => h,
+    notify: () => {},
+    async_m: () => ({ handle: 0n, free: () => {} }),
+    sync_m: () => ({ pointee: 1 }),
+  });
+  await c.sender.clone_twice_free_thrice(5n);
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepStrictEqual(freed, [5n]);
+  c.done();
+});
+
+test("async method: completion and drop flow end to end", async () => {
+  const c = pair();
+  const clientFreed: bigint[] = [];
+  await c.sender.init_vtable({
+    uniffi_free: () => {},
+    uniffi_clone: (h: bigint) => h,
+    notify: () => {},
+    sync_m: () => ({ pointee: 1 }),
+    async_m: (
+      _h: bigint,
+      complete: (data: bigint, v: number) => void,
+      data: bigint,
+    ) => {
+      setTimeout(() => complete(data, 7), 1);
+      return { handle: 77n, free: (h: bigint) => clientFreed.push(h) };
+    },
+  });
+  await c.sender.start_async(5n);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepStrictEqual(c.state.completions, [[42n, 7]]);
+  await c.sender.drop_async();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepStrictEqual(clientFreed, [77n]);
+  c.done();
+});
+
+test("a client callback that throws surfaces as a receiver-side console error, not a hang", async () => {
+  const c = pair();
+  const errors: string[] = [];
+  const orig = console.error;
+  console.error = (...a: unknown[]) => errors.push(a.join(" "));
+  try {
+    await c.sender.init_vtable({
+      uniffi_free: () => {},
+      uniffi_clone: (h: bigint) => h,
+      notify: () => {
+        throw new Error("client failed");
+      },
+      async_m: () => ({ handle: 0n, free: () => {} }),
+      sync_m: () => ({ pointee: 1 }),
+    });
+    await c.sender.fire(1n);
+    await new Promise((r) => setTimeout(r, 10));
+  } finally {
+    console.error = orig;
+  }
+  assert.ok(errors.some((e) => e.includes("client failed")));
+  c.done();
+});
+
+test("a handle crosses unchanged both ways, whatever its bits", async () => {
+  const { player } = fakePlayer();
+  const defs = {
+    ...DEFS,
+    functions: {
+      echo_handle: {
+        args: [FfiType.Handle],
+        ret: FfiType.Handle,
+        hasRustCallStatus: false,
+      },
+    },
+  } satisfies ModuleDefinitions;
+  let seen: bigint | undefined;
+  (player as any).echo_handle = (h: bigint) => (seen = h);
+  const { port1, port2 } = new MessageChannel();
+  const r = createReceiver(defs, player, port1);
+  const s = createSender(defs, port2);
+  const wide = (0xabcdn << 48n) | 0x1000n;
+  try {
+    assert.strictEqual(await s.echo_handle(wide), wide);
+    assert.strictEqual(seen, wide);
+  } finally {
+    s.close();
+    r.close();
+  }
+});

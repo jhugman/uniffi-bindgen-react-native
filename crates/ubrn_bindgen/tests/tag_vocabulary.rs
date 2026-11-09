@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-//! The player tag vocabulary exists in six places. This pins them to each other.
+//! The player tag vocabulary exists in five places. This pins them to each other.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -67,19 +67,15 @@ fn every_projection_of_the_tag_vocabulary_agrees() {
         .collect();
 
     const TS_OPENER: &str = "export const FfiType = {";
-    let player = js_ffi_type_keys("typescript/src/ffi-types-player.ts", TS_OPENER);
-    let wasm = js_ffi_type_keys("runtimes/wasm/core/src/ffi-type.ts", TS_OPENER);
+    // @ubjs/core owns the table; @ubjs/wasm/core re-exports it.
+    let ts_core = js_ffi_type_keys("typescript/src/ffi-definitions.ts", TS_OPENER);
     // The table the napi-flavour generated code imports at runtime, so a tag
     // missing here is a `tag: undefined` at registration, not a build failure.
     let node = js_ffi_type_keys("runtimes/napi/lib.js", "FfiType: {");
 
     assert_eq!(
-        core, player,
-        "core FfiTypeDesc vs typescript/src/ffi-types-player.ts"
-    );
-    assert_eq!(
-        core, wasm,
-        "core FfiTypeDesc vs runtimes/wasm/core/src/ffi-type.ts"
+        core, ts_core,
+        "core FfiTypeDesc vs typescript/src/ffi-definitions.ts"
     );
     assert_eq!(core, node, "core FfiTypeDesc vs runtimes/napi/lib.js");
 
