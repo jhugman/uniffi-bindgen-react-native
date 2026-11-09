@@ -80,18 +80,24 @@ console.debug(`-- {{ ffi_name }}`);
     {%- endfor %}
 {%- endmacro -%}
 
-{#- Sync FFI call with pointer receiver. -#}
-{%- macro to_ffi_pointer_call(callable, obj_factory) -%}
+{#- Opens the rust-call wrapper: the async twin awaits a player that
+   answers over a port; otherwise the sync one. Closed by the caller. -#}
+{%- macro rust_call_open(callable) -%}
     {%- match callable.throws -%}
     {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
+        {% if module.async_delivery %}await uniffiCaller.rustCallWithErrorAsync({% else %}uniffiCaller.rustCallWithError({% endif %}
             /*liftError:*/ {{ e.lift_error_fn }},
             /*caller:*/ (callStatus) => {
     {%- else -%}
-        uniffiCaller.rustCall(
+        {% if module.async_delivery %}await uniffiCaller.rustCallAsync({% else %}uniffiCaller.rustCall({% endif %}
             /*caller:*/ (callStatus) => {
     {%- endmatch %}
-            {%- if callable.return_type.is_some() %}
+{%- endmacro -%}
+
+{#- Sync FFI call with pointer receiver. -#}
+{%- macro to_ffi_pointer_call(callable, obj_factory) -%}
+    {%- call rust_call_open(callable) %}
+            {%- if callable.returns_from_ffi_call() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {{ obj_factory }}.clonePointer(this),
@@ -104,16 +110,8 @@ console.debug(`-- {{ ffi_name }}`);
 
 {#- Sync FFI call with no receiver (top-level function or constructor). -#}
 {%- macro to_ffi_call(callable) -%}
-    {%- match callable.throws -%}
-    {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
-            /*liftError:*/ {{ e.lift_error_fn }},
-            /*caller:*/ (callStatus) => {
-    {%- else -%}
-        uniffiCaller.rustCall(
-            /*caller:*/ (callStatus) => {
-    {%- endmatch %}
-            {%- if callable.return_type.is_some() %}
+    {%- call rust_call_open(callable) %}
+            {%- if callable.returns_from_ffi_call() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {%- call arg_list_lowered(callable) %}
@@ -127,16 +125,8 @@ console.debug(`-- {{ ffi_name }}`);
 {%- macro to_ffi_value_call(callable) -%}
     {%- match callable.value_receiver_ffi_converter() -%}
     {%- when Some with (ffi_converter) -%}
-    {%- match callable.throws -%}
-    {%- when Some with (e) -%}
-        uniffiCaller.rustCallWithError(
-            /*liftError:*/ {{ e.lift_error_fn }},
-            /*caller:*/ (callStatus) => {
-    {%- else -%}
-        uniffiCaller.rustCall(
-            /*caller:*/ (callStatus) => {
-    {%- endmatch %}
-            {%- if callable.return_type.is_some() %}
+    {%- call rust_call_open(callable) %}
+            {%- if callable.returns_from_ffi_call() %}
                 return
             {%- endif %} {% call native_method_handle(callable.ffi_name) %}(
                 {{ ffi_converter }}.lower(self_, nativeModule().rustbuffer_alloc),
@@ -158,7 +148,7 @@ console.debug(`-- {{ ffi_name }}`);
    instead to avoid allocating a fresh closure object at every call
    site invocation (V8-friendlier). -#}
 
-{#- Call body for value-receiver method: sync only (trait methods are never async). -#}
+{#- Call body for value-receiver method: never ffi-async, so there is no async branch to pick. -#}
 {%- macro call_body_value(callable) %}
 {%- match callable.return_type -%}
 {%-     when Some with (return_type) %}

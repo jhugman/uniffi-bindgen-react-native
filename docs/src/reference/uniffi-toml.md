@@ -97,6 +97,37 @@ Rust calls into these types through a vtable, and each slot is sync or async acc
 
 The [`force-async`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async) and [`force-async-list`](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/fixtures/force-async-list) fixtures exercise both forms.
 
+### Calling the player asynchronously
+
+`asyncDelivery` generates call bodies that `await` the player. It is for a player that answers over a message port — the wasm2 player in a worker, behind `@ubjs/worker` — where a synchronous call cannot exist.
+
+```toml
+[bindings.typescript]
+asyncDelivery = true
+```
+
+It implies `forceAsync = true`: every function, method and constructor returns a `Promise`, and `initialize()` does too. A `forceAsync` list alongside it is an error. `wasm2` is the only flavor that accepts it today; `jsi`, `jsi2`, `wasm` and `napi` reject it.
+
+`--async` on `ubrn generate wasm2 bindings` turns the same setting on. To generate sync and async bindings from one `uniffi.toml`, leave `asyncDelivery` out of the file and pass `--async` for the async build; the flag cannot turn off an `asyncDelivery = true` in the file.
+
+```admonish info
+Two things stay synchronous on the calling side: allocating a buffer for arguments (the sender owns it) and cloning an object handle for an argument. uniffi's clone returns the handle it was given, and a message port delivers in order, so the clone is posted and the handle used at once.
+```
+
+`uniffiInitAsync` in the generated `index.ts` opens the wasm where it runs, so it cannot connect a page to a worker. Skip it and start each side yourself, with `PLAYER_DEFINITIONS` and `setNativeModule` from the generated `-ffi` module:
+
+```ts
+// In the worker
+const wasm = await openWasm(source);
+createReceiver(PLAYER_DEFINITIONS, wasm.registerSync(PLAYER_DEFINITIONS), port);
+
+// On the page
+setNativeModule(createSender(PLAYER_DEFINITIONS, port));
+await bindings.default.initialize();
+```
+
+A library with several namespaces shares one channel and one merged table: a clone must land before the call that consumes it, and message ports only keep order within a port.
+
 ### Logging the FFI
 
 The generated Typescript code can optionally be created to generate logging.
