@@ -8,7 +8,6 @@ mod paths;
 pub mod typescript;
 
 pub mod async_wasm;
-pub mod channel;
 pub mod jsi;
 pub mod jsi2;
 pub mod napi;
@@ -17,10 +16,9 @@ pub mod wasm;
 pub mod wasm2;
 
 /// Test flavor: JSI (Hermes native), Jsi2 (generic JSI player shim), WASM
-/// (Node.js), Napi (Node.js N-API), Wasm2 (player-based WASM), Channel (Wasm2
-/// player behind a `@ubjs/worker` receiver, driven over an in-process
-/// sync port), or AsyncWasm (Wasm2 player behind a receiver, driven over a
-/// node `MessageChannel` with `--async` bindings).
+/// (Node.js), Napi (Node.js N-API), Wasm2 (player-based WASM), or AsyncWasm
+/// (Wasm2 player behind a `@ubjs/worker` receiver, driven over a node
+/// `MessageChannel` with `--async` bindings).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
@@ -28,7 +26,6 @@ pub enum Flavor {
     Wasm,
     Napi,
     Wasm2,
-    Channel,
     AsyncWasm,
 }
 
@@ -40,7 +37,6 @@ impl Flavor {
             Flavor::Wasm => "wasm",
             Flavor::Napi => "napi",
             Flavor::Wasm2 => "wasm2",
-            Flavor::Channel => "channel",
             Flavor::AsyncWasm => "async-wasm",
         }
     }
@@ -214,7 +210,7 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
     if flavor == Flavor::Napi {
         runtime_paths.push(format!(r#""@ubjs/node": ["{rel_root}/runtimes/napi/lib"]"#));
     }
-    if matches!(flavor, Flavor::Wasm2 | Flavor::Channel | Flavor::AsyncWasm) {
+    if matches!(flavor, Flavor::Wasm2 | Flavor::AsyncWasm) {
         // `paths` bypasses the package `exports` map, so the bare specifier
         // the generated index imports needs pointing at the node build.
         runtime_paths.push(format!(
@@ -230,12 +226,9 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
             r#""@ubjs/wasm/node": ["{rel_root}/runtimes/wasm/node/src/index"]"#
         ));
     }
-    if matches!(flavor, Flavor::Channel | Flavor::AsyncWasm) {
+    if flavor == Flavor::AsyncWasm {
         runtime_paths.push(format!(
             r#""@ubjs/worker": ["{rel_root}/channels/worker/src/index"]"#
-        ));
-        runtime_paths.push(format!(
-            r#""@ubjs/worker/testing": ["{rel_root}/channels/worker/src/testing"]"#
         ));
     }
     runtime_paths.join(",\n      ")

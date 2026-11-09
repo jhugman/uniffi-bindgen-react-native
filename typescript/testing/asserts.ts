@@ -199,7 +199,7 @@ export class AsyncAsserts extends Asserts {
   async assertThrowsAsync<T>(
     errorVariant: (err: any) => boolean,
     fn: () => Promise<T>,
-  ): Promise<void> {
+  ): Promise<any> {
     let error: any | undefined;
     try {
       await fn();
@@ -207,7 +207,7 @@ export class AsyncAsserts extends Asserts {
       error = e;
     }
     checkThrown(this, errorVariant, error);
-    return Promise.resolve();
+    return error;
   }
 
   async asyncMeasure<T>(

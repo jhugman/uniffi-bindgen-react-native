@@ -7,15 +7,30 @@
 //   cargo test -p uniffi-fixture-force-async -- jsi
 //   cargo test -p uniffi-fixture-force-async -- wasm
 
-import {
+import myModule, {
   Widget,
   DebugOnly,
   WidgetRecord,
   WidgetEnum,
   FlatWidget,
   makeFlatWidget,
+  Everything,
+  Echoer,
+  EchoError,
+  FlatError,
+  ForeignEcho,
+  echo,
+  echoAsync,
+  echoVia,
+  failVia,
+  failFlat,
+  failRichAsync,
+  returnForeign,
 } from "@/generated/uniffi_force_async";
-import { asyncTest } from "@/asserts";
+import { asyncTest, AsyncAsserts } from "@/asserts";
+
+// Registers the foreign-trait callbacks.
+myModule.initialize();
 
 (async () => {
   await asyncTest(
@@ -129,6 +144,106 @@ import { asyncTest } from "@/asserts";
       const two = await makeFlatWidget(2);
       t.assertEqual(two, FlatWidget.Two);
       t.assertEqual(await FlatWidget.asyncToString(two), "two");
+      t.end();
+    },
+  );
+
+  const sample = async (): Promise<Everything> => ({
+    flag: true,
+    small: -8,
+    byte: 8,
+    short: -16,
+    ushort: 16,
+    int: -32,
+    uint: 32,
+    long: BigInt(-64),
+    ulong: BigInt(64),
+    single: 1.5,
+    double: 2.25,
+    text: "héllo",
+    bytes: new Uint8Array([1, 2, 3]).buffer,
+    when: new Date(1_700_000_000_000),
+    span: 1500,
+    maybe: "maybe",
+    list: [1, 2, 3],
+    map: new Map([["a", 1]]),
+    record: { name: "r", value: 1 },
+    tagged: new WidgetEnum.Beta({ val: "b" }),
+    flat: FlatWidget.Two,
+    widget: (await Widget.create("w")) as Widget,
+    handle: BigInt(7),
+  });
+  async function check(t: AsyncAsserts, got: Everything, want: Everything) {
+    const { widget: gw, tagged: gt, bytes: gb, ...g } = got;
+    const { widget: ww, tagged: wt, bytes: wb, ...w } = want;
+    t.assertEqual(g, w);
+    // An ArrayBuffer stringifies to a constant, so compare its contents.
+    t.assertEqual(
+      Array.from(new Uint8Array(gb)),
+      Array.from(new Uint8Array(wb)),
+    );
+    t.assertEqual(await (gw as Widget).label(), await (ww as Widget).label());
+    t.assertTrue(await gt.equals(wt));
+  }
+  class TsEcho implements ForeignEcho {
+    async echo(v: Everything): Promise<Everything> {
+      return v;
+    }
+    async fail(code: number): Promise<void> {
+      throw new EchoError.Code({ code });
+    }
+  }
+
+  await asyncTest("a sync Rust function round-trips every type", async (t) => {
+    const v = await sample();
+    await check(t, await echo(v), v);
+    t.end();
+  });
+
+  await asyncTest(
+    "an async Rust function round-trips every type",
+    async (t) => {
+      const v = await sample();
+      await check(t, await echoAsync(v), v);
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "an object's sync and async methods round-trip every type",
+    async (t) => {
+      const v = await sample();
+      const e = (await Echoer.create()) as Echoer;
+      await check(t, await e.echo(v), v);
+      await check(t, await e.echoAsync(v), v);
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "an async foreign trait round-trips every type, called from Rust",
+    async (t) => {
+      const v = await sample();
+      await check(t, await echoVia(new TsEcho(), v), v);
+      const back = await returnForeign(new TsEcho());
+      await check(t, await back.echo(v), v);
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "errors cross from sync Rust, async Rust and an async foreign trait",
+    async (t) => {
+      await t.assertThrowsAsync(FlatError.Oops.instanceOf, () => failFlat());
+      // `EchoError.instanceOf` also accepts `Unexpected`, so pin the variant and payload.
+      const rich = await t.assertThrowsAsync(EchoError.Code.instanceOf, () =>
+        failRichAsync(3),
+      );
+      t.assertEqual(EchoError.Code.getInner(rich).code, 3, "failRichAsync");
+      const via = await t.assertThrowsAsync(EchoError.Code.instanceOf, () =>
+        failVia(new TsEcho(), 4),
+      );
+      t.assertEqual(EchoError.Code.getInner(via).code, 4, "failVia");
       t.end();
     },
   );

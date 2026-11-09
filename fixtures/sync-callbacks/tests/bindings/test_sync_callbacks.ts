@@ -4,22 +4,42 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 // To run:
-//   cargo test -p uniffi-fixture-callbacks -- jsi
-//   cargo test -p uniffi-fixture-callbacks -- wasm
+//   cargo test -p uniffi-fixture-sync-callbacks -- jsi
+//   cargo test -p uniffi-fixture-sync-callbacks -- wasm
 
-import myModule, {
+import syncCallbacks, {
+  callDelete,
   ComplexError,
+  EventListener,
+  EventSource,
+  Getters,
+  GettersComplexError,
+  GettersError,
+  makeObjectWithCallback,
+  makeRustGetters,
   ForeignGetters,
-  SimpleError,
-  RustStringifier,
+  KeywordListener,
+  PayloadInterface,
   RustGetters,
+  RustStringifier,
+  SimpleCallback,
+  simpleCallback,
+  SimpleError,
   StoredForeignStringifier,
-} from "@/generated/callbacks";
-import { test } from "@/asserts";
+  testGetters,
+  testRoundTripThroughForeign,
+  testRoundTripThroughRust,
+} from "@/generated/sync_callbacks";
+import { asyncTest, Asserts, AsyncAsserts, test } from "@/asserts";
+import {
+  uniffiRustFutureHandleCount,
+  uniffiForeignFutureHandleCount,
+} from "@ubjs/core";
+import "@/polyfills";
 
 // Initialize the callbacks for the module.
 // This will be hidden in the installation process.
-myModule.initialize();
+syncCallbacks.initialize();
 
 const BAD_ARGUMENT = "bad-argument";
 const UNEXPECTED_ERROR = "unexpected-error";
@@ -207,3 +227,160 @@ test("A callback passed into the constructor is not destroyed", (t) => {
   // If the jsi::Runtime has been destroyed already, then this will cause a
   // crash at the end of the run. This should be prevented.
 });
+
+class EventListenerImpl implements EventListener {
+  constructor(
+    private t: AsyncAsserts,
+    private max: number,
+  ) {}
+  onEvent(message: string, number: number): void {
+    // console.log("--", message, number);
+    if (number === this.max - 1) {
+      console.log("-- Done!", this.max);
+      this.t.end();
+    }
+  }
+}
+
+class KeywordListenerImpl implements KeywordListener {
+  delete_(value: string): string {
+    console.log("delete_", value);
+    return `deleted:${value}`;
+  }
+}
+
+async function testToMax(max: number, t: AsyncAsserts) {
+  const listener = new EventListenerImpl(t, max);
+  const source = new EventSource(listener);
+  source.start(`Going to ${max}, now at:`, max);
+}
+
+test("Reserved C++ keyword callback methods work end-to-end", (t) => {
+  const listener = new KeywordListenerImpl();
+  t.assertEqual(callDelete(listener, "abc"), "deleted:abc");
+});
+
+// A TypeScript implementation of the Getters trait, exercising the foreign implementation path.
+class TypeScriptTraitGetters implements Getters {
+  getBool(v: boolean, arg2: boolean): boolean {
+    return v !== arg2;
+  }
+
+  getString(v: string, arg2: boolean): string /*throws*/ {
+    if (v === "too-many-holes") {
+      throw new GettersError.TooManyHoles("too many holes");
+    } else if (v === "unexpected-error") {
+      throw new Error("unexpected error");
+    }
+    return arg2 ? v.toUpperCase() : v;
+  }
+
+  getOption(v: string, arg2: boolean): string | undefined /*throws*/ {
+    if (v === "os-error") {
+      throw new GettersComplexError.OsError({ code: 100, extendedCode: 200 });
+    } else if (v === "unknown-error") {
+      throw new GettersComplexError.UnknownError();
+    } else if (arg2) {
+      return v.length > 0 ? v.toUpperCase() : undefined;
+    } else {
+      return v;
+    }
+  }
+
+  getList(v: Array<number>, arg2: boolean): Array<number> {
+    return arg2 ? v : [];
+  }
+
+  getNothing(_v: string): void {
+    // do nothing
+  }
+
+  roundTripObject(payload: PayloadInterface): PayloadInterface {
+    return payload;
+  }
+}
+
+test("Rust getters: testGetters with a Rust implementation", (t) => {
+  const rustGetters = makeRustGetters();
+  testGetters(rustGetters);
+  // makeRustGetters returns a GettersImpl (Rust object); no explicit destroy available
+  // via the Getters interface, so just let it go out of scope.
+});
+
+test("TypeScript getters: testGetters with a TypeScript implementation", (t) => {
+  const tsGetters = new TypeScriptTraitGetters();
+  testGetters(tsGetters);
+});
+
+test("Round trip through Rust: TypeScript object is returned unchanged", (t) => {
+  const tsGetters = new TypeScriptTraitGetters();
+  const returned = testRoundTripThroughRust(tsGetters);
+  // The returned object should still work as a Getters implementation.
+  t.assertTrue(returned.getBool(true, false));
+  t.assertFalse(returned.getBool(true, true));
+});
+
+test("Round trip through foreign: Rust calls roundTripObject on TypeScript implementation", (t) => {
+  const tsGetters = new TypeScriptTraitGetters();
+  // This calls tsGetters.roundTripObject(payload) inside Rust and asserts the result.
+  // It will throw if roundTripObject returns the wrong object.
+  testRoundTripThroughForeign(tsGetters);
+});
+
+function checkRemainingFutures(t: Asserts) {
+  t.assertEqual(
+    0,
+    uniffiRustFutureHandleCount(),
+    "Number of remaining futures should be zero",
+  );
+  t.assertEqual(
+    0,
+    uniffiForeignFutureHandleCount(),
+    "Number of remaining foreign futures should be zero",
+  );
+}
+
+(async () => {
+  for (let i = 1; i <= 4096; i *= 2) {
+    await asyncTest(
+      `Full tilt test up to ${i}`,
+      async (t) => await testToMax(i, t),
+    );
+  }
+
+  await asyncTest("Updater actually calls the update callback", async (t) => {
+    let previousValue: string | undefined;
+    let updated = 0;
+    class Updater implements SimpleCallback {
+      onUpdate(old: string, new_: string): void {
+        previousValue = old;
+        updated++;
+      }
+      reset(): void {
+        previousValue = undefined;
+        updated = 0;
+      }
+    }
+
+    const cbJs = new Updater();
+    const cbRs = await simpleCallback(cbJs);
+    cbRs.onUpdate("old", "new");
+    t.assertEqual(previousValue, "old");
+    t.assertEqual(updated, 1);
+    cbJs.reset();
+
+    const obj = await makeObjectWithCallback(cbJs);
+    t.assertNotNull(obj);
+
+    await obj.update("alice");
+    t.assertEqual(previousValue, "key");
+    t.assertEqual(updated, 1);
+
+    await obj.update("bob");
+    t.assertEqual(previousValue, "alice");
+    t.assertEqual(updated, 2);
+
+    checkRemainingFutures(t);
+    t.end();
+  });
+})();

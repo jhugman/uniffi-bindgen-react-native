@@ -93,33 +93,6 @@ async fn throw_object() -> Result<(), Arc<SimpleObject>> {
     Err(obj)
 }
 
-// Simple callback interface object, with a synchronous method.
-// The foreign trait isn't asynchronous, so we shouldn't be seeing
-// any problem here.
-#[uniffi::export(with_foreign)]
-pub trait SimpleCallback: Sync + Send {
-    fn on_update(&self, previous: String, current: String);
-}
-
-#[uniffi::export]
-async fn simple_callback(callback: Arc<dyn SimpleCallback>) -> Arc<dyn SimpleCallback> {
-    callback
-}
-
-fn from_simple_callback(callback: Arc<dyn SimpleCallback>) -> Box<EventHandlerFn> {
-    Box::new(move |old: String, new: String| {
-        let callback = callback.clone();
-        Box::pin(async move {
-            callback.on_update(old, new);
-        })
-    })
-}
-
-#[uniffi::export]
-async fn make_object_with_callback(callback: Arc<dyn SimpleCallback>) -> Arc<SimpleObject> {
-    SimpleObject::new_with_callback(from_simple_callback(callback))
-}
-
 // An async callback interface; the async foreign trait will be
 // a Send and Sync, so this shouldn't be testing anything new.
 #[cfg(target_arch = "wasm32")]

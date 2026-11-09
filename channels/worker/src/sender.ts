@@ -79,29 +79,6 @@ export class SenderCore {
     );
   }
 
-  invokeSync(fn: string, args: unknown[]): unknown {
-    const plan = this.lookup(fn);
-    let done = false,
-      value: unknown,
-      error: Error | undefined;
-    this.dispatch(plan, args, {
-      resolve: (v) => {
-        done = true;
-        value = v;
-      },
-      reject: (e) => {
-        done = true;
-        error = e;
-      },
-    });
-    if (!done)
-      throw new Error(
-        `worker: "${fn}" did not return synchronously; the port is not synchronous`,
-      );
-    if (error) throw error;
-    return value;
-  }
-
   rustbuffer_alloc(n: number): Uint8Array {
     return new Uint8Array(n);
   }
@@ -168,9 +145,7 @@ export class SenderCore {
       this.settle(id);
       throw e;
     }
-    // A synchronous port may already have settled the call.
-    if (signal && this.pending.has(id))
-      pending.detach = this.replayAbort(id, signal);
+    if (signal) pending.detach = this.replayAbort(id, signal);
   }
 
   // An AbortSignal cannot cross a port, so its abort crosses as a cancel
@@ -237,25 +212,10 @@ export class SenderCore {
       const args = entry.plan.args.map((p, i) =>
         marshalIn(p, msg.args[i], this.ctx),
       );
-      // Await only a thenable: a non-thenable result must reach postMessage synchronously so a sync port can answer a sync vtable method.
+      // Await only a thenable, so a non-thenable result is posted without an extra tick.
       let result: any = entry.fn(...args);
       if (result && typeof result.then === "function") result = await result;
-      let value: unknown;
-      if (entry.plan.hasRustCallStatus) {
-        value =
-          "pointee" in result
-            ? {
-                pointee: marshalOut(
-                  entry.plan.ret,
-                  result.pointee,
-                  this.ctx,
-                  transfer,
-                ),
-              }
-            : { code: result.code, errorBuf: result.errorBuf };
-      } else {
-        value = marshalOut(entry.plan.ret, result, this.ctx, transfer);
-      }
+      const value = marshalOut(entry.plan.ret, result, this.ctx, transfer);
       this.port.postMessage(
         { kind: "callback-return", id: msg.id, ok: true, value },
         transfer,

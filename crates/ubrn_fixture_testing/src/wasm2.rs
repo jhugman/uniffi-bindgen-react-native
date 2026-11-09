@@ -114,57 +114,6 @@ pub(crate) fn generated_namespaces(ts_dir: &Utf8Path) -> Vec<String> {
     namespaces
 }
 
-/// Write the bootstrap a port-backed flavor preloads, and return its path.
-///
-/// Everything up to the opened wasm is the same for every such flavor: the
-/// namespaces are whichever `*-ffi.ts` were generated, and the glue module
-/// only exists when wasm-bindgen wrote one. `transport_imports` and
-/// `wire_namespace` are the flavor's own: its imports, and the block that
-/// puts its transport between `registerSync` and `setNativeModule`.
-///
-/// Mirrors the init sequence in the generated index template
-/// (`gen_typescript/templates/index.ts`: openWasm, resolveModule,
-/// registerSync, setNativeModule, `default.initialize()`); `async_wasm::write_worker`
-/// is a third copy of the openWasm/resolveModule half. Keep all three in
-/// step.
-pub(crate) fn write_player_bootstrap(
-    ts_dir: &Utf8Path,
-    lib_stem: &str,
-    file_name: &str,
-    transport_imports: &str,
-    wire_namespace: impl Fn(&str) -> String,
-) -> Utf8PathBuf {
-    let namespaces = generated_namespaces(ts_dir);
-
-    let glue = ts_dir.join(format!("{lib_stem}_bg.js")).exists();
-    let mut src = String::new();
-    src.push_str("import { openWasm } from \"@ubjs/wasm\";\n");
-    src.push_str(transport_imports);
-    if glue {
-        src.push_str(&format!("import * as glue from \"./{lib_stem}_bg.js\";\n"));
-    }
-    for ns in &namespaces {
-        src.push_str(&format!(
-            "import {{ PLAYER_DEFINITIONS as defs_{ns}, setNativeModule as set_{ns} }} from \"./{ns}-ffi.js\";\n\
-             import * as mod_{ns} from \"./{ns}.js\";\n"
-        ));
-    }
-    src.push_str(&format!(
-        "const wasm = await openWasm(new URL(\"./{lib_stem}.wasm\", import.meta.url){});\n",
-        if glue {
-            format!(", {{ resolveModule: async (n) => n.endsWith(\"{lib_stem}_bg.js\") ? glue : undefined }}")
-        } else {
-            String::new()
-        }
-    ));
-    for ns in &namespaces {
-        src.push_str(&wire_namespace(ns));
-    }
-    let path = ts_dir.join(file_name);
-    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
-    path
-}
-
 /// Generate bindings via the CLI, using the `wasm2` subcommand.
 fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path, extra_args: &[&str]) {
     let mut cmd = Command::new("cargo");

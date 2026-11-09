@@ -434,25 +434,28 @@ test("an async RustBuffer result is the player's own copy, transferred without a
   }
 });
 
-test("a sync vtable method over an asynchronous port throws pointing at forceAsync", async () => {
+test("a sync vtable method throws asking for an async fn, and nothing reaches the client", async () => {
   const { port1, port2 } = new MessageChannel();
   const { player } = fakePlayer();
   const r = createReceiver(DEFS, player, port1);
   const s = senderSide(port2);
-  s.post({
-    kind: "call",
-    id: 1,
-    fn: "init_vtable",
-    args: [
-      { uniffi_free: 1, uniffi_clone: 2, notify: 3, async_m: 4, sync_m: 5 },
-    ],
-  });
-  await s.next();
-  s.post({ kind: "call", id: 2, fn: "sync_method", args: [5n] });
-  const msgs = [await s.next(), await s.next()];
-  const ret = msgs.find((m) => m.kind === "return") as any;
-  assert.strictEqual(ret.ok, false);
-  assert.match(ret.error.message, /SyncM.*forceAsync/);
-  r.close();
-  port2.close();
+  try {
+    s.post({
+      kind: "call",
+      id: 1,
+      fn: "init_vtable",
+      args: [
+        { uniffi_free: 1, uniffi_clone: 2, notify: 3, async_m: 4, sync_m: 5 },
+      ],
+    });
+    await s.next();
+    s.post({ kind: "call", id: 2, fn: "sync_method", args: [5n] });
+    const ret = (await s.next()) as any;
+    assert.strictEqual(ret.kind, "return");
+    assert.strictEqual(ret.ok, false);
+    assert.match(ret.error.message, /SyncM.*async fn/);
+  } finally {
+    r.close();
+    port2.close();
+  }
 });

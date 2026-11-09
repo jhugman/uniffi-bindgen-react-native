@@ -9,7 +9,7 @@
 
 import { asyncTest } from "@/asserts";
 import theModule, {
-  type BasicDelegate,
+  type AsyncDelegate,
   Builder,
   createArcDroppingBuilder,
   createDroppingBuilder,
@@ -24,10 +24,8 @@ function delayPromise(delayMs: number): Promise<void> {
   });
 }
 
-const basicDelegate: BasicDelegate = {
-  method: (userId: string) => {
-    return "foo";
-  },
+const asyncDelegate: AsyncDelegate = {
+  method: async (_userId: string) => "foo",
 };
 
 (async () => {
@@ -50,7 +48,7 @@ const basicDelegate: BasicDelegate = {
     const makeClientBuilder = async () => {
       try {
         const builder = getBuilder();
-        builder.setBasicDelegate(basicDelegate);
+        builder.setAsyncDelegate(asyncDelegate);
         (builder as Builder).uniffiDestroy();
       } catch (e) {
         console.error(e);
@@ -66,7 +64,7 @@ const basicDelegate: BasicDelegate = {
   await asyncTest("Dropping in Rust", async (t) => {
     try {
       for (let i = 0; i < 1000; i++) {
-        createDroppingBuilder(basicDelegate);
+        createDroppingBuilder(asyncDelegate);
       }
     } catch (e) {
       console.error(e);
@@ -78,7 +76,7 @@ const basicDelegate: BasicDelegate = {
   await asyncTest("Dropping Arc in Rust", async (t) => {
     try {
       for (let i = 0; i < 1000; i++) {
-        createArcDroppingBuilder(basicDelegate);
+        createArcDroppingBuilder(asyncDelegate);
       }
     } catch (e) {
       console.error(e);
@@ -91,7 +89,7 @@ const basicDelegate: BasicDelegate = {
     const makeClientBuilder = async () => {
       try {
         const builder = getBuilder();
-        builder.setBasicDelegate(basicDelegate);
+        builder.setAsyncDelegate(asyncDelegate);
       } catch (e) {
         console.error(e);
       }

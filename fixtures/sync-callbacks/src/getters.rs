@@ -4,10 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-#[cfg(target_arch = "wasm32")]
-extern crate uniffi_runtime_wasm as _;
-
-trait ForeignGetters {
+pub trait ForeignGetters {
     fn get_bool(&self, v: bool, argument_two: bool) -> Result<bool, SimpleError>;
     fn get_string(&self, v: String, arg2: bool) -> Result<String, SimpleError>;
     fn get_option(&self, v: Option<String>, arg2: bool) -> Result<Option<String>, ComplexError>;
@@ -50,7 +47,7 @@ impl RustGetters {
     pub fn new() -> Self {
         RustGetters
     }
-    fn get_bool(
+    pub fn get_bool(
         &self,
         callback: Box<dyn ForeignGetters>,
         v: bool,
@@ -58,7 +55,7 @@ impl RustGetters {
     ) -> Result<bool, SimpleError> {
         callback.get_bool(v, argument_two)
     }
-    fn get_string(
+    pub fn get_string(
         &self,
         callback: Box<dyn ForeignGetters>,
         v: String,
@@ -66,7 +63,7 @@ impl RustGetters {
     ) -> Result<String, SimpleError> {
         callback.get_string(v, arg2)
     }
-    fn get_option(
+    pub fn get_option(
         &self,
         callback: Box<dyn ForeignGetters>,
         v: Option<String>,
@@ -74,7 +71,7 @@ impl RustGetters {
     ) -> Result<Option<String>, ComplexError> {
         callback.get_option(v, arg2)
     }
-    fn get_list(
+    pub fn get_list(
         &self,
         callback: Box<dyn ForeignGetters>,
         v: Vec<i32>,
@@ -83,7 +80,7 @@ impl RustGetters {
         callback.get_list(v, arg2)
     }
 
-    fn get_string_optional_callback(
+    pub fn get_string_optional_callback(
         &self,
         callback: Option<Box<dyn ForeignGetters>>,
         v: String,
@@ -92,7 +89,11 @@ impl RustGetters {
         callback.map(|c| c.get_string(v, arg2)).transpose()
     }
 
-    fn get_nothing(&self, callback: Box<dyn ForeignGetters>, v: String) -> Result<(), SimpleError> {
+    pub fn get_nothing(
+        &self,
+        callback: Box<dyn ForeignGetters>,
+        v: String,
+    ) -> Result<(), SimpleError> {
         callback.get_nothing(v)
     }
 }
@@ -106,7 +107,7 @@ impl Default for RustGetters {
 // Use `Send+Send` because we want to store the callback in an exposed
 // `Send+Sync` object.
 #[allow(clippy::wrong_self_convention)]
-trait StoredForeignStringifier: Send + Sync + std::fmt::Debug {
+pub trait StoredForeignStringifier: Send + Sync + std::fmt::Debug {
     fn from_simple_type(&self, value: i32) -> String;
     // We are not expecting to run this, but we would like to see the resulting
     // bindings compile.
@@ -120,14 +121,12 @@ pub struct RustStringifier {
 }
 
 impl RustStringifier {
-    fn new(callback: Box<dyn StoredForeignStringifier>) -> Self {
+    pub fn new(callback: Box<dyn StoredForeignStringifier>) -> Self {
         RustStringifier { callback }
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn from_simple_type(&self, value: i32) -> String {
+    pub fn from_simple_type(&self, value: i32) -> String {
         self.callback.from_simple_type(value)
     }
 }
-
-uniffi::include_scaffolding!("callbacks");

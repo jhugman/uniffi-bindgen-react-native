@@ -15,15 +15,9 @@ pub trait AsyncDelegate: Sync + Send {
     async fn method(&self, user_id: String) -> String;
 }
 
-#[uniffi::export(callback_interface)]
-pub trait BasicDelegate: Sync + Send {
-    fn method(&self, user_id: String) -> String;
-}
-
 #[derive(Clone, uniffi::Object)]
 pub struct Builder {
     async_delegate: Option<Arc<dyn AsyncDelegate>>,
-    basic_delegate: Option<Arc<dyn BasicDelegate>>,
 }
 
 pub(crate) fn unwrap_or_clone_arc<T: Clone>(arc: Arc<T>) -> T {
@@ -40,16 +34,11 @@ impl Builder {
         builder.async_delegate = Some(delegate.into());
         Arc::new(builder)
     }
-    pub fn set_basic_delegate(self: Arc<Self>, delegate: Box<dyn BasicDelegate>) -> Arc<Self> {
-        let mut builder = unwrap_or_clone_arc(self);
-        builder.basic_delegate = Some(delegate.into());
-        Arc::new(builder)
-    }
 }
 
 impl Builder {
-    pub fn set_basic_delegate_simplistic(&mut self, delegate: Box<dyn BasicDelegate>) {
-        self.basic_delegate = Some(delegate.into());
+    pub fn set_async_delegate_simplistic(&mut self, delegate: Box<dyn AsyncDelegate>) {
+        self.async_delegate = Some(delegate.into());
     }
 }
 
@@ -61,21 +50,20 @@ pub fn get_builder() -> Arc<Builder> {
 pub fn new_builder() -> Builder {
     Builder {
         async_delegate: None,
-        basic_delegate: None,
     }
 }
 
 #[uniffi::export]
-pub fn create_arc_dropping_builder(delegate: Box<dyn BasicDelegate>) {
+pub fn create_arc_dropping_builder(delegate: Box<dyn AsyncDelegate>) {
     let builder = get_builder();
-    builder.set_basic_delegate(delegate);
+    builder.set_async_delegate(delegate);
 }
 
 // Not crashing
 #[uniffi::export]
-pub fn create_dropping_builder(delegate: Box<dyn BasicDelegate>) {
+pub fn create_dropping_builder(delegate: Box<dyn AsyncDelegate>) {
     let mut builder = new_builder();
-    builder.set_basic_delegate_simplistic(delegate);
+    builder.set_async_delegate_simplistic(delegate);
     drop(builder);
 }
 

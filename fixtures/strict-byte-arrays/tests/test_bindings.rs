@@ -4,9 +4,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 ubrn_macros::build_foreign_language_testcases! {
-    "tests/bindings/test_strict_byte_arrays.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2, Channel],
+    "tests/bindings/test_strict_byte_arrays.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
+    "tests/bindings/test_strict_byte_arrays_async.ts" => [AsyncWasm],
     "tests/bindings/test_rustbuffer_alloc.ts" => [Jsi, Jsi2],
-    "tests/bindings/test_leak.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2, Channel],
+    "tests/bindings/test_leak.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
+    "tests/bindings/test_leak_async.ts" => [AsyncWasm],
     // [Jsi, Napi] only: wasm2 aliases the argument's linear memory rather than
     // adopting a copy, and has no "already consumed" marker, so an explicit
     // rustbuffer_free after the callee frees the aliased buffer double-frees.

@@ -1,0 +1,108 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ */
+// To run:
+//   cargo test -p uniffi-fixture-arc-futures -- async_wasm
+
+import {
+  asyncCallback,
+  AsyncCallback,
+  makeObject,
+  makeObjectWithAsyncCallback,
+  rustCallback,
+  SimpleObject,
+  throwObject,
+} from "@/generated/arc_futures";
+import { asyncTest, Asserts } from "@/asserts";
+import { uniffiForeignFutureHandleCount, UniffiThrownObject } from "@ubjs/core";
+import "@/polyfills";
+
+// The Rust future count is always 0 here: the player polls in the Worker.
+function checkRemainingFutures(t: Asserts) {
+  t.assertEqual(
+    0,
+    uniffiForeignFutureHandleCount(),
+    "Number of remaining foreign futures should be zero",
+  );
+}
+
+(async () => {
+  await asyncTest(
+    "Empty object; if this compiles, the test has passed",
+    async (t) => {
+      const obj = await makeObject();
+      t.assertNotNull(obj);
+      await obj.update("alice");
+      // 200 ms later.
+      checkRemainingFutures(t);
+      t.end();
+    },
+  );
+
+  await asyncTest("Updater actually calls the async callback", async (t) => {
+    let updated = 0;
+    let previousValue: string | undefined;
+    class Updater implements AsyncCallback {
+      async onUpdate(old: string, new_: string): Promise<void> {
+        previousValue = old;
+        updated++;
+      }
+      reset(): void {
+        previousValue = undefined;
+        updated = 0;
+      }
+    }
+
+    const cbJs = new Updater();
+    const cbRs = await asyncCallback(cbJs);
+    await cbRs.onUpdate("old", "new");
+    t.assertEqual(previousValue, "old");
+    t.assertEqual(updated, 1);
+    cbJs.reset();
+
+    const obj = await makeObjectWithAsyncCallback(cbJs);
+    t.assertNotNull(obj);
+
+    await obj.update("alice");
+    t.assertEqual(previousValue, "key");
+    t.assertEqual(updated, 1);
+
+    await obj.update("bob");
+    t.assertEqual(previousValue, "alice");
+    t.assertEqual(updated, 2);
+
+    checkRemainingFutures(t);
+    t.end();
+  });
+
+  await asyncTest("Object as error", async (t) => {
+    // The predicate is synchronous and calls no bindings.
+    await t.assertThrowsAsync((e: any) => {
+      if (!UniffiThrownObject.instanceOf(e)) {
+        return false;
+      }
+      if (!SimpleObject.hasInner(e)) {
+        return false;
+      }
+      let obj = e.inner;
+      t.assertNotNull(obj);
+      t.assertTrue(SimpleObject.instanceOf(obj));
+      return true;
+    }, throwObject);
+    checkRemainingFutures(t);
+    t.end();
+  });
+
+  await asyncTest("Async callbacks", async (t) => {
+    const cb = await rustCallback();
+    const r1 = await cb.onUpdate("old", "new");
+    t.assertEqual(r1, "old -> new");
+
+    const r2 = await cb.onUpdate("OLD", "NEW");
+    t.assertEqual(r2, "OLD -> NEW");
+    checkRemainingFutures(t);
+    t.end();
+  });
+})();

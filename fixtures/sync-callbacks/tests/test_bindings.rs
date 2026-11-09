@@ -4,5 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 ubrn_macros::build_foreign_language_testcases! {
-    "tests/bindings/test_callbacks_regression.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2, Channel],
+    "tests/bindings/test_sync_callbacks.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
+    "tests/bindings/test_sync_callbacks_leak.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
+    "tests/bindings/test_sync_callbacks_gc.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
 }

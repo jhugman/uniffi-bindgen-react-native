@@ -160,9 +160,6 @@ jobs:
       - name: Run unit tests of @ubjs/worker
         run: cd channels/worker && npm ci && npm test && npm run typecheck
 
-      - name: Run tests of generated WASM2 bindings through @ubjs/worker
-        run: "cargo test -- channel::"
-
       - name: Run tests of --async WASM2 bindings over a MessageChannel
         run: "cargo test -- async_wasm::"
 

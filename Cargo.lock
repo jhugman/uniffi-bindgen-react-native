@@ -2093,32 +2093,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "uniffi-fixture-callbacks"
-version = "0.22.0"
-dependencies = [
- "thiserror 1.0.69",
- "ubrn_fixture_testing",
- "ubrn_macros",
- "uniffi",
- "uniffi-runtime-wasm",
- "uniffi_core",
-]
-
-[[package]]
-name = "uniffi-fixture-callbacks-deadlock-regression"
-version = "0.22.0"
-dependencies = [
- "thiserror 1.0.69",
- "ubrn_fixture_testing",
- "ubrn_macros",
- "ubrn_testing",
- "uniffi",
- "uniffi-runtime-wasm",
- "uniffi_core",
- "wasm-bindgen-futures",
-]
-
-[[package]]
 name = "uniffi-fixture-coverall"
 version = "0.22.0"
 dependencies = [
@@ -2227,6 +2201,8 @@ dependencies = [
 name = "uniffi-fixture-force-async"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "thiserror 1.0.69",
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
@@ -2241,6 +2217,8 @@ dependencies = [
  "ubrn_fixture_testing",
  "ubrn_macros",
  "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
 ]
 
 [[package]]
@@ -2309,6 +2287,19 @@ dependencies = [
  "thiserror 1.0.69",
  "ubrn_fixture_testing",
  "ubrn_macros",
+ "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
+]
+
+[[package]]
+name = "uniffi-fixture-sync-callbacks"
+version = "0.22.0"
+dependencies = [
+ "thiserror 1.0.69",
+ "ubrn_fixture_testing",
+ "ubrn_macros",
+ "ubrn_testing",
  "uniffi",
  "uniffi-runtime-wasm",
  "uniffi_core",

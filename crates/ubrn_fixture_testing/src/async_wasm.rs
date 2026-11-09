@@ -24,10 +24,15 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
 
 const WORKER_FILE: &str = "uniffi-worker.async-wasm.ts";
 const WORKER_BOOTSTRAP_FILE: &str = "uniffi-worker-bootstrap.async-wasm.mjs";
+const DEFINITIONS_MODULE: &str = "uniffi-definitions.async-wasm";
 
-/// The preload: on the main thread, one `MessageChannel` per namespace, the
-/// receiver ends transferred into a Worker, a sender in front of each
-/// generated module.
+/// The preload: on the main thread, one `MessageChannel` for the whole
+/// library, its receiver end transferred into a Worker, one sender in front of
+/// every generated module.
+///
+/// There is one channel, not one per namespace: the generated clone of an
+/// object is fire-and-forget and must arrive before the call that consumes
+/// the handle, and Node orders messages within a port, not across ports.
 ///
 /// The Worker is given `execArgv: []` and loads [`WORKER_BOOTSTRAP_FILE`],
 /// not this file: tsx's ESM loader hooks don't propagate into a worker
@@ -42,35 +47,30 @@ const WORKER_BOOTSTRAP_FILE: &str = "uniffi-worker-bootstrap.async-wasm.mjs";
 /// call is outstanding, so a finished script exits.
 fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
     let namespaces = crate::wasm2::generated_namespaces(ts_dir);
-    write_worker(ts_dir, lib_stem, &namespaces);
+    write_definitions(ts_dir, &namespaces);
+    write_worker(ts_dir, lib_stem);
     write_worker_bootstrap(ts_dir);
 
-    let mut src = String::from(
-        "import { isMainThread, MessageChannel, Worker } from \"node:worker_threads\";\n\
-         import { createSender } from \"@ubjs/worker\";\n",
+    let mut src = format!(
+        "import {{ isMainThread, MessageChannel, Worker }} from \"node:worker_threads\";\n\
+         import {{ createSender }} from \"@ubjs/worker\";\n\
+         import {{ DEFINITIONS }} from \"./{DEFINITIONS_MODULE}.js\";\n"
     );
     for ns in &namespaces {
         src.push_str(&format!(
-            "import {{ PLAYER_DEFINITIONS as defs_{ns}, setNativeModule as set_{ns} }} from \"./{ns}-ffi.js\";\n\
+            "import {{ setNativeModule as set_{ns} }} from \"./{ns}-ffi.js\";\n\
              import * as mod_{ns} from \"./{ns}.js\";\n"
         ));
     }
     // No-op today (this file only ever runs on the main thread), but keeps a
     // future execArgv change from making the Worker spawn a Worker.
-    src.push_str("if (isMainThread) {\n");
-    src.push_str("const t0 = performance.now();\n");
-    for ns in &namespaces {
-        src.push_str(&format!("const ch_{ns} = new MessageChannel();\n"));
-    }
-    let ports: Vec<String> = namespaces
-        .iter()
-        .map(|ns| format!("{ns}: ch_{ns}.port1"))
-        .collect();
     src.push_str(&format!(
-        "const ports = {{ {} }};\n\
+        "if (isMainThread) {{\n\
+         const t0 = performance.now();\n\
+         const ch = new MessageChannel();\n\
          const worker = new Worker(new URL(\"./{WORKER_BOOTSTRAP_FILE}\", import.meta.url), {{\n\
-         \x20 workerData: {{ ports }},\n\
-         \x20 transferList: Object.values(ports),\n\
+         \x20 workerData: {{ port: ch.port1 }},\n\
+         \x20 transferList: [ch.port1],\n\
          \x20 // See async_wasm.rs::write_node_bootstrap: skip replaying this file's own\n\
          \x20 // --import inside the Worker.\n\
          \x20 execArgv: [],\n\
@@ -83,25 +83,72 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
          // script waiting for a reply until the test timeout.\n\
          worker.on(\"exit\", (code) => {{\n\
          \x20 if (code !== 0) throw new Error(`uniffi worker exited with ${{code}}`);\n\
-         }});\n",
-        ports.join(", ")
+         }});\n\
+         const sender = createSender(DEFINITIONS, ch.port2);\n"
     ));
     for ns in &namespaces {
         src.push_str(&format!(
-            "set_{ns}(createSender(defs_{ns}, ch_{ns}.port2));\n\
+            "set_{ns}(sender);\n\
              await mod_{ns}.default.initialize();\n"
         ));
     }
-    src.push_str("(globalThis as any).__ubrnStartupMs = performance.now() - t0;\n");
-    src.push_str("worker.unref();\n");
-    for ns in &namespaces {
-        src.push_str(&format!("ch_{ns}.port2.unref();\n"));
-    }
-    src.push_str("}\n");
+    src.push_str(
+        "(globalThis as any).__ubrnStartupMs = performance.now() - t0;\n\
+         worker.unref();\n\
+         ch.port2.unref();\n\
+         }\n",
+    );
 
-    let path = ts_dir.join("uniffi-bootstrap.async-wasm.ts");
+    write_generated(ts_dir, "uniffi-bootstrap.async-wasm.ts", src)
+}
+
+/// Writes one generated module into `ts_dir` and returns its path.
+fn write_generated(ts_dir: &Utf8Path, name: &str, src: String) -> Utf8PathBuf {
+    let path = ts_dir.join(name);
     std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
     path
+}
+
+/// One definitions object for the whole library, imported by both sides of the
+/// channel. Function names are crate-prefixed; callback and struct names are
+/// not, so namespaces share uniffi's generic shapes (e.g.
+/// `ForeignFutureDroppedCallback`), and two crates with a same-named foreign
+/// trait would collide. The generated module throws if a shared name's
+/// definitions ever differ, so the merge is order-independent.
+fn write_definitions(ts_dir: &Utf8Path, namespaces: &[String]) {
+    let mut src = String::new();
+    for ns in namespaces {
+        src.push_str(&format!(
+            "import {{ PLAYER_DEFINITIONS as defs_{ns} }} from \"./{ns}-ffi.js\";\n"
+        ));
+    }
+    let all: Vec<String> = namespaces.iter().map(|ns| format!("defs_{ns}")).collect();
+    src.push_str(&format!(
+        "const all = [{}];\n\
+         function merge(key: \"functions\" | \"callbacks\" | \"structs\") {{\n\
+         \x20 const out: Record<string, any> = {{}};\n\
+         \x20 for (const d of all) {{\n\
+         \x20   for (const [k, v] of Object.entries(d[key])) {{\n\
+         \x20     if (k in out && JSON.stringify(out[k]) !== JSON.stringify(v)) {{\n\
+         \x20       throw new Error(`definition ${{k}} differs between namespaces`);\n\
+         \x20     }}\n\
+         \x20     out[k] = v;\n\
+         \x20   }}\n\
+         \x20 }}\n\
+         \x20 return out;\n\
+         }}\n\
+         // One table, so the whole library shares one port.\n\
+         // One cdylib has one uniffi_core allocator: any crate's\n\
+         // `ffi_<crate>_rustbuffer_*` serves every namespace.\n\
+         export const DEFINITIONS = {{\n\
+         \x20 symbols: all[0].symbols,\n\
+         \x20 functions: merge(\"functions\"),\n\
+         \x20 callbacks: merge(\"callbacks\"),\n\
+         \x20 structs: merge(\"structs\"),\n\
+         }};\n",
+        all.join(", ")
+    ));
+    write_generated(ts_dir, &format!("{DEFINITIONS_MODULE}.ts"), src);
 }
 
 /// Plain-JS shim the Worker actually loads (given `execArgv: []`, it starts
@@ -114,40 +161,31 @@ fn write_worker_bootstrap(ts_dir: &Utf8Path) {
          register();\n\
          await import(new URL(\"./{WORKER_FILE}\", import.meta.url));\n"
     );
-    let path = ts_dir.join(WORKER_BOOTSTRAP_FILE);
-    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
+    write_generated(ts_dir, WORKER_BOOTSTRAP_FILE, src);
 }
 
-/// The Worker entry: open the wasm and put a receiver on each port it was
-/// handed. Mirrors the receiver half of `wasm2::write_player_bootstrap`.
-fn write_worker(ts_dir: &Utf8Path, lib_stem: &str, namespaces: &[String]) {
+/// The Worker entry: open the wasm and put the one receiver on the port it was
+/// handed. Mirrors the init sequence in the generated index template
+/// (`gen_typescript/templates/index.ts`): openWasm, resolveModule, registerSync.
+fn write_worker(ts_dir: &Utf8Path, lib_stem: &str) {
     let glue = ts_dir.join(format!("{lib_stem}_bg.js")).exists();
-    let mut src = String::from(
-        "import { workerData } from \"node:worker_threads\";\n\
-         import { openWasm } from \"@ubjs/wasm\";\n\
-         import { createReceiver } from \"@ubjs/worker\";\n",
+    let mut src = format!(
+        "import {{ workerData }} from \"node:worker_threads\";\n\
+         import {{ openWasm }} from \"@ubjs/wasm\";\n\
+         import {{ createReceiver }} from \"@ubjs/worker\";\n\
+         import {{ DEFINITIONS }} from \"./{DEFINITIONS_MODULE}.js\";\n"
     );
     if glue {
         src.push_str(&format!("import * as glue from \"./{lib_stem}_bg.js\";\n"));
     }
-    for ns in namespaces {
-        src.push_str(&format!(
-            "import {{ PLAYER_DEFINITIONS as defs_{ns} }} from \"./{ns}-ffi.js\";\n"
-        ));
-    }
     src.push_str(&format!(
-        "const wasm = await openWasm(new URL(\"./{lib_stem}.wasm\", import.meta.url){});\n",
+        "const wasm = await openWasm(new URL(\"./{lib_stem}.wasm\", import.meta.url){});\n\
+         createReceiver(DEFINITIONS, wasm.registerSync(DEFINITIONS), workerData.port);\n",
         if glue {
             format!(", {{ resolveModule: async (n) => n.endsWith(\"{lib_stem}_bg.js\") ? glue : undefined }}")
         } else {
             String::new()
         }
     ));
-    for ns in namespaces {
-        src.push_str(&format!(
-            "createReceiver(defs_{ns}, wasm.registerSync(defs_{ns}), workerData.ports.{ns});\n"
-        ));
-    }
-    let path = ts_dir.join(WORKER_FILE);
-    std::fs::write(&path, src).unwrap_or_else(|e| panic!("write {path}: {e}"));
+    write_generated(ts_dir, WORKER_FILE, src);
 }
