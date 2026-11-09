@@ -6,9 +6,14 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { MessageChannel } from "node:worker_threads";
-import { FfiType, type ModuleDefinitions } from "@ubjs/core";
+import {
+  FfiType,
+  type ModuleDefinitions,
+  type UniffiRustCallStatus,
+} from "@ubjs/core";
 import { createSender } from "../src/sender.js";
 import { createReceiver } from "../src/receiver.js";
+import { ChannelClosedError } from "../src/types.js";
 import { DEFS, fakePlayer } from "./fixtures.js";
 
 function pair() {
@@ -28,12 +33,72 @@ function pair() {
   };
 }
 
+test("closing a sender cancels its async entry in the worker", async () => {
+  const c = pair();
+  try {
+    const p = c.sender.sleep(10_000, { code: 0 }, new AbortController().signal);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.strictEqual(c.state.cancelled, 0);
+    c.sender.close();
+    await assert.rejects(p, ChannelClosedError);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.strictEqual(c.state.cancelled, 1);
+  } finally {
+    c.done();
+  }
+});
+
 test("scalar call with status round-trips", async () => {
   const c = pair();
   const status = { code: 0 };
   assert.strictEqual(await c.sender.add(20, 22, status), 42);
   assert.strictEqual(status.code, 0);
   c.done();
+});
+
+test("an async entry resolves over the port and cancels through the signal", async () => {
+  const c = pair();
+  try {
+    const status = { code: 0 };
+    assert.strictEqual(await c.sender.sleep(3, status, undefined), 6);
+    const ctl = new AbortController();
+    const s2 = { code: 0 };
+    const p = c.sender.sleep(10_000, s2, ctl.signal);
+    ctl.abort();
+    assert.strictEqual(await p, undefined);
+    assert.strictEqual(s2.code, 3);
+  } finally {
+    c.done();
+  }
+});
+
+test("two async entries in flight settle with their own statuses", async () => {
+  const c = pair();
+  try {
+    const a = { code: 0 },
+      b = { code: 0 };
+    const ctl = new AbortController();
+    const pa = c.sender.sleep(10_000, a, ctl.signal);
+    const pb = c.sender.sleep(3, b, undefined);
+    ctl.abort();
+    assert.deepStrictEqual(await Promise.all([pa, pb]), [undefined, 6]);
+    assert.deepStrictEqual([a.code, b.code], [3, 0]);
+    assert.strictEqual(c.state.cancelled, 1);
+  } finally {
+    c.done();
+  }
+});
+
+test("a panic reported by complete reaches the sender's status with its buffer", async () => {
+  const c = pair();
+  try {
+    const status: UniffiRustCallStatus = { code: 0 };
+    assert.strictEqual(await c.sender.sleep_fail(status, undefined), undefined);
+    assert.strictEqual(status.code, 2);
+    assert.strictEqual(new TextDecoder().decode(status.errorBuf), "panic");
+  } finally {
+    c.done();
+  }
 });
 
 test("the vtable is delivered and a Void callback reaches the client", async () => {

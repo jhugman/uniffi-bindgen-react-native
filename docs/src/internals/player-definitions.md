@@ -92,10 +92,21 @@ interface FunctionDef {
   args: FfiTypeDesc[];
   ret: FfiTypeDesc;          // FfiType.Void when the export returns nothing
   hasRustCallStatus: boolean;
+  async?: AsyncFunctionDef;  // when the player runs this future's poll loop
+}
+
+interface AsyncFunctionDef {
+  poll: string;              // the rust_future_* exports for this future
+  cancel: string;
+  complete: string;
+  free: string;
+  ret: FfiTypeDesc;          // the completed value's FFI type
 }
 ```
 
 Registration turns each entry into a JavaScript function on the returned module object, under the same key. The function takes one JavaScript value per element of `args` and, when `hasRustCallStatus` is true, one more: a status object the caller supplies. It returns the lifted `ret`, or `undefined` when the status reports an error.
+
+An entry with `async` starts a future, and the player runs that future's poll loop. Its function takes `(...args, status, signal)` and returns a Promise of the completed value, lifted as `async.ret`.
 
 ```typescript
 uniffi_uniffi_futures_fn_method_megaphone_say_after: {
@@ -110,7 +121,7 @@ ffi_uniffi_futures_rust_future_complete_u64: {
 },
 ```
 
-The bindgen lists every scaffolding function, object clone and free, vtable init, the contract-version export and every checksum. It lists the `rust_future_poll`, `complete`, `cancel` and `free` family only when the crate has an async function. It never lists the `rustbuffer_*` exports; those live in `symbols`. The filter is `should_include_function` in [`ffi_module/builder.rs`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_bindgen/src/bindings/gen_typescript/ffi_module/builder.rs).
+The bindgen lists every scaffolding function, object clone and free, vtable init, the contract-version export and every checksum. It lists the `rust_future_poll`, `complete`, `cancel` and `free` family only when the crate has an async function and the player leaves the poll loop to the generated code; for `wasm2`, each future-starting export names its family in `async` instead. It never lists the `rustbuffer_*` exports; those live in `symbols`. The filter is `should_include_function` in [`ffi_module/builder.rs`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_bindgen/src/bindings/gen_typescript/ffi_module/builder.rs).
 
 ### Call status
 

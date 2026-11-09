@@ -35,13 +35,16 @@ export type CallbackReturnMessage =
   | { kind: "callback-return"; id: number; ok: true; value: unknown }
   | { kind: "callback-return"; id: number; ok: false; error: WireError };
 export type ReleaseMessage = { kind: "release"; cb: number };
+/** One-way, sender to receiver: abort the in-flight async call `id`. */
+export type CancelMessage = { kind: "cancel"; id: number };
 
 export type ChannelMessage =
   | CallMessage
   | ReturnMessage
   | CallbackMessage
   | CallbackReturnMessage
-  | ReleaseMessage;
+  | ReleaseMessage
+  | CancelMessage;
 
 const KINDS = new Set([
   "call",
@@ -49,6 +52,7 @@ const KINDS = new Set([
   "callback",
   "callback-return",
   "release",
+  "cancel",
 ]);
 
 export function isChannelMessage(x: unknown): x is ChannelMessage {

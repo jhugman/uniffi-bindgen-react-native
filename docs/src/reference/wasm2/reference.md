@@ -272,7 +272,7 @@ impl ReceiptStore {
 const total = await store.totalForMonth(3);
 ```
 
-The player registers the continuation as a wasm function and hands Rust its index in the module's function table; Rust calls it when the future can make progress. Each poll resolves one promise, and the loop runs until the future reports ready. Behind a `@ubjs/worker` receiver the worker re-polls a future that reports `MAYBE_READY` itself, on a microtask, so a wake is never separated from its next poll by a message round trip (an IndexedDB transaction would auto-commit in that gap); the page sees one continuation per await.
+The player runs UniFFI's poll loop itself. An async function is one player entry that starts the future, re-polls it on microtasks while it reports `MAYBE_READY`, completes and frees it, and resolves with the result. A wake is never separated from its next poll, so an IndexedDB transaction is never left to auto-commit between them. Behind a `@ubjs/worker` receiver each await of a free function is one message out and one reply back; a method also sends a clone of its object's handle ahead of the call, without waiting for that reply. An `AbortSignal` the page passes is replayed as a one-way `cancel` message, which aborts the receiver's own signal for that call.
 
 Cancellation rides on `AbortSignal` where the Rust API supports it:
 

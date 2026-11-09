@@ -16,11 +16,14 @@
 //     looks the resolver up by cookie rather than by the usual handle, and
 //     calls it with `code`.
 
-import type { CallbackTable } from "./callback.js";
+import type { CallbackDef, CallbackTable } from "./callback.js";
 import { FfiType } from "./ffi-type.js";
 
+/** The name UniFFI gives the continuation in `FfiType.Callback(...)`. */
+export const RUST_FUTURE_CONTINUATION = "RustFutureContinuationCallback";
+
 /** The single shape used by every `RustFutureContinuationCallback`. */
-const CONT_DEF = {
+export const CONT_DEF: CallbackDef = {
   args: [FfiType.UInt64, FfiType.Int8],
   ret: FfiType.Void,
   hasRustCallStatus: false,
@@ -43,7 +46,7 @@ export class FutureRegistry {
     if (this.contShapeId < 0) {
       this.contShapeId = this.callbacks.defineShape(
         "__rust_future_continuation",
-        CONT_DEF as any,
+        CONT_DEF,
       );
       this.callbacks.registerContinuationShape(
         this.contShapeId,

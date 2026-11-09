@@ -38,6 +38,17 @@ const HOST_WASM_BYTES = new Uint8Array([
   0, 65, 0, 11,
 ]);
 
+const EMPTY_DEFS = {
+  symbols: {
+    rustbuffer_alloc: "_",
+    rustbuffer_free: "_",
+    rustbuffer_from_bytes: "_",
+  },
+  functions: {},
+  callbacks: {},
+  structs: {},
+};
+
 test("UniffiNativeModule.open resolves required helper exports", async () => {
   const mod = await UniffiNativeModule.open(HOST_WASM_BYTES);
   assert.ok(mod);
@@ -116,4 +127,10 @@ test("rustbuffer_alloc(0) returns an empty view without allocating", async () =>
   // Free of a zero-length view must be a safe no-op (don't call __ubrn_free
   // with a 0-length range, which would be a no-op anyway but the ptr may be 0).
   nm.rustbuffer_free(empty);
+});
+
+test("rustbuffer_free ignores a view that is not over wasm memory", async () => {
+  const mod = await UniffiNativeModule.open(HOST_WASM_BYTES);
+  const nm = await mod.register(EMPTY_DEFS);
+  assert.doesNotThrow(() => nm.rustbuffer_free(new Uint8Array([1, 2, 3])));
 });

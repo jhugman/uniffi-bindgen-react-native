@@ -42,6 +42,9 @@ const DEFINITIONS = {
       args: [{{ func.args.join(", ") }}],
       ret: {{ func.ret }},
       hasRustCallStatus: {{ func.has_rust_call_status }},
+      {%- if let Some(a) = func.async_entry %}
+      async: { poll: "{{ a.poll }}", cancel: "{{ a.cancel }}", complete: "{{ a.complete }}", free: "{{ a.free }}", ret: {{ a.ret }} },
+      {%- endif %}
     },
     {%- endfor %}
   },
@@ -77,9 +80,9 @@ interface NativeModuleInterface {
         {{- arg.name }}: {{ arg.type_name }}
         {%- if !loop.last %}, {% endif %}
       {%- endfor %}):
-      {%- if module.async_delivery %} Promise<{% else %} {% endif -%}
+      {%- if module.async_delivery || func.returns_promise %} Promise<{% else %} {% endif -%}
       {%- match func.return_type %}{% when Some with (rt) %}{{ rt }}{% when None %}void{% endmatch %}
-      {%- if module.async_delivery %}>{% endif %};
+      {%- if module.async_delivery || func.returns_promise %}>{% endif %};
   {%- endfor %}
     // Codegen call sites use these via `nativeModule().rustbuffer_alloc(...)`
     // and `nativeModule().rustbuffer_free(...)`. The runtime's registered

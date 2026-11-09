@@ -4,6 +4,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
+/// UniFFI's name for the callback a future's `poll` export takes.
+pub(crate) const RUST_FUTURE_CONTINUATION: &str = "RustFutureContinuationCallback";
+/// Its name in the generated TypeScript.
+pub(crate) const TS_RUST_FUTURE_CONTINUATION: &str = "UniffiRustFutureContinuationCallback";
+
 /// Top-level IR node for `{namespace}-ffi.ts`.
 ///
 /// All names and types are fully resolved strings; the template
@@ -54,6 +59,8 @@ pub(crate) struct FfiFunctionDecl {
     pub name: String,
     pub arguments: Vec<FfiArgDecl>,
     pub return_type: Option<String>,
+    /// The entry returns a Promise even without async delivery.
+    pub returns_promise: bool,
 }
 
 pub(crate) struct FfiArgDecl {
