@@ -108,12 +108,9 @@ export async function uniffiRustCallAsync<F, S extends UniffiRustCallStatus, T>(
     do {
       // Calling pollFunc with a callback that resolves the promise that pollRust
       // returns: pollRust makes the promise, uniffiFutureContinuationCallback resolves it.
-      pollResult = await pollRust((handle) => {
-        uniffiIgnoreVoidResult(
-          pollFunc(rustFuture, uniffiFutureContinuationCallback, handle),
-          "rust future poll",
-        );
-      });
+      pollResult = await pollRust((handle) =>
+        pollFunc(rustFuture, uniffiFutureContinuationCallback, handle),
+      );
     } while (pollResult !== UNIFFI_RUST_FUTURE_POLL_READY);
 
     // Now it's ready, all we need to do is pick up the result (and error).
@@ -140,13 +137,25 @@ const UNIFFI_RUST_FUTURE_RESOLVER_MAP = new UniffiHandleMap<
 >();
 
 // pollRust makes a new promise, stores the resolver in the resolver map,
-// then calls the pollFunc with the handle.
+// then calls the pollFunc with the handle. A poll that throws or rejects (a
+// player over a port that trapped) never fires the continuation, so it rejects.
 async function pollRust(
-  pollFunc: (handle: UniffiHandle) => void,
+  pollFunc: (handle: UniffiHandle) => void | Promise<void>,
 ): Promise<number> {
-  return new Promise<number>((resolve) => {
+  return new Promise<number>((resolve, reject) => {
     const handle = UNIFFI_RUST_FUTURE_RESOLVER_MAP.insert(resolve);
-    pollFunc(handle);
+    const fail = (e: unknown) => {
+      UNIFFI_RUST_FUTURE_RESOLVER_MAP.remove(handle);
+      reject(e);
+    };
+    try {
+      const result = pollFunc(handle);
+      if (result && typeof result.then === "function") {
+        result.then(undefined, fail);
+      }
+    } catch (e) {
+      fail(e);
+    }
   });
 }
 

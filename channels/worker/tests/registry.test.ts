@@ -42,6 +42,18 @@ test("ids start at 1 and never repeat after release", () => {
   );
 });
 
+test("a function registered twice stays registered until released twice", () => {
+  const r = new CallbackRegistry();
+  const f = () => {};
+  const id = r.register(f, PLAN);
+  r.register(f, PLAN);
+  r.release(id);
+  assert.strictEqual(r.get(id)?.fn, f);
+  r.release(id);
+  assert.strictEqual(r.get(id), undefined);
+  assert.strictEqual(r.size, 0);
+});
+
 test("releasing an unknown id is a no-op", () => {
   const r = new CallbackRegistry();
   r.release(99);
