@@ -1,0 +1,10 @@
+[Custom]
+typedef string Guid;
+
+// Wrapping another custom type.
+[Custom]
+typedef Guid ANestedGuid;
+
+namespace ext_types_custom {
+    Guid get_guid(optional Guid? value);
+};

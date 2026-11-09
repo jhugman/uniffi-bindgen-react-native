@@ -7,108 +7,136 @@
 //   cargo test -p uniffi-fixture-ext-types -- jsi
 //   cargo test -p uniffi-fixture-ext-types -- wasm
 
-import { test } from "@/asserts";
+import { asyncTest, test } from "@/asserts";
 
-import module1 from "@/generated/custom_types";
-import module2, {
+import customNs, {
   getGuid,
   getNestedOuid,
   getOuid,
 } from "@/generated/ext_types_custom";
-import module3, {
+import extTypesNs, {
   CombinedType,
-  ExternalCrateInterfaceInterface,
   getCombinedType,
-  getExternalCrateInterface,
+  getRemoteObject,
   getImportedNestedGuid,
   getImportedOuid,
-  getMaybeUniffiOneEnum,
-  getMaybeUniffiOneEnums,
-  getMaybeUniffiOneType,
+  getMaybeSharedEnum,
+  getMaybeSharedEnums,
+  getMaybeSharedRecord,
   getMaybeUrl,
   getMaybeUrls,
   getNestedExternalOuid,
   getObjectsType,
-  getUniffiOneEnum,
-  getUniffiOneEnums,
-  getUniffiOneProcMacroType,
-  getUniffiOneTrait,
-  getUniffiOneType,
-  getUniffiOneTypes,
+  getSharedEnum,
+  getSharedEnums,
+  getSharedObject,
+  getSharedProcMacroRecord,
+  getSharedTrait,
+  getSharedRecord,
+  getSharedRecords,
   getUrl,
   getUrls,
   ObjectsType,
-} from "@/generated/imported_types_lib";
-import module4, {
+} from "@/generated/ext_types";
+import consumerNs, {
   callTraitImpl,
-  getSubType,
+  getConsumerRecord,
   getTraitImpl,
-  SubLibType,
-  throwUniffiOneError,
-} from "@/generated/imported_types_sublib";
-import module5, {
-  getMyProcMacroType,
-  UniffiOneEnum,
-  UniffiOneError,
-  UniffiOneProcMacroType,
-  UniffiOneTrait,
-  UniffiOneType,
-} from "@/generated/uniffi_one_ns";
+  ConsumerRecord,
+  throwSharedError,
+} from "@/generated/ext_types_consumer";
+import sharedNs, {
+  getProcMacroRecord,
+  SharedEnum,
+  SharedError,
+  SharedObject,
+  SharedProcMacroRecord,
+  SharedTrait,
+  SharedRecord,
+} from "@/generated/ext_types_shared";
 
 import "@/polyfills";
 import { URL } from "@/converters";
 
-module1.initialize();
-module2.initialize();
-module3.initialize();
-module4.initialize();
-module5.initialize();
+customNs.initialize();
+extTypesNs.initialize();
+consumerNs.initialize();
+sharedNs.initialize();
 
-// import imported_types_lib
-// import Foundation
-
-test("combinedType from lib", (t) => {
+test("CombinedType from ext_types round-trips", (t) => {
   const ct: CombinedType = getCombinedType(undefined);
-  t.assertEqual(ct.uot.sval, "hello");
+  t.assertEqual(ct.sharedRecord.sval, "hello");
   t.assertEqual(ct.guid, "a-guid");
   t.assertEqual(ct.url, new URL("http://example.com/"));
-  t.assertEqual(ct.ecd.sval, "ecd");
+  t.assertEqual(ct.remoteRecord.sval, "remote");
 
   const ct2 = getCombinedType(ct);
   t.assertEqual(ct, ct2);
+
+  // Every Option set and every Vec non-empty, so the external converters
+  // run inside Option and Vec.
+  const full: CombinedType = {
+    ...ct,
+    maybeSharedRecord: SharedRecord.create({ sval: "maybe" }),
+    urls: [new URL("http://example.com/a"), new URL("http://example.com/b")],
+    maybeUrl: new URL("http://example.com/maybe"),
+    maybeGuid: "maybe-guid",
+  };
+  t.assertEqual(getCombinedType(full), full);
 });
 
-test("Getting a UniffiOneTrait from uniffi-one-ns, from getTraitImpl function in sublib", (t) => {
-  const ti: UniffiOneTrait = getTraitImpl();
-  t.assertEqual(ti.hello(), "sub-lib trait impl says hello");
-  const sub = SubLibType.create({
-    maybeEnum: undefined,
-    maybeTrait: ti,
-    maybeInterface: undefined,
-  });
-  t.assertNotNull(getSubType(sub).maybeTrait);
+test("SharedObject from ext_types_shared, made by ext_types", (t) => {
+  const o = getSharedObject();
+  t.assertEqual(o.increment(), 1);
+  t.assertEqual(o.increment(), 2);
 });
 
-test("UniffiOneTrait from uniffi-one-ns, ObjectsType record from lib, SubLibType record from sublib passing sublib object", (t) => {
+test("SharedObject made in TypeScript, held by ext_types_consumer and ext_types", (t) => {
+  const obj = new SharedObject();
+  t.assertEqual(obj.increment(), 1);
+
+  const consumer = getConsumerRecord(
+    ConsumerRecord.create({
+      maybeEnum: undefined,
+      maybeTrait: undefined,
+      maybeObject: obj,
+    }),
+  );
+  t.assertNotNull(consumer.maybeObject);
+  t.assertEqual(consumer.maybeObject!.increment(), 2);
+
+  const ob = getObjectsType(
+    ObjectsType.create({
+      maybeTrait: undefined,
+      maybeObject: obj,
+      consumer,
+    }),
+  );
+  t.assertNotNull(ob.maybeObject);
+  t.assertEqual(ob.maybeObject!.increment(), 3);
+  t.assertEqual(obj.increment(), 4);
+});
+
+test("SharedTrait from ext_types_shared, ObjectsType from ext_types, ConsumerRecord from ext_types_consumer passing a consumer object", (t) => {
   const ti = getTraitImpl();
-  const sub = SubLibType.create({
+  const consumer = ConsumerRecord.create({
     maybeEnum: undefined,
     maybeTrait: ti,
-    maybeInterface: undefined,
+    maybeObject: undefined,
   });
 
   const ob = ObjectsType.create({
     maybeTrait: ti,
-    maybeInterface: undefined,
-    sub,
+    maybeObject: undefined,
+    consumer,
   });
 
-  t.assertNull(getObjectsType(undefined).maybeInterface);
+  t.assertNull(getObjectsType(undefined).maybeObject);
   t.assertNotNull(getObjectsType(ob).maybeTrait);
-  t.assertNull(getUniffiOneTrait(undefined));
+  t.assertNull(getSharedTrait(undefined));
 });
 
-test("getUrl from lib using custom-type from custom-types-example", (t) => {
+test("Url from ext_types_custom round-trips through ext_types", (t) => {
   const url = new URL("http://example.com/");
   t.assertEqual(getUrl(url), url);
   t.assertEqual(getMaybeUrl(url), url);
@@ -117,7 +145,7 @@ test("getUrl from lib using custom-type from custom-types-example", (t) => {
   t.assertEqual(getMaybeUrls([url, undefined]), [url, undefined]);
 });
 
-test("Calling in to custom-types-example and lib", (t) => {
+test("Guid and Ouid from ext_types_custom, and the custom types ext_types builds on them", (t) => {
   t.assertEqual(getGuid("guid"), "guid");
   t.assertEqual(getOuid("ouid"), "ouid");
   t.assertEqual(getImportedOuid("ouid"), "ouid");
@@ -126,65 +154,106 @@ test("Calling in to custom-types-example and lib", (t) => {
   t.assertEqual(getNestedExternalOuid(undefined), "nested-external-ouid");
 });
 
-test("UniffiOneType record from uniffi-one, roundtrip function from lib", (t) => {
+test("SharedRecord from ext_types_shared round-trips through ext_types", (t) => {
   t.assertEqual(
-    getUniffiOneType(UniffiOneType.create({ sval: "hello" })).sval,
+    getSharedRecord(SharedRecord.create({ sval: "hello" })).sval,
     "hello",
   );
   t.assertEqual(
-    getMaybeUniffiOneType(UniffiOneType.create({ sval: "hello" }))?.sval,
+    getMaybeSharedRecord(SharedRecord.create({ sval: "hello" }))?.sval,
     "hello",
   );
-  t.assertNull(getMaybeUniffiOneType(undefined));
-  t.assertEqual(getUniffiOneTypes([UniffiOneType.create({ sval: "hello" })]), [
-    UniffiOneType.create({ sval: "hello" }),
+  t.assertNull(getMaybeSharedRecord(undefined));
+  t.assertEqual(getSharedRecords([SharedRecord.create({ sval: "hello" })]), [
+    SharedRecord.create({ sval: "hello" }),
   ]);
   t.assertEqual(
-    getMyProcMacroType(UniffiOneProcMacroType.create({ sval: "proc-macros" }))
+    getProcMacroRecord(SharedProcMacroRecord.create({ sval: "proc-macros" }))
       .sval,
     "proc-macros",
   );
 });
 
-test("UniffiOneEnum enum from uniffi-one, roundtrip function from lib", (t) => {
-  t.assertEqual(getUniffiOneEnum(UniffiOneEnum.One), UniffiOneEnum.One);
-  t.assertEqual(getMaybeUniffiOneEnum(UniffiOneEnum.One), UniffiOneEnum.One);
-  t.assertNull(getMaybeUniffiOneEnum(undefined));
-  t.assertEqual(getUniffiOneEnums([UniffiOneEnum.One, UniffiOneEnum.Two]), [
-    UniffiOneEnum.One,
-    UniffiOneEnum.Two,
+test("SharedEnum from ext_types_shared round-trips through ext_types", (t) => {
+  t.assertEqual(getSharedEnum(SharedEnum.One), SharedEnum.One);
+  t.assertEqual(getMaybeSharedEnum(SharedEnum.One), SharedEnum.One);
+  t.assertNull(getMaybeSharedEnum(undefined));
+  t.assertEqual(getSharedEnums([SharedEnum.One, SharedEnum.Two]), [
+    SharedEnum.One,
+    SharedEnum.Two,
   ]);
-  t.assertEqual(getMaybeUniffiOneEnums([UniffiOneEnum.One, undefined]), [
-    UniffiOneEnum.One,
+  t.assertEqual(getMaybeSharedEnums([SharedEnum.One, undefined]), [
+    SharedEnum.One,
     undefined,
   ]);
 });
 
-test("ExternalCrateInterface interface from uniffi-one-ns, roundtrip function from lib", (t) => {
-  const foo: ExternalCrateInterfaceInterface = getExternalCrateInterface("foo");
-  t.assertEqual(getExternalCrateInterface("foo").value(), "foo");
+test("RemoteObject from ext_types_remote, made by ext_types", (t) => {
+  t.assertEqual(getRemoteObject("foo").value(), "foo");
 });
 
-test("proc-macro fron uniffi-one-ns roundtripping via functions in lib", (t) => {
-  const t1 = UniffiOneProcMacroType.create({ sval: "hello" });
-  t.assertEqual(getUniffiOneProcMacroType(t1), t1);
-  t.assertEqual(getMyProcMacroType(t1), t1);
+test("SharedProcMacroRecord from ext_types_shared round-trips through ext_types and ext_types_shared", (t) => {
+  const t1 = SharedProcMacroRecord.create({ sval: "hello" });
+  t.assertEqual(getSharedProcMacroRecord(t1), t1);
+  t.assertEqual(getProcMacroRecord(t1), t1);
 });
 
-test("an error from uniffi one is used by another crate", (t) => {
-  t.assertThrows(UniffiOneError.instanceOf, () => {
-    throwUniffiOneError();
+test("SharedError from ext_types_shared is thrown by ext_types_consumer", (t) => {
+  t.assertThrows(SharedError.instanceOf, () => {
+    throwSharedError();
   });
 });
 
-test("TypeScript implementing an external trait works", (t) => {
-  const tsImpl: UniffiOneTrait = {
-    hello(): string {
-      return "hello from TypeScript implementing external trait";
+(async () => {
+  await asyncTest(
+    "SharedTrait from ext_types_shared, from getTraitImpl in ext_types_consumer",
+    async (t) => {
+      const ti: SharedTrait = getTraitImpl();
+      t.assertEqual(await ti.hello(), "consumer trait impl says hello");
+      const consumer = ConsumerRecord.create({
+        maybeEnum: undefined,
+        maybeTrait: ti,
+        maybeObject: undefined,
+      });
+      const fromConsumer = getConsumerRecord(consumer).maybeTrait;
+      t.assertNotNull(fromConsumer);
+      t.assertEqual(
+        await fromConsumer!.hello(),
+        "consumer trait impl says hello",
+      );
+
+      const ob = ObjectsType.create({
+        maybeTrait: ti,
+        maybeObject: undefined,
+        consumer,
+      });
+      const fromObjects = getObjectsType(ob).maybeTrait;
+      t.assertNotNull(fromObjects);
+      t.assertEqual(
+        await fromObjects!.hello(),
+        "consumer trait impl says hello",
+      );
+
+      const viaShared = getSharedTrait(ti);
+      t.assertNotNull(viaShared);
+      t.assertEqual(await viaShared!.hello(), "consumer trait impl says hello");
+      t.end();
     },
-  };
-  t.assertEqual(
-    callTraitImpl(tsImpl),
-    "hello from TypeScript implementing external trait",
   );
-});
+
+  await asyncTest(
+    "TypeScript implementing an external trait works",
+    async (t) => {
+      const tsImpl: SharedTrait = {
+        async hello(): Promise<string> {
+          return "hello from TypeScript implementing external trait";
+        },
+      };
+      t.assertEqual(
+        await callTraitImpl(tsImpl),
+        "hello from TypeScript implementing external trait",
+      );
+      t.end();
+    },
+  );
+})();

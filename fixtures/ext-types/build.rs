@@ -5,5 +5,5 @@
  */
 
 fn main() {
-    uniffi::generate_scaffolding("src/ext-types-lib.udl").unwrap();
+    uniffi::generate_scaffolding("src/ext_types.udl").unwrap();
 }

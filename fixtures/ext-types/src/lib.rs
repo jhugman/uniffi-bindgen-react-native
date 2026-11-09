@@ -7,27 +7,22 @@
 #[cfg(target_arch = "wasm32")]
 extern crate uniffi_runtime_wasm as _;
 
-use custom_types::Handle;
-use ext_types_custom::{ANestedGuid, Guid, Ouid};
-use ext_types_external_crate::{
-    ExternalCrateDictionary, ExternalCrateInterface, ExternalCrateNonExhaustiveEnum,
+use ext_types_consumer::ConsumerRecord;
+use ext_types_custom::{ANestedGuid, Guid, Ouid, Url};
+use ext_types_remote::{RemoteEnum, RemoteObject, RemoteRecord};
+use ext_types_shared::{
+    SharedEnum, SharedObject, SharedProcMacroRecord, SharedRecord, SharedTrait,
 };
 use std::sync::Arc;
-use uniffi_one::{
-    UniffiOneEnum, UniffiOneInterface, UniffiOneProcMacroType, UniffiOneTrait, UniffiOneType,
-    UniffiOneUDLTrait,
-};
-use uniffi_sublib::SubLibType;
-use url::Url;
 
 // Remote types require a macro call in the Rust source
-uniffi::use_remote_type!(custom_types::Url);
+uniffi::use_remote_type!(ext_types_custom::Url);
 
 pub struct CombinedType {
-    pub uoe: UniffiOneEnum,
-    pub uot: UniffiOneType,
-    pub uots: Vec<UniffiOneType>,
-    pub maybe_uot: Option<UniffiOneType>,
+    pub shared_enum: SharedEnum,
+    pub shared_record: SharedRecord,
+    pub shared_records: Vec<SharedRecord>,
+    pub maybe_shared_record: Option<SharedRecord>,
 
     pub guid: Guid,
     pub guids: Vec<Guid>,
@@ -37,29 +32,25 @@ pub struct CombinedType {
     pub urls: Vec<Url>,
     pub maybe_url: Option<Url>,
 
-    pub handle: Handle,
-    pub handles: Vec<Handle>,
-    pub maybe_handle: Option<Handle>,
-
-    pub ecd: ExternalCrateDictionary,
-    pub ecnee: ExternalCrateNonExhaustiveEnum,
+    pub remote_record: RemoteRecord,
+    pub remote_enum: RemoteEnum,
 }
 
 fn get_combined_type(existing: Option<CombinedType>) -> CombinedType {
     existing.unwrap_or_else(|| CombinedType {
-        uoe: UniffiOneEnum::One,
-        uot: UniffiOneType {
+        shared_enum: SharedEnum::One,
+        shared_record: SharedRecord {
             sval: "hello".to_string(),
         },
-        uots: vec![
-            UniffiOneType {
+        shared_records: vec![
+            SharedRecord {
                 sval: "first of many".to_string(),
             },
-            UniffiOneType {
+            SharedRecord {
                 sval: "second of many".to_string(),
             },
         ],
-        maybe_uot: None,
+        maybe_shared_record: None,
 
         guid: Guid("a-guid".into()),
         guids: vec![Guid("b-guid".into()), Guid("c-guid".into())],
@@ -69,12 +60,10 @@ fn get_combined_type(existing: Option<CombinedType>) -> CombinedType {
         urls: vec![],
         maybe_url: None,
 
-        handle: Handle(123),
-        handles: vec![Handle(1), Handle(2), Handle(3)],
-        maybe_handle: Some(Handle(4)),
-
-        ecd: ExternalCrateDictionary { sval: "ecd".into() },
-        ecnee: ExternalCrateNonExhaustiveEnum::One,
+        remote_record: RemoteRecord {
+            sval: "remote".into(),
+        },
+        remote_enum: RemoteEnum::One,
     })
 }
 
@@ -82,9 +71,9 @@ fn get_combined_type(existing: Option<CombinedType>) -> CombinedType {
 // (b) it's not currently possible to refer to external traits in UDL.
 #[derive(Default, uniffi::Record)]
 pub struct ObjectsType {
-    pub maybe_trait: Option<Arc<dyn UniffiOneTrait>>,
-    pub maybe_interface: Option<Arc<UniffiOneInterface>>,
-    pub sub: SubLibType,
+    pub maybe_trait: Option<Arc<dyn SharedTrait>>,
+    pub maybe_object: Option<Arc<SharedObject>>,
+    pub consumer: ConsumerRecord,
 }
 
 #[uniffi::export]
@@ -110,11 +99,6 @@ fn get_maybe_urls(urls: Vec<Option<Url>>) -> Vec<Option<Url>> {
 }
 
 #[uniffi::export]
-fn get_imported_guid(guid: Guid) -> Guid {
-    guid
-}
-
-#[uniffi::export]
 fn get_imported_ouid(ouid: Ouid) -> Ouid {
     ouid
 }
@@ -124,19 +108,6 @@ fn get_imported_ouid(ouid: Ouid) -> Ouid {
 fn get_imported_nested_guid(guid: Option<ANestedGuid>) -> ANestedGuid {
     guid.unwrap_or_else(|| ANestedGuid(Guid("nested".to_string())))
 }
-
-#[uniffi::export]
-fn get_imported_nested_ouid(guid: Option<ANestedGuid>) -> ANestedGuid {
-    guid.unwrap_or_else(|| ANestedGuid(Guid("nested".to_string())))
-}
-
-pub struct NestedExternalGuid(pub Guid);
-
-#[uniffi::export]
-fn get_nested_external_guid(nguid: Option<NestedExternalGuid>) -> NestedExternalGuid {
-    nguid.unwrap_or_else(|| NestedExternalGuid(Guid("nested-external".to_string())))
-}
-uniffi::custom_newtype!(NestedExternalGuid, Guid);
 
 // A local custom type wrapping an external imported procmacro type
 pub struct NestedExternalOuid(pub Ouid);
@@ -148,60 +119,50 @@ fn get_nested_external_ouid(ouid: Option<NestedExternalOuid>) -> NestedExternalO
 }
 
 // A struct
-fn get_uniffi_one_type(t: UniffiOneType) -> UniffiOneType {
+fn get_shared_record(t: SharedRecord) -> SharedRecord {
     t
 }
 
-fn get_uniffi_one_types(ts: Vec<UniffiOneType>) -> Vec<UniffiOneType> {
+fn get_shared_records(ts: Vec<SharedRecord>) -> Vec<SharedRecord> {
     ts
 }
 
-fn get_maybe_uniffi_one_type(t: Option<UniffiOneType>) -> Option<UniffiOneType> {
+fn get_maybe_shared_record(t: Option<SharedRecord>) -> Option<SharedRecord> {
     t
-}
-
-fn get_maybe_uniffi_one_types(ts: Vec<Option<UniffiOneType>>) -> Vec<Option<UniffiOneType>> {
-    ts
 }
 
 // An enum
-fn get_uniffi_one_enum(e: UniffiOneEnum) -> UniffiOneEnum {
+fn get_shared_enum(e: SharedEnum) -> SharedEnum {
     e
 }
 
-fn get_uniffi_one_enums(es: Vec<UniffiOneEnum>) -> Vec<UniffiOneEnum> {
+fn get_shared_enums(es: Vec<SharedEnum>) -> Vec<SharedEnum> {
     es
 }
 
-fn get_maybe_uniffi_one_enum(e: Option<UniffiOneEnum>) -> Option<UniffiOneEnum> {
+fn get_maybe_shared_enum(e: Option<SharedEnum>) -> Option<SharedEnum> {
     e
 }
 
-fn get_maybe_uniffi_one_enums(es: Vec<Option<UniffiOneEnum>>) -> Vec<Option<UniffiOneEnum>> {
+fn get_maybe_shared_enums(es: Vec<Option<SharedEnum>>) -> Vec<Option<SharedEnum>> {
     es
 }
 
-fn get_uniffi_one_interface() -> Arc<UniffiOneInterface> {
-    Arc::new(UniffiOneInterface::new())
+fn get_shared_object() -> Arc<SharedObject> {
+    Arc::new(SharedObject::new())
 }
 
 #[uniffi::export]
-fn get_uniffi_one_trait(t: Option<Arc<dyn UniffiOneTrait>>) -> Option<Arc<dyn UniffiOneTrait>> {
+fn get_shared_trait(t: Option<Arc<dyn SharedTrait>>) -> Option<Arc<dyn SharedTrait>> {
     t
 }
 
-fn get_uniffi_one_proc_macro_type(t: UniffiOneProcMacroType) -> UniffiOneProcMacroType {
+fn get_shared_proc_macro_record(t: SharedProcMacroRecord) -> SharedProcMacroRecord {
     t
 }
 
-fn get_external_crate_interface(val: String) -> Arc<ExternalCrateInterface> {
-    Arc::new(ExternalCrateInterface::new(val))
+fn get_remote_object(val: String) -> Arc<RemoteObject> {
+    Arc::new(RemoteObject::new(val))
 }
 
-fn get_uniffi_one_udl_trait(
-    t: Option<Arc<dyn UniffiOneUDLTrait>>,
-) -> Option<Arc<dyn UniffiOneUDLTrait>> {
-    t
-}
-
-uniffi::include_scaffolding!("ext-types-lib");
+uniffi::include_scaffolding!("ext_types");

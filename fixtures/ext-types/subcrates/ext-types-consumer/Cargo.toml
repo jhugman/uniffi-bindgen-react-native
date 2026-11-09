@@ -1,0 +1,16 @@
+[package]
+name = "uniffi-fixture-ext-types-consumer"
+edition = "2021"
+version = "0.22.0"
+authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
+license = "MPL-2.0"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "ext_types_consumer"
+
+[dependencies]
+async-trait = "0.1"
+uniffi = { workspace = true }
+uniffi-fixture-ext-types-shared = {path = "../ext-types-shared"}

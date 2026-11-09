@@ -5,24 +5,24 @@
  */
 // This crate does not use UniFFI, but it exposes some types which are used by crates which do.
 // This type is referenced as an "external" type as a dictionary.
-pub struct ExternalCrateDictionary {
+pub struct RemoteRecord {
     pub sval: String,
 }
 
-pub struct ExternalCrateInterface {
+pub struct RemoteObject {
     pub sval: String,
 }
 
 #[non_exhaustive]
-pub enum ExternalCrateNonExhaustiveEnum {
+pub enum RemoteEnum {
     One,
     Two,
 }
 
 // This type is referenced as an "external" type as an interface.
-impl ExternalCrateInterface {
+impl RemoteObject {
     pub fn new(sval: String) -> Self {
-        ExternalCrateInterface { sval }
+        RemoteObject { sval }
     }
 
     pub fn value(&self) -> String {

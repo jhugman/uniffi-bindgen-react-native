@@ -11,10 +11,10 @@ import { asyncTest, test } from "@/asserts";
 import bindings, {
   uniffiInitAsync,
   CombinedType,
-  UniffiOneEnum,
-  UniffiOneType,
+  SharedEnum,
+  SharedRecord,
   getCombinedType,
-  getUniffiOneEnum,
+  getSharedEnum,
 } from "@/generated";
 
 import "@/polyfills";
@@ -27,33 +27,34 @@ asyncTest("uniffiInitAsync is idempotent", async (t) => {
   t.end();
 });
 
-test("namespaced default exposes all 5 namespaces", (t) => {
-  t.assertNotNull(bindings.custom_types);
-  t.assertNotNull(bindings.ext_types_custom);
-  t.assertNotNull(bindings.imported_types_lib);
-  t.assertNotNull(bindings.imported_types_sublib);
-  t.assertNotNull(bindings.uniffi_one_ns);
+test("namespaced default exposes all 4 namespaces", (t) => {
+  t.assertEqual(Object.keys(bindings).sort(), [
+    "ext_types",
+    "ext_types_consumer",
+    "ext_types_custom",
+    "ext_types_shared",
+  ]);
 });
 
 test("call a function via the namespaced default", (t) => {
-  // imported_types_lib.getCombinedType is exposed as a named export of
-  // imported_types_lib.ts and therefore appears on the namespace object.
-  const ct = bindings.imported_types_lib.getCombinedType(undefined);
-  t.assertEqual(ct.uot.sval, "hello");
+  // ext_types.getCombinedType is exposed as a named export of
+  // ext_types.ts and therefore appears on the namespace object.
+  const ct = bindings.ext_types.getCombinedType(undefined);
+  t.assertEqual(ct.sharedRecord.sval, "hello");
 });
 
-test("call a function via re-exported name (export * across 5 namespaces)", (t) => {
+test("call a function via re-exported name (export * across 4 namespaces)", (t) => {
   const ct: CombinedType = getCombinedType(undefined);
-  t.assertEqual(ct.uot.sval, "hello");
+  t.assertEqual(ct.sharedRecord.sval, "hello");
 
-  // Pull a value from a different namespace (uniffi_one_ns) via re-export
-  // to prove all 5 namespaces flatten without collision.
-  t.assertEqual(getUniffiOneEnum(UniffiOneEnum.One), UniffiOneEnum.One);
+  // Pull a value from a different namespace (ext_types_shared) via re-export
+  // to prove all 4 namespaces flatten without collision.
+  t.assertEqual(getSharedEnum(SharedEnum.One), SharedEnum.One);
 });
 
-test("UniffiOneType from re-export round-trips", (t) => {
-  const v = UniffiOneType.create({ sval: "world" });
+test("SharedRecord from re-export round-trips", (t) => {
+  const v = SharedRecord.create({ sval: "world" });
   // round-trip via the namespaced default
-  const back = bindings.imported_types_lib.getUniffiOneType(v);
+  const back = bindings.ext_types.getSharedRecord(v);
   t.assertEqual(back.sval, "world");
 });
