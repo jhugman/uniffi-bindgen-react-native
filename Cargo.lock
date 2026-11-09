@@ -2049,6 +2049,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "uniffi-fixture-async-channel"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "thiserror 1.0.69",
+ "tokio",
+ "ubrn_fixture_testing",
+ "ubrn_macros",
+ "ubrn_testing",
+ "uniffi",
+ "uniffi-runtime-wasm",
+ "uniffi_core",
+]
+
+[[package]]
 name = "uniffi-fixture-async-traits"
 version = "0.21.0"
 dependencies = [
