@@ -33,7 +33,13 @@ const PUBLISH_FIELDS = [
   "publishConfig",
 ];
 
-const COPY_FILES = ["index.js", "lib.js", "index.d.ts", "README.md"];
+const COPY_FILES = [
+  "index.js",
+  "lib.js",
+  "lib.d.ts",
+  "index.d.ts",
+  "README.md",
+];
 
 const pkgDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const rootDir = join(pkgDir, "npm", "root");

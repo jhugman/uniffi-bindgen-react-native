@@ -15,11 +15,17 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     let p = crate::wasm2::prepare(crate_name, target_tmpdir, crate::Flavor::AsyncWasm);
     let test_script = Utf8Path::new(test_script);
     let bootstrap = write_node_bootstrap(&p.ts_dir, &p.lib_stem);
-    let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
-        &p.fixture_dir,
-        crate::Flavor::AsyncWasm,
+    let out_dir = Utf8Path::new(target_tmpdir).join(format!(
+        "ubrn-tests/{crate_name}-{}-async-wasm",
+        test_script.file_stem().unwrap_or("test")
     ));
-    crate::run_tsx_with_preload(test_script, &bootstrap);
+    let tsconfig = crate::prepare_tsx(
+        test_script,
+        &out_dir,
+        Some(&p.ts_dir),
+        crate::Flavor::AsyncWasm,
+    );
+    crate::run_tsx_with_preload(test_script, &bootstrap, &tsconfig);
 }
 
 const WORKER_FILE: &str = "uniffi-worker.async-wasm.ts";
@@ -172,7 +178,7 @@ fn write_worker(ts_dir: &Utf8Path, lib_stem: &str) {
     let mut src = format!(
         "import {{ workerData }} from \"node:worker_threads\";\n\
          import {{ openWasm }} from \"@ubjs/wasm\";\n\
-         import {{ createReceiver }} from \"@ubjs/worker\";\n\
+         import {{ createReceiver, type RegisteredPlayer }} from \"@ubjs/worker\";\n\
          import {{ DEFINITIONS }} from \"./{DEFINITIONS_MODULE}.js\";\n"
     );
     if glue {
@@ -180,7 +186,9 @@ fn write_worker(ts_dir: &Utf8Path, lib_stem: &str) {
     }
     src.push_str(&format!(
         "const wasm = await openWasm(new URL(\"./{lib_stem}.wasm\", import.meta.url){});\n\
-         createReceiver(DEFINITIONS, wasm.registerSync(DEFINITIONS), workerData.port);\n",
+         // `registerSync` is typed as a bare record but carries the rustbuffer helpers.\n\
+         const player = wasm.registerSync(DEFINITIONS) as RegisteredPlayer;\n\
+         createReceiver(DEFINITIONS, player, workerData.port);\n",
         if glue {
             format!(", {{ resolveModule: async (n) => n.endsWith(\"{lib_stem}_bg.js\") ? glue : undefined }}")
         } else {

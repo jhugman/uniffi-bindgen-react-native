@@ -6,15 +6,14 @@
 {%- if !module.strict_type_checking %}
 // @ts-nocheck
 {%- endif %}
+import type { UniffiResult, UniffiRustCallStatus } from "@ubjs/core";
 {%- if module.is_jsi %}
 
 import {
   type StructuralEquality as UniffiStructuralEquality,
   type UniffiForeignFuture as RuntimeUniffiForeignFuture,
-  type UniffiRustCallStatus,
   type UniffiGcObject,
   type UniffiRustFutureContinuationCallback as RuntimeUniffiRustFutureContinuationCallback,
-  type UniffiResult,
  } from '@ubjs/core';
 
 interface NativeModuleInterface {
