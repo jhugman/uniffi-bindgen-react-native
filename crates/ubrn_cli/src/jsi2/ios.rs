@@ -208,6 +208,8 @@ fn info_plist(lib_name: &str, folder: &str, config: &ProjectConfig) -> String {
     // are snake_case.
     let bundle_id = format!("{}.{}", jsi2.bundle_id_prefix(), lib_name.replace('_', "-"));
     let version = config.project_version();
+    // Apple bundle versions cannot contain SemVer prerelease/build suffixes.
+    let version = version.split(['-', '+']).next().unwrap();
     let min = &jsi2.min_ios_version;
     let platform = supported_platform(folder);
     format!(
@@ -238,5 +240,29 @@ fn supported_platform(folder: &str) -> &'static str {
         f if f == Platform::IosSimulator.lib_folder_name() => "iPhoneSimulator",
         f if f == Platform::Macos.lib_folder_name() => "MacOSX",
         _ => "iPhoneOS",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn framework_versions_omit_semver_suffixes() {
+        for version in ["0.31.0", "0.31.0-7", "0.31.0+build.7", "0.31.0-7+build.8"] {
+            let config: ProjectConfig = serde_json::from_value(serde_json::json!({
+                "version": version,
+                "rust": { "directory": "rust/shim" }
+            }))
+            .unwrap();
+            for folder in ["ios", "ios-simulator"] {
+                let plist = info_plist("example", folder, &config);
+                assert!(
+                    plist.contains("<key>CFBundleShortVersionString</key><string>0.31.0</string>"),
+                    "{version}: {plist}"
+                );
+                assert_eq!(config.project_version(), version);
+            }
+        }
     }
 }

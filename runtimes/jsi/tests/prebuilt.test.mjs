@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,6 +38,22 @@ test("prebuilt/ carries every slice the publish tarball ships", () => {
 // xcframework. A missing slice is the existence test's business, so skip it
 // here rather than failing twice.
 const onMacOS = process.platform === "darwin" ? test : test.skip;
+onMacOS("framework versions satisfy App Store requirements", () => {
+  const { version } = JSON.parse(
+    readFileSync(join(pkgDir, "package.json"), "utf8"),
+  );
+  for (const slice of frameworkExecutables) {
+    const plist = join(pkgDir, "prebuilt", dirname(slice), "Info.plist");
+    const bundleVersion = execFileSync(
+      "plutil",
+      ["-extract", "CFBundleShortVersionString", "raw", "-o", "-", plist],
+      { encoding: "utf8" },
+    ).trim();
+    assert.match(bundleVersion, /^\d+\.\d+\.\d+$/);
+    assert.equal(bundleVersion, version.split(/[-+]/, 1)[0]);
+  }
+});
+
 onMacOS("each framework slice is a dylib the app loads by @rpath", async (t) => {
   for (const slice of frameworkExecutables) {
     const path = join(pkgDir, "prebuilt", slice);
