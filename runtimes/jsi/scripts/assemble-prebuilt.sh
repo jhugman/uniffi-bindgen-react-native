@@ -10,7 +10,9 @@ IN="${1:-$HERE/artifacts}"
 OUT="$HERE/prebuilt"
 NAME=UniffiRuntimeJsi
 MIN_IOS_VERSION=15.1
-VERSION=$(node -p 'require(process.argv[1]).version' "$HERE/package.json")
+# Apple bundle versions must be three numeric components. Keep the full SemVer
+# for npm, but omit prerelease/build suffixes from CFBundleShortVersionString.
+VERSION=$(node -p 'require(process.argv[1]).version.split(/[-+]/, 1)[0]' "$HERE/package.json")
 
 abi_for() {
   case "$1" in
