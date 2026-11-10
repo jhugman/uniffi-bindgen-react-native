@@ -119,7 +119,8 @@ without pushing anything to a registry:
 
 ```admonish warning
 [`cocoapods.yml`](https://github.com/jhugman/uniffi-bindgen-react-native/actions/workflows/cocoapods.yml)
-has **no** dry-run input. Triggering it manually runs a real `pod trunk push`.
+has **no** dry-run input. Triggering it manually pushes to trunk for real,
+unless that version is already on trunk, when it does nothing.
 To only validate the podspec, run `pod spec lint uniffi-bindgen-react-native.podspec`
 locally instead.
 ```
@@ -136,7 +137,9 @@ Confirm each artifact actually went out:
   `@ubjs/node`, `@ubjs/wasm`, `@ubjs/worker` and `@ubjs/react-native`
 - crates.io: <https://crates.io/crates/uniffi-runtime-javascript/versions> and
   <https://crates.io/crates/uniffi-runtime-wasm/versions>
-- CocoaPods: `pod trunk info uniffi-bindgen-react-native`
+- CocoaPods: `pod trunk info uniffi-bindgen-react-native`. `pod trunk push`
+  often reports a failure after trunk has already recorded the version, so the
+  workflow judges the outcome by trunk's list of versions, not by the push.
 
 If a workflow fails part-way, re-run just that workflow from the Actions tab
 (`workflow_dispatch`, dry-run `false`) once the underlying problem is fixed —
