@@ -27,4 +27,4 @@ jobs:
       - name: Publish to CocoaPods
         env:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
-        run: pod trunk push uniffi-bindgen-react-native.podspec
+        run: .github/scripts/cocoapods-publish.sh

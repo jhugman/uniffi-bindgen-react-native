@@ -5,7 +5,50 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
-**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-6...main
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-7...main
+
+---
+
+# 0.31.0-7
+
+## ✨ What's New ✨
+
+### 🧵 `@ubjs/worker`: a `wasm2` library in a Web Worker
+
+A `wasm2` library can now run in a Web Worker, so its Rust work no longer blocks the page. The new [`@ubjs/worker`](https://www.npmjs.com/package/@ubjs/worker) package provides both ends of the channel. In the worker, `createReceiver` puts the `wasm2` player behind a `MessagePort`; on the page, `createSender` stands in for the player, and the generated bindings call it as they would the player itself. Both ends are built from the module's definitions table, whose types move into `@ubjs/core` so that every player and channel shares one table ([#466](https://github.com/jhugman/uniffi-bindgen-react-native/pull/466)).
+
+Bindings behind a port have to await every call. Set `asyncDelivery = true` in `uniffi.toml`, or pass `--async` to `ubrn generate wasm2 bindings`, and every function, method, constructor and `initialize()` returns a `Promise`. `asyncDelivery` implies `forceAsync`, and only `wasm2` accepts it for now ([#481](https://github.com/jhugman/uniffi-bindgen-react-native/pull/481)). [The reference](https://jhugman.github.io/uniffi-bindgen-react-native/reference/uniffi-toml.html#calling-the-player-asynchronously) shows what to call on each side of the worker; a library with several namespaces shares one channel between them.
+
+Each `await` costs one message out and one reply back, however many times Rust polls the future: the `wasm2` player now runs UniFFI's poll loop itself, so polling never crosses the port. Before that, every wake crossed to the page and back, and an IndexedDB transaction could auto-commit in the gap ([#495](https://github.com/jhugman/uniffi-bindgen-react-native/pull/495), [#506](https://github.com/jhugman/uniffi-bindgen-react-native/pull/506)). An `AbortSignal` crosses as a cancel message, and closing a sender cancels its calls still running in the worker.
+
+On an M-series Mac, an empty call through a Node worker costs about 23 µs, against 0.13 µs direct. In return, the longest stall on the main thread during 100 ms of Rust compute drops from 100 ms to 1.3 ms: the worker buys responsiveness, not throughput ([#484](https://github.com/jhugman/uniffi-bindgen-react-native/pull/484)).
+
+Two limits for now. A synchronous callback-interface method cannot be called over the channel, so make it `async fn` in Rust. And a `SharedWorker` can serve only one page for now: a second page would take over the first page's callbacks. The channel is tested end to end in Node `worker_threads`.
+
+## 🦊 What's Changed
+
+### Fixes
+
+- `jsi` flavour: `UniffiCallInvoker` now hands each callback the JS runtime that React Native's `CallInvoker` supplies, through the runtime-aware `CallFunc` overload, rather than the runtime captured from the caller ([#490](https://github.com/jhugman/uniffi-bindgen-react-native/pull/490), fixing [#423](https://github.com/jhugman/uniffi-bindgen-react-native/issues/423)). Thank you [@kosumic](https://github.com/kosumic)!
+
+### Documentation
+
+- The React Native getting-started guide now edits `example/index.js`, not the nonexistent `example/input.js` ([#493](https://github.com/jhugman/uniffi-bindgen-react-native/pull/493)). Thank you [@ZeroStride](https://github.com/ZeroStride)!
+- Whip joins the list of projects using `uniffi-bindgen-react-native` ([#494](https://github.com/jhugman/uniffi-bindgen-react-native/pull/494)). Thank you [@kosumic](https://github.com/kosumic)!
+
+### Testing and CI
+
+- A new `AsyncWasm` fixture flavour runs `--async` bindings against the `wasm2` player in a Node worker, over a real `MessagePort`. Fixtures that run there get an `_async` twin of their test script, and a new `async-channel` fixture covers what only an async player can get wrong: handles cloned fire-and-forget, callbacks crossing a port, and futures cancelled mid-flight ([#482](https://github.com/jhugman/uniffi-bindgen-react-native/pull/482), [#483](https://github.com/jhugman/uniffi-bindgen-react-native/pull/483), [#484](https://github.com/jhugman/uniffi-bindgen-react-native/pull/484), [#509](https://github.com/jhugman/uniffi-bindgen-react-native/pull/509)). The `ext-types` fixture now gives each crate one name ([#508](https://github.com/jhugman/uniffi-bindgen-react-native/pull/508)).
+- CI and local builds of this repo pin Rust 1.97.1 with `rust-toolchain.toml`, so a runner image bump no longer brings new clippy lints without warning ([#499](https://github.com/jhugman/uniffi-bindgen-react-native/pull/499)).
+- The JSI jobs build Hermes from `rn/0.84-stable`, which configures with CMake 4 ([#505](https://github.com/jhugman/uniffi-bindgen-react-native/pull/505)).
+- The CocoaPods publish job judges the outcome by trunk's list of versions rather than by `pod trunk push`, which reported a failure for each of the last three releases after the pod had published. Re-running it once the version is on trunk now does nothing ([#511](https://github.com/jhugman/uniffi-bindgen-react-native/pull/511)).
+- Maintainers can publish `@ubjs/core`, `@ubjs/wasm` and `@ubjs/worker` from any branch to [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) on demand, so another project can try unmerged work by commit ([#498](https://github.com/jhugman/uniffi-bindgen-react-native/pull/498)).
+
+## ⚠️ Breaking Changes
+
+- `wasm2` async functions now run through the player: each is one player entry that polls its future to completion, and the generated code calls that entry instead of driving the poll loop. Regenerate `wasm2` bindings and upgrade `@ubjs/wasm` and `@ubjs/core` together. New bindings on an older `@ubjs/wasm` fail with an `IncompatiblePlayer` error rather than misbehaving ([#506](https://github.com/jhugman/uniffi-bindgen-react-native/pull/506)). The other flavours are unchanged.
+
+**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-6...0.31.0-7
 
 ---
 
