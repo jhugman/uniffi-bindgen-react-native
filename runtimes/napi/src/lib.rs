@@ -55,6 +55,7 @@ use napi::bindgen_prelude::*;
 use napi::JsObject;
 use napi_derive::napi;
 
+mod buffers;
 mod call;
 mod callback;
 mod napi_utils;

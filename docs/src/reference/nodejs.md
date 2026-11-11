@@ -86,6 +86,10 @@ npm install @ubjs/node @ubjs/core
 
 The generated bindings import from `@ubjs/core` and use `@ubjs/node` to open and call into your `cdylib`. With `--lib-colocated`, place the compiled `cdylib` next to the generated JavaScript.
 
+### In Electron
+
+The same bindings run in Electron's main process and in its utility processes, which are Node environments too. Electron's V8 memory cage does not let JavaScript view memory that V8 did not allocate, so there the runtime copies each `RustBuffer` across instead of handing JavaScript a view of Rust's memory. On Node the view needs no copy. The runtime checks once, when a module registers, which of the two it is running in.
+
 ## Limitations
 
 - No `ubrn build node` / scaffolding command yet — you compile the `cdylib` and run `ubrn generate napi` yourself.
