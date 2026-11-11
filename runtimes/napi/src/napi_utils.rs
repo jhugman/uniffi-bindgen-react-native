@@ -24,28 +24,14 @@
 
 use std::ffi::c_void;
 
-use napi::{JsUnknown, NapiRaw};
-
 use uniffi_runtime_core::ffi_c_types::{
     ForeignBytesC, RustBufferC, RustBufferFreeFn, RustBufferFromBytesFn, RustCallStatusC,
 };
 
-/// A per-registration JS Symbol used as a hidden property key for stashing the
-/// underlying RustBuffer capacity on a `Uint8Array` that views library-owned memory.
+/// A per-registration JS Symbol used as a hidden property key for stashing a
+/// RustBuffer's capacity on the `Uint8Array` views the runtime hands out.
 ///
-/// Set on both kinds of library-owned view:
-///
-/// - **lift-handoff views** (a buffer Rust returned). The view's `byteLength` is `len` so
-///   converters that decode the whole view see only the message bytes, but the allocator
-///   needs `capacity` to free correctly when `capacity > len`.
-/// - **`rustbuffer_alloc` views**. Here `capacity == byteLength`, so the hint is redundant for
-///   freeing — but its *presence* is what marks the view as library-owned, which lets the
-///   argument-lowering path adopt the allocation instead of copying it.
-///
-/// Therefore the invariant is: **a hint is present if and only if the library owns the
-/// backing memory.** An ordinary V8-backed `Uint8Array` never carries one. A hint of `0`
-/// means the view was library-owned but has since been adopted by a callee, so the memory is
-/// gone and the view must not be used again.
+/// What each value means, and who frees what, is set out in [`crate::buffers`].
 ///
 /// The symbol is created once when the module registers and lives as long as the JS-side
 /// module facade.
@@ -430,6 +416,8 @@ pub unsafe fn rustbuffer_from_raw_bytes(
 
 /// Wrap externally-managed memory as a JS `Uint8Array` (via napi external ArrayBuffer).
 ///
+/// Only under [`crate::buffers::BufferViews::Alias`]: Electron's memory cage refuses it.
+///
 /// Unlike [`create_uint8array`], this **does not copy**: the returned typed array is a
 /// view directly over `data`. The caller is responsible for keeping the memory alive
 /// for as long as JS holds the view—we pass a no-op finalizer because the codegen-emitted
@@ -491,84 +479,6 @@ pub unsafe fn create_external_uint8array(
         ));
     }
     Ok(typedarray)
-}
-
-/// Convert a JS `Uint8Array` argument to a [`RustBufferC`] the callee can consume.
-///
-/// Two kinds of view arrive here, and they must be handled differently:
-///
-/// - **Library-owned views**, produced by `rustbuffer_alloc`. Codegen allocates one of these,
-///   fills it in place, and passes it straight through as the argument. It carries a capacity
-///   hint (see [`CapacitySymbol`]), and nothing else will ever free it: codegen frees returned
-///   buffers but never lowered arguments, and the view has a no-op finalizer. These are
-///   **adopted** — we hand the existing allocation to the callee, which frees it. Copying such
-///   a view instead would orphan the original and leak one whole payload per call.
-/// - **V8-owned arrays**, i.e. any ordinary `Uint8Array` from JS. These are not ours to give
-///   away, so they are **copied** into a fresh library allocation via `rustbuffer_from_bytes`.
-///
-/// The capacity marker is the discriminator: the runtime knows a buffer's capacity precisely
-/// when the library allocated it. On adoption the marker is reset to `0`, which makes any later
-/// `rustbuffer_free(view)` a no-op rather than a double free, since `free_rustbuffer` skips
-/// zero-capacity buffers.
-///
-/// The symbol is a required parameter, deliberately. It used to be an `Option`, and a caller
-/// with no symbol in scope could pass `None` to force the copy path — memory-safe in itself,
-/// but it silently orphaned every library-owned view that reached it, because nothing else
-/// frees a lowered argument. Requiring the symbol makes that a compile error instead of a
-/// leak, so a marshalling path added later cannot opt out by accident.
-///
-/// # Safety
-///
-/// - `raw_env` must be a valid `napi_env` for the current callback scope.
-/// - `js_val` must be a `napi_value` referring to a JS `TypedArray`.
-/// - `rb_from_bytes_ptr` must point to a valid `rustbuffer_from_bytes` function.
-pub unsafe fn js_uint8array_to_rust_buffer(
-    raw_env: napi::sys::napi_env,
-    js_val: JsUnknown,
-    rb_from_bytes_ptr: *const c_void,
-    capacity_symbol: &CapacitySymbol,
-) -> napi::Result<RustBufferC> {
-    // SAFETY: `raw()` drops the handle's lifetime tracking, so it needs the value
-    // to be live for the rest of this call — `js_val` is owned here and only read
-    // below, within the callback scope this function's contract names.
-    let raw_val = unsafe { js_val.raw() };
-    // SAFETY: raw_env is valid and raw_val refers to a TypedArray, per this function's contract.
-    let (data_ptr, length) =
-        unsafe { read_typedarray_data(raw_env, raw_val) }.ok_or_else(|| {
-            napi::Error::from_reason("Expected a Uint8Array argument for RustBuffer".to_string())
-        })?;
-
-    // An empty view owns no allocation, so there is nothing to adopt. `rustbuffer_alloc(0)`
-    // never sets a hint, and the copy path yields the correct empty `RustBufferC`.
-    if length == 0 {
-        // SAFETY: data_ptr/length came from read_typedarray_data above;
-        // rb_from_bytes_ptr is a valid rustbuffer_from_bytes per this function's contract.
-        return unsafe { rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr) };
-    }
-
-    // SAFETY: raw_env is valid and raw_val is a JS object (a TypedArray), per this function's contract.
-    if let Some(capacity) = unsafe { capacity_symbol.get(raw_env, raw_val) }? {
-        if capacity == 0 {
-            // The marker exists but has been zeroed, so this view was already adopted and
-            // its memory has since been freed by the callee. Reading it would be a
-            // use-after-free, so refuse rather than hand the callee a dangling pointer.
-            return Err(napi::Error::from_reason(
-                "RustBuffer argument was already consumed by a previous FFI call".to_string(),
-            ));
-        }
-        // SAFETY: raw_env is valid and raw_val is a JS object (a TypedArray), per this function's contract.
-        unsafe { capacity_symbol.set(raw_env, raw_val, 0) }?;
-        return Ok(RustBufferC {
-            capacity,
-            len: length as u64,
-            data: data_ptr as *mut u8,
-        });
-    }
-
-    // No marker: an ordinary V8-backed array from JS, which is not ours to give away.
-    // SAFETY: data_ptr/length came from read_typedarray_data above;
-    // rb_from_bytes_ptr is a valid rustbuffer_from_bytes per this function's contract.
-    unsafe { rustbuffer_from_raw_bytes(data_ptr, length, rb_from_bytes_ptr) }
 }
 
 /// Free a [`RustBufferC`] via the provided free function pointer.

@@ -768,7 +768,7 @@ unsafe fn write_js_return_to_bytes(
             // SAFETY: `raw_env` is a live handle for the current call scope;
             // `js_val` is a valid JS value per this function's contract on `desc`.
             let rb = unsafe {
-                napi_utils::js_uint8array_to_rust_buffer(
+                registration.buffer_views.lower(
                     raw_env,
                     js_val,
                     rb_from_bytes_ptr,
