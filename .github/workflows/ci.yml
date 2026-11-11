@@ -197,6 +197,10 @@ jobs:
       - name: Run runtime tests
         run: cd runtimes/napi && npm test
 
+      # Electron's V8 memory cage refuses external ArrayBuffers; ELECTRON_RUN_AS_NODE keeps it.
+      - name: Run runtime tests under Electron
+        run: cd runtimes/napi && npm run test:electron
+
       - name: Run bootstrap for N-API bindings
         run: cargo xtask bootstrap yarn
 
