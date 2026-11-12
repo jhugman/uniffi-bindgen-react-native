@@ -164,10 +164,64 @@ pub(super) fn rewrite_keywords(nm: String) -> String {
     }
 }
 
-/// Rename types that shadow JS globals (e.g. `Error` -> `Exception`).
+/// Standard JavaScript globals. A generated type with one of these names would shadow the global
+/// in the generated module, which relies on several of them (e.g. `Object.freeze`).
+static JS_GLOBALS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    HashSet::from([
+        "AggregateError",
+        "Array",
+        "ArrayBuffer",
+        "Atomics",
+        "BigInt",
+        "BigInt64Array",
+        "BigUint64Array",
+        "Boolean",
+        "DataView",
+        "Date",
+        "EvalError",
+        "FinalizationRegistry",
+        "Float32Array",
+        "Float64Array",
+        "Function",
+        "Int16Array",
+        "Int32Array",
+        "Int8Array",
+        "Intl",
+        "Iterator",
+        "JSON",
+        "Map",
+        "Math",
+        "Number",
+        "Object",
+        "Promise",
+        "Proxy",
+        "RangeError",
+        "ReferenceError",
+        "Reflect",
+        "RegExp",
+        "Set",
+        "SharedArrayBuffer",
+        "String",
+        "Symbol",
+        "SyntaxError",
+        "TypeError",
+        "URIError",
+        "Uint16Array",
+        "Uint32Array",
+        "Uint8Array",
+        "Uint8ClampedArray",
+        "WeakMap",
+        "WeakRef",
+        "WeakSet",
+    ])
+});
+
+/// Rename types that shadow JS globals: `Error` becomes `Exception`, and other standard globals
+/// get a trailing underscore, as reserved words do (`Object` -> `Object_`).
 pub(super) fn rewrite_js_builtins(nm: &str) -> String {
     match nm {
         "Error" => "Exception".to_string(),
+        _ if JS_GLOBALS.contains(nm) => format!("{nm}_"),
         _ => nm.to_string(),
     }
 }
@@ -200,5 +254,19 @@ pub(super) fn ffi_default_value_for(ffi_type: &general::FfiType) -> String {
         general::FfiType::Function(_) => "null".into(),
         general::FfiType::RustCallStatus => "uniffiCreateCallStatus()".into(),
         _ => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn js_globals_are_renamed() {
+        assert_eq!(rewrite_js_builtins("Error"), "Exception");
+        assert_eq!(rewrite_js_builtins("Object"), "Object_");
+        assert_eq!(rewrite_js_builtins("Map"), "Map_");
+        assert_eq!(rewrite_js_builtins("Promise"), "Promise_");
+        assert_eq!(rewrite_js_builtins("Tensor"), "Tensor");
     }
 }
