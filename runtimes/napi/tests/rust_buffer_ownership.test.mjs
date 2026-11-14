@@ -20,6 +20,7 @@ import assert from "node:assert";
 import lib from "../lib.js";
 const { UniffiNativeModule, FfiType } = lib;
 import { libPath } from "./helpers/lib-path.mjs";
+import { adoptsAllocViews } from "./helpers/external-buffers.mjs";
 
 const LIB_PATH = libPath("uniffi_napi_test_lib");
 
@@ -199,6 +200,64 @@ test("freeing an already-adopted argument view does not double free", () => {
   assert.strictEqual(after.count, before.count);
   assert.strictEqual(after.bytes, before.bytes);
 });
+
+test("a returned buffer passed back as an argument is released once", () => {
+  // Hand-written callers can do this. Where views alias Rust memory the second call adopts
+  // the returned allocation; under Electron the returned view is a copy, and is copied
+  // again. Either way every allocation is released exactly once.
+  const { nm, live } = openModule();
+  const before = live();
+
+  for (let i = 0; i < ITERATIONS; i++) {
+    const view = nm.rustbuffer_alloc(PAYLOAD_SIZE);
+    view.fill(i & 0xff);
+    const first = nm.uniffi_test_fn_echo_buffer(view, { code: 0 });
+    const second = nm.uniffi_test_fn_echo_buffer(first, { code: 0 });
+    assert.strictEqual(second.byteLength, PAYLOAD_SIZE);
+    assert.strictEqual(second[PAYLOAD_SIZE - 1], i & 0xff);
+    nm.rustbuffer_free(first);
+    nm.rustbuffer_free(second);
+  }
+
+  const after = live();
+  assert.strictEqual(after.count, before.count);
+  assert.strictEqual(after.bytes, before.bytes);
+});
+
+test("a lowered view passed twice is refused only where it was adopted", () => {
+  // An adopted view's memory goes with the callee, so a second pass would hand it a
+  // dangling pointer. Where nothing is adopted the view is still live V8 memory.
+  const { nm, live } = openModule();
+  const before = live();
+
+  const view = nm.rustbuffer_alloc(PAYLOAD_SIZE);
+  nm.rustbuffer_free(nm.uniffi_test_fn_echo_buffer(view, { code: 0 }));
+  if (adoptsAllocViews(nm)) {
+    assert.throws(
+      () => nm.uniffi_test_fn_echo_buffer(view, { code: 0 }),
+      /already consumed/,
+    );
+  } else {
+    const again = nm.uniffi_test_fn_echo_buffer(view, { code: 0 });
+    assert.strictEqual(again.byteLength, PAYLOAD_SIZE);
+    nm.rustbuffer_free(again);
+  }
+
+  const after = live();
+  assert.strictEqual(after.count, before.count);
+  assert.strictEqual(after.bytes, before.bytes);
+});
+
+test(
+  "under Electron, views are copied rather than aliased",
+  { skip: process.versions.electron ? false : "only under Electron" },
+  () => {
+    // Keeps `npm run test:electron` honest: if Electron ever allowed external buffers, this
+    // suite would quietly repeat the Node run and stop exercising the copy path.
+    const { nm } = openModule();
+    assert.strictEqual(adoptsAllocViews(nm), false);
+  },
+);
 
 test("empty rustbuffer_alloc view is accounted for", () => {
   const { nm, live } = openModule();

@@ -17,7 +17,7 @@
 //!    guards against concurrent unload) to write the return's native-endian
 //!    bytes into a buffer sized from the function's own return descriptor.
 //! 5. Convert those bytes into a JS value via [`marshal::read_return_to_js`],
-//!    or hand off a Rust-owned view for `RustBuffer` returns. The
+//!    or hand a `RustBuffer` return to JS via [`crate::buffers::BufferViews::hand_off`]. The
 //!    codegen-emitted lift wrapper consumes the view inside a `try/finally`
 //!    and calls back through `rustbuffer_free` to release the underlying Rust
 //!    allocation.
@@ -33,7 +33,6 @@ use crate::callback;
 use crate::callback::vtable;
 use crate::core_err;
 use crate::napi_utils;
-use crate::napi_utils::CapacitySymbol;
 use uniffi_runtime_core::ffi_c_types::{RustBufferC, RustCallStatusC};
 use uniffi_runtime_core::slot;
 use uniffi_runtime_core::{FfiTypeDesc, Module};
@@ -75,9 +74,9 @@ pub(crate) fn call_ffi_function(
             FfiTypeDesc::RustBuffer => {
                 // SAFETY: `env` is the active env for this call; `js_val` is the argument
                 // value just read from `ctx`, and `from_bytes_ptr` was resolved at
-                // registration time — satisfying `js_uint8array_to_rust_buffer`'s contract.
+                // registration time — satisfying `BufferViews::lower`'s contract.
                 let rust_buffer = unsafe {
-                    napi_utils::js_uint8array_to_rust_buffer(
+                    registration.buffer_views.lower(
                         env.raw(),
                         js_val,
                         module.rb_ops().from_bytes_ptr,
@@ -283,7 +282,7 @@ pub(crate) fn call_ffi_function(
             // `size_of::<RustBufferC>()` bytes at the front of `ret_bytes`, and the
             // check above confirms both `n` and the allocation cover that range.
             let rb: RustBufferC = unsafe { std::ptr::read_unaligned(ret_bytes.as_ptr().cast()) };
-            rust_buffer_to_js_uint8array_handoff(
+            registration.buffer_views.hand_off(
                 env,
                 rb,
                 module.rb_ops().free_ptr,
@@ -292,108 +291,4 @@ pub(crate) fn call_ffi_function(
         }
         _ => marshal::read_return_to_js(env, ret_desc, &ret_bytes[..n]),
     }
-}
-
-/// Hand a returned `RustBufferC` to JS as a `Uint8Array` view aliasing the
-/// Rust-owned bytes — no boundary copy. The codegen-emitted lift wrapper is
-/// expected to call `converter.lift(view)` inside a `try/finally` and invoke
-/// the runtime's `rustbuffer_free(view)` afterwards. The single mandatory copy
-/// now happens inside `lift()` itself (via `dest.set(view)` for byte arrays,
-/// `TextDecoder.decode` for strings, field-by-field reads for composites).
-///
-/// The view's `byteLength` is `rb.len` (so string/raw-byte-array converters
-/// that decode the whole view see only the message bytes). Rust may have
-/// allocated `rb.capacity > rb.len` bytes, so we stash `capacity` on the view
-/// via the runtime's per-registration capacity Symbol; the runtime's
-/// `rustbuffer_free` reads it back when releasing the allocation.
-///
-/// On any error in the handoff, we free the buffer to avoid leaking the
-/// Rust-side allocation.
-fn rust_buffer_to_js_uint8array_handoff(
-    env: &napi::Env,
-    rb: RustBufferC,
-    rb_free_ptr: *const c_void,
-    capacity_symbol: &CapacitySymbol,
-) -> Result<JsUnknown> {
-    let raw_env = env.raw();
-    // Until this function hands `rb` to JS, it is the buffer's sole owner: every early
-    // return has to release it or the allocation is unreachable.
-    //
-    // SAFETY (each `free_rustbuffer` below): `rb_free_ptr` was resolved by dlsym at
-    // registration time, and `rb` is the buffer the callee just returned, which no other
-    // owner holds.
-    let len = match usize::try_from(rb.len) {
-        Ok(n) => n,
-        Err(_) => {
-            // SAFETY: as noted above — `rb_free_ptr` was resolved at registration time
-            // and `rb` has had no other owner take it yet.
-            unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
-            return Err(napi::Error::from_reason(
-                "RustBuffer len exceeds addressable memory",
-            ));
-        }
-    };
-
-    // Nothing to alias, so any spare capacity has to be released here: a zero-length
-    // typed array cannot carry the data pointer forward, leaving `rustbuffer_free`
-    // nothing to work from.
-    if rb.len == 0 || rb.capacity == 0 || rb.data.is_null() {
-        // SAFETY: `raw_env` is valid for this callback scope; a null `data` with length 0
-        // allocates an empty buffer without reading anything.
-        let typedarray =
-            match unsafe { napi_utils::create_uint8array(raw_env, std::ptr::null(), 0) } {
-                Ok(typedarray) => typedarray,
-                Err(error) => {
-                    // SAFETY: as above — `rb_free_ptr` was resolved at registration time
-                    // and `rb` has had no other owner take it yet.
-                    unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
-                    return Err(error);
-                }
-            };
-        // SAFETY: as above — `typedarray` was allocated separately as an empty
-        // buffer over `null`, so nothing aliases `rb.data` regardless of which
-        // condition tripped the branch; `rb` has had no other owner take it.
-        unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
-        // SAFETY: `raw_env` is valid for this callback scope, and `typedarray` is the
-        // object created just above.
-        unsafe { capacity_symbol.set(raw_env, typedarray, 0)? };
-        // SAFETY: `raw_env` is valid for this callback scope, and `typedarray` is the
-        // object created just above.
-        return Ok(unsafe { JsUnknown::from_raw(raw_env, typedarray)? });
-    }
-
-    // SAFETY: `rb.data` points to a Rust-owned allocation of at least `len`
-    // bytes. We expose it to JS without a finalizer; the codegen-emitted
-    // try/finally calls `rustbuffer_free(view)` which will hand the (ptr,
-    // capacity) tuple back to the library's `rustbuffer_free`.
-    let typedarray = match unsafe { napi_utils::create_external_uint8array(raw_env, rb.data, len) }
-    {
-        Ok(typedarray) => typedarray,
-        Err(error) => {
-            // SAFETY: as above — `rb_free_ptr` was resolved at registration time
-            // and `rb` has had no other owner take it yet.
-            unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
-            return Err(error);
-        }
-    };
-
-    // Mark every handed-off view, including when `capacity == byteLength`: an absent
-    // marker means "not the library's, do not free", so an unmarked view leaks. The value
-    // is the true capacity, which may exceed `byteLength` — that is `rb.len`, so
-    // converters decoding the whole view see only the message bytes.
-    //
-    // SAFETY: `raw_env` is valid for this callback scope, and `typedarray` is the view
-    // created just above.
-    if let Err(error) = unsafe { capacity_symbol.set(raw_env, typedarray, rb.capacity) } {
-        // SAFETY: `rb_free_ptr` was resolved at registration time. `typedarray`
-        // does alias `rb.data` on this path, but it was created with a no-op
-        // finalizer — it never owned the allocation — and it is dropped
-        // unreturned, so freeing here is the only thing that releases it.
-        unsafe { napi_utils::free_rustbuffer(rb, rb_free_ptr) };
-        return Err(error);
-    }
-
-    // SAFETY: `raw_env` is valid for this callback scope, and `typedarray` is the
-    // view created above, now marked with its capacity.
-    Ok(unsafe { JsUnknown::from_raw(raw_env, typedarray)? })
 }

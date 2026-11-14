@@ -28,6 +28,7 @@ import assert from "node:assert";
 import lib from "../lib.js";
 const { UniffiNativeModule, FfiType } = lib;
 import { libPath } from "./helpers/lib-path.mjs";
+import { adoptsAllocViews } from "./helpers/external-buffers.mjs";
 
 function openModule() {
   return UniffiNativeModule.open(libPath("uniffi_napi_test_lib")).register({
@@ -108,8 +109,12 @@ test("a library-owned buffer returned from a callback is not orphaned", () => {
   );
 });
 
-test("adoption is observable: the returned view's marker is cleared", () => {
+test("adoption is observable: the returned view's marker is cleared", (t) => {
   const nm = openModule();
+  if (!adoptsAllocViews(nm)) {
+    t.skip("nothing is adopted where external buffers are refused");
+    return;
+  }
   let captured;
   const cb = (_handle) => {
     captured = nm.rustbuffer_alloc(PAYLOAD);
