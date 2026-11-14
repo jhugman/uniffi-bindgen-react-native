@@ -5,6 +5,16 @@
 [//]: # (## ⚠️ Breaking Changes)
 [//]: # (**Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/{{previous}}...{{current}})
 
+## 🦊 What's Changed
+
+### Fixes
+
+- `@ubjs/node` now works in Electron. Electron's V8 memory cage refuses the external `ArrayBuffer`s the runtime used to give JS a view of Rust memory, so every call that returned a `RustBuffer` failed. The runtime now asks once per module whether external buffers are allowed. Where they are not, it copies each returned buffer into V8 memory and releases the Rust allocation at once, and `rustbuffer_alloc` hands out V8 memory that lowering copies. Node keeps the zero-copy path ([#514](https://github.com/jhugman/uniffi-bindgen-react-native/pull/514), replacing [#417](https://github.com/jhugman/uniffi-bindgen-react-native/pull/417)). Thank you [@injaneity](https://github.com/injaneity) for the first version of this fix!
+
+### Testing and CI
+
+- The N-API runtime's tests also run under Electron, in CI and with `npm run test:electron` ([#514](https://github.com/jhugman/uniffi-bindgen-react-native/pull/514)).
+
 **Full Changelog**: https://github.com/jhugman/uniffi-bindgen-react-native/compare/0.31.0-7...main
 
 ---
