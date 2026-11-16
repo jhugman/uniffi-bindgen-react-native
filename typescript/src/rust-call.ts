@@ -32,9 +32,13 @@ export function uniffiIgnoreVoidResult(
   onFulfilled?: (value: any) => void,
 ): void {
   if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-    (result as Promise<any>).then(onFulfilled, (e: unknown) =>
-      console.error(`${what} failed`, e),
-    );
+    (result as Promise<any>).then(onFulfilled, (e: unknown) => {
+      // A closed channel rejects every queued free; the page already knows it is gone.
+      if ((e as { name?: unknown } | null)?.name === "ChannelClosedError") {
+        return;
+      }
+      console.error(`${what} failed`, e);
+    });
   }
 }
 export class UniffiRustCaller<Status extends UniffiRustCallStatus> {
