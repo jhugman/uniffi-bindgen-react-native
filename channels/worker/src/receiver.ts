@@ -8,7 +8,11 @@ import {
   type ModuleDefinitions,
   type UniffiRustCallStatus,
 } from "@ubjs/core";
-import type { ChannelListener, ChannelPort } from "./port.js";
+import {
+  onPortClosed,
+  type ChannelListener,
+  type ChannelPort,
+} from "./port.js";
 import {
   isChannelMessage,
   toWireError,
@@ -98,6 +102,7 @@ export class ReceiverCore {
     this.listener = (ev) => this.onMessage(ev.data);
     port.addEventListener("message", this.listener);
     port.start?.();
+    onPortClosed(port, () => this.close());
   }
 
   get registrySize(): number {
