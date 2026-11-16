@@ -198,6 +198,40 @@ self.onmessage = async ({ data }) => {
 
 Each worker gets its own linear memory, its own Rust-side state, and its own copy of the bindings. Nothing is shared, which is the point: wasm here is single-threaded, and a worker is how you keep a long Rust call off the main thread.
 
+## Running the player in a worker
+
+To keep every Rust call off the page's thread, run the player in a worker and leave the bindings on the page. Generate the page's bindings with `--async`, so every call awaits a reply over a port ([`asyncDelivery`](../uniffi-toml.md#calling-the-player-asynchronously)), and connect the two sides with one `MessageChannel`:
+
+```typescript
+// main thread
+import { uniffiInitAsync } from "./generated-web/index.port";
+
+const channel = new MessageChannel();
+const worker = new Worker(new URL("./receipts.worker.ts", import.meta.url), { type: "module" });
+worker.postMessage({ kind: "receipts/port", port: channel.port1 }, [channel.port1]);
+await uniffiInitAsync(channel.port2);
+```
+
+```typescript
+// receipts.worker.ts
+import { openWasm } from "@ubjs/wasm";
+import { createReceiver } from "@ubjs/worker";
+import { PLAYER_DEFINITIONS } from "./generated-web/player-definitions";
+
+self.onmessage = async ({ data }) => {
+    if (data.kind === "receipts/port") {
+        const mod = await openWasm(new URL("./generated-web/receipt_scanner.wasm", import.meta.url));
+        createReceiver(PLAYER_DEFINITIONS, mod.registerSync(PLAYER_DEFINITIONS), data.port);
+    }
+};
+```
+
+`index.port.ts` re-exports every namespace, so the page imports the API from it as it would from `index.ts`. It imports no wasm runtime: the page bundles the bindings and `@ubjs/worker`'s sender, and only the worker bundles the player. Calls the page makes before the worker attaches its receiver wait in the port.
+
+```admonish warning title="One port per library"
+Give a library one port however many namespaces it has, as `uniffiInitAsync` does. A method call clones its object's handle on the port of the namespace that defines the object, ahead of the call and without waiting. Ports keep order only within a port, so with a port per namespace a call to another namespace's function can overtake that clone, and Rust frees an object the page still holds.
+```
+
 ## Moving large byte payloads
 
 Records, strings and `Vec<u8>` cross the boundary as a serialised buffer. The generated call sites ask the player for wasm memory up front and write the payload straight into it, so a `Vec<u8>` argument costs one copy — the write — rather than a JavaScript array followed by a copy into wasm. Returns work the same way in reverse: the player hands the generated code a view aliasing wasm memory, the converter reads it, and a `finally` frees the allocation even when the conversion throws.

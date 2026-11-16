@@ -242,7 +242,7 @@ The table body is the same text in all three flavors, except that `napi` and `wa
 | | `napi` | `wasm2` | `jsi2` |
 | - | ------ | ------- | ------ |
 | Runs the poll loop | yes | yes | no |
-| `FfiType` comes from | `@ubjs/node` default export | `@ubjs/wasm/core` | `@ubjs/core` |
+| `FfiType` comes from | `@ubjs/node` default export | `@ubjs/core` | `@ubjs/core` |
 | Type check on the literal | none | `satisfies ModuleDefinitions` | `as const` only |
 | Registered by | `UniffiNativeModule.open(path).register(DEFINITIONS)` in the getter | `registerSync(PLAYER_DEFINITIONS)` from the generated `index.ts` | `globalThis.uniffi.open(path).register(DEFINITIONS)` in the getter |
 | Parsed by | `runtimes/napi/src/register/spec_from_js.rs` | `registerSync` in `runtimes/wasm/core/src/module.ts` | `cpp/jsi-player-shim/shim.cpp`, into a `#[repr(C)]` spec for `runtimes/core` |

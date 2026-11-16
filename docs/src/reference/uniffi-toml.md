@@ -114,19 +114,22 @@ It implies `forceAsync = true`: every function, method and constructor returns a
 Two things stay synchronous on the calling side: allocating a buffer for arguments (the sender owns it) and cloning an object handle for an argument. uniffi's clone returns the handle it was given, and a message port delivers in order, so the clone is posted and the handle used at once.
 ```
 
-`uniffiInitAsync` in the generated `index.ts` opens the wasm where it runs, so it cannot connect a page to a worker. Skip it and start each side yourself, with `PLAYER_DEFINITIONS` and `setNativeModule` from the generated `-ffi` module:
+When every namespace has async delivery, as `--async` gives, the bindings get two more files beside `index.ts`. `index.port.ts` re-exports every namespace and exports `uniffiInitAsync(port)`, which connects them all to the player through one port. `player-definitions.ts` exports the library's merged `PLAYER_DEFINITIONS`, for the receiver on the far side:
 
 ```ts
 // In the worker
+import { PLAYER_DEFINITIONS } from "./generated/player-definitions";
 const wasm = await openWasm(source);
 createReceiver(PLAYER_DEFINITIONS, wasm.registerSync(PLAYER_DEFINITIONS), port);
 
 // On the page
-setNativeModule(createSender(PLAYER_DEFINITIONS, port));
-await bindings.default.initialize();
+import { uniffiInitAsync } from "./generated/index.port";
+await uniffiInitAsync(port);
 ```
 
-A library with several namespaces shares one channel and one merged table: a clone must land before the call that consumes it, and message ports only keep order within a port.
+The `uniffiInitAsync` in `index.ts` opens the wasm where it runs instead. `index.port.ts` imports no wasm runtime, so a page that uses it bundles no player.
+
+A library needs one port however many namespaces it has. A method call clones its object's handle on the port of the namespace that defines the object, ahead of the call and without waiting. Message ports keep order only within a port, so with a port per namespace a call to another namespace's function can overtake the clone, and Rust frees an object the page still holds.
 
 ### Logging the FFI
 
