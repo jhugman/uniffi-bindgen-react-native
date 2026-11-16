@@ -54,6 +54,32 @@ pub(crate) fn generate_index_code(
     .context("generating index.ts from IR failed")
 }
 
+/// The files a library under async delivery gets beside `index.ts`: its merged
+/// table, and an entry that connects every namespace through one port. A
+/// namespace is an identifier, so neither name can clash with one.
+pub(crate) const ASYNC_INDEX_FILES: [&str; 2] = ["player-definitions.ts", "index.port.ts"];
+
+/// The [`ASYNC_INDEX_FILES`], by name.
+pub(crate) fn generate_async_index_code(
+    modules: Vec<ModuleMetadata>,
+    strict_type_checking: bool,
+) -> Result<Vec<(&'static str, String)>> {
+    let definitions = PlayerDefinitionsTsWrapper {
+        modules: modules.clone(),
+        strict_type_checking,
+    }
+    .render()
+    .context("generating player-definitions.ts failed")?;
+    let port = IndexPortTsWrapper {
+        modules,
+        strict_type_checking,
+    }
+    .render()
+    .context("generating index.port.ts failed")?;
+    let [definitions_file, port_file] = ASYNC_INDEX_FILES;
+    Ok(vec![(definitions_file, definitions), (port_file, port)])
+}
+
 pub(crate) fn generate_api_code_from_ir(api_module: api_module::TsApiModule) -> Result<String> {
     TsApiWrapperV2::new(api_module)
         .render()
@@ -112,6 +138,31 @@ struct IndexTsWrapper {
     /// A namespace delivering over a port has a promise-returning
     /// `initialize()`, so the index awaits it.
     async_delivery: bool,
+}
+
+#[derive(Template)]
+#[template(syntax = "ts", escape = "none", path = "player-definitions.ts")]
+struct PlayerDefinitionsTsWrapper {
+    modules: Vec<ModuleMetadata>,
+    strict_type_checking: bool,
+}
+
+#[derive(Template)]
+#[template(syntax = "ts", escape = "none", path = "index.port.ts")]
+struct IndexPortTsWrapper {
+    modules: Vec<ModuleMetadata>,
+    strict_type_checking: bool,
+}
+
+/// Test-only entry point: render the `--async` index files for the given
+/// namespaces, as [`generate_async_index_code`] names them.
+#[doc(hidden)]
+pub fn render_async_index_for_test(namespaces: &[&str]) -> Result<Vec<(&'static str, String)>> {
+    let modules = namespaces
+        .iter()
+        .map(|ns| ModuleMetadata::new(ns))
+        .collect();
+    generate_async_index_code(modules, false)
 }
 
 /// Test-only entry point: render the player lowlevel TS wrapper for a

@@ -30,4 +30,4 @@ pub mod __player_template_test {
 }
 
 #[doc(hidden)]
-pub use self::bindings::render_player_lowlevel_for_test;
+pub use self::bindings::{render_async_index_for_test, render_player_lowlevel_for_test};

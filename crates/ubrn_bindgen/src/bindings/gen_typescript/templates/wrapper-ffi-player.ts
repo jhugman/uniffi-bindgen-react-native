@@ -14,10 +14,10 @@ const { UniffiNativeModule, FfiType, resolveLibPath } = lib;
 {%- when PlayerHostSource::JsiGlobal %}
 import { FfiType } from "@ubjs/core";
 {%- when PlayerHostSource::WasmCore %}
-// Only `/core`, which is environment-neutral. Opening the `.wasm` is the
-// generated `index.ts`'s job, so this module
-// bundles for node, browsers and React Native alike.
-import { FfiType, type ModuleDefinitions } from "@ubjs/wasm/core";
+// The vocabulary only. The player is opened by the generated `index.ts`, or
+// sits behind a port, so this module bundles for node, browsers and React
+// Native alike, and a page behind a port bundles no wasm player.
+import { FfiType, type ModuleDefinitions } from "@ubjs/core";
 {%- endmatch %}
 
 import {
