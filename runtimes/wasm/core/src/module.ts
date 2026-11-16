@@ -26,7 +26,12 @@ export type WasmSource =
   | URL
   | string;
 
-export type NativeModuleInterface = Record<string, (...args: any[]) => any>;
+/** What `registerSync` returns: a function per definition, and the buffer
+ * pair the runtime answers itself, as `@ubjs/worker`'s receiver needs. */
+export type NativeModuleInterface = Record<string, (...args: any[]) => any> & {
+  rustbuffer_alloc(n: number): Uint8Array;
+  rustbuffer_free(view: Uint8Array): void;
+};
 
 const REQUIRED_EXPORTS = ["__ubrn_alloc", "__ubrn_free", "memory"] as const;
 
