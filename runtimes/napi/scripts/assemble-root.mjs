@@ -34,7 +34,13 @@ const PUBLISH_FIELDS = [
   "peerDependencies",
 ];
 
-const COPY_FILES = ["index.js", "lib.js", "index.d.ts", "README.md"];
+const COPY_FILES = [
+  "index.js",
+  "lib.js",
+  "index.d.ts",
+  "lib.d.ts",
+  "README.md",
+];
 
 const pkgDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const rootDir = join(pkgDir, "npm", "root");
@@ -64,7 +70,9 @@ const VERSION = workspaceRoot.version;
 
 const platforms = readdirSync(join(pkgDir, "npm")).filter((d) => d !== "root");
 if (platforms.length === 0) {
-  console.error("No npm/<triple>/ dirs found — run `napi create-npm-dir` first.");
+  console.error(
+    "No npm/<triple>/ dirs found — run `napi create-npm-dir` first.",
+  );
   process.exit(1);
 }
 

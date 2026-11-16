@@ -25,7 +25,7 @@
     "libffi"
   ],
   "main": "lib.js",
-  "types": "index.d.ts",
+  "types": "lib.d.ts",
   "napi": {
     "name": "uniffi-runtime-napi",
     "triples": {
@@ -46,6 +46,7 @@
     "index.js",
     "lib.js",
     "index.d.ts",
+    "lib.d.ts",
     "typescript/dist/",
     "*.node",
     "README.md"
