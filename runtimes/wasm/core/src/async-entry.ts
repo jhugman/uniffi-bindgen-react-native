@@ -7,7 +7,7 @@
 // poll loop here, so a caller behind a channel pays one round trip per await
 // rather than one per poll.
 import {
-  uniffiDriveRustFuture,
+  uniffiAsyncEntry,
   type AsyncFunctionDef,
   type FunctionDef,
   type UniffiRustCallStatus,
@@ -92,12 +92,5 @@ export function buildAsyncEntry(
         : value;
     },
   };
-  const argCount = def.args.length;
-  return function asyncEntry(...args: any[]): Promise<unknown> {
-    const status = args[argCount] as UniffiRustCallStatus;
-    const signal = args[argCount + 1] as AbortSignal | undefined;
-    // Before any await: lowered RustBuffer args alias wasm memory.
-    const rustFuture = start(...args.slice(0, argCount)) as bigint;
-    return uniffiDriveRustFuture(rustFuture, fns, status, signal);
-  };
+  return uniffiAsyncEntry(def.args.length, start, fns);
 }

@@ -7,6 +7,7 @@ import "../testing/polyfills";
 import { asyncTest } from "../testing/asserts";
 import {
   UniffiRustCaller,
+  uniffiAsyncEntry,
   uniffiRustCallAsync,
   uniffiDriveRustFuture,
   uniffiRustCallAsyncEntry,
@@ -25,6 +26,7 @@ function fns(
   opts: {
     poll?: UniffiRustFutureFns<number, UniffiRustCallStatus>["poll"];
     cancel?: UniffiRustFutureFns<number, UniffiRustCallStatus>["cancel"];
+    free?: UniffiRustFutureFns<number, UniffiRustCallStatus>["free"];
     complete?: (status: UniffiRustCallStatus) => number;
   } = {},
 ): UniffiRustFutureFns<number, UniffiRustCallStatus> {
@@ -46,8 +48,44 @@ function fns(
     },
     free: (rustFuture) => {
       calls.push(`free ${rustFuture}`);
+      if (opts.free) return opts.free(rustFuture);
     },
   };
+}
+
+// A poll that parks until cancel, which then reports READY to it, as a
+// cancelled Rust future does.
+function parkedUntilCancel(): {
+  poll: UniffiRustFutureFns<number, UniffiRustCallStatus>["poll"];
+  cancel: () => void;
+} {
+  let parked:
+    | { cb: (h: UniffiHandle, r: number) => void; handle: UniffiHandle }
+    | undefined;
+  return {
+    poll: (_rustFuture, cb, handle) => {
+      parked = { cb, handle };
+    },
+    cancel: () => {
+      setTimeout(() => parked!.cb(parked!.handle, 0 /* READY */), 0);
+    },
+  };
+}
+
+// Runs `body` with console.error captured, one line per call.
+async function withConsoleErrors<T>(
+  body: () => Promise<T>,
+): Promise<{ result: T; logged: string[] }> {
+  const logged: string[] = [];
+  const consoleError = console.error;
+  console.error = (...args: any[]) => {
+    logged.push(args.map((a) => String(a)).join(" "));
+  };
+  try {
+    return { result: await body(), logged };
+  } finally {
+    console.error = consoleError;
+  }
 }
 
 (async () => {
@@ -276,16 +314,8 @@ function fns(
     "an abort mid-flight cancels; the cancelled status comes back through complete",
     async (t) => {
       const calls: string[] = [];
-      let parked:
-        | { cb: (h: UniffiHandle, r: number) => void; handle: UniffiHandle }
-        | undefined;
       const f = fns(calls, {
-        poll: (_rustFuture, cb, handle) => {
-          parked = { cb, handle };
-        },
-        cancel: () => {
-          setTimeout(() => parked!.cb(parked!.handle, 0), 0);
-        },
+        ...parkedUntilCancel(),
         complete: (status) => {
           status.code = 3;
           return 1;
@@ -418,7 +448,7 @@ function fns(
     async (t) => {
       let lifted = false;
       await t.assertThrowsAsync(
-        (e) => /@ubjs\/wasm is too old/.test(e.message),
+        (e) => /predates these bindings/.test(e.message),
         () =>
           uniffiRustCallAsyncEntry(
             caller,
@@ -454,6 +484,151 @@ function fns(
             (buf) => new Error(`lifted:${buf[0]}`),
           ),
       );
+      t.end();
+    },
+  );
+  await asyncTest(
+    "the async entry starts the future before it returns, then drives it",
+    async (t) => {
+      const calls: string[] = [];
+      const entry = uniffiAsyncEntry(
+        2,
+        (a: number, b: number) => {
+          calls.push(`start ${a} ${b}`);
+          return BigInt(7);
+        },
+        fns(calls),
+      );
+      const p = entry(1, 2, { code: 0 }, undefined);
+      // The first poll runs before the drive's first await, so before the entry returns.
+      t.assertEqual(calls.join(","), "start 1 2,poll 7");
+      t.assertEqual(await p, 5);
+      t.assertEqual(calls.join(","), "start 1 2,poll 7,complete 7,free 7");
+      t.end();
+    },
+  );
+  await asyncTest(
+    "the async entry reads the status and signal after argCount arguments",
+    async (t) => {
+      const calls: string[] = [];
+      const entry = uniffiAsyncEntry(
+        1,
+        (...a: number[]) => {
+          calls.push(`start ${a.join(" ")}`);
+          return BigInt(7);
+        },
+        fns(calls, {
+          ...parkedUntilCancel(),
+          complete: (status) => {
+            status.code = 3;
+            return 1;
+          },
+        }),
+      );
+      const controller = new AbortController();
+      const status = { code: 0 };
+      const p = entry(4, status, controller.signal);
+      setTimeout(() => controller.abort(), 5);
+      t.assertEqual(await p, 1);
+      t.assertEqual(status.code, 3);
+      // start saw only the argCount arguments.
+      t.assertEqual(calls[0], "start 4");
+      t.assertTrue(
+        calls.includes("cancel 7"),
+        () => `calls: ${calls.join(",")}`,
+      );
+      t.assertEqual(calls[calls.length - 1], "free 7");
+      t.end();
+    },
+  );
+  await asyncTest(
+    "a start that throws throws before anything is polled",
+    async (t) => {
+      const calls: string[] = [];
+      const entry = uniffiAsyncEntry(
+        0,
+        () => {
+          throw new Error("lowering");
+        },
+        fns(calls),
+      );
+      t.assertThrows(
+        (e) => e.message === "lowering",
+        () => entry({ code: 0 }, undefined),
+      );
+      t.assertEqual(calls.length, 0);
+      t.end();
+    },
+  );
+  await asyncTest(
+    "every copy of the runtime counts futures in one global map",
+    async (t) => {
+      const map = (globalThis as any)[
+        Symbol.for("@ubjs/core/rust-future-resolvers/v1")
+      ];
+      t.assertTrue(map !== undefined, "no resolver map on globalThis");
+      const before = uniffiRustFutureHandleCount();
+      const handle = map.insert(() => {});
+      t.assertEqual(uniffiRustFutureHandleCount(), before + 1);
+      map.remove(handle);
+      t.assertEqual(uniffiRustFutureHandleCount(), before);
+      t.end();
+    },
+  );
+  await asyncTest(
+    "a cancel that throws is logged, and the call still completes",
+    async (t) => {
+      const calls: string[] = [];
+      const parked = parkedUntilCancel();
+      const f = fns(calls, {
+        ...parked,
+        cancel: () => {
+          parked.cancel();
+          throw new Error("cancel boom");
+        },
+      });
+      const controller = new AbortController();
+      const { result, logged } = await withConsoleErrors(() => {
+        const p = uniffiDriveRustFuture(
+          BigInt(7),
+          f,
+          { code: 0 },
+          controller.signal,
+        );
+        setTimeout(() => controller.abort(), 5);
+        return p;
+      });
+      t.assertEqual(result, 5);
+      t.assertEqual(logged.length, 1, () => `logged: ${logged.join(" | ")}`);
+      t.assertTrue(
+        logged[0].indexOf("rust future cancel failed") >= 0 &&
+          logged[0].indexOf("cancel boom") >= 0,
+        () => `expected the cancel failure to be logged, got: ${logged[0]}`,
+      );
+      t.assertEqual(calls[calls.length - 1], "free 7");
+      t.end();
+    },
+  );
+  await asyncTest(
+    "a free that throws is logged and does not replace the result",
+    async (t) => {
+      const calls: string[] = [];
+      const f = fns(calls, {
+        free: () => {
+          throw new Error("free boom");
+        },
+      });
+      const { result, logged } = await withConsoleErrors(() =>
+        uniffiDriveRustFuture(BigInt(7), f, { code: 0 }),
+      );
+      t.assertEqual(result, 5);
+      t.assertEqual(logged.length, 1, () => `logged: ${logged.join(" | ")}`);
+      t.assertTrue(
+        logged[0].indexOf("rust future free failed") >= 0 &&
+          logged[0].indexOf("free boom") >= 0,
+        () => `expected the free failure to be logged, got: ${logged[0]}`,
+      );
+      t.assertEqual(calls.join(","), "poll 7,complete 7,free 7");
       t.end();
     },
   );
