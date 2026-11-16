@@ -442,4 +442,166 @@ mod tests {
         assert_eq!(decl.return_type.as_deref(), Some("number"));
         assert!(decl.returns_promise);
     }
+
+    /// One async function as UniFFI lays it out: the export that starts the
+    /// future, its `rust_future_*` family, and the continuation poll takes.
+    fn namespace_with_one_async_function() -> general::Namespace {
+        let handle = general::FfiType::Handle(general::HandleKind::RustFuture);
+        let name =
+            |verb: &str| general::RustFfiFunctionName(format!("ffi_x_rust_future_{verb}_u32"));
+        let family = |verb: &str, kind, extra_args: Vec<general::FfiArgument>, ret, status| {
+            let mut arguments = vec![general::FfiArgument::new("handle", handle.clone())];
+            arguments.extend(extra_args);
+            general::FfiFunction {
+                name: name(verb),
+                arguments,
+                return_type: general::FfiReturnType { ty: ret },
+                has_rust_call_status_arg: status,
+                kind,
+                ..Default::default()
+            }
+        };
+        let start = general::FfiFunction {
+            name: general::RustFfiFunctionName("uniffi_x_fn_func_sleep".into()),
+            async_data: Some(general::AsyncData {
+                ffi_rust_future_poll: name("poll"),
+                ffi_rust_future_cancel: name("cancel"),
+                ffi_rust_future_free: name("free"),
+                ffi_rust_future_complete: name("complete"),
+                ffi_foreign_future_complete: general::FfiFunctionTypeName("unused".into()),
+                ffi_foreign_future_result: general::FfiStructName("unused".into()),
+            }),
+            arguments: vec![general::FfiArgument::new("ms", general::FfiType::UInt32)],
+            return_type: general::FfiReturnType {
+                ty: Some(handle.clone().into()),
+            },
+            kind: general::FfiFunctionKind::Scaffolding,
+            ..Default::default()
+        };
+        let continuation_name = general::FfiFunctionTypeName(RUST_FUTURE_CONTINUATION.into());
+        let poll = family(
+            "poll",
+            general::FfiFunctionKind::RustFuturePoll,
+            vec![
+                general::FfiArgument::new(
+                    "callback",
+                    general::FfiType::Function(continuation_name.clone()),
+                ),
+                general::FfiArgument::new("callback_data", general::FfiType::UInt64),
+            ],
+            None,
+            false,
+        );
+        let complete = family(
+            "complete",
+            general::FfiFunctionKind::RustFutureComplete,
+            vec![],
+            Some(general::FfiType::UInt32.into()),
+            true,
+        );
+        let cancel = family(
+            "cancel",
+            general::FfiFunctionKind::RustFutureCancel,
+            vec![],
+            None,
+            false,
+        );
+        let free = family(
+            "free",
+            general::FfiFunctionKind::RustFutureFree,
+            vec![],
+            None,
+            false,
+        );
+        let continuation = general::FfiFunctionType {
+            name: continuation_name,
+            arguments: vec![
+                general::FfiArgument::new("data", general::FfiType::UInt64),
+                general::FfiArgument::new("poll_result", general::FfiType::Int8),
+            ],
+            return_type: general::FfiReturnType { ty: None },
+            has_rust_call_status_arg: false,
+        };
+        general::Namespace {
+            name: "x".into(),
+            ffi_definitions: [
+                start.into(),
+                poll.into(),
+                complete.into(),
+                cancel.into(),
+                free.into(),
+                continuation.into(),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn table_for(flavor: crate::AbiFlavor) -> PlayerFfiModule {
+        PlayerFfiModule::from_general(
+            &namespace_with_one_async_function(),
+            &TsConfig::default(),
+            &flavor,
+            "x".into(),
+            None,
+        )
+    }
+
+    /// The template test renders a hand-built module, so only this runs the
+    /// builder decisions `low_level_async_polling` makes for napi.
+    #[test]
+    fn a_napi_table_names_the_future_family_only_in_the_async_field() {
+        let table = table_for(crate::AbiFlavor::Napi);
+
+        let functions: Vec<_> = table.functions.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(functions, ["uniffi_x_fn_func_sleep"]);
+        let entry = table.functions[0]
+            .async_entry
+            .as_ref()
+            .expect("the start export names its future family");
+        assert_eq!(
+            [&entry.poll, &entry.cancel, &entry.complete, &entry.free],
+            [
+                "ffi_x_rust_future_poll_u32",
+                "ffi_x_rust_future_cancel_u32",
+                "ffi_x_rust_future_complete_u32",
+                "ffi_x_rust_future_free_u32",
+            ]
+        );
+        assert_eq!(entry.ret, "FfiType.UInt32");
+
+        let callbacks: Vec<_> = table.callbacks.iter().map(|c| c.name.as_str()).collect();
+        assert!(
+            callbacks.is_empty(),
+            "the player supplies the continuation: {callbacks:?}"
+        );
+
+        let typed: Vec<_> = table
+            .typed_functions
+            .iter()
+            .map(|f| (f.name.as_str(), f.returns_promise))
+            .collect();
+        assert_eq!(typed, [("uniffi_x_fn_func_sleep", true)]);
+    }
+
+    #[test]
+    fn a_jsi2_table_lists_the_future_family_and_the_continuation() {
+        let table = table_for(crate::AbiFlavor::Jsi2);
+
+        let functions: Vec<_> = table.functions.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(
+            functions,
+            [
+                "uniffi_x_fn_func_sleep",
+                "ffi_x_rust_future_poll_u32",
+                "ffi_x_rust_future_complete_u32",
+                "ffi_x_rust_future_cancel_u32",
+                "ffi_x_rust_future_free_u32",
+            ]
+        );
+        assert!(table.functions.iter().all(|f| f.async_entry.is_none()));
+        let callbacks: Vec<_> = table.callbacks.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(callbacks, [RUST_FUTURE_CONTINUATION]);
+    }
 }
