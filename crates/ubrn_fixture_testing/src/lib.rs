@@ -214,12 +214,8 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
     if matches!(flavor, Flavor::Napi | Flavor::AsyncNapi) {
         runtime_paths.push(format!(r#""@ubjs/node": ["{rel_root}/runtimes/napi/lib"]"#));
     }
-    // AsyncNapi runs wasm2 bindings too: their `-ffi.ts` imports `FfiType`
-    // from `@ubjs/wasm/core`.
-    if matches!(
-        flavor,
-        Flavor::Wasm2 | Flavor::AsyncWasm | Flavor::AsyncNapi
-    ) {
+    // Not AsyncNapi: neither side of its port may load the wasm player.
+    if matches!(flavor, Flavor::Wasm2 | Flavor::AsyncWasm) {
         // `paths` bypasses the package `exports` map, so the bare specifier
         // the generated index imports needs pointing at the node build.
         runtime_paths.push(format!(

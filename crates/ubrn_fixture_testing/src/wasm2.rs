@@ -51,6 +51,13 @@ pub(crate) fn prepare(crate_name: &str, target_tmpdir: &str, flavor: Flavor) -> 
     let ts_dir = generated.join("ts");
     std::fs::create_dir_all(&ts_dir).expect("failed to create ts dir");
     generate_bindings(&wasm_file, &ts_dir, flavor.bindgen_args());
+    // Only bindings that wait on a port get the entry that connects one.
+    assert_eq!(
+        ts_dir.join("index.port.ts").exists(),
+        matches!(flavor, Flavor::AsyncWasm),
+        "index.port.ts under {}",
+        flavor.as_str()
+    );
 
     // Step 3: Stage the wasm next to the TS bindings, with DCE — fixture
     // artifacts are ours, so over-stripping fails a test rather than a user.
@@ -99,19 +106,6 @@ fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
     )
     .unwrap_or_else(|e| panic!("write {path}: {e}"));
     path
-}
-
-/// The generated namespaces: one `<ns>-ffi.ts` per uniffi namespace.
-pub(crate) fn generated_namespaces(ts_dir: &Utf8Path) -> Vec<String> {
-    let mut namespaces: Vec<String> = std::fs::read_dir(ts_dir)
-        .expect("read ts dir")
-        .filter_map(|e| e.ok())
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter_map(|name| name.strip_suffix("-ffi.ts").map(str::to_owned))
-        .collect();
-    namespaces.sort();
-    assert!(!namespaces.is_empty(), "no *-ffi.ts generated in {ts_dir}");
-    namespaces
 }
 
 /// Generate bindings via the CLI, using the `wasm2` subcommand. The library
