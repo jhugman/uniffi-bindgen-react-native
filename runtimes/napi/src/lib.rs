@@ -37,7 +37,9 @@
 //!   can directly construct napi values and call into JS synchronously.
 //! - **Cross-thread path**: When a callback fires on any other thread, we must use a
 //!   threadsafe function to schedule the call back onto the owning thread's event
-//!   loop, then block the calling thread until the result is available.
+//!   loop, then block the calling thread until the result is available. A callback
+//!   that reports nothing back (the future continuation, and the free and dropped
+//!   callbacks) is posted without waiting.
 //!
 //! [`callback::is_js_thread`] is the single predicate every callback path consults to choose
 //! between these two strategies, and it answers per callback: each callback records the thread

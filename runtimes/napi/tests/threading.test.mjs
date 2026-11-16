@@ -23,6 +23,32 @@ function openLib() {
   return UniffiNativeModule.open(LIB_PATH);
 }
 
+// Runs a helper script in a child process, killing it after 30 s. A null exit code means it was
+// killed.
+async function runScript(name) {
+  const script = join(import.meta.dirname, "helpers", name);
+  const child = spawn(process.execPath, [script], {
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+
+  let out = "";
+  child.stdout.on("data", (chunk) => {
+    out += String(chunk);
+  });
+
+  const exitCode = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve(null);
+    }, 30_000);
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+  return { out, exitCode };
+}
+
 test("callback: invoked from another thread dispatches to event loop", async () => {
   const lib = openLib();
   const nm = lib.register({
@@ -109,30 +135,7 @@ test("callback: receives RustBuffer arg from another thread", async () => {
 // `worker.terminate()` never resolves and `process.exit()` never takes effect, so an in-process
 // version would wedge the suite instead of failing it.
 test("threads: a second JS thread can invoke a callback", async () => {
-  const script = join(
-    import.meta.dirname,
-    "helpers",
-    "second-thread-callback.mjs",
-  );
-  const child = spawn(process.execPath, [script], {
-    stdio: ["ignore", "pipe", "inherit"],
-  });
-
-  let out = "";
-  child.stdout.on("data", (chunk) => {
-    out += String(chunk);
-  });
-
-  const exitCode = await new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      resolve(null);
-    }, 30_000);
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      resolve(code);
-    });
-  });
+  const { out, exitCode } = await runScript("second-thread-callback.mjs");
 
   assert.match(out, /^CALLED 7 42$/m, "the worker's callback did not run");
   assert.strictEqual(exitCode, 0, "the child did not exit on its own");
@@ -145,27 +148,21 @@ test("threads: a second JS thread can invoke a callback", async () => {
 // every environment as shutting down. The main thread's callbacks then bail out early and zero
 // their return buffers, which looks like a callback that silently never ran.
 test("threads: one environment's teardown leaves another's callbacks working", async () => {
-  const script = join(import.meta.dirname, "helpers", "env-teardown.mjs");
-  const child = spawn(process.execPath, [script], {
-    stdio: ["ignore", "pipe", "inherit"],
-  });
-
-  let out = "";
-  child.stdout.on("data", (chunk) => {
-    out += String(chunk);
-  });
-
-  const exitCode = await new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      resolve(null);
-    }, 30_000);
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      resolve(code);
-    });
-  });
+  const { out, exitCode } = await runScript("env-teardown.mjs");
 
   assert.match(out, /^CALLED 7 42$/m, "the main thread's callback did not run");
+  assert.strictEqual(exitCode, 0, "the child did not exit on its own");
+});
+
+// A cancel while a Rust thread wakes the future. UniFFI calls the continuation under the
+// future's scheduler lock, and cancel takes that lock on the JS thread: if the waker waits for
+// JS to run the continuation, neither thread moves.
+//
+// Run in a child process because a regression deadlocks the JS thread inside native code.
+test("futures: a cancel during a cross-thread wake does not deadlock", async () => {
+  const { out, exitCode } = await runScript("cancel-during-wake.mjs");
+
+  assert.match(out, /^STATUS 3$/m, "the future did not complete as cancelled");
+  assert.match(out, /^LIVE 0$/m, "the future was not freed");
   assert.strictEqual(exitCode, 0, "the child did not exit on its own");
 });
