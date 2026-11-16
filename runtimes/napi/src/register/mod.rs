@@ -8,13 +8,14 @@
 
 mod spec_from_js;
 
+use std::collections::HashSet;
 use std::ffi::c_void;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use napi::bindgen_prelude::*;
-use napi::{JsObject, JsUnknown, Result};
+use napi::{JsFunction, JsObject, JsUnknown, Result};
 
 use crate::buffers::{self, BufferViews};
 use crate::call::call_ffi_function;
@@ -44,12 +45,15 @@ pub(crate) struct Registration {
 }
 
 /// Build a JS object whose methods call into the native library described by `definitions`.
+///
+/// Each `async:` def's poll, cancel, complete and free exports are on it too, under their
+/// own names, whether or not the table lists them.
 pub fn register(
     env: Env,
     library_path: &str,
     definitions: JsObject,
 ) -> Result<(JsObject, Arc<Module>)> {
-    let spec = spec_from_js::parse_module_spec(&definitions)?;
+    let (spec, async_defs) = spec_from_js::parse_module_spec(&definitions)?;
 
     extern "C" fn noop_abort(_: *const c_void) {}
     let module = Module::new(Path::new(library_path), spec, noop_abort, std::ptr::null())
@@ -72,48 +76,35 @@ pub fn register(
         buffer_views: unsafe { BufferViews::probe(env.raw())? },
     });
 
+    // An async entry resolves with a JS-owned value, so a `complete` always copies.
+    let completes: HashSet<&str> = async_defs.iter().map(|d| d.complete.as_str()).collect();
+    let ret_views_for = |name: &str| {
+        if completes.contains(name) {
+            BufferViews::Copy
+        } else {
+            registration.buffer_views
+        }
+    };
+    let mut built = HashSet::new();
+
     let names = functions.get_property_names()?;
     let len = names.get_array_length()?;
-
     for i in 0..len {
         let name: String = names
             .get_element::<napi::JsString>(i)?
             .into_utf8()?
             .as_str()?
             .to_owned();
-
-        let fn_name = name.clone();
-        let module_ref = Arc::clone(&module);
-
-        let func_def = module.function_def(&name).ok_or_else(|| {
-            napi::Error::from_reason(format!("Function not found in module: {name}"))
-        })?;
-        let arg_types: Rc<Vec<FfiTypeDesc>> = Rc::new(func_def.args.clone());
-        let has_rust_call_status = func_def.has_rust_call_status;
-        // Resolved here rather than per call: the return width never changes,
-        // and looking it up in the closure would re-hash the function name on
-        // every invocation. Sized from `return_size`, the width core's call
-        // path writes, not from the arg-slot geometry: a pointer return is
-        // written as 8 bytes whatever the host's pointer size.
-        let ret_desc: Rc<FfiTypeDesc> = Rc::new(func_def.ret.clone());
-        let ret_size = uniffi_runtime_core::return_size(&ret_desc).map_err(core_err)?;
-        let reg_for_call = Arc::clone(&registration);
-
-        let js_func = env.create_function_from_closure(&name, move |ctx| {
-            call_ffi_function(
-                ctx.env,
-                &ctx,
-                &fn_name,
-                &module_ref,
-                &arg_types,
-                &ret_desc,
-                ret_size,
-                has_rust_call_status,
-                &reg_for_call,
-            )
-        })?;
-
+        let js_func = build_function(&env, &module, &registration, &name, ret_views_for(&name))?;
         result.set_named_property(&name, js_func)?;
+        built.insert(name);
+    }
+
+    for name in async_defs.iter().flat_map(|d| d.exports()) {
+        if built.insert(name.to_owned()) {
+            let js_func = build_function(&env, &module, &registration, name, ret_views_for(name))?;
+            result.set_named_property(name, js_func)?;
+        }
     }
 
     // `rustbuffer_alloc(n)` and `rustbuffer_free(view)` let JS allocate buffers that the
@@ -179,4 +170,44 @@ pub fn register(
     result.set_named_property("$uniffiTrampolineCount", count_fn)?;
 
     Ok((result, module))
+}
+
+/// A JS function calling the export `name`, handing a `RustBuffer` return off by `ret_views`.
+fn build_function(
+    env: &Env,
+    module: &Arc<Module>,
+    registration: &Arc<Registration>,
+    name: &str,
+    ret_views: BufferViews,
+) -> Result<JsFunction> {
+    let func_def = module
+        .function_def(name)
+        .ok_or_else(|| napi::Error::from_reason(format!("Function not found in module: {name}")))?;
+    let arg_types: Rc<Vec<FfiTypeDesc>> = Rc::new(func_def.args.clone());
+    let has_rust_call_status = func_def.has_rust_call_status;
+    // Resolved here rather than per call: the return width never changes,
+    // and looking it up in the closure would re-hash the function name on
+    // every invocation. Sized from `return_size`, the width core's call
+    // path writes, not from the arg-slot geometry: a pointer return is
+    // written as 8 bytes whatever the host's pointer size.
+    let ret_desc: Rc<FfiTypeDesc> = Rc::new(func_def.ret.clone());
+    let ret_size = uniffi_runtime_core::return_size(&ret_desc).map_err(core_err)?;
+    let fn_name = name.to_owned();
+    let module = Arc::clone(module);
+    let registration = Arc::clone(registration);
+
+    env.create_function_from_closure(name, move |ctx| {
+        call_ffi_function(
+            ctx.env,
+            &ctx,
+            &fn_name,
+            &module,
+            &arg_types,
+            &ret_desc,
+            ret_size,
+            has_rust_call_status,
+            &registration,
+            &ret_views,
+        )
+    })
 }

@@ -293,6 +293,13 @@ impl UniffiNativeModule {
 
     /// Parse JS-provided type definitions and produce a JS object whose methods
     /// are bound to the foreign functions found in the loaded library.
+    ///
+    /// A function def carrying `async: { poll, cancel, complete, free, ret }`
+    /// also registers those four exports under their own names, with UniFFI's
+    /// fixed future shapes. `complete` returns a `RustBuffer` as a JS-owned
+    /// copy. `@ubjs/node` then replaces the start function with one entry,
+    /// `(...args, status, signal) => Promise`, built by `@ubjs/core`'s
+    /// `uniffiAsyncEntry`.
     #[napi]
     pub fn register(&mut self, env: Env, definitions: JsObject) -> napi::Result<JsObject> {
         // Install the env cleanup hook on the first register call. This is the

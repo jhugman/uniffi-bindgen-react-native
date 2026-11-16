@@ -31,6 +31,7 @@ const PUBLISH_FIELDS = [
   "keywords",
   "bugs",
   "publishConfig",
+  "peerDependencies",
 ];
 
 const COPY_FILES = ["index.js", "lib.js", "index.d.ts", "README.md"];

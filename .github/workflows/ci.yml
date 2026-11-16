@@ -178,6 +178,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
+    # A lost continuation parks a test behind ref'd timers; fail long before GitHub's 6 hours.
+    timeout-minutes: 60
           node-version: 24
 
       - name: Install npm dependencies
@@ -185,6 +187,10 @@ jobs:
 
       - name: Build napi addon
         run: cd runtimes/napi && npm run build:debug
+      # Builds typescript/dist, the @ubjs/core that runtimes/napi links and its tests load.
+      - name: Run bootstrap for N-API bindings
+        run: cargo xtask bootstrap yarn
+
 
       - name: Build test fixtures
         run: |
@@ -200,9 +206,6 @@ jobs:
       # Electron's V8 memory cage refuses external ArrayBuffers; ELECTRON_RUN_AS_NODE keeps it.
       - name: Run runtime tests under Electron
         run: cd runtimes/napi && npm run test:electron
-
-      - name: Run bootstrap for N-API bindings
-        run: cargo xtask bootstrap yarn
 
       - name: Run tests of generated N-API bindings
         run: "cargo test -- napi::"

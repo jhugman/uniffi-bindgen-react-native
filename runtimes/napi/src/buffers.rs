@@ -18,10 +18,11 @@
 //!   only the message bytes; the marker carries the capacity the allocator needs.
 //! - **`0`**: nothing is left to free, so `rustbuffer_free` does nothing. Either the
 //!   allocation was adopted by a callee or released, or the view is V8 memory the runtime
-//!   handed out: an empty return, or, under [`BufferViews::Copy`], every `rustbuffer_alloc`
-//!   view and every return. Lowering refuses a non-empty one under [`BufferViews::Alias`],
-//!   because it can only be a dangling adopted view, and copies it under
-//!   [`BufferViews::Copy`], because nothing is adopted there.
+//!   handed out: an empty return, a future's `complete` result in either mode, or, under
+//!   [`BufferViews::Copy`], every `rustbuffer_alloc` view and every return. Lowering
+//!   refuses a non-empty one under [`BufferViews::Alias`], because it cannot tell a dangling
+//!   adopted view from an async result, and copies it under [`BufferViews::Copy`], because
+//!   nothing is adopted there.
 
 use std::ffi::c_void;
 
@@ -33,6 +34,7 @@ use crate::core_err;
 use crate::napi_utils::{self, CapacitySymbol};
 
 /// Whether JS may view Rust memory, decided once per registration.
+#[derive(Clone, Copy)]
 pub(crate) enum BufferViews {
     /// JS views Rust memory directly, as on Node.
     Alias,
@@ -96,7 +98,10 @@ impl BufferViews {
     /// `TextDecoder.decode` for strings, field-by-field reads for composites).
     ///
     /// Under [`Self::Copy`], and for an empty buffer, the bytes are copied into V8 memory
-    /// and the Rust allocation is released at once.
+    /// and the Rust allocation is released at once. A future's `complete` always hands off
+    /// under [`Self::Copy`]: an async entry resolves with a JS-owned value, and the copy is
+    /// made here, marked 0, because the generated `liftFunc` frees every async result and
+    /// `rustbuffer_free` refuses an unmarked view.
     ///
     /// On any error in the handoff, we free the buffer to avoid leaking the
     /// Rust-side allocation.
@@ -204,6 +209,10 @@ impl BufferViews {
     ///   every view the runtime hands out. These are not ours to give away, so they are
     ///   **copied** into a fresh library allocation via `rustbuffer_from_bytes`.
     ///
+    /// Under [`Self::Alias`], a non-empty view marked `0` is **refused**: it is an adopted
+    /// view whose memory the callee may have freed, or an async result's copy, and nothing
+    /// tells the two apart.
+    ///
     /// The marker is the discriminator: the runtime knows a buffer's capacity precisely when
     /// the library allocated it. On adoption the marker is reset to `0`, which makes any later
     /// `rustbuffer_free(view)` a no-op rather than a double free.
@@ -252,11 +261,13 @@ impl BufferViews {
         match unsafe { capacity_symbol.get(raw_env, raw_val) }? {
             // No marker: an ordinary V8-backed array from JS, which is not ours to give away.
             None => copy_bytes(),
-            // The marker exists but has been zeroed, so this view was already adopted and
-            // its memory has since been freed by the callee. Reading it would be a
-            // use-after-free, so refuse rather than hand the callee a dangling pointer.
+            // The marker exists but has been zeroed: either this view was already adopted
+            // and its memory freed by the callee, or it is an async result's copy. Nothing
+            // tells the two apart, and reading the first would be a use-after-free, so
+            // refuse rather than hand the callee a dangling pointer.
             Some(0) if matches!(self, Self::Alias) => Err(napi::Error::from_reason(
-                "RustBuffer argument was already consumed by a previous FFI call".to_string(),
+                "RustBuffer argument was already consumed by a previous FFI call, or is an async result"
+                    .to_string(),
             )),
             // Nothing is adopted here, so a zeroed marker means live V8 memory the runtime
             // handed out, which is not ours to give away either.

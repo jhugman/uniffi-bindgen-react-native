@@ -67,6 +67,36 @@ const result = nm.uniffi_foo_fn_add(3, 4, status);
 
 Arguments go in as JavaScript values, come out as JavaScript values. Errors from Rust land in the `status` object.
 
+## Async functions
+
+A function whose definition has an `async` field starts a Rust future, and uniffi-runtime-napi runs that future's poll loop:
+
+```js
+uniffi_foo_fn_sleep: {
+  args: [FfiType.UInt32],
+  ret: FfiType.Handle,
+  hasRustCallStatus: false,
+  async: {
+    poll: "ffi_foo_rust_future_poll_u32",
+    cancel: "ffi_foo_rust_future_cancel_u32",
+    complete: "ffi_foo_rust_future_complete_u32",
+    free: "ffi_foo_rust_future_free_u32",
+    ret: FfiType.UInt32,
+  },
+},
+```
+
+Its function takes the arguments, a status object and an optional `AbortSignal`, and returns a Promise of the completed value:
+
+```js
+const status = { code: 0 };
+const result = await nm.uniffi_foo_fn_sleep(100, status, signal);
+```
+
+An error from Rust lands in `status`, as for a synchronous call, and aborting the signal cancels the future. Registration looks up the four exports `async` names, and fails if one is missing; they need no entry of their own in `functions`.
+
+The poll loop comes from `@ubjs/core`, a peer dependency: install it beside this package with `npm install @ubjs/node @ubjs/core`. A table without `async` fields does not load it.
+
 ## What crosses the boundary
 
 | JS side | Rust side |
@@ -89,13 +119,17 @@ This matters for async Rust code that runs work on background threads but needs 
 ## Building
 
 ```sh
-# Build the native addon
+# Build @ubjs/core's dist, which the async tests load (run from the repository root)
+cargo xtask bootstrap yarn
+
+# Install dependencies, which links @ubjs/core, and build the native addon
+npm install
 npm run build
 
-# Run tests (builds test fixtures first)
-cd fixtures/test_lib && cargo build && cd ../..
-cd fixtures/uniffi-fixture-simple && cargo build && cd ../..
+# Build the test libraries, then run the tests under Node and under Electron
+cargo build -p uniffi-napi-test-lib -p uniffi-fixture-simple -p uniffi-example-arithmetic
 npm test
+npm run test:electron
 ```
 
 Requires Rust, Node.js, and a C compiler (for libffi).
