@@ -86,6 +86,14 @@ npm install @ubjs/node @ubjs/core
 
 The generated bindings import from `@ubjs/core` and use `@ubjs/node` to open and call into your `cdylib`. With `--lib-colocated`, place the compiled `cdylib` next to the generated JavaScript.
 
+### Async functions
+
+`@ubjs/node` runs UniFFI's poll loop for each `async fn` itself, as `@ubjs/wasm` does. Each async function becomes one entry that returns a Promise of the completed value, so the generated code awaits a single call however many times Rust polls the future. Each wake from a Rust thread costs one hop to the JS thread.
+
+`@ubjs/node` builds those entries with `@ubjs/core`, which it lists as a peer dependency; the install line above already adds it.
+
+Bindings need `@ubjs/node` from the same release of `uniffi-bindgen-react-native` that generated them. An older `@ubjs/node` does not run the poll loop, so the first async call fails with an `IncompatiblePlayer` error. Upgrade `@ubjs/node` and `@ubjs/core` together when you regenerate.
+
 ### In Electron
 
 The same bindings run in Electron's main process and in its utility processes, which are Node environments too. Electron's V8 memory cage does not let JavaScript view memory that V8 did not allocate, so there the runtime copies each `RustBuffer` across instead of handing JavaScript a view of Rust's memory. On Node the view needs no copy. The runtime checks once, when a module registers, which of the two it is running in.
@@ -94,5 +102,6 @@ The same bindings run in Electron's main process and in its utility processes, w
 
 - No `ubrn build node` / scaffolding command yet — you compile the `cdylib` and run `ubrn generate napi` yourself.
 - C++ bindings are not generated for this target; only TypeScript is produced.
+- Calling `unload()` on a `UniffiNativeModule` while an async call is in flight leaves that call's Promise pending. The pending call keeps the Node process alive, and its Rust future is never freed. Abort in-flight calls and let them settle before you call `unload()`, or exit the process explicitly.
 
 See the [`@ubjs/node` README](https://github.com/jhugman/uniffi-bindgen-react-native/tree/main/runtimes/napi) for lower-level details on how the runtime marshals values, dispatches callbacks across threads, and loads libraries.

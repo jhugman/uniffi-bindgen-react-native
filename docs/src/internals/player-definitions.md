@@ -14,7 +14,7 @@ Three flavors are players and they share one table:
 | `wasm2` | `@ubjs/wasm`, pure TypeScript | `runtimes/wasm/core` |
 | `jsi2` | a C++ shim over `runtimes/core`, installed as `globalThis.uniffi` | `runtimes/core` |
 
-The bindgen emits the table into `<namespace>-ffi.ts` as a constant named `DEFINITIONS`. The table body is identical across the three flavors; what differs is the import that supplies the `FfiType` factory and the call that registers the table. See [Per-flavor differences](#per-flavor-differences).
+The bindgen emits the table into `<namespace>-ffi.ts` as a constant named `DEFINITIONS`. The table body is identical across the three flavors except for async functions, since `napi` and `wasm2` run the poll loop and `jsi2` does not. Otherwise only the import that supplies the `FfiType` factory and the call that registers the table differ. See [Per-flavor differences](#per-flavor-differences).
 
 ## The root object
 
@@ -108,20 +108,41 @@ Registration turns each entry into a JavaScript function on the returned module 
 
 An entry with `async` starts a future, and the player runs that future's poll loop. Its function takes `(...args, status, signal)` and returns a Promise of the completed value, lifted as `async.ret`.
 
+A `jsi2` table lists a future-starting export as an ordinary function, beside the family the generated code polls it with:
+
 ```typescript
 uniffi_uniffi_futures_fn_method_megaphone_say_after: {
   args: [FfiType.Handle, FfiType.UInt16, FfiType.RustBuffer],
   ret: FfiType.Handle,
   hasRustCallStatus: false,
 },
-ffi_uniffi_futures_rust_future_complete_u64: {
+ffi_uniffi_futures_rust_future_complete_rust_buffer: {
   args: [FfiType.Handle],
-  ret: FfiType.Handle,
+  ret: FfiType.RustBuffer,
   hasRustCallStatus: true,
 },
 ```
 
-The bindgen lists every scaffolding function, object clone and free, vtable init, the contract-version export and every checksum. It lists the `rust_future_poll`, `complete`, `cancel` and `free` family only when the crate has an async function and the player leaves the poll loop to the generated code; for `wasm2`, each future-starting export names its family in `async` instead. It never lists the `rustbuffer_*` exports; those live in `symbols`. The filter is `should_include_function` in [`ffi_module/builder.rs`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_bindgen/src/bindings/gen_typescript/ffi_module/builder.rs).
+A `napi` or `wasm2` table names the family in the same start function's `async` field instead:
+
+```typescript
+uniffi_uniffi_futures_fn_method_megaphone_say_after: {
+  args: [FfiType.Handle, FfiType.UInt16, FfiType.RustBuffer],
+  ret: FfiType.Handle,
+  hasRustCallStatus: false,
+  async: {
+    poll: "ffi_uniffi_futures_rust_future_poll_rust_buffer",
+    cancel: "ffi_uniffi_futures_rust_future_cancel_rust_buffer",
+    complete: "ffi_uniffi_futures_rust_future_complete_rust_buffer",
+    free: "ffi_uniffi_futures_rust_future_free_rust_buffer",
+    ret: FfiType.RustBuffer,
+  },
+},
+```
+
+The player resolves those four exports by name and gives them UniFFI's fixed shapes, and it supplies the `RustFutureContinuationCallback` itself, so the table has no entry for it.
+
+The bindgen lists every scaffolding function, object clone and free, vtable init, the contract-version export and every checksum. It never lists the `rustbuffer_*` exports; those live in `symbols`. For async functions, `napi` and `wasm2` name each future-starting export's `rust_future_poll`, `complete`, `cancel` and `free` family in `async`. `jsi2` lists that family as ordinary functions, and only when the crate has an async function, because its generated code drives the loop. The filter is `should_include_function` in [`ffi_module/builder.rs`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_bindgen/src/bindings/gen_typescript/ffi_module/builder.rs).
 
 ### Call status
 
@@ -144,11 +165,11 @@ interface CallbackDef {
 }
 ```
 
-A callback entry describes a function Rust calls into JavaScript: the shape a JavaScript function must have before the generated code can pass it as a `Callback(name)`, whether as an argument or as a vtable field. The names come from UniFFI: `RustFutureContinuationCallback`, `CallbackInterface<Interface>Method<N>`, `CallbackInterfaceFree<Interface>`, `CallbackInterfaceClone<Interface>`, `ForeignFutureComplete<Type>`, and `ForeignFutureDroppedCallback`.
+A callback entry describes a function Rust calls into JavaScript: the shape a JavaScript function must have before the generated code can pass it as a `Callback(name)`, whether as an argument or as a vtable field. The names come from UniFFI: `RustFutureContinuationCallback`, `CallbackInterface<Interface>Method<N>`, `CallbackInterfaceFree<Interface>`, `CallbackInterfaceClone<Interface>`, `ForeignFutureComplete<Type>`, and `ForeignFutureDroppedCallback`. Only `jsi2` tables list `RustFutureContinuationCallback`: the `napi` and `wasm2` players supply it themselves.
 
 The JavaScript function receives one lifted value per element of `args`, using the same table as above. What it returns depends on the two flags.
 
-**Neither flag set.** The function returns the `ret` value directly, or nothing for `Void`. Free, clone and the continuation callback look like this.
+**Neither flag set.** The function returns the `ret` value directly, or nothing for `Void`. Free, clone and, in a `jsi2` table, the continuation callback look like this.
 
 **`outReturn`.** UniFFI's vtable methods return through an out-pointer rather than a C return value: the C signature has a trailing `uniffi_out_return` (or `uniffi_out_dropped_callback`) pointer argument and returns `void`. The bindgen strips that argument from `args`, puts its pointee type in `ret`, and sets the flag. The runtime adds the pointer parameter back and writes the function's return value through it. The JavaScript side sees an ordinary return.
 
@@ -216,10 +237,11 @@ ForeignFutureDroppedCallbackStruct: [
 
 ## Per-flavor differences
 
-The table body is the same text in all three flavors. The template, [`wrapper-ffi-player.ts`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_bindgen/src/bindings/gen_typescript/templates/wrapper-ffi-player.ts), switches only the framing.
+The table body is the same text in all three flavors, except that `napi` and `wasm2` run the poll loop: their tables name each async function's future family in `async`, and `jsi2` tables list it as ordinary functions (see [`functions`](#functions)). Beyond that, the template, [`wrapper-ffi-player.ts`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_bindgen/src/bindings/gen_typescript/templates/wrapper-ffi-player.ts), switches only the framing.
 
 | | `napi` | `wasm2` | `jsi2` |
 | - | ------ | ------- | ------ |
+| Runs the poll loop | yes | yes | no |
 | `FfiType` comes from | `@ubjs/node` default export | `@ubjs/wasm/core` | `@ubjs/core` |
 | Type check on the literal | none | `satisfies ModuleDefinitions` | `as const` only |
 | Registered by | `UniffiNativeModule.open(path).register(DEFINITIONS)` in the getter | `registerSync(PLAYER_DEFINITIONS)` from the generated `index.ts` | `globalThis.uniffi.open(path).register(DEFINITIONS)` in the getter |
@@ -238,12 +260,13 @@ The schema has no single source. Each consumer declares it in its own language, 
 
 | Path | Language | Role |
 | ---- | -------- | ---- |
-| `typescript/src/ffi-definitions.ts` | TypeScript | `FfiTypeDesc`, the `FfiType` factory, `ModuleDefinitions`, `FunctionDef`, `CallbackDef`, `FieldDesc`; `@ubjs/wasm/core` re-exports them |
+| `typescript/src/ffi-definitions.ts` | TypeScript | `FfiTypeDesc`, the `FfiType` factory, `ModuleDefinitions`, `FunctionDef`, `AsyncFunctionDef`, `CallbackDef`, `FieldDesc`; `@ubjs/wasm/core` re-exports them |
 | `runtimes/napi/lib.js` | JavaScript | the `FfiType` factory, no types |
 | `runtimes/core/src/ffi_type.rs`, `spec.rs` | Rust | `FfiTypeDesc`, `ModuleSpec` and the three `*Def` structs |
+| `runtimes/core/src/future.rs` | Rust | `AsyncFunctionDef`, and `add_async_entries`, which adds UniFFI's fixed future shapes to a `ModuleSpec` |
 | `runtimes/napi/src/register/spec_from_js.rs` | Rust | the parser from the JavaScript object to `ModuleSpec` |
 | `crates/ubrn_bindgen/src/bindings/gen_typescript/ffi_module_player/` | Rust | the IR the template renders; `args` and `ret` are already strings such as `"FfiType.UInt32"` |
-| `crates/ubrn_bindgen/tests/player_template_snapshots.rs`, `wasm2_codegen.rs` | Rust | snapshots that pin the emitted shape |
+| `crates/ubrn_bindgen/tests/player_template_snapshots.rs`, `wasm2_codegen.rs`, `napi_codegen.rs` | Rust | snapshots that pin the emitted shape |
 
 ```admonish warning
 Adding a tag means changing all of them: the two factories, the TypeScript union in `@ubjs/core`, the Rust enum, the `napi` parser, the `wasm2` `planArg` and lift switches, the bindgen mapping, and the snapshots. Nothing checks that the set is the same in every place except the fixture tests, which only exercise tags UniFFI emits.
