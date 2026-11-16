@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-async-traits -- async_wasm
+//   cargo test -p uniffi-fixture-async-traits -- async_napi
 
 import { getSayAfterTraits } from "@/generated/async_traits";
 import { asyncTest } from "@/asserts";

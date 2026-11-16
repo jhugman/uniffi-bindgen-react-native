@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-coverall -- async_wasm
+//   cargo test -p uniffi-fixture-coverall -- async_napi
 
 import "@/polyfills";
 import {

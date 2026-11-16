@@ -10,5 +10,5 @@ ubrn_macros::build_foreign_language_testcases! {
     // concluding it has hung.
     "tests/bindings/test_benchmark.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
     // Every call awaited, so one script runs direct and over the Worker.
-    "tests/bindings/test_benchmark_async.ts" => [Wasm2, AsyncWasm],
+    "tests/bindings/test_benchmark_async.ts" => [Wasm2, AsyncWasm, AsyncNapi],
 }

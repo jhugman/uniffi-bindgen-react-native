@@ -114,8 +114,10 @@ pub(crate) fn generated_namespaces(ts_dir: &Utf8Path) -> Vec<String> {
     namespaces
 }
 
-/// Generate bindings via the CLI, using the `wasm2` subcommand.
-fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path, extra_args: &[&str]) {
+/// Generate bindings via the CLI, using the `wasm2` subcommand. The library
+/// may be a `.wasm` or a native cdylib: bindgen reads the same metadata from
+/// either.
+pub(crate) fn generate_bindings(cdylib_path: &Utf8Path, ts_dir: &Utf8Path, extra_args: &[&str]) {
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
         .arg("-p")

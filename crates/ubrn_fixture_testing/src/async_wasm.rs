@@ -6,7 +6,8 @@
 
 //! Run a fixture with `--async` bindings over `@ubjs/worker`: the
 //! wasm2 player behind a receiver in a node Worker, the generated code in
-//! front of a sender on the main thread.
+//! front of a sender on the main thread. [`crate::async_napi`] shares the
+//! bootstrap, with its own Worker entry.
 
 use camino::{Utf8Path, Utf8PathBuf};
 
@@ -14,7 +15,7 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
     let _lock = crate::lock_fixture();
     let p = crate::wasm2::prepare(crate_name, target_tmpdir, crate::Flavor::AsyncWasm);
     let test_script = Utf8Path::new(test_script);
-    let bootstrap = write_node_bootstrap(&p.ts_dir, &p.lib_stem);
+    let bootstrap = write_node_bootstrap(&p.ts_dir, worker_source(&p.ts_dir, &p.lib_stem));
     let _tsconfig_guard = crate::CleanupFile::new(crate::write_fixture_tsconfig(
         &p.fixture_dir,
         crate::Flavor::AsyncWasm,
@@ -24,11 +25,12 @@ pub fn run_test(crate_name: &str, test_script: &str, target_tmpdir: &str) {
 
 const WORKER_FILE: &str = "uniffi-worker.async-wasm.ts";
 const WORKER_BOOTSTRAP_FILE: &str = "uniffi-worker-bootstrap.async-wasm.mjs";
-const DEFINITIONS_MODULE: &str = "uniffi-definitions.async-wasm";
+pub(crate) const DEFINITIONS_MODULE: &str = "uniffi-definitions.async-wasm";
 
 /// The preload: on the main thread, one `MessageChannel` for the whole
 /// library, its receiver end transferred into a Worker, one sender in front of
-/// every generated module.
+/// every generated module. `worker_src` is the Worker entry, which puts one
+/// receiver, over the flavor's player, on `workerData.port`.
 ///
 /// There is one channel, not one per namespace: the generated clone of an
 /// object is fire-and-forget and must arrive before the call that consumes
@@ -45,10 +47,10 @@ const DEFINITIONS_MODULE: &str = "uniffi-definitions.async-wasm";
 ///
 /// The Worker is unref'd once initialised: the sender refs its port while a
 /// call is outstanding, so a finished script exits.
-fn write_node_bootstrap(ts_dir: &Utf8Path, lib_stem: &str) -> Utf8PathBuf {
+pub(crate) fn write_node_bootstrap(ts_dir: &Utf8Path, worker_src: String) -> Utf8PathBuf {
     let namespaces = crate::wasm2::generated_namespaces(ts_dir);
     write_definitions(ts_dir, &namespaces);
-    write_worker(ts_dir, lib_stem);
+    write_generated(ts_dir, WORKER_FILE, worker_src);
     write_worker_bootstrap(ts_dir);
 
     let mut src = format!(
@@ -152,12 +154,16 @@ fn write_definitions(ts_dir: &Utf8Path, namespaces: &[String]) {
 }
 
 /// Plain-JS shim the Worker actually loads (given `execArgv: []`, it starts
-/// with none of tsx's own hooks registered). It registers tsx's loader
+/// with none of tsx's own hooks registered). It registers tsx's loaders
 /// itself via the programmatic API, then dynamically imports the real
 /// worker module — by then `@ubjs/*` and extensionless imports resolve.
+/// The CommonJS hooks are for `@ubjs/node`, whose `lib.js` `require`s
+/// `@ubjs/core`: without them that require sees no tsconfig `paths`.
 fn write_worker_bootstrap(ts_dir: &Utf8Path) {
     let src = format!(
-        "import {{ register }} from \"tsx/esm/api\";\n\
+        "import {{ register as registerCjs }} from \"tsx/cjs/api\";\n\
+         import {{ register }} from \"tsx/esm/api\";\n\
+         registerCjs();\n\
          register();\n\
          await import(new URL(\"./{WORKER_FILE}\", import.meta.url));\n"
     );
@@ -167,7 +173,7 @@ fn write_worker_bootstrap(ts_dir: &Utf8Path) {
 /// The Worker entry: open the wasm and put the one receiver on the port it was
 /// handed. Mirrors the init sequence in the generated index template
 /// (`gen_typescript/templates/index.ts`): openWasm, resolveModule, registerSync.
-fn write_worker(ts_dir: &Utf8Path, lib_stem: &str) {
+fn worker_source(ts_dir: &Utf8Path, lib_stem: &str) -> String {
     let glue = ts_dir.join(format!("{lib_stem}_bg.js")).exists();
     let mut src = format!(
         "import {{ workerData }} from \"node:worker_threads\";\n\
@@ -187,5 +193,5 @@ fn write_worker(ts_dir: &Utf8Path, lib_stem: &str) {
             String::new()
         }
     ));
-    write_generated(ts_dir, WORKER_FILE, src);
+    src
 }

@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-value-type-methods -- async_wasm
+//   cargo test -p uniffi-fixture-value-type-methods -- async_napi
 
 import { Point, Direction, Shape } from "@/generated/uniffi_value_type_methods";
 import { asyncTest } from "@/asserts";

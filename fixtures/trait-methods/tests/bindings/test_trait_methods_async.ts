@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-trait-methods -- async_wasm
+//   cargo test -p uniffi-fixture-trait-methods -- async_napi
 
 import {
   TraitMethods,

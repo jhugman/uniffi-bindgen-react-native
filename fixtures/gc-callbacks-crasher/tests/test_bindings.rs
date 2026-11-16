@@ -5,5 +5,5 @@
  */
 ubrn_macros::build_foreign_language_testcases! {
     "tests/bindings/test_gc_callbacks_crasher.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
-    "tests/bindings/test_gc_callbacks_crasher_async.ts" => [AsyncWasm],
+    "tests/bindings/test_gc_callbacks_crasher_async.ts" => [AsyncWasm, AsyncNapi],
 }
