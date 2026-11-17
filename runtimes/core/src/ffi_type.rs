@@ -7,7 +7,7 @@
 
 use crate::{Error, Result};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FfiTypeDesc {
     UInt8,
     Int8,
