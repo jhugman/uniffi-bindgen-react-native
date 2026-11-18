@@ -47,6 +47,14 @@ jobs:
         if: hashFiles('channels/worker/package.json') != ''
         run: cd channels/worker && npm ci
 
+      # `--ignore-scripts` keeps npm from running the linked `runtimes/napi`
+      # `prepare`, a release `napi build`.
+      - name: Install @ubjs/electron
+        if: hashFiles('channels/electron/package.json') != ''
+        run: |
+          cd runtimes/napi && npm ci --ignore-scripts && npm run build:ts
+          cd ../../channels/electron && npm ci --ignore-scripts && npm run build
+
       - name: Create @ubjs/node package dirs
         if: inputs.napi-targets != 'none'
         run: cd runtimes/napi && npm ci --ignore-scripts && npm run create-npm-dirs
@@ -73,14 +81,14 @@ jobs:
           npm run assemble-root
 
       # pkg-pr-new skips a path that doesn't exist, so a branch without
-      # `channels/worker` publishes the other two. Published together, the
-      # @ubjs/node packages point at each other's preview URLs.
+      # `channels/worker` or `channels/electron` publishes the rest. Packages
+      # published together point at each other's preview URLs.
       - name: "📦 Publish to pkg.pr.new"
         id: publish
         run: |
           napi=()
           [ -d runtimes/napi/npm/root ] && napi=(./runtimes/napi/npm/*/)
-          yarn pkg-pr-new publish ./typescript ./runtimes/wasm ./channels/worker "${napi[@]}"
+          yarn pkg-pr-new publish ./typescript ./runtimes/wasm ./channels/worker ./channels/electron "${napi[@]}"
 
       # Yarn 2+ only treats a URL as a tarball when it ends in `.tgz`, and the
       # URLs pkg.pr.new writes into the packages' own dependencies do not.
@@ -106,4 +114,8 @@ jobs:
             (IFS=$'\n'; echo "${resolutions[*]}") | sed '$!s/$/,/'
             echo '  }'
             echo '```'
+            if [[ " $PACKAGES " == *" @ubjs/electron@"* && " $PACKAGES " != *" @ubjs/node@"* ]]; then
+              echo
+              echo "This \`@ubjs/electron\` takes \`@ubjs/node\` from npm, which may lack this branch's changes; set \`napi-targets\` to preview it too."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

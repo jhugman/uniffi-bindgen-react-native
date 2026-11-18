@@ -215,6 +215,29 @@ jobs:
       - name: Run tests of generated N-API bindings
         run: "cargo test -- napi::"
 
+  integration-tests-electron:
+    name: 🧩 Integration tests (Electron)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Run bootstrap
+        run: cargo xtask bootstrap yarn
+
+      - name: Build @ubjs/worker
+        run: cd channels/worker && npm ci
+
+      - name: Build @ubjs/node
+        run: cd runtimes/napi && npm ci --ignore-scripts && npm run build:debug
+
+      - name: Build and unit-test @ubjs/electron
+        run: cd channels/electron && npm ci --ignore-scripts && npm run build && npm test && npm run typecheck
+
   integration-tests-checkout:
     name: 🧩 Integration tests (checkout)
     runs-on: ubuntu-latest
