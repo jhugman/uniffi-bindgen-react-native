@@ -10,17 +10,12 @@ name = "gc_callbacks_crasher"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-async-std = "1.12.0"
 async-trait = "0.1.83"
-thiserror = "1.0"
 uniffi = { workspace = true, features = ["tokio"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uniffi-runtime-wasm = { workspace = true }
 uniffi_core = { workspace = true, features = ["wasm-unstable-single-threaded"] }
-
-[build-dependencies]
-uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
 ubrn_macros = { workspace = true }
