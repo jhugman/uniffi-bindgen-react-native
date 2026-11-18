@@ -47,7 +47,7 @@ pub fn run_test(test_script: &str, flavor: Flavor, target_tmpdir: &str) {
             crate::run_tsx(test_script);
         }
         // Both need a fixture crate to build; no framework test lists them.
-        Flavor::AsyncWasm | Flavor::AsyncNapi => {
+        Flavor::AsyncWasm | Flavor::AsyncNapi | Flavor::AsyncElectron => {
             unimplemented!("{flavor_name} flavor is fixture-only, see its run_test")
         }
     }

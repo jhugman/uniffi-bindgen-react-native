@@ -105,3 +105,6 @@ runtimes/jsi/node_modules/
 # npm pack output, left behind by the compile gate
 typescript/*.tgz
 runtimes/jsi/*.tgz
+
+# @ubjs/electron fixture runs
+channels/electron/.fixture-runs/

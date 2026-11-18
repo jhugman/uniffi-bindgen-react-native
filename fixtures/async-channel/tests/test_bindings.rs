@@ -6,5 +6,6 @@
 // Named for the channel, not the flavor: an AsyncJsi flavor runs the same
 // script once a native transport exists.
 ubrn_macros::build_foreign_language_testcases! {
-    "tests/bindings/test_async_channel.ts" => [AsyncWasm, AsyncNapi],
+    "tests/bindings/test_async_channel.ts" => [AsyncWasm, AsyncNapi, AsyncElectron],
+    "tests/bindings/test_electron_lifecycle.ts" => [AsyncElectron],
 }
