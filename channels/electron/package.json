@@ -1,0 +1,58 @@
+{
+  "name": "@ubjs/electron",
+  "version": "0.31.0-7",
+  "description": "Runs a native uniffi library in an Electron utility process and drives it from a sandboxed page.",
+  "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhugman/uniffi-bindgen-react-native.git",
+    "directory": "channels/electron"
+  },
+  "license": "MPL-2.0",
+  "author": { "name": "James Hugman", "email": "james@hugman.tv" },
+  "keywords": ["uniffi", "ffi", "rust", "electron", "utilityprocess", "messageport", "typescript"],
+  "type": "module",
+  "exports": {
+    "./main": {
+      "import": { "types": "./dist/node/main/index.d.ts", "default": "./dist/node/main/index.js" },
+      "require": { "types": "./dist/cjs/main/index.d.ts", "default": "./dist/cjs/main/index.js" }
+    },
+    "./utility": { "types": "./dist/node/utility/index.d.ts", "default": "./dist/node/utility/index.js" },
+    "./page": { "types": "./dist/page/page/index.d.ts", "default": "./dist/page/page/index.js" },
+    "./preload": "./dist/preload.cjs",
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "main": ["dist/cjs/main/index.d.ts"]
+    }
+  },
+  "files": ["dist/", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.node.json && tsc -p tsconfig.cjs.json && tsc -p tsconfig.page.json && node scripts/build.mjs",
+    "prepare": "npm run build",
+    "pretest": "node scripts/build.mjs",
+    "test": "node --test --import tsx './tests/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ubjs/node": "^0.31.0-7",
+    "@ubjs/worker": "^0.31.0-7"
+  },
+  "peerDependencies": {
+    "@ubjs/core": "^0.31.0-7",
+    "electron": ">=41"
+  },
+  "peerDependenciesMeta": { "electron": { "optional": true } },
+  "devDependencies": {
+    "@ubjs/core": "file:../../typescript",
+    "@ubjs/node": "file:../../runtimes/napi",
+    "@ubjs/worker": "file:../worker",
+    "@types/node": "^24",
+    "electron": "41.10.2",
+    "esbuild": "^0.25",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "publishConfig": { "access": "public" }
+}
