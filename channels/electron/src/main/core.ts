@@ -68,8 +68,6 @@ export interface MainDeps {
   isPackaged(): boolean;
   fileExists(path: string): boolean;
   warn(message: string): void;
-  /** For a utility that outlives its kill(); a pid already gone is ignored. */
-  sigkill(pid: number): void;
 }
 
 export interface MainApi {
@@ -244,7 +242,6 @@ export function createMain(deps: MainDeps): MainApi {
         wc,
         utilityProcess: deps.utilityProcess,
         MessageChannelMain: deps.MessageChannelMain,
-        sigkill: deps.sigkill,
         warn: deps.warn,
         emit(event) {
           try {

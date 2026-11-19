@@ -118,7 +118,7 @@ export class FakeUtility extends EventEmitter {
   }
 }
 
-/** Main's Electron objects, recording every fork, channel, warning and SIGKILL. */
+/** Main's Electron objects, recording every fork, channel and warning. */
 export function fakeMain() {
   const ipcMain = new EventEmitter();
   const forks: {
@@ -129,7 +129,6 @@ export function fakeMain() {
   }[] = [];
   const channels: { port1: FakePortMain; port2: FakePortMain }[] = [];
   const warnings: string[] = [];
-  const sigkills: number[] = [];
   const files = new Set(["/app/lib.dylib"]);
   let packaged = false;
   let forkError: Error | undefined;
@@ -161,7 +160,6 @@ export function fakeMain() {
     isPackaged: () => packaged,
     fileExists: (path: string) => files.has(path),
     warn: (message: string) => void warnings.push(message),
-    sigkill: (pid: number) => void sigkills.push(pid),
   } as unknown as MainDeps;
 
   return {
@@ -170,7 +168,6 @@ export function fakeMain() {
     forks,
     channels,
     warnings,
-    sigkills,
     files,
     setPackaged(value: boolean) {
       packaged = value;

@@ -132,42 +132,33 @@ test("a new request retires the current connection before forking", () => {
     s.events.map((e) => `${e.kind} ${e.id}`),
     [`spawn ${ID1}`, `ready ${ID1}`, `exit ${ID1}`, `spawn ${ID2}`],
   );
-  assert.deepStrictEqual(s.fx.sigkills, []);
 });
 
-test("a utility that ignores kill gets SIGKILL after 2 s", (t) => {
-  mockTimers(t);
+test("a utility retired before it spawned is killed when it spawns", () => {
   const s = setup();
-  const child1 = s.live(ID1, 101);
+  s.ask(ID1);
+  const early = s.fx.forks[0].child;
   s.ask(ID2);
-  t.mock.timers.tick(1999);
-  assert.deepStrictEqual(s.fx.sigkills, []);
-  t.mock.timers.tick(1);
-  assert.deepStrictEqual(s.fx.sigkills, [101]);
-  assert.strictEqual(s.fx.forks.length, 1, "still waiting for its exit");
-  child1.exit(9);
-  assert.strictEqual(s.fx.forks.length, 2);
-
-  // An exit within the bound cancels it.
-  const u = setup();
-  const child = u.live(ID1, 201);
-  u.ask(ID2);
-  t.mock.timers.tick(1999);
-  child.exit(15);
-  t.mock.timers.tick(5000);
-  assert.deepStrictEqual(u.fx.sigkills, []);
-
-  // Killed before it spawned, its bound starts when it spawns.
-  const v = setup();
-  v.ask(ID1);
-  const early = v.fx.forks[0].child;
-  v.ask(ID2);
-  t.mock.timers.tick(5000);
-  assert.deepStrictEqual(v.fx.sigkills, []);
+  assert.strictEqual(early.killed, 1, "a kill before spawn does nothing");
   early.spawn(301);
   assert.strictEqual(early.killed, 2, "killed again on spawn");
-  t.mock.timers.tick(2000);
-  assert.deepStrictEqual(v.fx.sigkills, [301]);
+  assert.strictEqual(s.fx.forks.length, 1, "still waiting for its exit");
+  early.exit(15);
+  assert.strictEqual(s.fx.forks.length, 2);
+});
+
+test("a utility retired twice is killed once and its page told once", () => {
+  const s = starting();
+  s.ask(ID2);
+  s.handle.close();
+  assert.strictEqual(s.child.killed, 1);
+  // close() also answers the waiting ID2; ID1 hears only that it was replaced.
+  assert.deepStrictEqual(
+    errorReplies(s.frame)
+      .filter((r) => r.id === ID1)
+      .map((r) => r.reason),
+    ["start-failed"],
+  );
 });
 
 test("three requests in a row fork once more, for the newest id", () => {

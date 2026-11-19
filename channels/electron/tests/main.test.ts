@@ -237,7 +237,7 @@ test("a fork that throws fails the start", () => {
   assert.deepStrictEqual(fx.channels, []);
 });
 
-test("an init that throws kills the child, even before it spawns, and fails the start", () => {
+test("an init that throws fails the start and retires the child, even before it spawns", () => {
   const fx = fakeMain();
   fx.failInit(new TypeError("An object could not be cloned."));
   const s = setup({}, fx);
@@ -253,7 +253,19 @@ test("an init that throws kills the child, even before it spawns, and fails the 
   assert.strictEqual(child.killed, 1);
   child.spawn(7);
   assert.strictEqual(child.killed, 2);
-  assert.deepStrictEqual(s.events, [], "no spawn reported for it");
+
+  // Like any failed start: a new request waits for its exit, which is reported.
+  s.ask(s.frame, { id: "f".repeat(32) });
+  assert.strictEqual(fx.forks.length, 1, "no fork alongside it");
+  child.exit(1);
+  assert.strictEqual(fx.forks.length, 2);
+  assert.deepStrictEqual(
+    s.events.map((e) => [e.kind, "expected" in e ? e.expected : undefined]),
+    [
+      ["spawn", undefined],
+      ["exit", false],
+    ],
+  );
 });
 
 test("a utility's fatal error is warned, not thrown", () => {

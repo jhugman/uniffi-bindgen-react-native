@@ -22,13 +22,6 @@ const main = sharedMain(() =>
     isPackaged: () => app.isPackaged,
     fileExists: existsSync,
     warn: (message) => console.warn(`@ubjs/electron: ${message}`),
-    sigkill: (pid) => {
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {
-        // It exited first.
-      }
-    },
   }),
 );
 
