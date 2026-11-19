@@ -305,14 +305,24 @@ pub(crate) unsafe fn alloc_aliased(
     // SAFETY: rb.data points to a valid allocation of `len` bytes that the Rust
     // library owns; the view is released either by `rustbuffer_free(view)` or by being
     // adopted when passed as an FFI argument, so no finalizer is required.
-    let typedarray = unsafe { napi_utils::create_external_uint8array(raw_env, rb.data, len)? };
-    // Mark unconditionally, including `rustbuffer_alloc(0)` where the capacity is 0: an
-    // absent marker means "not the library's, refuse to free", so a zero-capacity view is
-    // marked 0 rather than left bare.
-    //
-    // SAFETY: `raw_env` is the active env for this callback, and `typedarray` is the
-    // view created just above.
-    unsafe { capacity_symbol.set(raw_env, typedarray, rb.capacity)? };
+    let typedarray = unsafe { napi_utils::create_external_uint8array(raw_env, rb.data, len) }
+        .and_then(|typedarray| {
+            // Mark unconditionally, including `rustbuffer_alloc(0)` where the capacity is
+            // 0: an absent marker means "not the library's, refuse to free", so a
+            // zero-capacity view is marked 0 rather than left bare.
+            //
+            // SAFETY: `raw_env` is the active env for this callback, and `typedarray` is
+            // the view created just above.
+            unsafe { capacity_symbol.set(raw_env, typedarray, rb.capacity)? };
+            Ok(typedarray)
+        })
+        .inspect_err(|_| {
+            // No view reaches JS, so nothing else will free `rb`.
+            //
+            // SAFETY: `rb` was allocated above and is not handed to JS; `free_ptr` was
+            // resolved at registration time.
+            unsafe { napi_utils::free_rustbuffer(rb, module.rb_ops().free_ptr) };
+        })?;
     // SAFETY: `raw_env` is the active env for this callback, and `typedarray` is the
     // live napi_value created above.
     unsafe { JsUnknown::from_raw(raw_env, typedarray) }

@@ -249,6 +249,17 @@ test("a lowered view passed twice is refused only where it was adopted", () => {
 });
 
 test(
+  "under Node, views alias Rust memory",
+  { skip: process.versions.electron ? "only under Node" : false },
+  () => {
+    // The mode-dependent tests above take the mode from the runtime, so a probe that
+    // wrongly answered Copy on Node would pass them as one more skip. This pins it.
+    const { nm } = openModule();
+    assert.strictEqual(adoptsAllocViews(nm), true);
+  },
+);
+
+test(
   "under Electron, views are copied rather than aliased",
   { skip: process.versions.electron ? false : "only under Electron" },
   () => {

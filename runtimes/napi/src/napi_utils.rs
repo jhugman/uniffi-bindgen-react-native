@@ -275,12 +275,14 @@ impl Drop for CapacitySymbol {
 /// The `ArrayBuffer` owns the backing memory; the `TypedArray` is a lightweight
 /// view with zero additional allocation. We copy `len` bytes from `data` into
 /// the newly allocated `ArrayBuffer` and return the `Uint8Array` view as a raw
-/// `napi_value`.
+/// `napi_value`. A null `data` copies nothing, leaving `len` zeroed bytes: this is how
+/// `rustbuffer_alloc` makes a view where external buffers are refused.
 ///
 /// # Safety
 ///
 /// - `raw_env` must be a valid `napi_env` for the current callback scope.
-/// - `data` must point to at least `len` readable bytes (ignored when `len == 0`).
+/// - `data` must be null or point to at least `len` readable bytes (ignored when
+///   `len == 0`).
 pub unsafe fn create_uint8array(
     raw_env: napi::sys::napi_env,
     data: *const u8,
