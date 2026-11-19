@@ -6,7 +6,14 @@
 // The page: connects through @ubjs/electron, then runs the fixture's script.
 import { connect } from "@ubjs/electron/page";
 import { uniffiInitAsync } from "@/generated/index.port";
-import { fixture, setConnection, settled } from "@/asserts";
+import {
+  exitOf,
+  fixture,
+  pageIndex,
+  setConnection,
+  settled,
+  utilityPid,
+} from "@/asserts";
 
 const errors: string[] = [];
 addEventListener("error", (ev) => errors.push(String(ev.error ?? ev.message)));
@@ -16,6 +23,10 @@ addEventListener("unhandledrejection", (ev) =>
 
 (async () => {
   try {
+    // A reload's old utility must end itself once its port closes. Waiting for
+    // that before connecting means a retire for this connect cannot stand in.
+    const page = await pageIndex();
+    if (page > 0) await exitOf(await utilityPid(page - 1));
     const start = performance.now();
     const conn = await connect({ timeoutMs: 15_000 });
     await uniffiInitAsync(conn.port);

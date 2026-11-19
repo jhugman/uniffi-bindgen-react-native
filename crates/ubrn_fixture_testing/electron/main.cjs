@@ -18,14 +18,26 @@ const events = [];
 const waiters = [];
 // The utility each load of the window connected to.
 const pidOfPage = [];
+// Utilities the script killed on purpose, whose exits are not failures.
+const killed = new Set();
 let page = 0;
 let win;
 let finished = false;
 
-function finish(failure) {
+// Every utility but the one the window still holds must have exited.
+async function lingering() {
+  const holding = win?.isDestroyed() === false ? pidOfPage[page] : undefined;
+  const others = result.pids.filter((pid) => pid !== holding);
+  const outcomes = await Promise.allSettled(others.map(exitOf));
+  return others.filter((_, i) => outcomes[i].status === "rejected");
+}
+
+async function finish(failure) {
   if (finished) return;
   finished = true;
   if (failure) result.failures.push(failure);
+  // Checked before main exits: Electron takes every utility down with it.
+  for (const pid of await lingering()) result.failures.push(`utility ${pid} outlived its page`);
   const passed = result.failures.length === 0 && result.ran > 0;
   // Pipes are asynchronous on macOS, so exit only once the line is written.
   const exit = () => app.exit(passed ? 0 : 1);
@@ -53,6 +65,10 @@ function onUtility(event) {
     pidOfPage[page] ??= event.pid;
   }
   if (event.kind !== "exit") return;
+  // A crash fails the run, even where the script catches every call it rejects.
+  if (!event.expected && !killed.has(event.pid)) {
+    result.failures.push(`utility ${event.pid} exited unexpectedly, with code ${event.code}`);
+  }
   for (const w of waiters.splice(0)) {
     if (w.pid === event.pid) w.resolve(event);
     else waiters.push(w);
@@ -64,6 +80,7 @@ ipcMain.handle("fixture:utility-pid", (_e, n) => pidOfPage[n]);
 ipcMain.handle("fixture:exit-of", async (_e, pid) => ({ code: (await exitOf(pid)).code }));
 ipcMain.handle("fixture:kill-utility", () => {
   const pid = pidOfPage[page];
+  killed.add(pid);
   process.kill(pid, "SIGKILL");
   return pid;
 });
@@ -90,6 +107,9 @@ ipcMain.on("fixture:done", async (_e, r) => {
 });
 
 setTimeout(() => finish("watchdog"), WATCHDOG_MS);
+// Electron's dialog for an uncaught exception would block main, and the watchdog with it.
+process.on("uncaughtException", (e) => finish(`main: uncaught ${e?.stack ?? e}`));
+process.on("unhandledRejection", (e) => finish(`main: unhandled rejection ${e?.stack ?? e}`));
 app.disableHardwareAcceleration();
 // The lifecycle script closes the window; that must not quit the run.
 app.on("window-all-closed", () => {});

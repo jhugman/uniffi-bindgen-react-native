@@ -55,8 +55,8 @@ async function firstLoad(t: AsyncAsserts): Promise<void> {
 }
 
 async function afterReload(t: AsyncAsserts): Promise<void> {
-  // This page had not asked yet when its old port closed, so main had not
-  // retired the old utility: it ended itself.
+  // The bootstrap waited for this exit before it connected, so main had not
+  // retired the old utility: it ended itself when its port closed.
   const old = await exitOf(await utilityPid(0));
   t.assertEqual(old.code, 0, "the old utility's exit code");
   t.assertEqual(await liveCounters(), 0, "a fresh utility");

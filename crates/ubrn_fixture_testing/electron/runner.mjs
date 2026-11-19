@@ -33,15 +33,6 @@ const FORBIDDEN = /node_modules\/(electron|@ubjs\/node|@ubjs\/wasm)\/|runtimes\/
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const failures = [];
 
-function isAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** A negative pid is a process group. */
 function kill(pid) {
   try {
@@ -164,17 +155,6 @@ if (!result) {
   for (const pid of result.pids) {
     if (!stdout.lines.some((l) => l.trim() === `[utility] init ${pid}`)) failures.push(`no stdout from utility ${pid}`);
     if (!stderr.lines.some((l) => l.trim() === `[utility] stderr ${pid}`)) failures.push(`no stderr from utility ${pid}`);
-  }
-  // A utility ends a few ms after main, and a zombie answers kill(pid, 0) until it is reaped.
-  const deadline = Date.now() + GRACE_MS;
-  let alive = result.pids.filter(isAlive);
-  while (alive.length > 0 && Date.now() < deadline) {
-    await sleep(100);
-    alive = alive.filter(isAlive);
-  }
-  for (const pid of alive) {
-    failures.push(`utility ${pid} outlived the run`);
-    kill(pid);
   }
   console.log(`\n${result.ran} tests; startup ${result.startupMs.join(", ")} ms`);
 }
