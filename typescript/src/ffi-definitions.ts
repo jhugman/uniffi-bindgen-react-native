@@ -101,9 +101,11 @@ export interface ModuleDefinitions {
 type MergedKey = "functions" | "callbacks" | "structs";
 
 /** One table for a library of several namespaces, so one player and one port
- * serve them all. Function names are crate-prefixed; callback and struct names
- * are not, so namespaces share uniffi's generic shapes. A shared name whose
- * definitions differ (two crates with a same-named foreign trait) throws.
+ * serve them all. Function names are crate-prefixed, and each foreign trait's
+ * callbacks and structs carry its namespace, so only uniffi's generic shapes
+ * share a name across namespaces. A shared name whose definitions differ
+ * throws; that takes two names that concatenate alike, such as namespace `app`
+ * with trait `CoreListener` and namespace `app_core` with trait `Listener`.
  * Definitions are compared as JSON, so as the bindgen writes them. */
 export function uniffiMergeDefinitions(
   tables: readonly ModuleDefinitions[],

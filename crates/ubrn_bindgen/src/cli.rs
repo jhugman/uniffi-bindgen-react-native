@@ -315,12 +315,7 @@ fn generate_index_from_modules(
         }
     } else {
         // A port entry left by an earlier `--async` run would put a sender behind sync call sites.
-        for name in gen_typescript::ASYNC_INDEX_FILES {
-            let path = ts_dir.join(name);
-            if path.exists() {
-                std::fs::remove_file(&path)?;
-            }
-        }
+        gen_typescript::remove_stale_async_index_files(ts_dir)?;
     }
     Ok(())
 }
