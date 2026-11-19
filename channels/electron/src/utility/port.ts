@@ -8,8 +8,8 @@ import type { ChannelPort } from "@ubjs/worker";
 
 /** Fits an Electron MessagePortMain, an EventEmitter, to ChannelPort.
  * MessagePortMain refuses anything but a port in a transfer list, so
- * messages are copied instead. `closed` settles when the far end goes, or
- * on `close()`. */
+ * messages are copied instead. `closed` settles on `close()`, or when the
+ * far end goes; Electron reports that only once the port has started. */
 export function fromMessagePortMain(port: MessagePortMain): ChannelPort & {
   start(): void;
   close(): void;

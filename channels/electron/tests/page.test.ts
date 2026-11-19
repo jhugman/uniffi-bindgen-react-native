@@ -6,11 +6,9 @@
 import assert from "node:assert";
 import { once } from "node:events";
 import { test, type TestContext } from "node:test";
-import { createSender } from "@ubjs/worker";
 import { createPage, type PageWindow } from "../src/page/core.js";
 import { DISCONNECTED, PORT } from "../src/protocol.js";
 import { fakeWindow } from "./fakes/page.js";
-import { DEFS } from "./fakes/player.js";
 import { stubPort } from "./fakes/preload.js";
 import { within } from "./fakes/helpers.js";
 
@@ -211,6 +209,15 @@ test("closing the port settles disconnected as closed, and a later notice change
   assert.deepStrictEqual(await conn.disconnected, {
     code: null,
     reason: "closed",
+  });
+});
+
+test("a disconnected notice once connected settles disconnected with its code and reason", async (t) => {
+  const { fx, id, conn } = await connected(t);
+  fx.dispatch({ type: DISCONNECTED, id, code: 9, reason: "utility-exited" });
+  assert.deepStrictEqual(await within(conn.disconnected), {
+    code: 9,
+    reason: "utility-exited",
   });
 });
 

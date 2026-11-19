@@ -7,7 +7,13 @@ import assert from "node:assert";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import vm from "node:vm";
-import { BRIDGE_KEY, CONNECT, DISCONNECTED, PORT } from "../src/protocol.js";
+import {
+  BRIDGE_KEY,
+  CONNECT,
+  DISCONNECTED,
+  PORT,
+  PROTOCOL,
+} from "../src/protocol.js";
 import { installPreload } from "../src/preload/core.js";
 import { fakeRenderer, stubPort } from "./fakes/preload.js";
 import { ID } from "./fakes/helpers.js";
@@ -136,6 +142,12 @@ function runShipped(contextIsolated: boolean) {
   });
   return r;
 }
+
+test("dist/preload.cjs installs the bridge, and only with contextIsolation", () => {
+  const r = runShipped(true);
+  assert.strictEqual(r.exposed.get(BRIDGE_KEY)?.protocol, PROTOCOL);
+  assert.throws(() => runShipped(false), /needs contextIsolation/);
+});
 
 test("the pending id outlives its port, so a later death still reaches the page", () => {
   const { bridge, deliver, posted } = installed();

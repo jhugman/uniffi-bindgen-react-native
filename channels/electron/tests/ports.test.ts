@@ -6,7 +6,6 @@
 import assert from "node:assert";
 import { once } from "node:events";
 import { test } from "node:test";
-import { createReceiver, createSender } from "@ubjs/worker";
 import { fromMessagePortMain } from "../src/utility/port.js";
 import { wrapPagePort } from "../src/page/port.js";
 import {
@@ -16,11 +15,8 @@ import {
   fakeRendererToUtility,
 } from "./fakes/ports.js";
 import { tick, within } from "./fakes/helpers.js";
-import { DEFS, fakePlayer } from "./fakes/player.js";
 
-const MiB8 = 8 * 1024 * 1024;
 const asPage = (p: FakePagePort) => p as unknown as MessagePort;
-const closedError = { name: "ChannelClosedError" };
 
 test("fromMessagePortMain drops the transfer list", async () => {
   const { port1, port2 } = fakeMessageChannelMain();
@@ -38,7 +34,7 @@ test("fromMessagePortMain drops the transfer list", async () => {
   assert.deepStrictEqual(ev.data, new Uint8Array([1, 2, 3]));
 });
 
-test("its closed settles when the peer closes, and postMessage does nothing after", async () => {
+test("its closed settles when the peer closes, once started, and postMessage does nothing after", async () => {
   const { port1, port2 } = fakeMessageChannelMain();
   const port = fromMessagePortMain(asMain(port1));
   let settled = false;
@@ -47,6 +43,14 @@ test("its closed settles when the peer closes, and postMessage does nothing afte
   assert.strictEqual(settled, false);
 
   port2.close();
+  await tick();
+  await tick();
+  assert.strictEqual(
+    settled,
+    false,
+    "Electron reports the close only once started",
+  );
+  port.start();
   await within(port.closed);
   const posted = port1.posted;
   port.postMessage("late");
@@ -56,6 +60,7 @@ test("its closed settles when the peer closes, and postMessage does nothing afte
 test("its closed settles on close()", async () => {
   const { port1, port2 } = fakeMessageChannelMain();
   const port = fromMessagePortMain(asMain(port1));
+  port2.start();
   const peerHeard = once(port2, "close");
   port.close();
   await within(port.closed);

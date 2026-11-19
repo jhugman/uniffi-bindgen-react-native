@@ -65,8 +65,8 @@ export class FakePortMain extends EventEmitter implements FakeEnd {
   closed = false;
   /** postMessage calls that did not throw, delivered or not. */
   posted = 0;
-  private inbox = new Inbox<{ data: unknown; ports: unknown[] }>((ev) =>
-    this.emit("message", ev),
+  private inbox = new Inbox<{ data: unknown; ports: unknown[] } | "close">(
+    (ev) => (ev === "close" ? this.emit("close") : this.emit("message", ev)),
   );
 
   start(): void {
@@ -95,7 +95,8 @@ export class FakePortMain extends EventEmitter implements FakeEnd {
     this.inbox.push({ data, ports });
   }
   remoteClosed(): void {
-    this.emit("close");
+    // Like a real MessagePortMain, it reports a far end's close only once started.
+    this.inbox.push("close");
   }
 }
 
