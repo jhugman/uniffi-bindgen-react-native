@@ -3,7 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-import type { FfiType as CoreFfiType, ModuleDefinitions } from "@ubjs/core";
+// @ubjs/core publishes ESM types only, so this CommonJS file asks for them as an import.
+import type {
+  FfiType as CoreFfiType,
+  ModuleDefinitions,
+} from "@ubjs/core" with { "resolution-mode": "import" };
 export {
   resolveLibPath,
   ResolveLibPathError,
