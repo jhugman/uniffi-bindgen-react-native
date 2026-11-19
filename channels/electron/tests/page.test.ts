@@ -173,6 +173,30 @@ test("no reply within timeoutMs rejects with timeout naming /main, and a late po
   assert.ok(late.closed);
 });
 
+test("timeoutMs Infinity, or any delay too long for a timer, waits for the reply", async (t) => {
+  for (const timeoutMs of [Infinity, 2 ** 31]) {
+    const fx = fakeWindow();
+    const pending = createPage(fx.win).connect({ timeoutMs });
+    // setTimeout would fire such a delay after about a millisecond.
+    await new Promise((r) => setTimeout(r, 20));
+    assert.strictEqual(await isSettled(pending), false, `${timeoutMs} ms`);
+    const { port1, port2 } = new MessageChannel();
+    t.after(() => port2.close());
+    fx.dispatch({ type: PORT, id: fx.ids[0], info: null }, { ports: [port1] });
+    await within(pending);
+  }
+});
+
+test("outside a window, isAvailable is false and connect rejects with unavailable", async () => {
+  assert.strictEqual("window" in globalThis, false);
+  const page = await import("../src/page/index.js");
+  assert.strictEqual(page.isAvailable(), false);
+  await assert.rejects(page.connect(), {
+    name: "ConnectError",
+    reason: "unavailable",
+  });
+});
+
 test("a malformed error reply for our id still closes its ports", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const fx = fakeWindow();

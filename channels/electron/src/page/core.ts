@@ -21,6 +21,7 @@ import {
 } from "./port.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /** Why connect() failed. On any of them the app can fall back to wasm. */
 export class ConnectError extends Error {
@@ -149,14 +150,17 @@ export function createPage(win: PageWindow): {
         for (const port of ev.ports) if (port !== kept) port.close();
       }
     });
-    timer = setTimeout(
-      () =>
-        fail(
-          "timeout",
-          `no reply from the main process within ${timeoutMs} ms: main does not import @ubjs/electron/main, or the utility is still starting`,
-        ),
-      timeoutMs,
-    );
+    // setTimeout fires at once for a delay it cannot hold, Infinity included.
+    if (timeoutMs <= MAX_TIMER_MS) {
+      timer = setTimeout(
+        () =>
+          fail(
+            "timeout",
+            `no reply from the main process within ${timeoutMs} ms: main does not import @ubjs/electron/main, or the utility is still starting`,
+          ),
+        timeoutMs,
+      );
+    }
     try {
       bridge.connect(id);
     } catch (e) {
