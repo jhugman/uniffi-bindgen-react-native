@@ -41,7 +41,7 @@
   },
   "peerDependencies": {
     "@ubjs/core": "^0.31.0-7",
-    "electron": ">=41"
+    "electron": ">=41.0.0-0"
   },
   "peerDependenciesMeta": { "electron": { "optional": true } },
   "devDependencies": {

@@ -25,8 +25,8 @@ test("the version is the root's, and every @ubjs range is ^ plus it", () => {
   assert.ok("@ubjs/core" in pkg.peerDependencies);
 });
 
-test("electron is an optional peer from 41, developed against 41.10.2", () => {
-  assert.strictEqual(pkg.peerDependencies.electron, ">=41");
+test("electron is an optional peer from 41, prereleases included, developed against 41.10.2", () => {
+  assert.strictEqual(pkg.peerDependencies.electron, ">=41.0.0-0");
   assert.deepStrictEqual(pkg.peerDependenciesMeta, {
     electron: { optional: true },
   });
