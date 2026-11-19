@@ -107,5 +107,20 @@ mod tests {
         assert!(!def(vec![Handle], Int32, false, false).is_fire_and_forget());
         assert!(!def(vec![RustBuffer], Void, false, false).is_fire_and_forget());
         assert!(!def(vec![Callback("X".into())], Void, false, false).is_fire_and_forget());
+        // Each of these points at the caller's memory, which a posted call would read
+        // after the caller has returned.
+        let s = || Box::new(Struct("S".into()));
+        for arg in [
+            Reference(s()),
+            MutReference(s()),
+            VoidPointer,
+            Struct("S".into()),
+            ForeignBytes,
+        ] {
+            assert!(
+                !def(vec![Handle, arg.clone()], Void, false, false).is_fire_and_forget(),
+                "{arg:?} must not be posted"
+            );
+        }
     }
 }
