@@ -227,12 +227,15 @@ export class SenderCore {
       // Await only a thenable, so a non-thenable result is posted without an extra tick.
       let result: any = entry.fn(...args);
       if (result && typeof result.then === "function") result = await result;
+      // The port may have closed while the callback ran, and a closed port may throw.
+      if (this.closed) return;
       const value = marshalOut(entry.plan.ret, result, this.ctx, transfer);
       this.port.postMessage(
         { kind: "callback-return", id: msg.id, ok: true, value },
         transfer,
       );
     } catch (e) {
+      if (this.closed) return;
       this.port.postMessage({
         kind: "callback-return",
         id: msg.id,
@@ -266,6 +269,8 @@ export class SenderCore {
       };
     }
     return (...args: unknown[]) => {
+      // Rust may still fire a forwarded callback once the port has closed.
+      if (this.closed) return;
       const transfer: Transferable[] = [];
       const wire = cbPlan.args.map((p, i) =>
         marshalOut(p, args[i], this.ctx, transfer),

@@ -147,6 +147,31 @@ test("a receiver aborts its in-flight entries when closed settles, and posts not
   assert.deepStrictEqual(p.posted, []);
 });
 
+test("a callback Rust fires after closed posts nothing, even on a port that throws", async () => {
+  const p = closablePort();
+  const { player, state } = fakePlayer();
+  createReceiver(DEFS, player, p.port);
+  p.deliver({
+    kind: "call",
+    id: 1,
+    fn: "init_vtable",
+    args: [
+      { uniffi_free: 1, uniffi_clone: 2, notify: 3, async_m: 4, sync_m: 5 },
+    ],
+  });
+  await tick();
+  p.settle();
+  await tick();
+  p.posted.length = 0;
+  p.port.postMessage = (m) => {
+    p.posted.push(m);
+    throw new Error("the far end is gone");
+  };
+  state.vtable.notify(9n, new Uint8Array([9]));
+  state.vtable.uniffi_free(9n);
+  assert.deepStrictEqual(p.posted, []);
+});
+
 test("a port that refuses posts once closed still rejects every call in flight", async () => {
   const p = closablePort();
   const sender = createSender(DEFS, p.port);
