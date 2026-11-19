@@ -12,7 +12,6 @@ name = "uniffi_trait_methods"
 [dependencies]
 uniffi = { workspace = true }
 once_cell = "1.12"
-thiserror = "1.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uniffi-runtime-wasm = { workspace = true }

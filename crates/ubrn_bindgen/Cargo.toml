@@ -16,7 +16,6 @@ cargo_metadata = { workspace = true }
 clap = { workspace = true }
 extend = { workspace = true }
 heck = { workspace = true }
-paste = { workspace = true }
 serde = { workspace = true }
 textwrap = "0.16.1"
 toml = ">=0.8, <=0.9"

@@ -12,9 +12,6 @@ name = "uniffi_rondpointpm"
 [dependencies]
 uniffi = { workspace = true }
 
-[build-dependencies]
-uniffi = { workspace = true, features = ["build"] }
-
 [dev-dependencies]
 ubrn_macros = { workspace = true }
 ubrn_fixture_testing = { workspace = true }

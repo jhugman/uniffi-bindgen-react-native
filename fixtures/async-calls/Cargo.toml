@@ -15,8 +15,6 @@ name = "uniffi-fixture-async-calls"
 path = "src/bin.rs"
 
 [dependencies]
-async-trait = "0.1"
-futures = "0.3"
 thiserror = "1.0"
 once_cell = "1.18.0"
 ubrn_testing = { path = "../../crates/ubrn_testing" }
