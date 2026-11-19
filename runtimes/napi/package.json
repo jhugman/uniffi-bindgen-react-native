@@ -59,8 +59,8 @@
     "assemble-root": "node ./scripts/assemble-root.mjs",
     "prepare": "npm run build",
     "fmt": "prettier --write . && cargo fmt",
-    "test": "node --import ./tests/setup.mjs --test --test-timeout=60000 --test-force-exit tests/*.test.mjs",
-    "test:electron": "ELECTRON_RUN_AS_NODE=1 electron --import ./tests/setup.mjs --test --test-timeout=60000 --test-force-exit tests/*.test.mjs",
+    "test": "node --import ./tests/setup.mjs --test --test-timeout=60000 tests/*.test.mjs",
+    "test:electron": "ELECTRON_RUN_AS_NODE=1 electron --import ./tests/setup.mjs --test --test-timeout=60000 tests/*.test.mjs",
     "test:ts": "node --test tests/resolve-lib.test.mjs"
   },
   "peerDependencies": {
