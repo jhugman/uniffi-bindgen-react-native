@@ -88,6 +88,8 @@ interface Served {
 
 const NOT_SERVED =
   "the main process does not serve this window; call serve() from @ubjs/electron/main for it before it loads";
+const NOT_ALLOWED =
+  "the main process serves this window, but its allowFrame does not admit this frame";
 
 function absolutePath(what: "entry" | "library", path: unknown): string {
   if (typeof path !== "string" || !isAbsolute(path)) {
@@ -186,8 +188,8 @@ export function createMain(deps: MainDeps): MainApi {
     old.whenExited(() => launch(served));
   };
 
-  // One handler for every window, so an unserved one hears not-served
-  // instead of waiting out its timeout.
+  // One handler for every window, so an unserved window or a declined frame
+  // hears not-served instead of waiting out its timeout.
   deps.ipcMain.on(CONNECT, (event: IpcMainEvent, payload: unknown) => {
     const frame = event.senderFrame;
     if (!frame) return;
@@ -198,7 +200,10 @@ export function createMain(deps: MainDeps): MainApi {
       fail(event.sender, frame, id, "not-served", NOT_SERVED);
       return;
     }
-    if (!mayAsk(served, frame)) return;
+    if (!mayAsk(served, frame)) {
+      fail(event.sender, frame, id, "not-served", NOT_ALLOWED);
+      return;
+    }
     request(served, id, frame);
   });
 

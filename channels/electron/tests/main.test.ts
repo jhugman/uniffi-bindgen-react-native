@@ -102,11 +102,17 @@ test("a request with no sender frame, or a malformed id, is dropped", () => {
 
 test("by default only the main frame may ask; allowFrame decides otherwise", () => {
   const sub = new FakeFrame("file:///app/sub.html");
+  // A declined frame hears not-served at once rather than waiting out its timeout.
+  const declined = (frame: FakeFrame) => {
+    const error = errorReply(frame);
+    assert.strictEqual(error.reason, "not-served");
+    assert.match(error.message, /allowFrame/);
+  };
 
   const s = setup();
   s.ask(sub);
   assert.deepStrictEqual(s.fx.forks, []);
-  assert.deepStrictEqual(sub.posted, []);
+  declined(sub);
   assert.deepStrictEqual(s.frame.posted, []);
   s.ask();
   assert.strictEqual(s.fx.forks.length, 1);
@@ -114,7 +120,7 @@ test("by default only the main frame may ask; allowFrame decides otherwise", () 
   const t = setup({ allowFrame: (f) => f.url === "file:///app/sub.html" });
   t.ask();
   assert.deepStrictEqual(t.fx.forks, []);
-  assert.deepStrictEqual(t.frame.posted, []);
+  declined(t.frame);
   t.ask(sub);
   assert.strictEqual(t.fx.forks.length, 1);
 
@@ -126,7 +132,7 @@ test("by default only the main frame may ask; allowFrame decides otherwise", () 
   });
   assert.doesNotThrow(() => u.ask());
   assert.deepStrictEqual(u.fx.forks, []);
-  assert.deepStrictEqual(u.frame.posted, []);
+  declined(u.frame);
   assert.strictEqual(u.fx.warnings.length, 1);
   assert.match(u.fx.warnings[0], /bad filter/);
 });
