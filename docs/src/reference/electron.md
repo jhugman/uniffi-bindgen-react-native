@@ -123,7 +123,7 @@ If `@ubjs/node` or the library fails to load, the utility exits 1, and the page'
 `@ubjs/electron/preload` is a CommonJS file that puts `window.__ubjsElectron` in the page. It needs `contextIsolation`, which is Electron's default. Load it in one of three ways:
 
 - Set it as `webPreferences.preload`, if you have no preload of your own, as in the example above.
-- Register it beside your own with `session.registerPreloadScript({ type: "frame", filePath: require.resolve("@ubjs/electron/preload") })`. This reaches every window in the session, so give the windows you serve their own, for example `session.fromPartition("persist:app")`.
+- Register it beside your own with a `Session`'s `registerPreloadScript({ type: "frame", filePath: require.resolve("@ubjs/electron/preload") })`, as in `session.defaultSession.registerPreloadScript(...)`. This reaches every window in that session, so give the windows you serve their own, for example `session.fromPartition("persist:app")`.
 - `require` it for its side effect, from a preload that you bundle.
 
 ```admonish warning
@@ -159,7 +159,9 @@ if (isAvailable()) {
 Import `uniffiInitAsync` and the API from `./generated/index.port`, never from `./generated` or `./generated/index`. `generate wasm2 bindings --async` also writes `index.ts`, the wasm entry. It imports `@ubjs/wasm`, which a native-only app does not install.
 ```
 
-`isAvailable()` says whether the preload ran. `connect({ timeoutMs })` resolves to a `Connection`. `timeoutMs` defaults to 30 000.
+`isAvailable()` says whether the preload ran. `connect({ timeoutMs })` resolves to a `Connection`. `timeoutMs` defaults to 30 000; `Infinity` waits forever. Outside a window, as under SSR, `isAvailable()` is `false` and `connect()` rejects with `unavailable`.
+
+Load one copy of `@ubjs/electron/page` in a document. Two copies, as from a duplicated bundle, break each other: the first closes the second's port, and stops hearing when the utility dies.
 
 - `port` is what you pass to `uniffiInitAsync`. `port.close()` ends the connection.
 - `info` is what main's `info()` returned.
@@ -168,7 +170,7 @@ Import `uniffiInitAsync` and the API from `./generated/index.port`, never from `
 `connect()` rejects with a `ConnectError`. Its `reason` is one of:
 
 - `unavailable`: the preload did not run, or the page is not context isolated.
-- `not-served`: main does not serve this window. Call `serve()` before the window loads.
+- `not-served`: main does not serve this window, or its `allowFrame` does not admit this frame. Call `serve()` before the window loads.
 - `start-failed`: the utility did not start. The message names the cause.
 - `timeout`: nothing answered within `timeoutMs`. Main never imported `@ubjs/electron/main`, or the utility took longer than that to start.
 
@@ -208,14 +210,16 @@ An exit is `expected` when main retired the utility for a new request or a teard
 
 - Unpack the native files. Add the `.node` file and your library to `asarUnpack`. `serve()` rewrites an `app.asar` path to `app.asar.unpacked` and checks that the file is there.
 - Sign the library with the rest of the app.
-- `@ubjs/node` loads a prebuilt addon from `@ubjs/node-<platform>-<arch>`, which installs for the machine you build on. To build for the other architecture, install that package too.
+- `@ubjs/node` loads a prebuilt addon from a package named for the platform, which installs for the machine you build on: `@ubjs/node-<platform>-<arch>` on macOS, and the same with `-gnu`, `-musl` or `-msvc` after it on Linux and Windows, as in `@ubjs/node-linux-x64-gnu`. To build for the other architecture, install that package too.
 - For a universal macOS build, install both `@ubjs/node-darwin-arm64` and `@ubjs/node-darwin-x64`, and unpack both `.node` files. No universal `@ubjs/node` package is published. Then either ship a universal library made with `lipo -create`, or choose the library's path by `process.arch` in `serve({ library })`.
 
 ## Security
 
 Serve only windows that load your own content. The utility runs native code with your app's rights, and any frame that may connect can call it, whatever it has navigated to. If a window can reach content you do not control, pass `allowFrame` to admit only your own frames, and block that navigation, as Electron's security checklist advises.
 
-Load the preload only where you need it. `session.registerPreloadScript` puts the bridge in every window of the session, remote ones too. Main answers an unserved window with `not-served`, but a narrower bridge is easier to reason about.
+The page is trusted with the native library's memory safety, not only its API. Object handles cross the port as raw pointers into the utility's memory, so script that runs in an admitted frame, an XSS in your own content included, can forge one and crash the utility or corrupt its memory.
+
+Load the preload only where you need it. `registerPreloadScript` puts the bridge in every window of the session, remote ones too. Main answers an unserved window with `not-served`, but a narrower bridge is easier to reason about.
 
 ## Limitations
 
