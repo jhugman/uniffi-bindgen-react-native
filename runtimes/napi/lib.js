@@ -33,8 +33,15 @@ function asyncFunctions(definitions) {
 // Each async function becomes one entry, `(...args, status, signal) => Promise`, driving the
 // future through the exports its `async:` def names. `complete` already returns a JS-owned
 // value, so nothing here copies.
-const nativeRegister = native.UniffiNativeModule.prototype.register;
-native.UniffiNativeModule.prototype.register = function register(definitions) {
+//
+// Module registries that share the cached addon, such as Jest's, evaluate this file again
+// against the same class, so the native function is kept where a second evaluation finds it
+// rather than wrapping the first wrapper.
+const proto = native.UniffiNativeModule.prototype;
+const NATIVE_REGISTER = Symbol.for("@ubjs/node.nativeRegister");
+proto[NATIVE_REGISTER] ??= proto.register;
+const nativeRegister = proto[NATIVE_REGISTER];
+proto.register = function register(definitions) {
   const asyncFns = asyncFunctions(definitions);
   const uniffiAsyncEntry =
     asyncFns.length > 0 ? asyncEntryBuilder() : undefined;

@@ -9,6 +9,7 @@
 // counts below read a map the two copies share.
 import { test } from "node:test";
 import assert from "node:assert";
+import { createRequire } from "node:module";
 import { uniffiRustFutureHandleCount } from "@ubjs/core";
 import lib from "../lib.js";
 const { UniffiNativeModule } = lib;
@@ -141,5 +142,23 @@ test("two registrations of one library each drive their own futures", async () =
     other.uniffi_test_fn_future_from_thread(2, 1, { code: 0 }, undefined),
   ]);
   assert.deepStrictEqual(values, [1, 2]);
+  assert.strictEqual(liveFutures(), 0);
+});
+
+test("lib.js evaluated again wraps the native register only once", async () => {
+  // Jest gives each test file its own module registry but shares the cached addon, so
+  // lib.js runs again against the same class.
+  const require = createRequire(import.meta.url);
+  delete require.cache[require.resolve("../lib.js")];
+  const again = require("../lib.js");
+  assert.strictEqual(again.UniffiNativeModule, UniffiNativeModule);
+
+  const fresh = again.UniffiNativeModule.open(LIB).register(asyncDefinitions());
+  const status = { code: 0 };
+  assert.strictEqual(
+    await fresh.uniffi_test_fn_future_u32(5, status, undefined),
+    5,
+  );
+  assert.strictEqual(status.code, 0);
   assert.strictEqual(liveFutures(), 0);
 });
