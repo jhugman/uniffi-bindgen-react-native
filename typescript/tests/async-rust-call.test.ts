@@ -366,6 +366,25 @@ async function withConsoleErrors<T>(
   );
 
   await asyncTest(
+    "a signal that cannot take a listener rejects the driver and still frees",
+    async (t) => {
+      const calls: string[] = [];
+      await t.assertThrowsAsync(
+        (e) => e instanceof TypeError,
+        () =>
+          uniffiDriveRustFuture(
+            BigInt(7),
+            fns(calls),
+            { code: 0 },
+            {} as AbortSignal,
+          ),
+      );
+      t.assertEqual(calls.join(","), "free 7");
+      t.end();
+    },
+  );
+
+  await asyncTest(
     "a throwing complete rejects the driver and still frees",
     async (t) => {
       const calls: string[] = [];

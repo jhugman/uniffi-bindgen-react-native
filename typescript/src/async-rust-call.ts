@@ -167,7 +167,9 @@ export async function uniffiDriveRustFuture<F, S extends UniffiRustCallStatus>(
 ): Promise<F> {
   // Without a signal nothing can abort the call, so it needs no closure.
   const abortFunc = signal && createAbortFunction(rustFuture, fns.cancel);
-  if (abortFunc) signal?.addEventListener("abort", abortFunc);
+  // Only a listener that was added is removed, so a signal that refuses one
+  // still reaches the free.
+  let listening = false;
 
   // Keep the Node.js event loop alive while polling the Rust future.
   // The napi runtime's callback TSFNs are deliberately unref'd (so leaked TSFNs
@@ -185,6 +187,10 @@ export async function uniffiDriveRustFuture<F, S extends UniffiRustCallStatus>(
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
+    if (abortFunc) {
+      signal?.addEventListener("abort", abortFunc);
+      listening = true;
+    }
     // Events don't replay, so no listener catches an abort that landed before
     // the listener existed; the flag does. A throwing cancel is logged, and the
     // loop goes on to poll and free.
@@ -207,7 +213,7 @@ export async function uniffiDriveRustFuture<F, S extends UniffiRustCallStatus>(
     if (keepAlive !== undefined) clearTimeout(keepAlive);
     // We remove the abortFunc now so we don't trigger a use-after-free
     // panic.
-    if (abortFunc) signal?.removeEventListener("abort", abortFunc);
+    if (listening && abortFunc) signal?.removeEventListener("abort", abortFunc);
     uniffiIgnoreFailure(() => fns.free(rustFuture), "rust future free");
   }
 }
