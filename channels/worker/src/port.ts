@@ -21,4 +21,22 @@ export interface ChannelPort {
   /** Node's MessagePort: hold the event loop open. Absent on browser ports. */
   ref?(): void;
   unref?(): void;
+  /** Settles once the far end is gone; a sender or receiver over this port then closes itself. */
+  closed?: PromiseLike<unknown>;
+}
+
+/** Calls `close` once `port.closed` settles either way. Only a thenable
+ * counts, so an adapter's boolean `closed` flag is ignored. */
+export function onPortClosed(port: ChannelPort, close: () => void): void {
+  const { closed } = port;
+  if (typeof closed?.then !== "function") return;
+  // Nothing awaits this reaction, so a throw from close() is warned, not left unhandled.
+  const run = () => {
+    try {
+      close();
+    } catch (e) {
+      console.warn("worker: closing after the port closed threw", e);
+    }
+  };
+  closed.then(run, run);
 }

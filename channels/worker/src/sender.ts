@@ -4,7 +4,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 import type { ModuleDefinitions, UniffiRustCallStatus } from "@ubjs/core";
-import type { ChannelListener, ChannelPort } from "./port.js";
+import {
+  onPortClosed,
+  type ChannelListener,
+  type ChannelPort,
+} from "./port.js";
 import {
   fromWireError,
   isChannelMessage,
@@ -63,6 +67,7 @@ export class SenderCore {
     this.listener = (ev) => this.onMessage(ev.data);
     port.addEventListener("message", this.listener);
     port.start?.();
+    onPortClosed(port, () => this.close());
   }
 
   get registrySize(): number {
@@ -92,8 +97,15 @@ export class SenderCore {
     this.port.removeEventListener("message", this.listener);
     if (this.pending.size > 0) this.port.unref?.();
     for (const [id, p] of this.pending) {
-      // Nothing on this side can cancel it once the port is gone.
-      if (p.plan.isAsync) this.port.postMessage({ kind: "cancel", id });
+      // Nothing on this side can cancel it once the port is gone. A port
+      // whose far end is gone may refuse the post; every call still rejects.
+      if (p.plan.isAsync) {
+        try {
+          this.port.postMessage({ kind: "cancel", id });
+        } catch {
+          // Nothing is left to cancel it on.
+        }
+      }
       p.detach?.();
       p.reject(new ChannelClosedError());
     }
@@ -215,12 +227,15 @@ export class SenderCore {
       // Await only a thenable, so a non-thenable result is posted without an extra tick.
       let result: any = entry.fn(...args);
       if (result && typeof result.then === "function") result = await result;
+      // The port may have closed while the callback ran, and a closed port may throw.
+      if (this.closed) return;
       const value = marshalOut(entry.plan.ret, result, this.ctx, transfer);
       this.port.postMessage(
         { kind: "callback-return", id: msg.id, ok: true, value },
         transfer,
       );
     } catch (e) {
+      if (this.closed) return;
       this.port.postMessage({
         kind: "callback-return",
         id: msg.id,
@@ -254,6 +269,8 @@ export class SenderCore {
       };
     }
     return (...args: unknown[]) => {
+      // Rust may still fire a forwarded callback once the port has closed.
+      if (this.closed) return;
       const transfer: Transferable[] = [];
       const wire = cbPlan.args.map((p, i) =>
         marshalOut(p, args[i], this.ctx, transfer),

@@ -85,3 +85,9 @@ module.exports = {
     MutReference: (inner) => ({ tag: "MutReference", inner }),
   },
 };
+
+// Node's ESM loader finds named exports by assignment, not through a spread.
+module.exports.UniffiNativeModule = native.UniffiNativeModule;
+module.exports.FfiType = module.exports.FfiType;
+module.exports.resolveLibPath = resolveLibPath;
+module.exports.ResolveLibPathError = ResolveLibPathError;
