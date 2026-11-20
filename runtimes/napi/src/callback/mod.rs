@@ -12,7 +12,8 @@
 //!   converts to JS values, calls the JS function, and writes the return value.
 //! - [`dispatch_to_js_thread`]: runs off the JS thread, copies the arg buffer,
 //!   sends it to the JS thread via a ThreadsafeFunction, and blocks on a
-//!   sync_channel for the return value.
+//!   sync_channel for the return value. A callback that reports nothing back
+//!   (see `CallbackDef::is_fire_and_forget`) is posted without waiting.
 //! - [`is_js_thread`]: returns whether the current thread is the one that registered the
 //!   callback, and so may touch its napi values directly.
 //!
@@ -32,8 +33,9 @@
 //!     -> copies ret_buf into libffi return slot
 //! ```
 //!
-//! This module handles BOTH simple callbacks (fire-and-forget) AND VTable callbacks
-//! (blocking with return values and RustCallStatus handling).
+//! This module handles both simple callbacks and VTable callbacks. Off the JS thread, a
+//! callback that returns `Void` with no `RustCallStatus`, no out-return and only scalar or
+//! `Handle` args is fire-and-forget; every other one blocks until JS has run it.
 
 use std::ffi::c_void;
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -100,6 +102,8 @@ struct CallbackUserData {
     out_return: bool,
     /// Precomputed size of the return value in bytes (0 for void or out_return).
     ret_size: usize,
+    /// Whether a call from another thread is posted without waiting for JS to run it.
+    fire_and_forget: bool,
     /// Thread-safe function for dispatching to `owner_thread`.
     tsfn: Mutex<Option<ThreadsafeFunction<DispatchPayload, ErrorStrategy::Fatal>>>,
     /// Reference to the Module, needed for fn_pointer wrapping (Callback-typed args).
@@ -130,14 +134,14 @@ unsafe impl Sync for CallbackUserData {}
 // ---------------------------------------------------------------------------
 
 /// Payload sent from the calling thread to the JS thread via ThreadsafeFunction.
-/// Payload sent from the calling thread to the JS thread via ThreadsafeFunction.
 struct DispatchPayload {
     /// Copied arg bytes from the core trampoline's flat buffer.
     args: Vec<u8>,
     /// Number of bytes expected in the return buffer.
     ret_len: usize,
-    /// Channel to send the return bytes back to the calling thread.
-    reply: SyncSender<Vec<u8>>,
+    /// Channel to send the return bytes back to the calling thread; `None` when
+    /// nothing waits for them.
+    reply: Option<SyncSender<Vec<u8>>>,
     /// The callback's user_data pointer, forwarded so the TSFN handler can
     /// call `on_js_thread`.
     user_data: *const c_void,
@@ -382,6 +386,7 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
 
 /// Cross-thread path: copies the arg buffer, dispatches to the JS thread via
 /// ThreadsafeFunction, and blocks until the JS thread sends back the return bytes.
+/// A fire-and-forget callback returns as soon as it is posted.
 ///
 /// # Safety
 ///
@@ -414,13 +419,18 @@ pub extern "C" fn dispatch_to_js_thread(
     // Compute ret_len: for out_return=true, ret_len=0 (returns are via out-pointer).
     let ret_len = ud.ret_size;
 
-    // Create the rendezvous channel.
-    let (tx, rx) = sync_channel(1);
+    // The rendezvous channel, unless nothing comes back.
+    let (reply, rx, mode) = if ud.fire_and_forget {
+        (None, None, ThreadsafeFunctionCallMode::NonBlocking)
+    } else {
+        let (tx, rx) = sync_channel(1);
+        (Some(tx), Some(rx), ThreadsafeFunctionCallMode::Blocking)
+    };
 
     let payload = DispatchPayload {
         args: args_copy,
         ret_len,
-        reply: tx,
+        reply,
         user_data,
     };
 
@@ -432,8 +442,18 @@ pub extern "C" fn dispatch_to_js_thread(
             eprintln!("uniffi-runtime-napi: dispatch_to_js_thread has no ThreadsafeFunction");
             return;
         };
-        tsfn.call(payload, ThreadsafeFunctionCallMode::Blocking);
+        let _status = tsfn.call(payload, mode);
+        #[cfg(debug_assertions)]
+        if _status != napi::Status::Ok {
+            eprintln!("uniffi-runtime-napi: dispatch_to_js_thread could not post: {_status}");
+        }
     }
+
+    // UniFFI calls the future continuation under the future's scheduler lock, which
+    // `poll`, `cancel` and `free` take on the JS thread: waiting here would deadlock.
+    let Some(rx) = rx else {
+        return;
+    };
 
     // Block until the JS thread sends back the return bytes.
     match rx.recv() {
@@ -532,6 +552,7 @@ pub fn create_callback_user_data(
         has_rust_call_status: def.has_rust_call_status,
         out_return: def.out_return,
         ret_size,
+        fire_and_forget: def.is_fire_and_forget(),
         tsfn: Mutex::new(None),
         module: Arc::clone(module),
         registration: Arc::clone(registration),
@@ -554,8 +575,10 @@ pub fn create_callback_user_data(
                     ret_buf.as_mut_ptr(),
                     payload.user_data,
                 );
-                // Send the return bytes back to the calling thread.
-                let _ = payload.reply.send(ret_buf);
+                // Send the return bytes back to the calling thread, if it is waiting.
+                if let Some(reply) = payload.reply {
+                    let _ = reply.send(ret_buf);
+                }
 
                 // Return empty vec—the TSFN callback mechanism requires a Vec<JsUnknown>
                 // but we've handled everything ourselves.

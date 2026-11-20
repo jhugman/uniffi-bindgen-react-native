@@ -10,6 +10,7 @@
 ### Fixes
 
 - `@ubjs/node` now works in Electron. Electron's V8 memory cage refuses the external `ArrayBuffer`s the runtime used to give JS a view of Rust memory, so every call that returned a `RustBuffer` failed. The runtime now asks once per module whether external buffers are allowed. Where they are not, it copies each returned buffer into V8 memory and releases the Rust allocation at once, and `rustbuffer_alloc` hands out V8 memory that lowering copies. Node keeps the zero-copy path ([#514](https://github.com/jhugman/uniffi-bindgen-react-native/pull/514), replacing [#417](https://github.com/jhugman/uniffi-bindgen-react-native/pull/417)). Thank you [@injaneity](https://github.com/injaneity) for the first version of this fix!
+- `@ubjs/node` no longer deadlocks when an async call is cancelled while a Rust thread wakes it. From a Rust thread, it now posts the future continuation, the free of a JS callback object and the drop of a foreign future without waiting for JS to run them, as `jsi` does. These keep no order: a free can run after a later callback, and one posted callback can overtake another.
 
 ### Testing and CI
 

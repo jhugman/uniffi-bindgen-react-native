@@ -82,7 +82,7 @@ Arguments go in as JavaScript values, come out as JavaScript values. Errors from
 Rust code can call back into JavaScript. uniffi-runtime-napi handles two cases:
 
 - **Same thread**: calls the JS function directly (fast).
-- **Different thread**: serializes the arguments, dispatches to the main thread, blocks until the JS function returns.
+- **Different thread**: serializes the arguments, dispatches to the main thread, blocks until the JS function returns. A callback that reports nothing back is posted without waiting: one that returns nothing, reports no status and takes only numbers and handles. UniFFI's are the future continuation, the free of a JS callback object, and the drop of a foreign future. Rust carries on before JS runs them, and they keep no order: a free can run after a later callback, and one posted callback can overtake another. A callback-interface method that returns nothing still blocks, because it reports a status.
 
 This matters for async Rust code that runs work on background threads but needs to call foreign trait methods defined in JS.
 

@@ -3,9 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
+use std::collections::BTreeMap;
 use std::ptr;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[repr(C)]
 pub struct RustBuffer {
@@ -1011,4 +1013,247 @@ pub extern "C" fn uniffi_test_fn_call_erroring_out_return_callback(
     let mut out = 0u32;
     cb(1, &mut out, &mut cb_status);
     take_callback_error(cb_status)
+}
+
+// --- Futures ---
+//
+// A hand-written UniFFI future ABI over this fixture's allocator, so async tests can count
+// live futures and buffers exactly. Results are kept as bytes until `complete`, which is the
+// only place a future allocates a `RustBuffer`.
+
+pub type RustFutureContinuation = extern "C" fn(u64, i8);
+
+const POLL_READY: i8 = 0;
+const POLL_MAYBE_READY: i8 = 1;
+
+const CALL_ERROR: i8 = 1;
+const CALL_UNEXPECTED_ERROR: i8 = 2;
+const CALL_CANCELLED: i8 = 3;
+
+enum Outcome {
+    U32(u32),
+    Bytes(Vec<u8>),
+    Error(Vec<u8>),
+}
+
+/// How a pending future is woken. Spawned by its first pending poll.
+enum Waker {
+    FromThread { value: u32, delay_ms: u32 },
+    UnderLock,
+}
+
+struct FutureState {
+    outcome: Option<Outcome>,
+    cancelled: bool,
+    continuation: Option<(RustFutureContinuation, u64)>,
+    waker: Option<Waker>,
+}
+
+struct TestFuture {
+    state: Mutex<FutureState>,
+}
+
+impl TestFuture {
+    /// Sets the outcome, then takes the stored continuation and calls it, as UniFFI's
+    /// scheduler does: a later `cancel` has nothing to fire.
+    fn wake(&self, outcome: Outcome) {
+        let continuation = {
+            let mut state = self.state.lock().unwrap();
+            state.outcome = Some(outcome);
+            state.continuation.take()
+        };
+        if let Some((cb, data)) = continuation {
+            cb(data, POLL_MAYBE_READY);
+        }
+    }
+}
+
+/// Every future started and not yet freed. Handles are the keys, from 1.
+static FUTURES: Mutex<BTreeMap<u64, Arc<TestFuture>>> = Mutex::new(BTreeMap::new());
+static NEXT_FUTURE: AtomicU64 = AtomicU64::new(1);
+
+/// Stands in for UniFFI's scheduler lock: the under-lock waker holds it across its
+/// continuation call, and `cancel` takes it, as UniFFI's `cancel` takes the scheduler lock.
+static WAKE_LOCK: Mutex<()> = Mutex::new(());
+static WAKER_ENTERED: AtomicBool = AtomicBool::new(false);
+
+fn start_future(outcome: Option<Outcome>, waker: Option<Waker>) -> u64 {
+    let handle = NEXT_FUTURE.fetch_add(1, Ordering::Relaxed);
+    let future = Arc::new(TestFuture {
+        state: Mutex::new(FutureState {
+            outcome,
+            cancelled: false,
+            continuation: None,
+            waker,
+        }),
+    });
+    FUTURES.lock().unwrap().insert(handle, future);
+    handle
+}
+
+fn find_future(handle: u64) -> Option<Arc<TestFuture>> {
+    FUTURES.lock().unwrap().get(&handle).cloned()
+}
+
+fn spawn_waker(future: Arc<TestFuture>, waker: Waker) {
+    std::thread::spawn(move || match waker {
+        Waker::FromThread { value, delay_ms } => {
+            std::thread::sleep(Duration::from_millis(delay_ms.into()));
+            future.wake(Outcome::U32(value));
+        }
+        Waker::UnderLock => {
+            let _wake = WAKE_LOCK.lock().unwrap();
+            WAKER_ENTERED.store(true, Ordering::SeqCst);
+            future.wake(Outcome::U32(1));
+        }
+    });
+}
+
+/// Takes the outcome for a `complete`, writing a cancelled or erroring one to `status`.
+fn take_outcome(handle: u64, status: &mut RustCallStatus) -> Option<Outcome> {
+    status.code = 0;
+    let Some(future) = find_future(handle) else {
+        status.code = CALL_UNEXPECTED_ERROR;
+        return None;
+    };
+    let mut state = future.state.lock().unwrap();
+    // Not ready, or already completed, reads as cancelled, as it does in UniFFI.
+    let outcome = if state.cancelled {
+        None
+    } else {
+        state.outcome.take()
+    };
+    match outcome {
+        None => {
+            status.code = CALL_CANCELLED;
+            None
+        }
+        Some(Outcome::Error(bytes)) => {
+            status.code = CALL_ERROR;
+            status.error_buf = alloc_rustbuffer(&bytes);
+            None
+        }
+        ok => ok,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_future_u32(value: u32) -> u64 {
+    start_future(Some(Outcome::U32(value)), None)
+}
+
+/// Ready with `len` bytes, byte `i` being `i as u8`.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_future_buffer(len: u32) -> u64 {
+    let bytes = (0..len).map(|i| i as u8).collect();
+    start_future(Some(Outcome::Bytes(bytes)), None)
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_future_error() -> u64 {
+    start_future(Some(Outcome::Error(vec![1, 2, 3])), None)
+}
+
+/// Pending until a thread, spawned by the first pending poll, sleeps and then wakes it.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_future_from_thread(value: u32, delay_ms: u32) -> u64 {
+    start_future(None, Some(Waker::FromThread { value, delay_ms }))
+}
+
+/// Pending until cancelled.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_future_parked() -> u64 {
+    start_future(None, None)
+}
+
+/// Pending until a thread, spawned by the first pending poll, wakes it while holding
+/// `WAKE_LOCK`.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_future_wake_under_lock() -> u64 {
+    WAKER_ENTERED.store(false, Ordering::SeqCst);
+    start_future(None, Some(Waker::UnderLock))
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_rust_future_poll(handle: u64, cb: RustFutureContinuation, data: u64) {
+    // An unknown handle reads as ready, so the caller's `complete` reports it.
+    let Some(future) = find_future(handle) else {
+        return cb(data, POLL_READY);
+    };
+    let mut state = future.state.lock().unwrap();
+    if state.cancelled || state.outcome.is_some() {
+        drop(state);
+        return cb(data, POLL_READY);
+    }
+    state.continuation = Some((cb, data));
+    let waker = state.waker.take();
+    drop(state);
+    if let Some(waker) = waker {
+        spawn_waker(future, waker);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_rust_future_cancel(handle: u64) {
+    let _wake = WAKE_LOCK.lock().unwrap();
+    let Some(future) = find_future(handle) else {
+        return;
+    };
+    let continuation = {
+        let mut state = future.state.lock().unwrap();
+        state.cancelled = true;
+        state.continuation.take()
+    };
+    if let Some((cb, data)) = continuation {
+        cb(data, POLL_READY);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_rust_future_complete_u32(
+    handle: u64,
+    status: &mut RustCallStatus,
+) -> u32 {
+    match take_outcome(handle, status) {
+        Some(Outcome::U32(value)) => value,
+        Some(_) => {
+            status.code = CALL_UNEXPECTED_ERROR;
+            0
+        }
+        None => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_rust_future_complete_rust_buffer(
+    handle: u64,
+    status: &mut RustCallStatus,
+) -> RustBuffer {
+    match take_outcome(handle, status) {
+        Some(Outcome::Bytes(bytes)) => alloc_rustbuffer(&bytes),
+        Some(_) => {
+            status.code = CALL_UNEXPECTED_ERROR;
+            alloc_rustbuffer(&[])
+        }
+        None => alloc_rustbuffer(&[]),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_rust_future_free(handle: u64) {
+    FUTURES.lock().unwrap().remove(&handle);
+}
+
+/// Number of futures started and not yet freed.
+#[no_mangle]
+pub extern "C" fn uniffi_test_live_future_count(status: &mut RustCallStatus) -> i32 {
+    status.code = 0;
+    FUTURES.lock().unwrap().len() as i32
+}
+
+/// 1 once the under-lock waker holds `WAKE_LOCK`.
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_waker_entered(status: &mut RustCallStatus) -> i8 {
+    status.code = 0;
+    WAKER_ENTERED.load(Ordering::SeqCst) as i8
 }
