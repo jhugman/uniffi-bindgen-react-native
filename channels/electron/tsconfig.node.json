@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "outDir": "dist/node"
+  },
+  "include": ["src/protocol.ts", "src/main/**/*", "src/utility/**/*"]
+}

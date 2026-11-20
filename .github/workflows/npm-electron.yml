@@ -1,0 +1,58 @@
+name: Publish @ubjs/electron to npmjs
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run without publishing to npm"
+        type: boolean
+        default: true
+  workflow_call:
+
+jobs:
+  publish-electron:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      # The dev dependencies are `file:` links to the in-tree packages, which
+      # resolve each other through `dist`. Build them first, in order.
+      # `--ignore-scripts` keeps npm from running the linked `runtimes/napi`
+      # `prepare`, a release `napi build`.
+      - run: cd typescript && npm ci && npm run build
+      - run: cd channels/worker && npm ci
+      - run: cd runtimes/napi && npm ci --ignore-scripts && npm run build:ts
+      - run: cd channels/electron && npm ci --ignore-scripts && npm run build && npm test && npm run typecheck
+
+      - name: "📦 npm publish: @ubjs/electron (dry-run)"
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+        run: |
+          echo "::notice::DRY RUN — not publishing to npm"
+          cd channels/electron && npm publish --dry-run --access public --tag latest
+
+      # A release publishes @ubjs/node and @ubjs/worker in parallel with this
+      # workflow, and the napi matrix finishes last.
+      - name: Wait for @ubjs/node and @ubjs/worker
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_call' || !inputs.dry-run }}
+        run: |
+          V=$(node -p "require('./channels/electron/package.json').version")
+          for _ in $(seq 1 60); do
+            if [ "$(npm view "@ubjs/node@$V" version 2>/dev/null)" = "$V" ] &&
+               [ "$(npm view "@ubjs/worker@$V" version 2>/dev/null)" = "$V" ]; then exit 0; fi
+            sleep 60
+          done
+          echo "::error::@ubjs/node@$V or @ubjs/worker@$V did not reach npm within 60 minutes"; exit 1
+
+      - name: "📦 npm publish: @ubjs/electron"
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_call' || !inputs.dry-run }}
+        run: cd channels/electron && npm publish --provenance --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
