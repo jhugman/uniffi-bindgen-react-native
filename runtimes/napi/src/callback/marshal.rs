@@ -41,7 +41,6 @@ use std::sync::Arc;
 
 use napi::{Env, JsFunction, JsObject, JsUnknown, NapiRaw, NapiValue, Result};
 
-use crate::napi_utils;
 use uniffi_runtime_core::ffi_c_types::RustBufferC;
 use uniffi_runtime_core::slot;
 use uniffi_runtime_core::{FfiTypeDesc, Module};
@@ -150,9 +149,9 @@ fn marshal_field_to_bytes(
         FfiTypeDesc::RustBuffer => {
             // SAFETY: `env` is the active env for this callback, `js_val` is the field
             // value just read from the JS object, and `rb_from_bytes_ptr` was resolved
-            // at registration time — satisfying `js_uint8array_to_rust_buffer`'s contract.
+            // at registration time — satisfying `BufferViews::lower`'s contract.
             let rb = unsafe {
-                napi_utils::js_uint8array_to_rust_buffer(
+                registration.buffer_views.lower(
                     env.raw(),
                     js_val,
                     rb_from_bytes_ptr,
@@ -196,7 +195,7 @@ fn marshal_field_to_bytes(
                 // property value just read, and `rb_from_bytes_ptr` was resolved
                 // at registration time.
                 let rb = unsafe {
-                    napi_utils::js_uint8array_to_rust_buffer(
+                    registration.buffer_views.lower(
                         env.raw(),
                         err_val,
                         rb_from_bytes_ptr,
@@ -327,9 +326,9 @@ fn marshal_arg_to_bytes(
             let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
             // SAFETY: `env` is the active env for this callback, `js_val` is the
             // argument value read above, and `rb_from_bytes_ptr` comes from the
-            // loaded module — satisfying `js_uint8array_to_rust_buffer`'s contract.
+            // loaded module — satisfying `BufferViews::lower`'s contract.
             let rb = unsafe {
-                napi_utils::js_uint8array_to_rust_buffer(
+                registration.buffer_views.lower(
                     env.raw(),
                     js_val,
                     rb_from_bytes_ptr,

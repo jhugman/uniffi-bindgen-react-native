@@ -60,11 +60,13 @@
     "prepare": "npm run build",
     "fmt": "prettier --write . && cargo fmt",
     "test": "node --import ./tests/setup.mjs --test tests/*.test.mjs",
+    "test:electron": "ELECTRON_RUN_AS_NODE=1 electron --import ./tests/setup.mjs --test tests/*.test.mjs",
     "test:ts": "node --test tests/resolve-lib.test.mjs"
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.0",
     "@types/node": "^24",
+    "electron": "41.10.2",
     "prettier": "^3.8.1",
     "typescript": "^5.4.0"
   }

@@ -346,7 +346,8 @@ pub extern "C" fn on_js_thread(args: *const u8, ret: *mut u8, user_data: *const 
                                 &js_status_obj,
                                 status_ptr,
                                 ud.raw_env,
-                                ud.module.rb_ops().from_bytes_ptr,
+                                &ud.module,
+                                &ud.registration,
                             );
                         }
                     }
@@ -768,7 +769,7 @@ unsafe fn write_js_return_to_bytes(
             // SAFETY: `raw_env` is a live handle for the current call scope;
             // `js_val` is a valid JS value per this function's contract on `desc`.
             let rb = unsafe {
-                napi_utils::js_uint8array_to_rust_buffer(
+                registration.buffer_views.lower(
                     raw_env,
                     js_val,
                     rb_from_bytes_ptr,
@@ -867,8 +868,6 @@ unsafe fn write_uniffi_result(
     module: &Arc<Module>,
     registration: &Arc<crate::register::Registration>,
 ) {
-    let rb_from_bytes_ptr = module.rb_ops().from_bytes_ptr;
-
     // Read and write the status code.
     if !status_ptr.is_null() {
         if let Ok(code) = result_obj.get_named_property::<i32>("code") {
@@ -883,25 +882,12 @@ unsafe fn write_uniffi_result(
         if unsafe { (*status_ptr).code } != 0 {
             if let Ok(error_buf_val) = result_obj.get_named_property::<napi::JsUnknown>("errorBuf")
             {
-                // Check if the value is a TypedArray (not undefined/null).
-                // SAFETY: `env.raw()` is a live handle for the current call
-                // scope; `error_buf_val.raw()` is a live handle for the value
-                // just read above.
-                let typedarray =
-                    unsafe { napi_utils::read_typedarray_data(env.raw(), error_buf_val.raw()) };
-                if let Some((data, length)) = typedarray {
-                    if length > 0 && !data.is_null() {
-                        // SAFETY: `data`/`length` describe the TypedArray's
-                        // backing bytes just read above via `read_typedarray_data`.
-                        if let Ok(rb) = unsafe {
-                            napi_utils::rustbuffer_from_raw_bytes(data, length, rb_from_bytes_ptr)
-                        } {
-                            // SAFETY: `status_ptr` is non-null here and points to a
-                            // valid `RustCallStatusForVTable`.
-                            unsafe { (*status_ptr).error_buf = rb };
-                        }
-                    }
-                }
+                // SAFETY: `env.raw()` is a live handle for the current call scope;
+                // `status_ptr` is non-null here and points to a valid
+                // `RustCallStatusForVTable`.
+                unsafe {
+                    write_error_buf(env.raw(), error_buf_val, status_ptr, module, registration)
+                };
             }
         }
     }
@@ -940,34 +926,58 @@ unsafe fn write_uniffi_result(
 ///
 /// # Safety
 ///
-/// `status_ptr` must point to a valid `RustCallStatusForVTable`.
+/// `raw_env` must be a valid `napi_env` for the current callback scope, and `status_ptr`
+/// must be null or point to a valid `RustCallStatusForVTable`.
 unsafe fn write_error_buf_from_status_obj(
     js_status_obj: &napi::JsObject,
     status_ptr: *mut RustCallStatusForVTable,
     raw_env: napi::sys::napi_env,
-    rb_from_bytes_ptr: *const c_void,
+    module: &Module,
+    registration: &crate::register::Registration,
 ) {
     if status_ptr.is_null() {
         return;
     }
     if let Ok(error_buf_val) = js_status_obj.get_named_property::<napi::JsUnknown>("errorBuf") {
-        // SAFETY: `raw_env` is valid per this function's contract (it is
-        // forwarded from `on_js_thread`'s live env); `error_buf_val.raw()`
-        // is a live handle for the value just read above.
-        let typedarray = unsafe { napi_utils::read_typedarray_data(raw_env, error_buf_val.raw()) };
-        if let Some((data, length)) = typedarray {
-            if length > 0 && !data.is_null() {
-                // SAFETY: `data`/`length` describe the TypedArray's backing
-                // bytes just read above via `read_typedarray_data`.
-                if let Ok(rb) = unsafe {
-                    napi_utils::rustbuffer_from_raw_bytes(data, length, rb_from_bytes_ptr)
-                } {
-                    // SAFETY: `status_ptr` is non-null (checked above) and
-                    // points to a valid `RustCallStatusForVTable`, per this
-                    // function's `# Safety` contract.
-                    unsafe { (*status_ptr).error_buf = rb };
-                }
-            }
-        }
+        // SAFETY: `raw_env` is valid and `status_ptr` is non-null (checked above) and
+        // valid, per this function's contract.
+        unsafe { write_error_buf(raw_env, error_buf_val, status_ptr, module, registration) };
+    }
+}
+
+/// Lowers a callback's `errorBuf` into its RustCallStatus like any other `RustBuffer`
+/// argument, so a view from `rustbuffer_alloc` is adopted rather than copied and orphaned.
+/// Anything other than a non-empty TypedArray leaves the status without an error buffer.
+///
+/// # Safety
+///
+/// `raw_env` must be a valid `napi_env` for the current callback scope, and `status_ptr`
+/// must be non-null and point to a valid `RustCallStatusForVTable`.
+unsafe fn write_error_buf(
+    raw_env: napi::sys::napi_env,
+    error_buf_val: napi::JsUnknown,
+    status_ptr: *mut RustCallStatusForVTable,
+    module: &Module,
+    registration: &crate::register::Registration,
+) {
+    // SAFETY: `raw_env` is valid per this function's contract; `error_buf_val.raw()` is a
+    // live handle owned by this call.
+    let typedarray = unsafe { napi_utils::read_typedarray_data(raw_env, error_buf_val.raw()) };
+    if !matches!(typedarray, Some((_, length)) if length > 0) {
+        return;
+    }
+    // SAFETY: `raw_env` is valid and `error_buf_val` is a TypedArray, checked just above;
+    // `from_bytes_ptr` was resolved at registration time.
+    let lowered = unsafe {
+        registration.buffer_views.lower(
+            raw_env,
+            error_buf_val,
+            module.rb_ops().from_bytes_ptr,
+            &registration.capacity_symbol,
+        )
+    };
+    if let Ok(rb) = lowered {
+        // SAFETY: `status_ptr` is non-null and valid, per this function's contract.
+        unsafe { (*status_ptr).error_buf = rb };
     }
 }

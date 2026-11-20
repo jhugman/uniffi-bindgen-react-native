@@ -14,22 +14,20 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use napi::bindgen_prelude::*;
-use napi::{JsObject, JsUnknown, NapiRaw, NapiValue, Result};
+use napi::{JsObject, JsUnknown, Result};
 
+use crate::buffers::{self, BufferViews};
 use crate::call::call_ffi_function;
 use crate::core_err;
-use crate::napi_utils;
 use crate::napi_utils::CapacitySymbol;
-use uniffi_runtime_core::ffi_c_types::RustBufferC;
 use uniffi_runtime_core::{FfiTypeDesc, Module};
 
 /// State created once per `register()` call and shared by every function closure the
 /// resulting facade exposes.
 ///
-/// Both members are per-registration JS Symbols, and both are keyed to the `napi_env`
-/// that `register()` ran on — which is what makes their contents safe to reuse across
-/// calls. Bundling them keeps the dispatch signature manageable as more per-registration
-/// state accrues.
+/// The Symbols are keyed to the `napi_env` that `register()` ran on, which is what makes
+/// their contents safe to reuse across calls. Bundling them keeps the dispatch signature
+/// manageable as more per-registration state accrues.
 pub(crate) struct Registration {
     /// Hidden capacity-hint key on lift-handoff `Uint8Array` views. A handed-off view's
     /// `byteLength` is `rb.len`, but Rust may have allocated `rb.capacity > rb.len`, so
@@ -40,6 +38,9 @@ pub(crate) struct Registration {
     /// dispatch rebuilds one per call — a permanent ~3 KB leak, and the async poll
     /// loop passes its continuation on every poll. See `callback::cache`.
     pub(crate) trampolines: crate::callback::cache::TrampolineCache,
+    /// Whether JS may view Rust memory directly, or must be given copies, as under
+    /// Electron's memory cage.
+    pub(crate) buffer_views: BufferViews,
 }
 
 /// Build a JS object whose methods call into the native library described by `definitions`.
@@ -67,6 +68,8 @@ pub fn register(
         trampolines: unsafe {
             crate::callback::cache::TrampolineCache::new(env.raw(), module.spec_callbacks().keys())?
         },
+        // SAFETY: as above.
+        buffer_views: unsafe { BufferViews::probe(env.raw())? },
     });
 
     let names = functions.get_property_names()?;
@@ -113,112 +116,51 @@ pub fn register(
         result.set_named_property(&name, js_func)?;
     }
 
-    // `rustbuffer_alloc(n)` -> Uint8Array view over Rust-owned memory of capacity `n`.
-    // `rustbuffer_free(view)` -> hands the underlying (ptr, capacity) back to the
-    // library's `rustbuffer_free`. Together they let JS allocate buffers that the
-    // codegen-emitted lowering path can fill in place and ship to Rust without copying.
-    let alloc_module = Arc::clone(&module);
-    let reg_for_alloc = Arc::clone(&registration);
-    let alloc_fn = env.create_function_from_closure("rustbuffer_alloc", move |ctx| {
-        let size_arg: i32 = ctx.get(0)?;
-        if size_arg < 0 {
-            return Err(napi::Error::from_reason(
-                "rustbuffer_alloc size must be non-negative".to_string(),
-            ));
+    // `rustbuffer_alloc(n)` and `rustbuffer_free(view)` let JS allocate buffers that the
+    // codegen-emitted lowering path fills in place and ships to Rust. Which `rustbuffer_alloc`
+    // the facade gets is decided here, once.
+    let alloc_fn = match registration.buffer_views {
+        BufferViews::Alias => {
+            let module = Arc::clone(&module);
+            let registration = Arc::clone(&registration);
+            env.create_function_from_closure("rustbuffer_alloc", move |ctx| {
+                let size: i32 = ctx.get(0)?;
+                // SAFETY: `ctx.env` is the active env for this callback.
+                unsafe {
+                    buffers::alloc_aliased(
+                        ctx.env.raw(),
+                        &module,
+                        size,
+                        &registration.capacity_symbol,
+                    )
+                }
+            })?
         }
-        let rb = alloc_module.rustbuffer_alloc(size_arg).map_err(core_err)?;
-        let len = usize::try_from(rb.capacity).map_err(|_| {
-            // Free what we just allocated to avoid leaking on the error path.
-            // SAFETY: `rb` was just allocated above and not yet handed to JS, so this is
-            // the sole owner; `free_ptr` was resolved at registration time.
-            unsafe { napi_utils::free_rustbuffer(rb, alloc_module.rb_ops().free_ptr) };
-            napi::Error::from_reason("RustBuffer capacity exceeds addressable memory".to_string())
-        })?;
-        // SAFETY: rb.data points to a valid allocation of `len` bytes that the Rust
-        // library owns; the view is released either by `rustbuffer_free(view)` or by being
-        // adopted when passed as an FFI argument, so no finalizer is required.
-        //
-        // CONTRACT: adoption frees the backing allocation but cannot detach this view, so the
-        // `Uint8Array` is left dangling over freed memory. A view must be treated as consumed
-        // once it has been passed as an FFI argument: reading it afterwards is a use-after-free,
-        // and passing it a second time fails with an "already consumed" error. Generated lowering
-        // code drops the view immediately, so this only bites hand-written callers.
-        let typedarray =
-            unsafe { napi_utils::create_external_uint8array(ctx.env.raw(), rb.data, len)? };
-        // Stamp the capacity so the runtime can recognise this view as library-owned. Two
-        // consumers rely on it: `rustbuffer_free` frees against the true capacity, and the
-        // argument-lowering path adopts the allocation instead of copying it. Without the
-        // stamp, a lowered argument gets copied and this allocation is orphaned.
-        //
-        // Unconditional, including `rustbuffer_alloc(0)` where the capacity is 0: an
-        // absent marker means "not the library's, refuse to free", so a zero-capacity
-        // view is marked 0 — "ours, nothing to free" — rather than left bare.
-        //
-        // SAFETY: `ctx.env` is the active env for this callback, and `typedarray` is the
-        // view created just above.
-        unsafe {
-            reg_for_alloc
-                .capacity_symbol
-                .set(ctx.env.raw(), typedarray, rb.capacity)?
-        };
-        // SAFETY: `ctx.env` is the active env for this callback, and `typedarray` is the
-        // live napi_value created above.
-        unsafe { JsUnknown::from_raw(ctx.env.raw(), typedarray) }
-    })?;
+        BufferViews::Copy => {
+            let registration = Arc::clone(&registration);
+            env.create_function_from_closure("rustbuffer_alloc", move |ctx| {
+                let size: i32 = ctx.get(0)?;
+                // SAFETY: `ctx.env` is the active env for this callback.
+                unsafe { buffers::alloc_copied(ctx.env.raw(), size, &registration.capacity_symbol) }
+            })?
+        }
+    };
     result.set_named_property("rustbuffer_alloc", alloc_fn)?;
 
     let free_module = Arc::clone(&module);
     let reg_for_free = Arc::clone(&registration);
     let free_fn = env.create_function_from_closure("rustbuffer_free", move |ctx| {
-        let js_val: JsUnknown = ctx.get(0)?;
-        let raw_env = ctx.env.raw();
-        // SAFETY: js_val is a JS value from the current callback scope; `raw()`
-        // returns the underlying napi_value handle without changing its ownership.
-        let raw_val = unsafe { js_val.raw() };
-        // SAFETY: js_val came from JS; if it is not a typed array,
-        // `read_typedarray_data` returns None and we surface a clean error.
-        let (data_ptr, length) = unsafe { napi_utils::read_typedarray_data(raw_env, raw_val) }
-            .ok_or_else(|| {
-                napi::Error::from_reason(
-                    "rustbuffer_free expected a Uint8Array argument".to_string(),
-                )
-            })?;
-        let _ = length;
-        // The marker is authoritative. Three cases:
-        //   (a) marker > 0 — library-owned. `rustbuffer_alloc(n)` views carry `n`;
-        //       lift-handoff views carry the true capacity, which may exceed
-        //       `byteLength` (that is `rb.len`). Free against the marker.
-        //   (b) marker == 0 — the view was already adopted as an FFI argument, so the
-        //       callee has freed the memory. Must be a no-op, not a double free.
-        //   (c) no marker — the bytes are not the library's. Reject.
-        //
-        // Rejecting (c) rather than ignoring it keeps a caller's mistake visible. Guessing
-        // the capacity from `byteLength` instead would pass V8-owned memory to Rust's
-        // allocator.
-        //
-        // SAFETY: raw_env / raw_val are valid for the current callback scope, and
-        // `raw_val` is the typed array the caller passed.
-        let capacity =
-            unsafe { reg_for_free.capacity_symbol.get(raw_env, raw_val)? }.ok_or_else(|| {
-                napi::Error::from_reason("rustbuffer_free received an unowned Uint8Array")
-            })?;
-        if capacity == 0 {
-            return ctx.env.get_undefined().map(|u| u.into_unknown());
-        }
-
-        // Mark the view released before handing its allocation back, so repeated
-        // cleanup is a no-op rather than a double free.
-        //
-        // SAFETY: as above — `raw_env` and `raw_val` are valid for this callback scope.
-        unsafe { reg_for_free.capacity_symbol.set(raw_env, raw_val, 0)? };
-        let rb = RustBufferC {
-            capacity,
-            len: 0,
-            data: data_ptr as *mut u8,
+        let view: JsUnknown = ctx.get(0)?;
+        // SAFETY: `ctx.env` is the active env for this callback, and `free_ptr` was resolved
+        // when the module opened.
+        unsafe {
+            buffers::free(
+                ctx.env.raw(),
+                view,
+                free_module.rb_ops().free_ptr,
+                &reg_for_free.capacity_symbol,
+            )?
         };
-        // SAFETY: free_ptr was resolved at registration time, and the marker ties this
-        // exact pointer and capacity to a buffer the library allocated.
-        unsafe { napi_utils::free_rustbuffer(rb, free_module.rb_ops().free_ptr) };
         ctx.env.get_undefined().map(|u| u.into_unknown())
     })?;
     result.set_named_property("rustbuffer_free", free_fn)?;

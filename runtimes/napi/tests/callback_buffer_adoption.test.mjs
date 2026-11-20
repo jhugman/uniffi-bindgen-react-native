@@ -28,6 +28,7 @@ import assert from "node:assert";
 import lib from "../lib.js";
 const { UniffiNativeModule, FfiType } = lib;
 import { libPath } from "./helpers/lib-path.mjs";
+import { adoptsAllocViews } from "./helpers/external-buffers.mjs";
 
 function openModule() {
   return UniffiNativeModule.open(libPath("uniffi_napi_test_lib")).register({
@@ -43,8 +44,29 @@ function openModule() {
         ret: FfiType.RustBuffer,
         hasRustCallStatus: true,
       },
+      erroring_cb: {
+        args: [FfiType.UInt64],
+        ret: FfiType.UInt32,
+        hasRustCallStatus: true,
+      },
+      erroring_out_return_cb: {
+        args: [FfiType.UInt64],
+        ret: FfiType.UInt32,
+        hasRustCallStatus: true,
+        outReturn: true,
+      },
     },
     functions: {
+      uniffi_test_fn_call_erroring_callback: {
+        args: [FfiType.Callback("erroring_cb")],
+        ret: FfiType.Int32,
+        hasRustCallStatus: true,
+      },
+      uniffi_test_fn_call_erroring_out_return_callback: {
+        args: [FfiType.Callback("erroring_out_return_cb")],
+        ret: FfiType.Int32,
+        hasRustCallStatus: true,
+      },
       uniffi_test_fn_call_buffer_returning_callback: {
         args: [FfiType.Callback("buffer_returning_cb"), FfiType.UInt64],
         ret: FfiType.UInt32,
@@ -108,8 +130,12 @@ test("a library-owned buffer returned from a callback is not orphaned", () => {
   );
 });
 
-test("adoption is observable: the returned view's marker is cleared", () => {
+test("adoption is observable: the returned view's marker is cleared", (t) => {
   const nm = openModule();
+  if (!adoptsAllocViews(nm)) {
+    t.skip("nothing is adopted where external buffers are refused");
+    return;
+  }
   let captured;
   const cb = (_handle) => {
     captured = nm.rustbuffer_alloc(PAYLOAD);
@@ -154,4 +180,44 @@ test("a plain JS Uint8Array returned from a callback is still copied", () => {
   }
 
   assert.deepStrictEqual(live(nm), before, "the copies must all be released");
+});
+
+test("an error buffer a callback reports is not orphaned", () => {
+  // Generated code lowers a callback's error through `rustbuffer_alloc` too, and Rust
+  // frees what it finds in the status, so the same adoption rule applies to `errorBuf`.
+  const nm = openModule();
+  const before = live(nm);
+
+  const lowerError = () => {
+    const view = nm.rustbuffer_alloc(PAYLOAD);
+    view.fill(0x45);
+    return view;
+  };
+  // Without an out-return, the callback writes the error into the status it is passed.
+  const viaStatus = (_handle, status) => {
+    status.code = 1;
+    status.errorBuf = lowerError();
+    return 0;
+  };
+  // With one, it returns `{ code, errorBuf }`.
+  const viaResult = (_handle) => ({ code: 1, errorBuf: lowerError() });
+
+  for (let i = 0; i < ITERATIONS; i++) {
+    assert.strictEqual(
+      nm.uniffi_test_fn_call_erroring_callback(viaStatus, { code: 0 }),
+      PAYLOAD,
+    );
+    assert.strictEqual(
+      nm.uniffi_test_fn_call_erroring_out_return_callback(viaResult, {
+        code: 0,
+      }),
+      PAYLOAD,
+    );
+  }
+
+  assert.deepStrictEqual(
+    live(nm),
+    before,
+    "every error buffer must be released exactly once",
+  );
 });

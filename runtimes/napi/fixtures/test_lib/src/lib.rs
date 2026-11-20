@@ -973,3 +973,42 @@ pub extern "C" fn uniffi_test_fn_call_buffer_returning_callback(
     free_buffer(rb);
     len
 }
+
+// A callback that fails reports its error in `RustCallStatus.error_buf`, which Rust then
+// owns and frees, as uniffi's generated code does. Generated JS lowers the error through
+// `rustbuffer_alloc`, so the runtime must adopt that view or orphan it.
+pub type ErroringCallback = extern "C" fn(u64, &mut RustCallStatus) -> u32;
+pub type ErroringOutReturnCallback = extern "C" fn(u64, *mut u32, &mut RustCallStatus);
+
+/// The callback's error length after freeing it, or -1 if it reported no error.
+fn take_callback_error(cb_status: RustCallStatus) -> i32 {
+    if cb_status.code == 0 {
+        return -1;
+    }
+    let len = cb_status.error_buf.len as i32;
+    free_buffer(cb_status.error_buf);
+    len
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_call_erroring_callback(
+    cb: ErroringCallback,
+    status: &mut RustCallStatus,
+) -> i32 {
+    status.code = 0;
+    let mut cb_status = new_cb_status();
+    cb(1, &mut cb_status);
+    take_callback_error(cb_status)
+}
+
+#[no_mangle]
+pub extern "C" fn uniffi_test_fn_call_erroring_out_return_callback(
+    cb: ErroringOutReturnCallback,
+    status: &mut RustCallStatus,
+) -> i32 {
+    status.code = 0;
+    let mut cb_status = new_cb_status();
+    let mut out = 0u32;
+    cb(1, &mut out, &mut cb_status);
+    take_callback_error(cb_status)
+}
