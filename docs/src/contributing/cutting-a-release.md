@@ -45,6 +45,14 @@ version. Both it and `@ubjs/wasm` link `@ubjs/core` from `../../typescript` as a
 devDependency, so their lockfiles refresh before the new `@ubjs/core` exists on
 npm.
 
+Apple frameworks use only the numeric `MAJOR.MINOR.PATCH` portion of the
+package version in `CFBundleShortVersionString`: for example, `0.31.0-7`
+becomes `0.31.0`. App Store Connect rejects prerelease or build suffixes in
+this field, including in embedded frameworks. The prebuilt assembly and
+`ubrn build jsi2 ios` both strip these suffixes; the prebuilt completeness
+test checks the generated plists before publication. npm, Cargo and
+CocoaPods retain the full package version.
+
 ## Steps
 
 1. Increment the version number, keeping all nine files in sync:
