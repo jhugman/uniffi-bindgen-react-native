@@ -31,6 +31,13 @@ export declare class UniffiNativeModule {
   /**
    * Parse JS-provided type definitions and produce a JS object whose methods
    * are bound to the foreign functions found in the loaded library.
+   *
+   * A function def carrying `async: { poll, cancel, complete, free, ret }`
+   * also registers those four exports under their own names, with UniFFI's
+   * fixed future shapes. `complete` returns a `RustBuffer` as a JS-owned
+   * copy. `@ubjs/node` then replaces the start function with one entry,
+   * `(...args, status, signal) => Promise`, built by `@ubjs/core`'s
+   * `uniffiAsyncEntry`.
    */
   register(definitions: object): object
   /**

@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-error-types -- async_wasm
+//   cargo test -p uniffi-fixture-error-types -- async_napi
 
 import { asyncTest } from "@/asserts";
 import {

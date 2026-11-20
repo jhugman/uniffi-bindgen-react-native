@@ -134,6 +134,28 @@ export async function uniffiRustCallAsyncEntry<
 }
 
 /**
+ * A player's async function as one entry, `(...args, status, signal) =>
+ * Promise`: `start` takes the first `argCount` arguments and returns the
+ * future, which is then driven by `uniffiDriveRustFuture`.
+ *
+ * `start` runs before any await, because a player's lowered arguments may
+ * alias its memory until the call returns. So a throwing `start` throws out
+ * of the entry rather than rejecting.
+ */
+export function uniffiAsyncEntry<F, S extends UniffiRustCallStatus>(
+  argCount: number,
+  start: (...args: any[]) => bigint,
+  fns: UniffiRustFutureFns<F, S>,
+): (...args: any[]) => Promise<F> {
+  return function asyncEntry(...args: any[]): Promise<F> {
+    const status = args[argCount] as S;
+    const signal = args[argCount + 1] as AbortSignal | undefined;
+    const rustFuture = start(...args.slice(0, argCount));
+    return uniffiDriveRustFuture(rustFuture, fns, status, signal);
+  };
+}
+
+/**
  * Polls an already-started future to READY, completes it into `status` and
  * frees it. Never throws on a non-zero status: the caller reads it.
  */
@@ -145,7 +167,9 @@ export async function uniffiDriveRustFuture<F, S extends UniffiRustCallStatus>(
 ): Promise<F> {
   // Without a signal nothing can abort the call, so it needs no closure.
   const abortFunc = signal && createAbortFunction(rustFuture, fns.cancel);
-  if (abortFunc) signal?.addEventListener("abort", abortFunc);
+  // Only a listener that was added is removed, so a signal that refuses one
+  // still reaches the free.
+  let listening = false;
 
   // Keep the Node.js event loop alive while polling the Rust future.
   // The napi runtime's callback TSFNs are deliberately unref'd (so leaked TSFNs
@@ -163,9 +187,13 @@ export async function uniffiDriveRustFuture<F, S extends UniffiRustCallStatus>(
   // We now poll the Rust future until it's ready.
   // The poll, complete and free methods are specialized by the FFIType of the return value.
   try {
+    if (abortFunc) {
+      signal?.addEventListener("abort", abortFunc);
+      listening = true;
+    }
     // Events don't replay, so no listener catches an abort that landed before
-    // the listener existed; the flag does, and inside the try a throwing cancel
-    // still frees the future via the `finally` below.
+    // the listener existed; the flag does. A throwing cancel is logged, and the
+    // loop goes on to poll and free.
     if (signal?.aborted) {
       abortFunc?.();
     }
@@ -185,16 +213,34 @@ export async function uniffiDriveRustFuture<F, S extends UniffiRustCallStatus>(
     if (keepAlive !== undefined) clearTimeout(keepAlive);
     // We remove the abortFunc now so we don't trigger a use-after-free
     // panic.
-    if (abortFunc) signal?.removeEventListener("abort", abortFunc);
-    uniffiIgnoreVoidResult(fns.free(rustFuture), "rust future free");
+    if (listening && abortFunc) signal?.removeEventListener("abort", abortFunc);
+    uniffiIgnoreFailure(() => fns.free(rustFuture), "rust future free");
+  }
+}
+
+// Cancel and free must not throw out of the loop: a throw from an abort
+// listener is uncaught, and one from a `finally` replaces the call's outcome.
+function uniffiIgnoreFailure(
+  func: () => void | Promise<void>,
+  what: string,
+): void {
+  try {
+    uniffiIgnoreVoidResult(func(), what);
+  } catch (e) {
+    console.error(`${what} failed`, e);
   }
 }
 
 // The resolver handle map contains the resolvers from each of the pollRust promises.
 type PromiseResolver<T> = (value: T) => void;
-const UNIFFI_RUST_FUTURE_RESOLVER_MAP = new UniffiHandleMap<
+// One map per JS global, shared by every copy of this module loaded into it,
+// so the CJS and ESM builds resolve and count the same futures. A copy from
+// another release may have made it: bump the key's version if the map's
+// `insert`, `remove` or `size` contract changes.
+const UNIFFI_RUST_FUTURE_RESOLVER_MAP: UniffiHandleMap<
   PromiseResolver<number>
->();
+> = ((globalThis as any)[Symbol.for("@ubjs/core/rust-future-resolvers/v1")] ??=
+  new UniffiHandleMap<PromiseResolver<number>>());
 
 // pollRust makes a new promise, stores the resolver in the resolver map,
 // then calls the pollFunc with the handle. A poll that throws or rejects (a
@@ -227,7 +273,7 @@ function createAbortFunction(
   // This will cause pollFunc to come back with a POLL_READY,
   // then the makeRustCall will throw an AbortError.
   return () => {
-    uniffiIgnoreVoidResult(cancelFunc(rustFuture), "rust future cancel");
+    uniffiIgnoreFailure(() => cancelFunc(rustFuture), "rust future cancel");
   };
 }
 

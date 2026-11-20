@@ -166,14 +166,15 @@ impl AbiFlavor {
     /// Whether the player runs UniFFI's future poll loop itself: an async
     /// function's registered entry returns a Promise of the completed value,
     /// and the `rust_future_*` family never reaches the generated code.
+    /// Napi and Wasm2 both do; for Jsi2 the generated code drives the loop.
     pub fn low_level_async_polling(&self) -> bool {
         #[cfg(feature = "wasm")]
         {
-            matches!(self, Self::Wasm2)
+            matches!(self, Self::Napi | Self::Wasm2)
         }
         #[cfg(not(feature = "wasm"))]
         {
-            false
+            matches!(self, Self::Napi)
         }
     }
 

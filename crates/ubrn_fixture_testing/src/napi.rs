@@ -45,14 +45,20 @@ pub fn run_test(crate_name: &str, test_script: &str, _target_tmpdir: &str) {
     run_test_runner(test_script);
 }
 
-/// Build the N-API runtime (debug mode) if not already built.
-fn ensure_napi_runtime_built() {
+/// Build the N-API runtime in the fixtures' cargo profile, if not already built.
+pub(crate) fn ensure_napi_runtime_built() {
     BUILD_NAPI_RUNTIME.call_once(|| {
         let napi_dir = paths::napi_runtime_dir();
+        // A release library behind a debug addon would skew a native benchmark.
+        let script = if metadata::cargo_profile() == "release" {
+            "build"
+        } else {
+            "build:debug"
+        };
         run_cmd_quietly(
             crate::command("npm")
                 .arg("run")
-                .arg("build:debug")
+                .arg(script)
                 .current_dir(napi_dir.as_str()),
         );
     });

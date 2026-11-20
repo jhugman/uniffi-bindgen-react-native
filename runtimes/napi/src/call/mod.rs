@@ -20,7 +20,7 @@
 //!    or hand a `RustBuffer` return to JS via [`crate::buffers::BufferViews::hand_off`]. The
 //!    codegen-emitted lift wrapper consumes the view inside a `try/finally`
 //!    and calls back through `rustbuffer_free` to release the underlying Rust
-//!    allocation.
+//!    allocation, if the view still aliases it.
 
 mod marshal;
 
@@ -29,6 +29,7 @@ use std::sync::Arc;
 
 use napi::{JsObject, JsUnknown, NapiRaw, NapiValue, Result};
 
+use crate::buffers::BufferViews;
 use crate::callback;
 use crate::callback::vtable;
 use crate::core_err;
@@ -46,6 +47,9 @@ use uniffi_runtime_core::{FfiTypeDesc, Module};
 ///
 /// `ret_desc`/`ret_size` are resolved once at registration alongside
 /// `arg_types`, so nothing on this path looks the function up a second time.
+///
+/// A `RustBuffer` return is handed off by `ret_views`, which is the registration's
+/// own views except for a future's `complete`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn call_ffi_function(
     env: &napi::Env,
@@ -57,6 +61,7 @@ pub(crate) fn call_ffi_function(
     ret_size: usize,
     has_rust_call_status: bool,
     registration: &Arc<crate::register::Registration>,
+    ret_views: &BufferViews,
 ) -> Result<JsUnknown> {
     let declared_arg_count = arg_types.len();
 
@@ -282,7 +287,7 @@ pub(crate) fn call_ffi_function(
             // `size_of::<RustBufferC>()` bytes at the front of `ret_bytes`, and the
             // check above confirms both `n` and the allocation cover that range.
             let rb: RustBufferC = unsafe { std::ptr::read_unaligned(ret_bytes.as_ptr().cast()) };
-            registration.buffer_views.hand_off(
+            ret_views.hand_off(
                 env,
                 rb,
                 module.rb_ops().free_ptr,

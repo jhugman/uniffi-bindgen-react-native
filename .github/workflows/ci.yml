@@ -54,6 +54,11 @@ jobs:
       - name: Run tests
         run: cargo test --verbose --workspace --exclude 'uniffi-example-*' --exclude 'uniffi-fixture-*' --exclude 'javascript-runtime-tests'
 
+      # Workspace builds unify ubrn_cli's default `wasm` feature into ubrn_bindgen;
+      # built alone, it compiles and tests its `cfg(not(feature = "wasm"))` branches.
+      - name: Run tests of ubrn_bindgen without wasm
+        run: cargo test --verbose -p ubrn_bindgen
+
       - name: Run tests for binaries
         run: cargo test --bins
 
@@ -173,12 +178,18 @@ jobs:
   integration-tests-napi-runtime:
     name: 🧩 Integration tests (N-API runtime and bindings)
     runs-on: ubuntu-latest
+    # A lost continuation parks a test behind ref'd timers; fail long before GitHub's 6 hours.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+
+      # Builds typescript/dist, the @ubjs/core that runtimes/napi links and its tests load.
+      - name: Run bootstrap for N-API bindings
+        run: cargo xtask bootstrap yarn
 
       - name: Install npm dependencies
         run: cd runtimes/napi && npm ci
@@ -200,9 +211,6 @@ jobs:
       # Electron's V8 memory cage refuses external ArrayBuffers; ELECTRON_RUN_AS_NODE keeps it.
       - name: Run runtime tests under Electron
         run: cd runtimes/napi && npm run test:electron
-
-      - name: Run bootstrap for N-API bindings
-        run: cargo xtask bootstrap yarn
 
       - name: Run tests of generated N-API bindings
         run: "cargo test -- napi::"

@@ -7,6 +7,7 @@ mod metadata;
 mod paths;
 pub mod typescript;
 
+pub mod async_napi;
 pub mod async_wasm;
 pub mod jsi;
 pub mod jsi2;
@@ -16,9 +17,10 @@ pub mod wasm;
 pub mod wasm2;
 
 /// Test flavor: JSI (Hermes native), Jsi2 (generic JSI player shim), WASM
-/// (Node.js), Napi (Node.js N-API), Wasm2 (player-based WASM), or AsyncWasm
+/// (Node.js), Napi (Node.js N-API), Wasm2 (player-based WASM), AsyncWasm
 /// (Wasm2 player behind a `@ubjs/worker` receiver, driven over a node
-/// `MessageChannel` with `--async` bindings).
+/// `MessageChannel` with `--async` bindings), or AsyncNapi (as AsyncWasm, with
+/// the Napi player and the native library behind the receiver).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
@@ -27,6 +29,7 @@ pub enum Flavor {
     Napi,
     Wasm2,
     AsyncWasm,
+    AsyncNapi,
 }
 
 impl Flavor {
@@ -38,13 +41,14 @@ impl Flavor {
             Flavor::Napi => "napi",
             Flavor::Wasm2 => "wasm2",
             Flavor::AsyncWasm => "async-wasm",
+            Flavor::AsyncNapi => "async-napi",
         }
     }
 
     /// The `generate wasm2 bindings` switches this flavor asks for.
     pub fn bindgen_args(&self) -> &'static [&'static str] {
         match self {
-            Flavor::AsyncWasm => &["--async"],
+            Flavor::AsyncWasm | Flavor::AsyncNapi => &["--async"],
             _ => &[],
         }
     }
@@ -207,10 +211,15 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
         // once all generated fixtures are regenerated to import @ubjs/core.
         format!(r#""uniffi-bindgen-react-native": ["{rel_root}/typescript/src/index"]"#),
     ];
-    if flavor == Flavor::Napi {
+    if matches!(flavor, Flavor::Napi | Flavor::AsyncNapi) {
         runtime_paths.push(format!(r#""@ubjs/node": ["{rel_root}/runtimes/napi/lib"]"#));
     }
-    if matches!(flavor, Flavor::Wasm2 | Flavor::AsyncWasm) {
+    // AsyncNapi runs wasm2 bindings too: their `-ffi.ts` imports `FfiType`
+    // from `@ubjs/wasm/core`.
+    if matches!(
+        flavor,
+        Flavor::Wasm2 | Flavor::AsyncWasm | Flavor::AsyncNapi
+    ) {
         // `paths` bypasses the package `exports` map, so the bare specifier
         // the generated index imports needs pointing at the node build.
         runtime_paths.push(format!(
@@ -226,7 +235,7 @@ fn tsconfig_runtimes(flavor: Flavor, rel_root: &Utf8PathBuf) -> String {
             r#""@ubjs/wasm/node": ["{rel_root}/runtimes/wasm/node/src/index"]"#
         ));
     }
-    if flavor == Flavor::AsyncWasm {
+    if matches!(flavor, Flavor::AsyncWasm | Flavor::AsyncNapi) {
         runtime_paths.push(format!(
             r#""@ubjs/worker": ["{rel_root}/channels/worker/src/index"]"#
         ));

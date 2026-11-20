@@ -81,9 +81,10 @@ export class ReceiverCore {
       makeForwarder: (id: number, p: CallbackPlan, l: CallbackLifetime) =>
         this.makeForwarder(id, p, l),
     };
-    // Views the player returns from a synchronous call alias wasm memory and
-    // are ours to free; an async entry's result and the views the player
-    // passes into a callback are JS-owned copies already.
+    // Views the player returns from a synchronous call may alias the player's
+    // memory (wasm's, or Rust's under napi) and are ours to free; an async
+    // entry's result and the views the player passes into a callback are
+    // JS-owned copies already.
     this.returnCtx = {
       ...shared,
       bufferOut: (v) => {

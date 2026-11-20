@@ -3,15 +3,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
-// Runs on Wasm2 (direct) and AsyncWasm (over a Worker). Every call is
-// awaited: on Wasm2 the sync exports return values, on AsyncWasm promises,
-// and `await` accepts both. The delta between the two runs is the channel.
-// Every timed call also goes through one extra closure and promise in
-// shape(), which is an equal floor under every µs/call figure on both
-// flavors.
+// Runs on Wasm2 (direct), and over a Worker on AsyncWasm (the wasm player)
+// and AsyncNapi (the napi player and the native library). Every call is
+// awaited: on Wasm2 the sync exports return values, over a Worker promises,
+// and `await` accepts both. Wasm2 against AsyncWasm is the channel; AsyncWasm
+// against AsyncNapi is wasm against native. The wasm build is always
+// release, but the native one is debug unless UBRN_PROFILE=release, so set
+// it to compare the two. Every timed call also goes through one extra
+// closure and promise in shape(), which is an equal floor under every
+// µs/call figure on every flavor.
 //
 //   cargo test -p uniffi-fixture-benchmark -- wasm2::test_benchmark_async
 //   cargo test -p uniffi-fixture-benchmark -- async_wasm::
+//   UBRN_PROFILE=release cargo test -p uniffi-fixture-benchmark -- async_napi::
 
 import {
   addU32,
@@ -120,7 +124,7 @@ async function observe(label: string, fn: () => Promise<unknown>) {
     async (t) => {
       const ms = (globalThis as any).__ubrnStartupMs;
       console.log(
-        `\n--- startup (open wasm + initialize; AsyncWasm includes Worker spawn) ---\n  ${ms === undefined ? "n/a" : fmtMs(ms) + "ms"}`,
+        `\n--- startup (open the library + initialize; AsyncWasm and AsyncNapi include Worker spawn) ---\n  ${ms === undefined ? "n/a" : fmtMs(ms) + "ms"}`,
       );
       t.end();
     },

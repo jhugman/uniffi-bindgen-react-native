@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-coverall2 -- async_wasm
+//   cargo test -p uniffi-fixture-coverall2 -- async_napi
 
 import {
   identityArrayBuffer,

@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-async-channel -- async_wasm
+//   cargo test -p uniffi-fixture-async-channel -- async_napi
 
 import {
   Counter,

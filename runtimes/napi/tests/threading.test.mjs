@@ -166,3 +166,13 @@ test("futures: a cancel during a cross-thread wake does not deadlock", async () 
   assert.match(out, /^LIVE 0$/m, "the future was not freed");
   assert.strictEqual(exitCode, 0, "the child did not exit on its own");
 });
+
+// The same race through an async entry: aborting its signal makes the drive's listener call
+// cancel.
+test("futures: aborting an entry during a cross-thread wake does not deadlock", async () => {
+  const { out, exitCode } = await runScript("abort-during-wake.mjs");
+
+  assert.match(out, /^STATUS 3$/m, "the entry did not complete as cancelled");
+  assert.match(out, /^LIVE 0$/m, "the future was not freed");
+  assert.strictEqual(exitCode, 0, "the child did not exit on its own");
+});

@@ -46,9 +46,8 @@ pub fn run_test(test_script: &str, flavor: Flavor, target_tmpdir: &str) {
             paths::assert_wasm_bootstrap();
             crate::run_tsx(test_script);
         }
-        // AsyncWasm needs a fixture crate to build for wasm32; no framework
-        // test currently lists it.
-        Flavor::AsyncWasm => {
+        // Both need a fixture crate to build; no framework test lists them.
+        Flavor::AsyncWasm | Flavor::AsyncNapi => {
             unimplemented!("{flavor_name} flavor is fixture-only, see its run_test")
         }
     }

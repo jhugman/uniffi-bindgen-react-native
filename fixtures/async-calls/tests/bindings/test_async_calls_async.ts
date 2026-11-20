@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-async-calls -- async_wasm
+//   cargo test -p uniffi-fixture-async-calls -- async_napi
 
 import {
   alwaysReady,

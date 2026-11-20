@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-async-callbacks -- async_wasm
+//   cargo test -p uniffi-fixture-async-callbacks -- async_napi
 
 import {
   asStringUsingTrait,

@@ -383,14 +383,14 @@ test("close cancels every async entry still running and posts nothing after", as
   assert.deepStrictEqual(posted, []);
 });
 
-test("an async entry that returns a future handle is an error naming the too-old player", async () => {
+test("an async entry that returns a future handle is an IncompatiblePlayer error", async () => {
   const { s, done } = receiverPair();
   try {
     s.post({ kind: "call", id: 1, fn: "sleep_unawaited", args: [] });
     const m = (await s.next()) as any;
     assert.strictEqual(m.id, 1);
     assert.strictEqual(m.ok, false);
-    assert.match(m.error.message, /@ubjs\/wasm is too old/);
+    assert.match(m.error.message, /predates these bindings/);
   } finally {
     done();
   }

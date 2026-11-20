@@ -7,11 +7,13 @@
 
 use std::collections::HashMap;
 
-use napi::{JsObject, Result};
+use napi::{JsObject, JsUnknown, Result, ValueType};
 use uniffi_runtime_core::{
-    desc_from_name, CallbackDef, FfiTypeDesc, FunctionDef, ModuleSpec, RustBufferSymbols,
-    StructDef, StructField,
+    add_async_entries, desc_from_name, AsyncFunctionDef, CallbackDef, FfiTypeDesc, FunctionDef,
+    ModuleSpec, RustBufferSymbols, StructDef, StructField,
 };
+
+use crate::core_err;
 
 /// Parse an `FfiTypeDesc` from a JS object with shape `{ tag: string, ...params }`.
 fn ffi_type_desc_from_js(obj: &JsObject) -> Result<FfiTypeDesc> {
@@ -47,7 +49,8 @@ fn ffi_type_desc_from_js(obj: &JsObject) -> Result<FfiTypeDesc> {
     }
 }
 
-pub fn parse_module_spec(definitions: &JsObject) -> Result<ModuleSpec> {
+/// The spec, with every `async:` def's future exports already added, and those defs.
+pub fn parse_module_spec(definitions: &JsObject) -> Result<(ModuleSpec, Vec<AsyncFunctionDef>)> {
     let symbols: JsObject = definitions.get_named_property("symbols")?;
     let rustbuffer_symbols = RustBufferSymbols {
         alloc: symbols.get_named_property::<String>("rustbuffer_alloc")?,
@@ -55,20 +58,43 @@ pub fn parse_module_spec(definitions: &JsObject) -> Result<ModuleSpec> {
         from_bytes: symbols.get_named_property::<String>("rustbuffer_from_bytes")?,
     };
 
-    let functions = parse_functions(definitions)?;
+    let (functions, async_defs) = parse_functions(definitions)?;
     let callbacks = parse_callbacks(definitions)?;
     let structs = parse_structs(definitions)?;
 
-    Ok(ModuleSpec {
+    let mut spec = ModuleSpec {
         rustbuffer_symbols,
         functions,
         callbacks,
         structs,
-    })
+    };
+    add_async_entries(&mut spec, &async_defs).map_err(core_err)?;
+    Ok((spec, async_defs))
 }
 
-fn parse_functions(defs: &JsObject) -> Result<HashMap<String, FunctionDef>> {
+/// A function's `async: { poll, cancel, complete, free, ret }`, if it has one.
+fn parse_async(f: &JsObject) -> Result<Option<AsyncFunctionDef>> {
+    let value: JsUnknown = f.get_named_property("async")?;
+    // Absent or `null`: no future, as wasm2 reads it.
+    if matches!(value.get_type()?, ValueType::Undefined | ValueType::Null) {
+        return Ok(None);
+    }
+    let a = JsObject::try_from(value)?;
+    let ret_obj: JsObject = a.get_named_property("ret")?;
+    Ok(Some(AsyncFunctionDef {
+        poll: a.get_named_property("poll")?,
+        cancel: a.get_named_property("cancel")?,
+        complete: a.get_named_property("complete")?,
+        free: a.get_named_property("free")?,
+        ret: ffi_type_desc_from_js(&ret_obj)?,
+    }))
+}
+
+fn parse_functions(
+    defs: &JsObject,
+) -> Result<(HashMap<String, FunctionDef>, Vec<AsyncFunctionDef>)> {
     let mut out = HashMap::new();
+    let mut async_defs = Vec::new();
     let functions: JsObject = defs.get_named_property("functions")?;
     let names = functions.get_property_names()?;
     let len = names.get_array_length()?;
@@ -89,6 +115,7 @@ fn parse_functions(defs: &JsObject) -> Result<HashMap<String, FunctionDef>> {
         let ret_obj: JsObject = f.get_named_property("ret")?;
         let ret = ffi_type_desc_from_js(&ret_obj)?;
         let has_rust_call_status: bool = f.get_named_property("hasRustCallStatus")?;
+        async_defs.extend(parse_async(&f)?);
         out.insert(
             name,
             FunctionDef {
@@ -98,7 +125,7 @@ fn parse_functions(defs: &JsObject) -> Result<HashMap<String, FunctionDef>> {
             },
         );
     }
-    Ok(out)
+    Ok((out, async_defs))
 }
 
 fn parse_callbacks(defs: &JsObject) -> Result<HashMap<String, CallbackDef>> {

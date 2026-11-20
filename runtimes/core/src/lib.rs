@@ -12,6 +12,7 @@ mod callback;
 mod cif;
 mod error;
 mod ffi_type;
+mod future;
 mod library;
 mod lifecycle;
 mod module;
@@ -27,6 +28,7 @@ pub use call::{return_size, slot_size_align, ArgLayout, PreparedCall, SlotLayout
 pub use callback::{CallbackFnPtr, DispatchFn, IsJsThreadFn, OnJsThreadFn, VTableField};
 pub use error::{Error, Result};
 pub use ffi_type::{desc_from_name, tag_name_of, FfiTypeDesc, ALL_TAG_NAMES};
+pub use future::{add_async_entries, AsyncFunctionDef, RUST_FUTURE_CONTINUATION};
 pub use library::LibraryHandle;
 pub use module::{
     slot_size_align_for_name, AbortCallbacksFn, Module, StructFieldLayout, StructLayout,

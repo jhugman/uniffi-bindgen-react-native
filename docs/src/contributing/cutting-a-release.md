@@ -28,7 +28,9 @@ for every supported target (macOS x64/arm64, Linux gnu/musl on x64/arm64,
 Windows x64/arm64), publishes each as a platform package
 (`@ubjs/node-darwin-arm64`, `@ubjs/node-linux-x64-gnu`, …), then publishes the
 `@ubjs/node` root package whose `optionalDependencies` point at them. If the
-build matrix fails for any target, the publish job does not run.
+build matrix fails for any target, the publish job does not run. It declares
+`@ubjs/core` as a `peerDependency`, for its async functions, so that range has
+to move with the version too.
 
 `@ubjs/wasm` is the wasm2 player runtime, and `uniffi-runtime-wasm` is the
 helper crate a consuming cdylib links. `@ubjs/wasm` declares `@ubjs/core` as a
@@ -41,9 +43,9 @@ context, such as a page driving wasm2 in a Web Worker. It has the same
 `@ubjs/react-native` is the JSI player. Its workflow builds the Rust half for
 each iOS and Android slice, assembles them into `prebuilt/`, then publishes. It
 also declares `@ubjs/core` as a `peerDependency` whose range moves with the
-version. Both it and `@ubjs/wasm` link `@ubjs/core` from `../../typescript` as a
-devDependency, so their lockfiles refresh before the new `@ubjs/core` exists on
-npm.
+version. It, `@ubjs/wasm`, `@ubjs/worker` and `@ubjs/node` link `@ubjs/core`
+from `../../typescript` as a devDependency, so their lockfiles refresh before
+the new `@ubjs/core` exists on npm.
 
 Apple frameworks use only the numeric `MAJOR.MINOR.PATCH` portion of the
 package version in `CFBundleShortVersionString`: for example, `0.31.0-7`
@@ -60,7 +62,7 @@ CocoaPods retain the full package version.
    - [`crates/ubrn_cli/Cargo.toml`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/ubrn_cli/Cargo.toml#L3)
    - [`crates/uniffi-runtime-javascript/Cargo.toml`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/crates/uniffi-runtime-javascript/Cargo.toml#L3)
    - [`typescript/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/typescript/package.json#L3) (the `@ubjs/core` runtime)
-   - [`runtimes/napi/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/napi/package.json#L3) (the `@ubjs/node` runtime)
+   - [`runtimes/napi/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/napi/package.json#L3) (the `@ubjs/node` runtime — also its `@ubjs/core` `peerDependency` range)
    - [`runtimes/wasm/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/wasm/package.json#L3) (the `@ubjs/wasm` runtime — also its `@ubjs/core` `peerDependency` range)
    - [`channels/worker/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/channels/worker/package.json#L3) (the `@ubjs/worker` channel — also its `@ubjs/core` `peerDependency` range)
    - [`runtimes/jsi/package.json`](https://github.com/jhugman/uniffi-bindgen-react-native/blob/main/runtimes/jsi/package.json#L3) (the `@ubjs/react-native` player — also its `@ubjs/core` `peerDependency` range)

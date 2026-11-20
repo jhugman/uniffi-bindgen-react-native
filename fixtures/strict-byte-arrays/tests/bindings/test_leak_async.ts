@@ -8,6 +8,7 @@
 //
 // To run:
 //   cargo test -p uniffi-fixture-strict-byte-arrays -- async_wasm::test_leak
+//   cargo test -p uniffi-fixture-strict-byte-arrays -- async_napi::test_leak
 import {
   measureBytes,
   liveBigAllocCount,

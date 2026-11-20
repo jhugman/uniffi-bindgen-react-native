@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-time -- async_wasm
+//   cargo test -p uniffi-fixture-time -- async_napi
 
 import {
   now as rustNow,

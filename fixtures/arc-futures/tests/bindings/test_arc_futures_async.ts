@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-arc-futures -- async_wasm
+//   cargo test -p uniffi-fixture-arc-futures -- async_napi
 
 import {
   asyncCallback,

@@ -5,6 +5,7 @@
  */
 // To run:
 //   cargo test -p uniffi-fixture-strict-byte-arrays -- async_wasm::test_strict_byte_arrays
+//   cargo test -p uniffi-fixture-strict-byte-arrays -- async_napi::test_strict_byte_arrays
 
 import {
   identityBytes,
