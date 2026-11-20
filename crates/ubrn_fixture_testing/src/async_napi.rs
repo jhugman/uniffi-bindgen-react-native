@@ -49,8 +49,8 @@ fn worker_source(cdylib: &Utf8Path) -> String {
         "import {{ workerData }} from \"node:worker_threads\";\n\
          import lib from \"@ubjs/node\";\n\
          import {{ createReceiver }} from \"@ubjs/worker\";\n\
-         import {{ DEFINITIONS }} from \"./{definitions}.js\";\n\
-         const player = lib.UniffiNativeModule.open({lib_path}).register(DEFINITIONS);\n\
-         createReceiver(DEFINITIONS, player, workerData.port);\n"
+         import {{ PLAYER_DEFINITIONS }} from \"./{definitions}.js\";\n\
+         const player = lib.UniffiNativeModule.open({lib_path}).register(PLAYER_DEFINITIONS);\n\
+         createReceiver(PLAYER_DEFINITIONS, player, workerData.port);\n"
     )
 }

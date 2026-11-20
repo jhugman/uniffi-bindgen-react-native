@@ -66,8 +66,8 @@ pub enum PlayerHostSource {
     /// Use `globalThis.uniffi.open(...)` (installed by the JSI shim) and import
     /// `FfiType` from `@ubjs/core`.
     JsiGlobal,
-    /// Import `FfiType` from the environment-neutral `@ubjs/wasm/core`, and
-    /// take the module from a generated entrypoint via `setNativeModule`.
+    /// Import `FfiType` from `@ubjs/core`, and take the module from a
+    /// generated entrypoint via `setNativeModule`.
     WasmCore,
 }
 

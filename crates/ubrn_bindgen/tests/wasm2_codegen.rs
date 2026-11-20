@@ -5,23 +5,25 @@
  */
 
 //! Checks that `wrapper-ffi-player.ts` renders its Wasm2 branches: the
-//! runtime import comes from `@ubjs/wasm/core`, the module exports
+//! vocabulary import comes from `@ubjs/core`, the module exports
 //! `PLAYER_DEFINITIONS` and `setNativeModule`, and the napi-only
-//! `UniffiNativeModule.open(...)` path is absent.
+//! `UniffiNativeModule.open(...)` path is absent. Also checks the `--async`
+//! entry that connects every namespace through one port.
 
 #![cfg(feature = "wasm")]
 
-use ubrn_bindgen::{render_player_lowlevel_for_test, AbiFlavor};
+use ubrn_bindgen::{render_async_index_for_test, render_player_lowlevel_for_test, AbiFlavor};
 
 #[test]
 fn wasm2_player_ffi_renders_expected_markers() {
     let rendered = render_player_lowlevel_for_test(&AbiFlavor::Wasm2, false)
         .expect("rendering wasm2 player wrapper-ffi.ts should succeed");
 
-    // Wasm2 imports from the wasm runtime, not napi.
+    // The vocabulary only, from `@ubjs/core`: `@ubjs/wasm/core` exports the
+    // player too, which a page behind a port would then bundle.
     assert!(
-        rendered.contains(r#"import { FfiType, type ModuleDefinitions } from "@ubjs/wasm/core""#),
-        "expected wasm2 runtime import in rendered output:\n{rendered}"
+        rendered.contains(r#"import { FfiType, type ModuleDefinitions } from "@ubjs/core""#),
+        "expected the @ubjs/core vocabulary import in rendered output:\n{rendered}"
     );
 
     // `as const` would freeze the arrays, which then will not assign.
@@ -58,12 +60,8 @@ fn wasm2_player_ffi_renders_expected_markers() {
     // here would make every browser and React Native bundle pull in node
     // built-ins.
     assert!(
-        !rendered.contains("@ubjs/wasm/node") && !rendered.contains("@ubjs/wasm/browser"),
-        "wasm2 wrapper must import only /core, not an environment subpath:\n{rendered}"
-    );
-    assert!(
-        rendered.contains(r#"from "@ubjs/wasm/core""#),
-        "expected the neutral /core import in wasm2 rendering:\n{rendered}"
+        !rendered.contains("@ubjs/wasm"),
+        "wasm2 wrapper must not import the wasm runtime:\n{rendered}"
     );
     assert!(
         !rendered.contains("openWasm"),
@@ -168,4 +166,73 @@ fn wasm2_player_table_renders_an_async_entry() {
         !delivered.contains("Promise<Promise<"),
         "the async entry must not be wrapped in two promises:\n{delivered}"
     );
+}
+
+#[test]
+fn async_index_connects_every_namespace_through_one_sender() {
+    // `port` and `sender` are also the entry's own names.
+    let namespaces = ["alpha", "port", "sender"];
+    let files = render_async_index_for_test(&namespaces)
+        .expect("rendering the --async index files should succeed");
+    let names: Vec<&str> = files.iter().map(|(name, _)| *name).collect();
+    assert_eq!(names, ["player-definitions.ts", "index.port.ts"]);
+    let (defs, port) = (&files[0].1, &files[1].1);
+
+    // One sender over the merged table, handed to every namespace.
+    assert_eq!(
+        port.matches("createSender(").count(),
+        1,
+        "expected exactly one sender:\n{port}"
+    );
+    assert!(
+        port.contains("createSender(PLAYER_DEFINITIONS, port)"),
+        "expected the sender over the merged table:\n{port}"
+    );
+    assert_eq!(
+        port.matches("(sender);").count(),
+        namespaces.len(),
+        "expected the one sender handed to each namespace and nothing else:\n{port}"
+    );
+    for ns in namespaces {
+        assert!(
+            port.contains(&format!("setNativeModule_{ns}(sender);")),
+            "expected {ns} to get the sender:\n{port}"
+        );
+        assert!(
+            port.contains(&format!("import * as ns_{ns} from './{ns}';")),
+            "expected {ns} imported under a name the entry does not use:\n{port}"
+        );
+        assert!(
+            port.contains(&format!("await ns_{ns}.default.initialize();")),
+            "expected {ns} to be initialised:\n{port}"
+        );
+        assert!(
+            port.contains(&format!("export * from './{ns}';")),
+            "expected the entry to re-export {ns}:\n{port}"
+        );
+    }
+
+    // The merged table imports only the tables, so the far side can import it.
+    assert!(
+        defs.contains("uniffiMergeDefinitions(["),
+        "expected the merge helper:\n{defs}"
+    );
+    for ns in namespaces {
+        assert!(
+            defs.contains(&format!("from './{ns}-ffi';")),
+            "expected {ns}'s table:\n{defs}"
+        );
+        assert!(
+            !defs.contains(&format!("from './{ns}';")),
+            "the merged table must not import {ns}'s API:\n{defs}"
+        );
+    }
+
+    // A page that only talks to a port must not bundle the wasm player.
+    for (name, code) in &files {
+        assert!(
+            !code.contains("@ubjs/wasm"),
+            "{name} must not import the wasm runtime:\n{code}"
+        );
+    }
 }

@@ -289,10 +289,13 @@ fn generate_index_from_modules(
     let mut strict_type_checking = !general_root.namespaces.is_empty();
     // One namespace is enough: awaiting a sync namespace's void `initialize()` is harmless.
     let mut async_delivery = false;
+    // Every namespace, to sit behind a port: a sync namespace's calls would get promises.
+    let mut all_async_delivery = !general_root.namespaces.is_empty();
     for namespace in general_root.namespaces.values() {
         let config = ts_config_for(namespace, switches)?;
         strict_type_checking &= config.strict_type_checking;
         async_delivery |= config.async_delivery;
+        all_async_delivery &= config.async_delivery;
     }
     let code = gen_typescript::generate_index_code(
         modules.to_vec(),
@@ -304,6 +307,16 @@ fn generate_index_from_modules(
     )?;
     let path = ts_dir.join("index.ts");
     ubrn_common::write_file(path, code)?;
+    if all_async_delivery {
+        for (name, code) in
+            gen_typescript::generate_async_index_code(modules.to_vec(), strict_type_checking)?
+        {
+            ubrn_common::write_file(ts_dir.join(name), code)?;
+        }
+    } else {
+        // A port entry left by an earlier `--async` run would put a sender behind sync call sites.
+        gen_typescript::remove_stale_async_index_files(ts_dir)?;
+    }
     Ok(())
 }
 

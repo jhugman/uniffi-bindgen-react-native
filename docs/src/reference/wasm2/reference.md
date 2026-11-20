@@ -372,7 +372,7 @@ class UniffiNativeModule {
 
 `disableJit` forces the interpreted dispatcher. The player already falls back to it where `new Function` is unavailable, so the flag is for tests and for pinning behaviour deliberately.
 
-The `@ubjs/wasm/core` subpath is the environment-neutral half: `FfiType`, `UniffiNativeModule` and the types. The generated `receipts-ffi.ts` imports only this, which is why it bundles anywhere.
+The `@ubjs/wasm/core` subpath is the environment-neutral half: `FfiType`, `UniffiNativeModule` and the types. The generated `receipts-ffi.ts` imports nothing from `@ubjs/wasm`: its `FfiType` comes from `@ubjs/core`, so it bundles anywhere, and a page whose player sits behind a port bundles no player.
 
 ## Errors you may meet
 

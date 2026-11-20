@@ -97,3 +97,42 @@ export interface ModuleDefinitions {
   callbacks: Record<string, CallbackDef>;
   structs: Record<string, FieldDesc[]>;
 }
+
+type MergedKey = "functions" | "callbacks" | "structs";
+
+/** One table for a library of several namespaces, so one player and one port
+ * serve them all. Function names are crate-prefixed, and each foreign trait's
+ * callbacks and structs carry its namespace, so only uniffi's generic shapes
+ * share a name across namespaces. A shared name whose definitions differ
+ * throws; that takes two names that concatenate alike, such as namespace `app`
+ * with trait `CoreListener` and namespace `app_core` with trait `Listener`.
+ * Definitions are compared as JSON, so as the bindgen writes them. */
+export function uniffiMergeDefinitions(
+  tables: readonly ModuleDefinitions[],
+): ModuleDefinitions {
+  if (tables.length === 0) {
+    throw new Error("uniffiMergeDefinitions: no tables to merge");
+  }
+  const merge = <K extends MergedKey>(key: K): ModuleDefinitions[K] => {
+    // No prototype, so `constructor` and friends are names like any other.
+    const out: Record<string, unknown> = Object.create(null);
+    for (const table of tables) {
+      for (const [name, def] of Object.entries(table[key])) {
+        if (name in out && JSON.stringify(out[name]) !== JSON.stringify(def)) {
+          throw new Error(
+            `uniffiMergeDefinitions: ${key} ${name} differs between namespaces`,
+          );
+        }
+        out[name] = def;
+      }
+    }
+    return out as ModuleDefinitions[K];
+  };
+  return {
+    // One library has one allocator: any namespace's buffer functions serve all.
+    symbols: tables[0].symbols,
+    functions: merge("functions"),
+    callbacks: merge("callbacks"),
+    structs: merge("structs"),
+  };
+}
