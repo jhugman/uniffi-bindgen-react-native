@@ -218,7 +218,8 @@ jobs:
   integration-tests-electron:
     name: 🧩 Integration tests (Electron)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The cold cargo build of every fixture runs in this job; each run's own watchdog ends a hang sooner.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 
@@ -226,8 +227,20 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install a virtual display
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xauth xvfb
+
+      # Ubuntu blocks the user namespaces Chromium's sandbox needs; the fix is this, never --no-sandbox.
+      - name: Allow Chromium's sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Run bootstrap
         run: cargo xtask bootstrap yarn
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-41.10.2-${{ runner.os }}
 
       - name: Build @ubjs/worker
         run: cd channels/worker && npm ci
@@ -236,7 +249,10 @@ jobs:
         run: cd runtimes/napi && npm ci --ignore-scripts && npm run build:debug
 
       - name: Build and unit-test @ubjs/electron
-        run: cd channels/electron && npm ci --ignore-scripts && npm run build && npm test && npm run typecheck
+        run: cd channels/electron && npm ci --ignore-scripts && node node_modules/electron/install.js && npm run build && npm test && npm run typecheck
+
+      - name: Run the --async fixtures under Electron
+        run: "xvfb-run -a cargo test -- async_electron::"
 
   integration-tests-checkout:
     name: 🧩 Integration tests (checkout)

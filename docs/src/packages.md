@@ -10,10 +10,12 @@ The runtime is published under the `@ubjs` scope. A freshly generated project de
 | ------ | ------- | ----------- |
 | Any target | [`@ubjs/core`][core-npm] | the generated TypeScript |
 | Node.js | [`@ubjs/node`][napi-npm] (with `@ubjs/core`) | the generated TypeScript |
+| Electron | [`@ubjs/electron`][electron-npm] (with `@ubjs/node`, `@ubjs/core` and `@ubjs/worker`) | the app's main, utility, preload and page code |
 | React Native | `uniffi-bindgen-react-native` (with `@ubjs/core`) | CocoaPods / CMake, for the C++/JSI runtime |
 
 - **`@ubjs/core`** is the TypeScript runtime (FFI converters, `RustBuffer`, polyfills), shared by every target. New generated code imports it.
 - **`@ubjs/node`** is a single prebuilt N-API addon that loads your compiled `cdylib` at runtime and calls into it with [libffi](https://sourceware.org/libffi/). Because UniFFI uses a small, fixed set of FFI types, one addon works with any UniFFI library — there is no per-library glue to compile. See the [Node.js reference](reference/nodejs.md).
+- **`@ubjs/electron`** runs a native library in an Electron utility process and connects a sandboxed page to it through a port. See the [Electron reference](reference/electron.md).
 - For **React Native**, the C++/JSI runtime ships inside the `uniffi-bindgen-react-native` package (the `uniffi-bindgen-react-native.podspec` and `cpp/includes`), which the generated turbo-module compiles against. Start with the [React Native tutorial](guides/rn/getting-started.md); the [Web tutorial](guides/web/getting-started.md) extends it.
 
 The `uniffi-bindgen-react-native` package itself is the `ubrn` command line and the React Native build tooling. On React Native it is a regular dependency (for the C++ runtime above); for a Node.js-only project it is only needed at build time, as a dev dependency.
@@ -24,3 +26,4 @@ The `uniffi-bindgen-react-native` package itself is the `ubrn` command line and 
 
 [core-npm]: https://www.npmjs.com/package/@ubjs/core
 [napi-npm]: https://www.npmjs.com/package/@ubjs/node
+[electron-npm]: https://www.npmjs.com/package/@ubjs/electron

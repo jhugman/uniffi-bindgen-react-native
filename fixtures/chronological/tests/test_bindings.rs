@@ -5,5 +5,5 @@
  */
 ubrn_macros::build_foreign_language_testcases! {
     "tests/bindings/test_chronological.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
-    "tests/bindings/test_chronological_async.ts" => [AsyncWasm, AsyncNapi],
+    "tests/bindings/test_chronological_async.ts" => [AsyncWasm, AsyncNapi, AsyncElectron],
 }

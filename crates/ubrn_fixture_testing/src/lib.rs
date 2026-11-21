@@ -7,6 +7,7 @@ mod metadata;
 mod paths;
 pub mod typescript;
 
+pub mod async_electron;
 pub mod async_napi;
 pub mod async_wasm;
 pub mod jsi;
@@ -19,8 +20,10 @@ pub mod wasm2;
 /// Test flavor: JSI (Hermes native), Jsi2 (generic JSI player shim), WASM
 /// (Node.js), Napi (Node.js N-API), Wasm2 (player-based WASM), AsyncWasm
 /// (Wasm2 player behind a `@ubjs/worker` receiver, driven over a node
-/// `MessageChannel` with `--async` bindings), or AsyncNapi (as AsyncWasm, with
-/// the Napi player and the native library behind the receiver).
+/// `MessageChannel` with `--async` bindings), AsyncNapi (as AsyncWasm, with
+/// the Napi player and the native library behind the receiver), or
+/// AsyncElectron (as AsyncNapi, through `@ubjs/electron`: the script in a
+/// sandboxed page, the player in a utility process).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flavor {
     Jsi,
@@ -30,6 +33,7 @@ pub enum Flavor {
     Wasm2,
     AsyncWasm,
     AsyncNapi,
+    AsyncElectron,
 }
 
 impl Flavor {
@@ -42,13 +46,14 @@ impl Flavor {
             Flavor::Wasm2 => "wasm2",
             Flavor::AsyncWasm => "async-wasm",
             Flavor::AsyncNapi => "async-napi",
+            Flavor::AsyncElectron => "async-electron",
         }
     }
 
     /// The `generate wasm2 bindings` switches this flavor asks for.
     pub fn bindgen_args(&self) -> &'static [&'static str] {
         match self {
-            Flavor::AsyncWasm | Flavor::AsyncNapi => &["--async"],
+            Flavor::AsyncWasm | Flavor::AsyncNapi | Flavor::AsyncElectron => &["--async"],
             _ => &[],
         }
     }

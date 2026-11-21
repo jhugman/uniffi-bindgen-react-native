@@ -98,6 +98,8 @@ Bindings need `@ubjs/node` from the same release of `uniffi-bindgen-react-native
 
 The same bindings run in Electron's main process and in its utility processes, which are Node environments too. Electron's V8 memory cage does not let JavaScript view memory that V8 did not allocate, so there the runtime copies each `RustBuffer` across instead of handing JavaScript a view of Rust's memory. On Node the view needs no copy. The runtime checks once, when a module registers, which of the two it is running in.
 
+To call a library from a sandboxed Electron page, see [Electron support](electron.md).
+
 ## Limitations
 
 - No `ubrn build node` / scaffolding command yet — you compile the `cdylib` and run `ubrn generate napi` yourself.
