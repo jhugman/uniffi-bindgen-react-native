@@ -27,9 +27,11 @@ There are several possible approaches:
 
 The simplest route for this would be to use a [`FinalizationRegistry`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry).
 
-Unfortunately, [this is not yet supported by hermes](https://github.com/facebook/hermes/issues/604). ([New issue](https://github.com/facebook/hermes/issues/1440))
+Node and browsers have one, so the `napi` and `wasm2` bindings use it. Unfortunately, [this is not yet supported by hermes](https://github.com/facebook/hermes/issues/604). ([New issue](https://github.com/facebook/hermes/issues/1440))
 
-Instead, for every Javascript object constructor called, we create a `DestructibleObject` in C++, that is represented in Javascript but has a [C++ destructor](https://isocpp.org/wiki/faq/dtors).
+With the `jsi2` flavor, `@ubjs/react-native` supplies a registry in its place, used only while Hermes has none of its own. Each object carries a [C++ destructor](https://isocpp.org/wiki/faq/dtors). When Hermes collects the object, the destructor notes it, and soon after, on the JS thread, the object is freed in Rust through its ordinary free call. Objects still alive when the JS runtime is destroyed, as on a reload, are not freed.
+
+With the `jsi` flavor, for every Javascript object constructor called, we create a `DestructibleObject` in C++, that is represented in Javascript but has a [C++ destructor](https://isocpp.org/wiki/faq/dtors).
 
 [At the end of this \[C++\] object's lifetime](https://en.cppreference.com/w/cpp/language/destructor), the destructor is called.
 
