@@ -30,20 +30,27 @@ namespace jsi = facebook::jsi;
 // cross into core. Kept numeric because every per-call marshal switches on it.
 typedef enum {
   UBRN_TY_VOID = 0,
-  UBRN_TY_U8 = 1,  UBRN_TY_I8 = 2,
-  UBRN_TY_U16 = 3, UBRN_TY_I16 = 4,
-  UBRN_TY_U32 = 5, UBRN_TY_I32 = 6,
-  UBRN_TY_U64 = 7, UBRN_TY_I64 = 8,
-  UBRN_TY_F32 = 9, UBRN_TY_F64 = 10,
+  UBRN_TY_U8 = 1,
+  UBRN_TY_I8 = 2,
+  UBRN_TY_U16 = 3,
+  UBRN_TY_I16 = 4,
+  UBRN_TY_U32 = 5,
+  UBRN_TY_I32 = 6,
+  UBRN_TY_U64 = 7,
+  UBRN_TY_I64 = 8,
+  UBRN_TY_F32 = 9,
+  UBRN_TY_F64 = 10,
   UBRN_TY_HANDLE = 11,
   UBRN_TY_RUSTBUFFER = 12, // fully supported (args and return values)
-  UBRN_TY_CALLBACK = 13,   // named; the name travels in the parallel *_type_names array
-  UBRN_TY_STRUCT = 14,     // named; the name travels in the parallel *_type_names array
-  UBRN_TY_REFERENCE = 15,  // pointer to a named struct (vtable); marshalled as
-                           // Reference(Struct(name))
-  UBRN_TY_RUSTCALLSTATUS = 16, // inline RustCallStatus struct ({i8, u64, u64, ptr});
-                               // appears only as a struct field (e.g. inside
-                               // ForeignFutureResult<T>)
+  UBRN_TY_CALLBACK =
+      13, // named; the name travels in the parallel *_type_names array
+  UBRN_TY_STRUCT =
+      14, // named; the name travels in the parallel *_type_names array
+  UBRN_TY_REFERENCE = 15, // pointer to a named struct (vtable); marshalled as
+                          // Reference(Struct(name))
+  UBRN_TY_RUSTCALLSTATUS = 16, // inline RustCallStatus struct ({i8, u64, u64,
+                               // ptr}); appears only as a struct field (e.g.
+                               // inside ForeignFutureResult<T>)
   // Not a type. What ubrnTagFromName answers with for a name the shim cannot
   // marshal; also marks a signature the player skips.
   UBRN_TY_UNSUPPORTED = 0xFF,
@@ -60,11 +67,16 @@ inline UbrnFfiType ubrnTagFromName(std::string_view n) {
   };
   static constexpr Entry kTable[] = {
       {"Void", UBRN_TY_VOID},
-      {"UInt8", UBRN_TY_U8},     {"Int8", UBRN_TY_I8},
-      {"UInt16", UBRN_TY_U16},   {"Int16", UBRN_TY_I16},
-      {"UInt32", UBRN_TY_U32},   {"Int32", UBRN_TY_I32},
-      {"UInt64", UBRN_TY_U64},   {"Int64", UBRN_TY_I64},
-      {"Float32", UBRN_TY_F32},  {"Float64", UBRN_TY_F64},
+      {"UInt8", UBRN_TY_U8},
+      {"Int8", UBRN_TY_I8},
+      {"UInt16", UBRN_TY_U16},
+      {"Int16", UBRN_TY_I16},
+      {"UInt32", UBRN_TY_U32},
+      {"Int32", UBRN_TY_I32},
+      {"UInt64", UBRN_TY_U64},
+      {"Int64", UBRN_TY_I64},
+      {"Float32", UBRN_TY_F32},
+      {"Float64", UBRN_TY_F64},
       {"Handle", UBRN_TY_HANDLE},
       {"RustBuffer", UBRN_TY_RUSTBUFFER},
       {"Callback", UBRN_TY_CALLBACK},
