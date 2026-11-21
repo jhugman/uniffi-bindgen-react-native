@@ -13,6 +13,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 add_library(ubrn_jsi_player SHARED
   ../cpp/shim.cpp
   ../cpp/callbacks.cpp
+  ../cpp/finalization.cpp
   ../cpp/abi_assert.cpp
   cpp-adapter.cpp
 )
