@@ -248,6 +248,8 @@ pub(crate) struct TsObject {
     pub ffi_clone: String,
     pub ffi_free: String,
     pub supports_finalization_registry: bool,
+    /// The registry is `uniffiFinalizationRegistry` from the `-ffi` module.
+    pub finalization_registry_from_player: bool,
     pub has_callback_interface: bool,
     pub strict_object_types: bool,
     /// `forceAsync` names this type. Kept so validation can reject a

@@ -270,12 +270,15 @@ impl PlayerFfiModule {
         use heck::ToUpperCamelCase;
         let module_name = format!("Native{}", namespace.name.to_upper_camel_case());
 
-        // No bless_pointer for the player — the player runtime handles that
-        // internally. The synthetic string helpers, however, ARE installed on
-        // the native module by the player shim (createFromUtf8 fast path) for
-        // flavors without a JS TextDecoder (Jsi2), so the converter's calls to
-        // them must typecheck against NativeModuleInterface. Their names keep
-        // the `ubrn_` prefix to match build_string_helper / the shim methods.
+        // No bless_pointer for the player: objects are freed through a
+        // FinalizationRegistry, the host's or, for Jsi2, the player's own (see
+        // `uniffiFinalizationRegistry`).
+        //
+        // The synthetic string helpers, however, ARE installed on the native
+        // module by the player shim (createFromUtf8 fast path) for flavors
+        // without a JS TextDecoder (Jsi2), so the converter's calls to them
+        // must typecheck against NativeModuleInterface. Their names keep the
+        // `ubrn_` prefix to match build_string_helper / the shim methods.
         let mut functions = if installs_string_helpers {
             TsFfiModule::synthetic_string_functions()
         } else {

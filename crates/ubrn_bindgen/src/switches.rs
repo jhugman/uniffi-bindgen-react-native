@@ -121,8 +121,16 @@ impl AbiFlavor {
         }
     }
 
+    /// Whether objects are freed through a `FinalizationRegistry` when JS drops
+    /// them. Jsi instead blesses each object with a C++ destructor of its own.
     pub fn supports_finalization_registry(&self) -> bool {
         !matches!(self, Self::Jsi)
+    }
+
+    /// Whether the player supplies that registry when the engine has none.
+    /// Hermes has none, so the Jsi2 player makes one from native destructors.
+    pub fn finalization_registry_from_player(&self) -> bool {
+        matches!(self, Self::Jsi2)
     }
 
     /// Whether this flavor initializes synchronously at module load.

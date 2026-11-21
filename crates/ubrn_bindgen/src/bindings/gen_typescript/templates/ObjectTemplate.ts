@@ -105,9 +105,15 @@ export class {{ obj.impl_class_name }} extends UniffiAbstractObject
 const {{ obj.obj_factory }}: UniffiObjectFactory<{{ obj.protocol_name }}> = (() => {
     {% if obj.supports_finalization_registry %}
     /// <reference lib="es2021" />
+    {%- if obj.finalization_registry_from_player %}
+    const registry = uniffiFinalizationRegistry<UniffiHandle>((heldValue: UniffiHandle) => {
+        {{ obj.obj_factory }}.freePointer(heldValue);
+    });
+    {%- else %}
     const registry = typeof FinalizationRegistry !== 'undefined' ? new FinalizationRegistry<UniffiHandle>((heldValue: UniffiHandle) => {
         {{ obj.obj_factory }}.freePointer(heldValue);
     }) : null;
+    {%- endif %}
     {% endif %}
     return {
     create(pointer: UniffiHandle): {{ obj.protocol_name }} {
