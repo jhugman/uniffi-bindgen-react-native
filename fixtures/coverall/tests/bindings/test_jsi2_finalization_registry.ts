@@ -4,8 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 // The jsi player's stand-in for FinalizationRegistry, called directly, for
-// what generated bindings do not exercise: tokens other than the target, a
-// target in two registries, a cleanup that throws, and the TypeErrors.
+// what generated bindings do not exercise: held values at and past the edges
+// of a handle, tokens other than the target, a target in two registries, a
+// cleanup that throws, and the TypeErrors.
 import nativeModule from "@/generated/coverall-ffi";
 import { asyncTest, type AsyncAsserts } from "@/asserts";
 import { collectGarbage } from "@/gc";
@@ -49,8 +50,12 @@ async function withConsoleError(
 
 const isTypeError = (e: any) => e instanceof TypeError;
 
+// A BigInt is written with its `n`: JSON has none, and the suffix keeps it
+// apart from a number or a string of the same digits.
 function sorted(values: unknown[]): string {
-  return JSON.stringify([...values].sort());
+  return JSON.stringify(
+    values.map((v) => (typeof v === "bigint" ? `${v}n` : v)).sort(),
+  );
 }
 
 (async () => {
@@ -67,12 +72,33 @@ function sorted(values: unknown[]): string {
   );
 
   await asyncTest(
+    "a BigInt held value reaches the cleanup unchanged",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h) => cleaned.push(h));
+      const heldValues = [
+        BigInt(0),
+        BigInt("9007199254740993"), // 2^53 + 1, past what a number holds exactly
+        BigInt("18446744073709551615"), // 2^64 - 1, the largest handle
+        // Those that do not fit in 64 unsigned bits.
+        BigInt(-1),
+        BigInt("18446744073709551616"), // 2^64
+      ];
+      registerDropped(registry, heldValues);
+      await collectGarbage();
+      t.assertEqual(sorted(cleaned), sorted(heldValues));
+      t.end();
+    },
+  );
+
+  await asyncTest(
     "a token other than the target unregisters, once",
     async (t: AsyncAsserts) => {
       const cleaned: unknown[] = [];
       const registry = createFinalizationRegistry((h) => cleaned.push(h));
       const token = {};
-      registerDropped(registry, ["x", "y"], token);
+      // A BigInt, as generated bindings hold, and a value of any other kind.
+      registerDropped(registry, ["x", BigInt(7)], token);
       t.assertTrue(registry.unregister(token), "the first unregister");
       t.assertFalse(registry.unregister(token), "the second unregister");
       t.assertFalse(registry.unregister({}), "a token never registered");

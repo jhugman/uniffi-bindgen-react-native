@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace jsi = facebook::jsi;
@@ -198,7 +199,7 @@ public:
     }
 
     const uint64_t id = nextId_++;
-    held_.emplace(id, jsi::Value(rt, heldValue));
+    held_.emplace(id, hold(rt, heldValue));
     asTarget->targetOf.push_back({collected_, id});
     if (asToken != nullptr) {
       asToken->tokenOf.push_back({serial_, id});
@@ -249,13 +250,13 @@ public:
       if (it == held_.end()) {
         continue;
       }
-      jsi::Value heldValue = std::move(it->second);
+      Held held = std::move(it->second);
       held_.erase(it);
       // Reported rather than rethrown, so a cleanup that throws does not cost
       // the rest theirs. The generated cleanup only frees, so what it throws
       // is a free that failed in Rust, which would otherwise leave no trace.
       try {
-        cleanup_.call(rt, heldValue);
+        cleanup_.call(rt, unhold(rt, std::move(held)));
       } catch (const jsi::JSError &e) {
         reportCleanupError(rt, e.getMessage());
       } catch (const std::exception &e) {
@@ -267,11 +268,35 @@ public:
   }
 
 private:
+  // A held value until its cleanup. Generated bindings hold a BigInt handle,
+  // kept as its integer: a jsi::Value is a GC root, so keeping one would add
+  // a root per live object to every collection's marking. Anything else is
+  // kept as the value itself.
+  using Held = std::variant<uint64_t, jsi::Value>;
+
+  static Held hold(jsi::Runtime &rt, const jsi::Value &v) {
+    if (v.isBigInt()) {
+      auto big = v.getBigInt(rt);
+      if (big.isUint64(rt)) {
+        return Held(std::in_place_type<uint64_t>, big.getUint64(rt));
+      }
+    }
+    return Held(std::in_place_type<jsi::Value>, rt, v);
+  }
+
+  // The held value as it was registered: a handle becomes its BigInt again.
+  static jsi::Value unhold(jsi::Runtime &rt, Held &&held) {
+    if (const auto *handle = std::get_if<uint64_t>(&held)) {
+      return jsi::Value(jsi::BigInt::fromUint64(rt, *handle));
+    }
+    return std::move(std::get<jsi::Value>(held));
+  }
+
   const uint64_t serial_ =
       g_nextRegistrySerial.fetch_add(1, std::memory_order_relaxed);
   uint64_t nextId_ = 1;
   jsi::Function cleanup_;
-  std::unordered_map<uint64_t, jsi::Value> held_;
+  std::unordered_map<uint64_t, Held> held_;
   std::shared_ptr<Collected> collected_;
 };
 
