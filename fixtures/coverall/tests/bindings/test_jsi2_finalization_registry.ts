@@ -32,6 +32,21 @@ function registerDropped(
   }
 }
 
+// Runs `body` with `console.error` replaced, which is where the registry logs
+// a cleanup that throws.
+async function withConsoleError(
+  replacement: (...args: unknown[]) => void,
+  body: () => Promise<void>,
+) {
+  const original = console.error;
+  console.error = replacement;
+  try {
+    await body();
+  } finally {
+    console.error = original;
+  }
+}
+
 const isTypeError = (e: any) => e instanceof TypeError;
 
 function sorted(values: unknown[]): string {
@@ -98,7 +113,7 @@ function sorted(values: unknown[]): string {
   );
 
   await asyncTest(
-    "a cleanup that throws does not cost the others theirs",
+    "a cleanup that throws is logged, and does not cost the others theirs",
     async (t: AsyncAsserts) => {
       const cleaned: unknown[] = [];
       const registry = createFinalizationRegistry((h) => {
@@ -108,7 +123,36 @@ function sorted(values: unknown[]): string {
         cleaned.push(h);
       });
       registerDropped(registry, ["good-1", "bad", "good-2"]);
-      await collectGarbage();
+      const logged: string[] = [];
+      await withConsoleError(
+        (...args) => logged.push(args.join(" ")),
+        collectGarbage,
+      );
+      t.assertEqual(sorted(cleaned), sorted(["good-1", "good-2"]));
+      t.assertEqual(logged.length, 1, `logged: ${JSON.stringify(logged)}`);
+      t.assertTrue(
+        logged[0].includes("FinalizationRegistry") &&
+          logged[0].includes("expected: a cleanup that throws"),
+        `logged: ${logged[0]}`,
+      );
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "a console.error that throws does not stop the drain",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h: string) => {
+        if (h.startsWith("bad")) {
+          throw new Error("expected: a cleanup that throws");
+        }
+        cleaned.push(h);
+      });
+      registerDropped(registry, ["bad-1", "good-1", "bad-2", "good-2"]);
+      await withConsoleError(() => {
+        throw new Error("expected: a console.error that throws");
+      }, collectGarbage);
       t.assertEqual(sorted(cleaned), sorted(["good-1", "good-2"]));
       t.end();
     },

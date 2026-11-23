@@ -25,7 +25,8 @@ namespace ubrn_fin {
 // registration, because it runs inside the collector, possibly off the JS
 // thread or as the runtime is destroyed, where no JS may run. A task posted
 // through `callInvoker` later hands each queued held value to `cleanup` on the
-// JS thread.
+// JS thread. A cleanup that throws is logged to `console.error`, and the rest
+// still run.
 //
 // A target or token that already carries another native state cannot take a
 // destructor, so `register` throws a TypeError for one.

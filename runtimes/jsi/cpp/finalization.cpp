@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -32,6 +33,29 @@ std::atomic<uint64_t> g_nextRegistrySerial{1};
       ctor.callAsConstructor(
           rt, jsi::String::createFromUtf8(
                   rt, "uniffi jsi player: FinalizationRegistry: " + message)));
+}
+
+// An engine's own FinalizationRegistry surfaces an error its cleanup throws;
+// this one logs it to `console.error`. On the JS thread only. Throws nothing,
+// so that neither a missing console nor one that throws can stop a drain.
+void reportCleanupError(jsi::Runtime &rt, const std::string &message) noexcept {
+  try {
+    auto console = rt.global().getProperty(rt, "console");
+    if (!console.isObject()) {
+      return;
+    }
+    auto consoleObj = console.getObject(rt);
+    auto error = consoleObj.getProperty(rt, "error");
+    if (!error.isObject() || !error.getObject(rt).isFunction(rt)) {
+      return;
+    }
+    error.getObject(rt).getFunction(rt).callWithThis(
+        rt, consoleObj,
+        jsi::String::createFromUtf8(
+            rt, "uniffi jsi player: FinalizationRegistry: a cleanup threw: " +
+                    message));
+  } catch (...) {
+  }
 }
 
 // A registry's queue of registrations whose targets have been collected.
@@ -227,12 +251,17 @@ public:
       }
       jsi::Value heldValue = std::move(it->second);
       held_.erase(it);
-      // Swallowed, so a cleanup that throws does not cost the rest theirs.
-      // There is nobody to report it to: the generated cleanup only frees, and
-      // a free that fails here would have leaked without a registry anyway.
+      // Reported rather than rethrown, so a cleanup that throws does not cost
+      // the rest theirs. The generated cleanup only frees, so what it throws
+      // is a free that failed in Rust, which would otherwise leave no trace.
       try {
         cleanup_.call(rt, heldValue);
+      } catch (const jsi::JSError &e) {
+        reportCleanupError(rt, e.getMessage());
+      } catch (const std::exception &e) {
+        reportCleanupError(rt, e.what());
       } catch (...) {
+        reportCleanupError(rt, "a C++ exception of unknown type");
       }
     }
   }
