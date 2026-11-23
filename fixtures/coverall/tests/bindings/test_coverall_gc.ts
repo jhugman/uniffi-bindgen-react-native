@@ -35,10 +35,19 @@ async function collectGarbage() {
 
 // Each step makes its garbage in a function of its own, so that nothing on the
 // caller's stack still refers to it when the collection runs.
-function makeAndDrop() {
-  for (let i = 0; i < N; i++) {
-    new Coveralls(`dropped-${i}`);
-  }
+//
+// A step that drops what it makes counts it while it still holds all of it.
+// With `jsi`, a collection frees what it finds there and then, so one that ran
+// partway through making them would leave fewer than N for a later count.
+function makeAndDrop(t: AsyncAsserts, before: bigint) {
+  const made = Array.from(
+    { length: N },
+    (_, i) => new Coveralls(`dropped-${i}`),
+  );
+  assertAlive(t, before + BigInt(N), "before the GC");
+  // Used once more after the count, because an engine may let a local go at
+  // its last use, and then all N become garbage together.
+  made.length = 0;
 }
 
 function makeAndDestroy() {
@@ -47,10 +56,10 @@ function makeAndDestroy() {
   }
 }
 
-function cloneAndDrop(original: Coveralls) {
-  for (let i = 0; i < N; i++) {
-    original.cloneMe();
-  }
+function cloneAndDrop(t: AsyncAsserts, before: bigint, original: Coveralls) {
+  const made = Array.from({ length: N }, () => original.cloneMe());
+  assertAlive(t, before + BigInt(N), "before the GC");
+  made.length = 0;
 }
 
 function assertAlive(t: AsyncAsserts, expected: bigint, when: string) {
@@ -67,8 +76,7 @@ function assertAlive(t: AsyncAsserts, expected: bigint, when: string) {
     "objects constructed in JS and dropped are freed after a GC",
     async (t) => {
       const before = getNumAlive();
-      makeAndDrop();
-      assertAlive(t, before + BigInt(N), "before the GC");
+      makeAndDrop(t, before);
       await collectGarbage();
       assertAlive(t, before, "after the GC");
       t.end();
@@ -80,8 +88,7 @@ function assertAlive(t: AsyncAsserts, expected: bigint, when: string) {
     async (t) => {
       const original = new Coveralls("original");
       const before = getNumAlive();
-      cloneAndDrop(original);
-      assertAlive(t, before + BigInt(N), "before the GC");
+      cloneAndDrop(t, before, original);
       await collectGarbage();
       assertAlive(t, before, "after the GC");
       original.uniffiDestroy();
