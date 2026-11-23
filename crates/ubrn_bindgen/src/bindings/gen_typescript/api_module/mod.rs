@@ -560,11 +560,21 @@ impl TsApiModule {
             })
             .map(str::to_string)
             .collect();
-        if !ffi_types.is_empty() {
+        let ffi_values: Vec<String> = if module.flavor.finalization_registry_from_player()
+            && module
+                .type_definitions
+                .iter()
+                .any(|td| matches!(td, TsTypeDefinition::Object(_)))
+        {
+            vec!["uniffiFinalizationRegistry".to_string()]
+        } else {
+            Vec::new()
+        };
+        if !ffi_types.is_empty() || !ffi_values.is_empty() {
             file_imports.push(TsFileImport {
                 path: format!("./{}-ffi", module.module_name),
                 types: ffi_types,
-                values: Vec::new(),
+                values: ffi_values,
             });
         }
 

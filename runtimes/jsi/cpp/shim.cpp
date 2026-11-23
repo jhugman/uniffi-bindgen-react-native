@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "callbacks.h" // Rust -> JS callback machinery (vtable building, the three fns)
+#include "finalization.h"    // createFinalizationRegistry, for objects JS drops
 #include "ubrn_jsi.h"        // from runtimes/jsi/include
 #include "ubrn_jsi_player.h" // the host-facing install() and its Resolver
 #include "value_conv.h" // ArgDesc / scalarToBytes / bytesToScalar / arrayBytes
@@ -852,6 +853,20 @@ jsi::Value UniffiPlayerRoot::get(jsi::Runtime &rt,
           jsi::Object handle(rt);
           handle.setProperty(rt, "register", makeRegister(rt, path, self));
           return jsi::Value(rt, handle);
+        });
+  }
+  if (prop == "createFinalizationRegistry") {
+    // Generated bindings ask for this in place of FinalizationRegistry, which
+    // Hermes lacks. Its drains are posted through this runtime's invoker, and
+    // only ever call JS, so they need nothing else of the root.
+    auto invoker = callInvoker_;
+    return jsi::Function::createFromHostFunction(
+        rt, jsi::PropNameID::forAscii(rt, "createFinalizationRegistry"), 1,
+        [invoker](jsi::Runtime &rt, const jsi::Value &, const jsi::Value *args,
+                  size_t count) -> jsi::Value {
+          const jsi::Value undefined;
+          return ubrn_fin::createFinalizationRegistry(
+              rt, invoker, count > 0 ? args[0] : undefined);
         });
   }
   if (prop == "$teardownCount") {

@@ -6,4 +6,6 @@
 ubrn_macros::build_foreign_language_testcases! {
     "tests/bindings/test_gc_callbacks_crasher.ts" => [Jsi, Wasm, Napi, Wasm2, Jsi2],
     "tests/bindings/test_gc_callbacks_crasher_async.ts" => [AsyncWasm, AsyncNapi, AsyncElectron],
+    // Forces collections through the Hermes test-runner's `__hermesGc`.
+    "tests/bindings/test_gc_releases_delegates.ts" => [Jsi, Jsi2],
 }

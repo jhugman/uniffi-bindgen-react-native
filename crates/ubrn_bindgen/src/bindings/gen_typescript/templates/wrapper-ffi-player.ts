@@ -162,6 +162,49 @@ const getter: () => NativeModuleInterface = () => {
 };
 {%- endmatch %}
 export default getter;
+{%- if module.host_source == PlayerHostSource::JsiGlobal %}
+
+// What an object factory needs of a FinalizationRegistry.
+export type UniffiFinalizationRegistry<T> = {
+  register(target: object, heldValue: T, unregisterToken?: object): void;
+  unregister(unregisterToken: object): boolean;
+};
+
+// The engine's FinalizationRegistry when it has one. Hermes has none, so the
+// player makes one instead: each target carries a native destructor, and
+// `cleanup` runs on the JS thread after it.
+//
+// Chosen at the first registration, not at module load: by then the player
+// has opened the library, so `globalThis.uniffi` is there. With neither, as on
+// Hermes with a player too old to make one, dropped objects leak until
+// `uniffiDestroy()`.
+export function uniffiFinalizationRegistry<T>(
+  cleanup: (heldValue: T) => void,
+): UniffiFinalizationRegistry<T> {
+  let registry: UniffiFinalizationRegistry<T> | null | undefined;
+  const get = (): UniffiFinalizationRegistry<T> | null => {
+    if (registry === undefined) {
+      const Global = (globalThis as any).FinalizationRegistry;
+      const uniffi = (globalThis as any).uniffi;
+      registry =
+        typeof Global === "function"
+          ? new Global(cleanup)
+          : typeof uniffi?.createFinalizationRegistry === "function"
+            ? uniffi.createFinalizationRegistry(cleanup)
+            : null;
+    }
+    return registry ?? null;
+  };
+  return {
+    register(target: object, heldValue: T, unregisterToken?: object) {
+      get()?.register(target, heldValue, unregisterToken);
+    },
+    unregister(unregisterToken: object): boolean {
+      return get()?.unregister(unregisterToken) ?? false;
+    },
+  };
+}
+{%- endif %}
 
 // Structs and function types for calling back into Typescript from Rust.
 {%- for def in module.typed_definitions %}

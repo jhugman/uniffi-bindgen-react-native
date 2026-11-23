@@ -667,6 +667,7 @@ pub(super) fn build_object(
     );
 
     let supports_finalization_registry = flavor.supports_finalization_registry();
+    let finalization_registry_from_player = flavor.finalization_registry_from_player();
 
     let vtable = interface
         .vtable
@@ -695,6 +696,7 @@ pub(super) fn build_object(
         ffi_clone,
         ffi_free,
         supports_finalization_registry,
+        finalization_registry_from_player,
         has_callback_interface,
         strict_object_types,
         force_async,

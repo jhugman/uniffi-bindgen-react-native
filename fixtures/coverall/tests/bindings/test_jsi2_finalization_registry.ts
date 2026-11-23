@@ -1,0 +1,205 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ */
+// The jsi player's stand-in for FinalizationRegistry, called directly, for
+// what generated bindings do not exercise: held values at and past the edges
+// of a handle, tokens other than the target, a target in two registries, a
+// cleanup that throws, and the TypeErrors.
+import nativeModule from "@/generated/coverall-ffi";
+import { asyncTest, type AsyncAsserts } from "@/asserts";
+import { collectGarbage } from "@/gc";
+import "@/polyfills";
+
+type Registry = {
+  register(target: object, heldValue: unknown, unregisterToken?: object): void;
+  unregister(unregisterToken: object): boolean;
+};
+
+const createFinalizationRegistry: (
+  cleanup: (heldValue: any) => void,
+) => Registry = (globalThis as any).uniffi.createFinalizationRegistry;
+
+// Registers targets nothing else refers to, in a frame that is gone by the
+// time the collection runs.
+function registerDropped(
+  registry: Registry,
+  heldValues: unknown[],
+  token?: object,
+) {
+  for (const heldValue of heldValues) {
+    registry.register({}, heldValue, token);
+  }
+}
+
+// Runs `body` with `console.error` replaced, which is where the registry logs
+// a cleanup that throws.
+async function withConsoleError(
+  replacement: (...args: unknown[]) => void,
+  body: () => Promise<void>,
+) {
+  const original = console.error;
+  console.error = replacement;
+  try {
+    await body();
+  } finally {
+    console.error = original;
+  }
+}
+
+const isTypeError = (e: any) => e instanceof TypeError;
+
+// A BigInt is written with its `n`: JSON has none, and the suffix keeps it
+// apart from a number or a string of the same digits.
+function sorted(values: unknown[]): string {
+  return JSON.stringify(
+    values.map((v) => (typeof v === "bigint" ? `${v}n` : v)).sort(),
+  );
+}
+
+(async () => {
+  await asyncTest(
+    "the cleanup gets each held value once its target is collected",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h) => cleaned.push(h));
+      registerDropped(registry, ["a", "b", "c"]);
+      await collectGarbage();
+      t.assertEqual(sorted(cleaned), sorted(["a", "b", "c"]));
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "a BigInt held value reaches the cleanup unchanged",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h) => cleaned.push(h));
+      const heldValues = [
+        BigInt(0),
+        BigInt("9007199254740993"), // 2^53 + 1, past what a number holds exactly
+        BigInt("18446744073709551615"), // 2^64 - 1, the largest handle
+        // Those that do not fit in 64 unsigned bits.
+        BigInt(-1),
+        BigInt("18446744073709551616"), // 2^64
+      ];
+      registerDropped(registry, heldValues);
+      await collectGarbage();
+      t.assertEqual(sorted(cleaned), sorted(heldValues));
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "a token other than the target unregisters, once",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h) => cleaned.push(h));
+      const token = {};
+      // A BigInt, as generated bindings hold, and a value of any other kind.
+      registerDropped(registry, ["x", BigInt(7)], token);
+      t.assertTrue(registry.unregister(token), "the first unregister");
+      t.assertFalse(registry.unregister(token), "the second unregister");
+      t.assertFalse(registry.unregister({}), "a token never registered");
+      await collectGarbage();
+      t.assertEqual(sorted(cleaned), sorted([]));
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "unregistering after the cleanup has run finds nothing",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h) => cleaned.push(h));
+      const token = {};
+      registerDropped(registry, ["z"], token);
+      await collectGarbage();
+      t.assertEqual(sorted(cleaned), sorted(["z"]));
+      t.assertFalse(registry.unregister(token));
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "a target in two registries reaches both cleanups",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const first = createFinalizationRegistry((h) => cleaned.push(`1:${h}`));
+      const second = createFinalizationRegistry((h) => cleaned.push(`2:${h}`));
+      ((target: object) => {
+        first.register(target, "t");
+        second.register(target, "t");
+      })({});
+      await collectGarbage();
+      t.assertEqual(sorted(cleaned), sorted(["1:t", "2:t"]));
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "a cleanup that throws is logged, and does not cost the others theirs",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h) => {
+        if (h === "bad") {
+          throw new Error("expected: a cleanup that throws");
+        }
+        cleaned.push(h);
+      });
+      registerDropped(registry, ["good-1", "bad", "good-2"]);
+      const logged: string[] = [];
+      await withConsoleError(
+        (...args) => logged.push(args.join(" ")),
+        collectGarbage,
+      );
+      t.assertEqual(sorted(cleaned), sorted(["good-1", "good-2"]));
+      t.assertEqual(logged.length, 1, `logged: ${JSON.stringify(logged)}`);
+      t.assertTrue(
+        logged[0].includes("FinalizationRegistry") &&
+          logged[0].includes("expected: a cleanup that throws"),
+        `logged: ${logged[0]}`,
+      );
+      t.end();
+    },
+  );
+
+  await asyncTest(
+    "a console.error that throws does not stop the drain",
+    async (t: AsyncAsserts) => {
+      const cleaned: unknown[] = [];
+      const registry = createFinalizationRegistry((h: string) => {
+        if (h.startsWith("bad")) {
+          throw new Error("expected: a cleanup that throws");
+        }
+        cleaned.push(h);
+      });
+      registerDropped(registry, ["bad-1", "good-1", "bad-2", "good-2"]);
+      await withConsoleError(() => {
+        throw new Error("expected: a console.error that throws");
+      }, collectGarbage);
+      t.assertEqual(sorted(cleaned), sorted(["good-1", "good-2"]));
+      t.end();
+    },
+  );
+
+  await asyncTest("misuse is a TypeError", async (t: AsyncAsserts) => {
+    t.assertThrows(isTypeError, () => createFinalizationRegistry(42 as any));
+    const registry = createFinalizationRegistry(() => {});
+    const target = {};
+    t.assertThrows(isTypeError, () => registry.register(42 as any, "h"));
+    t.assertThrows(isTypeError, () => registry.register(target, target));
+    t.assertThrows(isTypeError, () =>
+      registry.register(target, "h", 42 as any),
+    );
+    t.assertThrows(isTypeError, () => registry.unregister(42 as any));
+    // The player's own buffers carry native state of their own, which a
+    // destructor cannot share.
+    const buffer = nativeModule().rustbuffer_alloc(8).buffer;
+    t.assertThrows(isTypeError, () => registry.register(buffer, "h"));
+    t.assertThrows(isTypeError, () => registry.register(target, "h", buffer));
+    t.assertFalse(registry.unregister(buffer));
+    t.end();
+  });
+})();

@@ -98,8 +98,9 @@ static_assert(offsetof(UbrnCallbackSpec, ret_tag_name) == 4 * kPtr,
 static_assert(offsetof(UbrnCallbackSpec, has_rust_call_status) == 5 * kPtr,
               "CallbackSpec.has_rust_call_status @5 pointers");
 // The two u8 flags share one pointer-sized slot.
-static_assert(offsetof(UbrnCallbackSpec, out_return) == 5 * kPtr + 1,
-              "CallbackSpec.out_return immediately follows has_rust_call_status");
+static_assert(
+    offsetof(UbrnCallbackSpec, out_return) == 5 * kPtr + 1,
+    "CallbackSpec.out_return immediately follows has_rust_call_status");
 static_assert(offsetof(UbrnCallbackSpec, ret_type_name) == 6 * kPtr,
               "CallbackSpec.ret_type_name @6 pointers");
 static_assert(sizeof(UbrnCallbackSpec) == 7 * kPtr, "CallbackSpec size");

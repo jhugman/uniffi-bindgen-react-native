@@ -48,7 +48,7 @@ if (NOT UBRN_JSI_LIB)
 endif ()
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-add_library(ubrn_jsi_player SHARED shim.cpp callbacks.cpp abi_assert.cpp)
+add_library(ubrn_jsi_player SHARED shim.cpp callbacks.cpp finalization.cpp abi_assert.cpp)
 if (MSVC)
     target_compile_definitions(ubrn_jsi_player PRIVATE NOMINMAX)
 endif ()

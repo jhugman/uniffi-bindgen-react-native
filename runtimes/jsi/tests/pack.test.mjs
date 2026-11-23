@@ -27,6 +27,7 @@ test("the tarball carries what the consumer's build compiles and links", () => {
     "README.md",
     "cpp/shim.cpp",
     "cpp/callbacks.cpp",
+    "cpp/finalization.cpp",
     "cpp/abi_assert.cpp",
     "cpp/ubrn_jsi_player.h",
     "include/ubrn_jsi.h",
