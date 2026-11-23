@@ -31,6 +31,8 @@ Node and browsers have one, so the `napi` and `wasm2` bindings use it. Unfortuna
 
 With the `jsi2` flavor, `@ubjs/react-native` supplies a registry in its place, used only while Hermes has none of its own. Each object carries a [C++ destructor](https://isocpp.org/wiki/faq/dtors). When Hermes collects the object, the destructor notes it, and soon after, on the JS thread, the object is freed in Rust through its ordinary free call. Objects still alive when the JS runtime is destroyed, as on a reload, are not freed.
 
+Your own code can use the same registry, as `uniffi.createFinalizationRegistry(cleanup)`, with `register` and `unregister` as on a `FinalizationRegistry`, but register plain objects with it, not functions. A function already passed to Rust as a callback cannot be registered, and one that is registered gets a new native trampoline, never freed, each time it is later passed to Rust.
+
 With the `jsi` flavor, for every Javascript object constructor called, we create a `DestructibleObject` in C++, that is represented in Javascript but has a [C++ destructor](https://isocpp.org/wiki/faq/dtors).
 
 [At the end of this \[C++\] object's lifetime](https://en.cppreference.com/w/cpp/language/destructor), the destructor is called.

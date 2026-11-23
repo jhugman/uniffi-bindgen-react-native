@@ -29,6 +29,12 @@ namespace ubrn_fin {
 //
 // A target or token that already carries another native state cannot take a
 // destructor, so `register` throws a TypeError for one.
+//
+// A function keeps its callback identity in that same slot (callbacks.cpp), so
+// one already passed to Rust as a callback cannot be registered, and one
+// registered here gets a new trampoline, never freed, each time it is passed
+// to Rust. Generated bindings register only their objects; other callers
+// should register plain objects.
 facebook::jsi::Value createFinalizationRegistry(
     facebook::jsi::Runtime &rt,
     std::shared_ptr<facebook::react::CallInvoker> callInvoker,
