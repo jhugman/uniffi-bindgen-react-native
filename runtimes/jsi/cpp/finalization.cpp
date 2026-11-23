@@ -106,18 +106,23 @@ public:
   }
 };
 
-// The Finalizer on `obj`, attaching one if it has no native state at all.
-std::shared_ptr<Finalizer> finalizerOf(jsi::Runtime &rt, const jsi::Object &obj,
-                                       const char *role) {
-  if (obj.hasNativeState(rt)) {
-    auto existing =
-        std::dynamic_pointer_cast<Finalizer>(obj.getNativeState(rt));
-    if (existing == nullptr) {
-      throwTypeError(rt, std::string("the ") + role +
-                             " already carries another native state");
-    }
-    return existing;
+// The Finalizer on `obj`, or null if it has no native state at all. Throws for
+// one that carries another native state, which a destructor cannot share.
+std::shared_ptr<Finalizer>
+existingFinalizer(jsi::Runtime &rt, const jsi::Object &obj, const char *role) {
+  if (!obj.hasNativeState(rt)) {
+    return nullptr;
   }
+  auto existing = std::dynamic_pointer_cast<Finalizer>(obj.getNativeState(rt));
+  if (existing == nullptr) {
+    throwTypeError(rt, std::string("the ") + role +
+                           " already carries another native state");
+  }
+  return existing;
+}
+
+std::shared_ptr<Finalizer> attachFinalizer(jsi::Runtime &rt,
+                                           const jsi::Object &obj) {
   auto created = std::make_shared<Finalizer>();
   obj.setNativeState(rt, created);
   return created;
@@ -150,10 +155,22 @@ public:
     if (!token.isUndefined() && !token.isObject()) {
       throwTypeError(rt, "register: the unregister token must be an object");
     }
-    auto asTarget = finalizerOf(rt, target.getObject(rt), "target");
+    auto targetObj = target.getObject(rt);
+    auto asTarget = existingFinalizer(rt, targetObj, "target");
     std::shared_ptr<Finalizer> asToken;
     if (token.isObject()) {
-      asToken = finalizerOf(rt, token.getObject(rt), "unregister token");
+      asToken = existingFinalizer(rt, token.getObject(rt), "unregister token");
+    }
+    // Attached only once both have passed, so that a token carrying another
+    // native state leaves the target as it was.
+    if (asTarget == nullptr) {
+      asTarget = attachFinalizer(rt, targetObj);
+    }
+    if (token.isObject() && asToken == nullptr) {
+      // Generated bindings pass the target as its own token.
+      asToken = jsi::Value::strictEquals(rt, token, target)
+                    ? asTarget
+                    : attachFinalizer(rt, token.getObject(rt));
     }
 
     const uint64_t id = nextId_++;
