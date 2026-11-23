@@ -8,6 +8,7 @@
 // target in two registries, a cleanup that throws, and the TypeErrors.
 import nativeModule from "@/generated/coverall-ffi";
 import { asyncTest, type AsyncAsserts } from "@/asserts";
+import { collectGarbage } from "@/gc";
 import "@/polyfills";
 
 type Registry = {
@@ -18,19 +19,6 @@ type Registry = {
 const createFinalizationRegistry: (
   cleanup: (heldValue: any) => void,
 ) => Registry = (globalThis as any).uniffi.createFinalizationRegistry;
-
-// The Hermes test-runner installs this; it forces a full collection.
-const hermesGc: () => void = (globalThis as any).__hermesGc;
-
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-async function collectGarbage() {
-  for (let i = 0; i < 20; i++) {
-    hermesGc();
-    await sleep(10);
-  }
-}
 
 // Registers targets nothing else refers to, in a frame that is gone by the
 // time the collection runs.

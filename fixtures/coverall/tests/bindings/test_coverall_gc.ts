@@ -11,27 +11,12 @@
 // object would take it low.
 import coverall, { Coveralls, getNumAlive } from "@/generated/coverall";
 import { asyncTest, type AsyncAsserts } from "@/asserts";
+import { collectGarbage } from "@/gc";
 import "@/polyfills";
 
 coverall.initialize();
 
 const N = 100;
-
-// The Hermes test-runner installs this; it forces a full collection.
-const hermesGc: () => void = (globalThis as any).__hermesGc;
-
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-// Collect, then yield to the event loop so that anything the collection queued
-// on the JS thread gets to run, several times over: one collection need not
-// find everything.
-async function collectGarbage() {
-  for (let i = 0; i < 20; i++) {
-    hermesGc();
-    await sleep(10);
-  }
-}
 
 // Each step makes its garbage in a function of its own, so that nothing on the
 // caller's stack still refers to it when the collection runs.

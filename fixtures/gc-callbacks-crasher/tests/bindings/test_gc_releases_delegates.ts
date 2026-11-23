@@ -9,26 +9,12 @@
 //
 // A WeakRef to each delegate shows whether JS has released it.
 import { asyncTest } from "@/asserts";
+import { collectGarbage } from "@/gc";
 import theModule, { getBuilder } from "@/generated/gc_callbacks_crasher";
 
 theModule.initialize();
 
 const N = 10;
-
-// The Hermes test-runner installs this; it forces a full collection.
-const hermesGc: () => void = (globalThis as any).__hermesGc;
-
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-// Collecting the Builders frees them in Rust, which releases the delegates;
-// only a later collection can then find the delegates.
-async function collectGarbage() {
-  for (let i = 0; i < 20; i++) {
-    hermesGc();
-    await sleep(10);
-  }
-}
 
 // In a function of its own, so that neither the builders nor the delegate are
 // still on the stack when the collection runs.
@@ -43,6 +29,8 @@ function dropBuilderHoldingDelegate(): WeakRef<object> {
     "delegates held by dropped Rust objects are released after a GC",
     async (t) => {
       const delegates = Array.from({ length: N }, dropBuilderHoldingDelegate);
+      // Collecting the Builders frees them in Rust, which releases the
+      // delegates; only a later collection can then find the delegates.
       await collectGarbage();
       const held = delegates.filter((d) => d.deref() !== undefined).length;
       t.assertEqual(held, 0, `${held} of ${N} delegates still held`);
