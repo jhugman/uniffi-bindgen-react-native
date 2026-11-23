@@ -230,8 +230,10 @@ private:
 };
 
 void Collected::push(uint64_t id) noexcept {
+  // Whether this call claimed the drain, so that a failure to post it can give
+  // the claim back.
+  bool post = false;
   try {
-    bool post = false;
     {
       std::lock_guard<std::mutex> lk(mtx_);
       // Without an invoker nothing could ever drain the queue.
@@ -252,8 +254,21 @@ void Collected::push(uint64_t id) noexcept {
       });
     }
   } catch (...) {
-    // A destructor that throws terminates. Losing this registration leaks
-    // one Rust object, which is what happened before there was a registry.
+    // A destructor that throws terminates, so nothing may escape.
+    //
+    // An id that was never queued leaks its one object, as it would have
+    // without a registry. One queued without its drain is worse: every later
+    // push would see a drain pending, post none, and the registry would free
+    // nothing more. So the claim is given back, and the next push posts a
+    // drain that takes everything queued, this id included; until then, those
+    // objects wait. A lock that fails here leaves the claim stuck.
+    if (post) {
+      try {
+        std::lock_guard<std::mutex> lk(mtx_);
+        drainPosted_ = false;
+      } catch (...) {
+      }
+    }
   }
 }
 
