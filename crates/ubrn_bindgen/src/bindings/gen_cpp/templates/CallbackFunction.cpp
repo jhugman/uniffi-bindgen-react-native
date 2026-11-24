@@ -156,8 +156,8 @@ namespace {{ ns }} {
         // If rsLamda is null, then there is no runtime to call into.
         if (rsLambda == nullptr) {
             // Rust can still call after the runtime is gone: a destructor dropping
-            // the JS callback, or a Rust thread calling one of its methods. The
-            // RustBuffer arguments are still ours, so free them before returning.
+            // the JS callback, or a Rust thread calling one of its methods.
+            {#- Any RustBuffer arguments are still ours, so free them before returning. #}
             {%- for arg in callback.arguments_no_return() %}
             {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
             {%-   let arg_t = arg.type_().borrow()|ffi_type_name_from_js %}
