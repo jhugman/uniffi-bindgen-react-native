@@ -92,6 +92,7 @@ pub enum TestCase {
         required: String,
     },
     Three(#[uniffi(default = 5)] i32),
+    Four(#[uniffi(default = None)] Option<String>),
 }
 
 #[uniffi::export]
