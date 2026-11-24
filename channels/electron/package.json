@@ -1,6 +1,6 @@
 {
   "name": "@ubjs/electron",
-  "version": "0.31.0-7",
+  "version": "0.31.0-8",
   "description": "Runs a native uniffi library in an Electron utility process and drives it from a sandboxed page.",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {
@@ -36,11 +36,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@ubjs/node": "^0.31.0-7",
-    "@ubjs/worker": "^0.31.0-7"
+    "@ubjs/node": "^0.31.0-8",
+    "@ubjs/worker": "^0.31.0-8"
   },
   "peerDependencies": {
-    "@ubjs/core": "^0.31.0-7",
+    "@ubjs/core": "^0.31.0-8",
     "electron": ">=41.0.0-0"
   },
   "peerDependenciesMeta": { "electron": { "optional": true } },

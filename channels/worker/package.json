@@ -1,6 +1,6 @@
 {
   "name": "@ubjs/worker",
-  "version": "0.31.0-7",
+  "version": "0.31.0-8",
   "description": "MessagePort channel that drives a uniffi-bindgen-react-native player from another JavaScript context.",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {
@@ -22,7 +22,7 @@
     "test": "node --test --import tsx './tests/*.test.ts'",
     "typecheck": "tsc -p tsconfig.tests.json"
   },
-  "peerDependencies": { "@ubjs/core": "^0.31.0-7" },
+  "peerDependencies": { "@ubjs/core": "^0.31.0-8" },
   "devDependencies": {
     "@ubjs/core": "file:../../typescript",
     "@types/node": "^24",
