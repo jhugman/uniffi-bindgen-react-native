@@ -217,26 +217,16 @@ fn marshal_field_to_bytes(
             // else: zero-initialized slot is already correct for success status
         }
         FfiTypeDesc::Callback(cb_name) => {
-            // Callback-typed struct field: create a trampoline and write the fn pointer.
-            // SAFETY: `env` is the active env for this callback; `js_val` is the field
-            // value just read from the JS object above.
-            let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), js_val.raw())? };
-            let user_data = crate::callback::create_callback_user_data(
+            // Callback-typed struct field. Every async foreign method returns a struct whose
+            // `free` is the same JS function each time, and a trampoline is never freed, so
+            // building one per call would leak one per call.
+            let fn_ptr = crate::callback::cache::trampoline_for_js_fn(
                 env,
-                js_fn,
+                &js_val,
                 cb_name,
                 module,
                 registration,
             )?;
-            let fn_ptr = module
-                .make_callback_trampoline(
-                    cb_name,
-                    crate::callback::on_js_thread,
-                    crate::callback::dispatch_to_js_thread,
-                    crate::callback::is_js_thread,
-                    user_data,
-                )
-                .map_err(crate::core_err)?;
             slot::write_pointer(slot, fn_ptr);
         }
         other => {

@@ -11,7 +11,9 @@
 // thing keeping that bounded is reuse. `rust_future_poll_*` passes its
 // continuation on every poll, so without reuse an await leaks a CbUserData and
 // a libffi closure per poll: measured at ~720 bytes, reaching 295 MB RSS over
-// 400k polls and still climbing linearly.
+// 400k polls and still climbing linearly. A callback can also arrive as a struct
+// field: every async foreign method returns a struct whose `free` is a callback,
+// the same module-level function each time.
 //
 // The count is asserted rather than the memory. RSS is too noisy to assert on,
 // and nothing else observable moves: the continuation is a module-level const,
@@ -23,15 +25,24 @@
 // To run:
 //   cargo test -p uniffi-fixture-futures -- jsi2::test_trampoline_cache
 //   cargo test -p uniffi-fixture-futures -- napi::test_trampoline_cache
-import { alwaysReady } from "@/generated/futures";
+import myModule, {
+  alwaysReady,
+  asStringUsingTrait,
+  type AsyncParser,
+} from "@/generated/futures";
 import nativeModule from "@/generated/futures-ffi";
 import { asyncTest } from "@/asserts";
 import "@/polyfills";
+
+// Registers the `AsyncParser` vtable, which the second test needs.
+myModule.initialize();
 
 // Enough polls that a per-call leak is unambiguous, but quick enough to sit in
 // the normal suite — a regression shows up as +1 per poll, so the assertion is
 // exact equality rather than a threshold.
 const POLLS = 2000;
+// Each call is a round trip through a JS async method, so fewer of them.
+const CALLS = 500;
 
 const trampolineCount = (): number =>
   (nativeModule() as any).$uniffiTrampolineCount();
@@ -57,6 +68,37 @@ const trampolineCount = (): number =>
         `built ${after - before} extra trampolines across ${POLLS} polls ` +
           `(expected 0: the poll continuation is a module-level const, so ` +
           `every poll should hit the cache)`,
+      );
+      t.end();
+    },
+    60000,
+  );
+
+  await asyncTest(
+    "async foreign method reuses one trampoline for its returned free callback",
+    async (t) => {
+      const parser: AsyncParser = {
+        asString: async (_delayMs: number, value: number) => value.toString(),
+        tryFromString: async (_delayMs: number, value: string) =>
+          parseInt(value, 10),
+        delay: async (_delayMs: number) => {},
+        tryDelay: async (_delayMs: string) => {},
+      };
+      // As above: the first call builds the trampolines it needs.
+      await asStringUsingTrait(parser, 0, 0);
+      const before = trampolineCount();
+
+      for (let i = 0; i < CALLS; i++) {
+        t.assertEqual(await asStringUsingTrait(parser, 0, i), i.toString());
+      }
+
+      const after = trampolineCount();
+      t.assertEqual(
+        after,
+        before,
+        `built ${after - before} extra trampolines across ${CALLS} calls ` +
+          `(expected 0: the free callback in each returned struct is the ` +
+          `same function, so every call should hit the cache)`,
       );
       t.end();
     },

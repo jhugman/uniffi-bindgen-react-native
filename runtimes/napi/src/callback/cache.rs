@@ -5,8 +5,8 @@
  */
 //! Trampoline cache: one libffi trampoline per (callback name, JS function).
 //!
-//! Building a trampoline for a callback argument is expensive and **permanently
-//! leaked**, by design: the library may invoke the function pointer from any thread
+//! Building a trampoline for a callback argument or a callback-typed struct field
+//! is expensive and **permanently leaked**, by design: the library may invoke the function pointer from any thread
 //! at any later time, so nothing can safely reclaim it. Each one costs
 //!
 //! - a strong `napi_ref` pinning the JS function,
@@ -16,10 +16,11 @@
 //! - a leaked `TrampolineUserdata`, and
 //! - a libffi `Closure`, which owns an executable page.
 //!
-//! Dispatch used to build one on *every* call that passed a callback, so the cost
-//! became a ~3 KB per-call leak. That is reached from ordinary generated code: the
-//! async poll loop passes its continuation callback on every poll, so every `await`
-//! leaked ~3.2 KB regardless of argument types.
+//! Building one on *every* call that carries a callback turns that into a per-call
+//! leak, and ordinary generated code reaches it twice: the async poll loop passes its
+//! continuation callback on every poll (~3.2 KB per `await`), and every async
+//! foreign method returns a struct whose `free` field is a callback.
+//! [`trampoline_for_js_fn`] is the one place both go through.
 //!
 //! Caching removes the per-call part without changing any lifetime: trampolines are
 //! still never freed, there is just one per distinct (callback name, function) pair
@@ -48,13 +49,99 @@
 //!
 //! Stashing the identity on the JS function (via [`TrampolineCache::set`]) can fail
 //! — e.g. a frozen function refuses the property write — and that error is
-//! propagated with `?`, failing the whole FFI call. This is asymmetric with the
+//! propagated with `?`, failing the whole FFI call. For a struct field returned to
+//! Rust, the error reaches `write_js_value_to_pointer`, which leaves the struct
+//! unwritten, so Rust sees its default. This is asymmetric with the
 //! jsi bridge, which catches the equivalent failure and falls through to building
 //! (and leaking) an unmemoised trampoline instead of failing the call. Do not
 //! assume the two bridges behave the same on this input.
 
 use std::collections::HashMap;
+use std::ffi::c_void;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
+use napi::{Env, JsUnknown, NapiRaw, NapiValue};
+use uniffi_runtime_core::Module;
+
+use crate::register::Registration;
+
+/// The trampoline for `js_val` as callback `cb_name`, built and remembered the first time
+/// this JS function is seen under that name.
+///
+/// Every place that turns a JS function into a callback pointer on each call comes here: a
+/// callback argument (the async poll loop's continuation, on every poll), and a
+/// callback-typed struct field (the `free` in the struct every async foreign method
+/// returns). Vtables are built once per registration, so they build directly.
+pub(crate) fn trampoline_for_js_fn(
+    env: &Env,
+    js_val: &JsUnknown,
+    cb_name: &str,
+    module: &Arc<Module>,
+    registration: &Arc<Registration>,
+) -> napi::Result<*const c_void> {
+    // The actual trampoline map lives in core, keyed on (callback name, identity).
+    // This engine's job is only to mint and stash a stable identity for the JS
+    // function object — the Symbol belongs to this `register()` call and so to
+    // this env, and never crosses realms — then ask core for the trampoline that
+    // identity maps to. A trampoline holds no per-call state, since callbacks
+    // receive their handle as an ordinary argument, so reuse across calls is safe.
+    //
+    // A hit on both lookups costs only that — nothing below runs until a miss.
+    //
+    // SAFETY: `js_val` is a value from the current callback scope, so `raw()`
+    // yields a `napi_value` valid for that scope without transferring ownership.
+    let raw_fn_val = unsafe { js_val.raw() };
+    // SAFETY: `env` is the active env for this call and `raw_fn_val` is the value
+    // read above; a lookup miss is reported as `Ok(None)`, so a JS function
+    // carrying no marker is simply minted a fresh identity below rather than
+    // misread.
+    let stashed = unsafe {
+        registration
+            .trampolines
+            .get(env.raw(), raw_fn_val, cb_name)?
+    };
+    if let Some(fn_ptr) = stashed.and_then(|identity| module.trampoline_for(cb_name, identity)) {
+        return Ok(fn_ptr);
+    }
+    // SAFETY: `raw_fn_val` is a `napi_value` from this callback scope.
+    // `from_raw` errors rather than aborting if it is not a function, and
+    // the declared type is `Callback`, so a non-function here is a caller error.
+    let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), raw_fn_val)? };
+    // Minted and stashed here, past the function check but before
+    // anything is built: `set` writes a hidden marker onto the caller's
+    // own value, and a value that turns out not to be a function is
+    // handed back untouched. Stashing first means a build failure below
+    // leaves only an identity with no map entry, which the miss path
+    // above already handles. Building first would leak the trampoline,
+    // its userdata and the strong function ref on a failed `set`, and
+    // leak them again on every retry.
+    let identity = match stashed {
+        Some(identity) => identity,
+        None => {
+            let identity = registration.trampolines.next_identity();
+            // SAFETY: same env and value as the lookup above.
+            unsafe {
+                registration
+                    .trampolines
+                    .set(env.raw(), raw_fn_val, cb_name, identity)?
+            };
+            identity
+        }
+    };
+    let user_data = super::create_callback_user_data(env, js_fn, cb_name, module, registration)?;
+    let fn_ptr = module
+        .make_callback_trampoline(
+            cb_name,
+            super::on_js_thread,
+            super::dispatch_to_js_thread,
+            super::is_js_thread,
+            user_data,
+        )
+        .map_err(crate::core_err)?;
+    module.remember_trampoline(cb_name, identity, fn_ptr);
+    Ok(fn_ptr)
+}
 
 /// Per-registration hidden Symbols keyed by callback name, used to stash the
 /// identity minted for the JS function that Symbol is read from.
