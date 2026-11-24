@@ -88,6 +88,16 @@ impl ImportAccumulator {
             .insert(ImportedItem::Type(name.into()));
     }
 
+    /// Imports the runtime's `Cursor` class as the type `UniffiCursor`. The converters name it
+    /// only in type position, so a type-only import is enough. The alias keeps it apart from
+    /// any other `Cursor` in the module: a crate type, an external type, or a custom type's
+    /// import. Under the same name, `strictTypeChecking` fails with TS2440; without it, every
+    /// `Cursor` in the module, the user's included, resolves to the runtime class. The
+    /// templates write `UniffiCursor` to match.
+    pub fn add_runtime_cursor(&mut self) {
+        self.add_infra_type("Cursor as UniffiCursor");
+    }
+
     pub fn add_ext_value(&mut self, name: &str, namespace: &str) {
         self.imports
             .entry(format!("./{namespace}"))
@@ -177,7 +187,7 @@ impl ImportAccumulator {
     fn collect_custom(&mut self, c: &TsCustomType) {
         self.add_infra_type("FfiConverter");
         self.add_infra_type("RustBufferAllocator");
-        self.add_infra_value("Cursor");
+        self.add_runtime_cursor();
         self.add_infra_value("uniffiTypeNameSymbol");
         if let Some(cfg) = &c.custom_config {
             for (name, from) in &cfg.imports {
@@ -198,7 +208,7 @@ impl ImportAccumulator {
 
     fn collect_enum(&mut self, e: &TsEnum) {
         self.add_infra_value("AbstractFfiConverterByteArray");
-        self.add_infra_value("Cursor");
+        self.add_runtime_cursor();
         self.add_infra_value("UniffiInternalError");
         if !e.is_flat {
             self.add_infra_value("uniffiTypeNameSymbol");
@@ -230,7 +240,7 @@ impl ImportAccumulator {
     fn collect_record(&mut self, r: &TsRecord) {
         self.add_infra_value("uniffiCreateRecord");
         self.add_infra_value("AbstractFfiConverterByteArray");
-        self.add_infra_value("Cursor");
+        self.add_runtime_cursor();
         self.add_exported_converter(&r.ffi_converter_name);
 
         if r.has_callables() {

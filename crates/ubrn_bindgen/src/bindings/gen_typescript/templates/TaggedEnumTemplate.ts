@@ -168,7 +168,7 @@ export type {{ type_name }} = InstanceType<
 const {{ e.ffi_converter_name }} = (() => {
     type TypeName = {{ type_name }};
     class FFIConverter extends AbstractFfiConverterByteArray<TypeName> {
-        readFromCursor(c: Cursor): TypeName {
+        readFromCursor(c: UniffiCursor): TypeName {
             switch (c.readI32()) {
             {%- for variant in e.variants %}
             {%-   let has_fields = !variant.fields.is_empty() %}
@@ -192,7 +192,7 @@ const {{ e.ffi_converter_name }} = (() => {
                 default: throw new UniffiInternalError.UnexpectedEnumCase();
             }
         }
-        writeIntoCursor(value: TypeName, c: Cursor): void {
+        writeIntoCursor(value: TypeName, c: UniffiCursor): void {
             switch (value.tag) {
                 {%- for variant in e.variants %}
                 {%-   let has_fields = !variant.fields.is_empty() %}

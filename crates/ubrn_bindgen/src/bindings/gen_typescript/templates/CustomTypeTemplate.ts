@@ -37,11 +37,11 @@ const {{ custom.ffi_converter_name }} = (() => {
             const intermediate = {{ config.lower_expr }};
             return intermediateConverter.lower(intermediate, alloc);
         }
-        readFromCursor(c: Cursor): TsType {
+        readFromCursor(c: UniffiCursor): TsType {
             const intermediate = intermediateConverter.readFromCursor(c);
             return {{ config.lift_expr }};
         }
-        writeIntoCursor(value: TsType, c: Cursor): void {
+        writeIntoCursor(value: TsType, c: UniffiCursor): void {
             const intermediate = {{ config.lower_expr }};
             intermediateConverter.writeIntoCursor(intermediate, c);
         }
