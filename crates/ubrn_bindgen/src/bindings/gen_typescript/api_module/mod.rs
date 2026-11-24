@@ -88,10 +88,12 @@ impl ImportAccumulator {
             .insert(ImportedItem::Type(name.into()));
     }
 
-    /// The runtime's `Cursor` class, which the converters name only in type position. It is
-    /// imported as `UniffiCursor` so that a Rust type called `Cursor` does not collide with it:
-    /// both would otherwise share one name in the generated module, and every `Cursor` in that
-    /// module, the user's type included, would resolve to the runtime class.
+    /// Imports the runtime's `Cursor` class as the type `UniffiCursor`. The converters name it
+    /// only in type position, so a type-only import is enough. The alias keeps it apart from
+    /// any other `Cursor` in the module: a crate type, an external type, or a custom type's
+    /// import. Under the same name, `strictTypeChecking` fails with TS2440; without it, every
+    /// `Cursor` in the module, the user's included, resolves to the runtime class. The
+    /// templates write `UniffiCursor` to match.
     pub fn add_runtime_cursor(&mut self) {
         self.add_infra_type("Cursor as UniffiCursor");
     }

@@ -176,8 +176,8 @@ pub fn echo_bare_obj_arg(value: std::sync::Arc<ZeroArgObj>) -> std::sync::Arc<Ze
 }
 
 // Regression test: a crate type named `Cursor` must not collide with the
-// generated module's import of the runtime's own `Cursor` class. This one
-// is a plain `String` wrapper and should come out as `string` in the
+// generated module's import of the runtime's own `Cursor` class. It is a
+// plain `String` wrapper, so it should come out as `string` in the
 // generated bindings, both as a record field and as a function arg/return.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Cursor(pub String);
