@@ -1,6 +1,6 @@
 {
   "name": "@ubjs/react-native",
-  "version": "0.31.0-7",
+  "version": "0.31.0-8",
   "description": "The uniffi JSI player for React Native: one native module that loads any uniffi-bindgen-react-native library",
   "homepage": "https://github.com/jhugman/uniffi-bindgen-react-native",
   "repository": {
@@ -40,7 +40,7 @@
     }
   },
   "peerDependencies": {
-    "@ubjs/core": "^0.31.0-7",
+    "@ubjs/core": "^0.31.0-8",
     "react-native": "*"
   },
   "devDependencies": {
