@@ -122,6 +122,7 @@ pub(crate) enum OptionalFields {
         maybe_string: Option<String>,
         maybe_record: Option<AnimalRecord>,
     },
+    Tuple(Option<String>, Option<AnimalRecord>),
     Empty,
 }
 
