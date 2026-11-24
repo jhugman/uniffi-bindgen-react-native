@@ -53,11 +53,26 @@ namespace {{ ns }} {
             {%- when None -%}
             {%- endmatch -%}) {
 
+        {#- Rust hands each RustBuffer argument over to us, and `toJs` only gives JS a
+            view of it. The JS side lifts (copies) every argument before the callback
+            returns, so each buffer is freed when `body` exits, however it exits. The
+            guards all come before the first `toJs`, so a throw from one conversion
+            cannot skip the free of a later buffer. #}
+        {%- for arg in callback.arguments_no_return() %}
+        {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
+        {%-   let arg_t = arg.type_().borrow()|ffi_type_name_from_js %}
+        {%-   if arg_t == "RustBuffer" %}
+        struct Free_{{ arg_nm_rs }} {
+            RustBuffer buf;
+            ~Free_{{ arg_nm_rs }}() { {{ arg.type_().borrow()|bridging_class(ci) }}::rustbuffer_free(buf); }
+        } free_{{ arg_nm_rs }} { {{ arg_nm_rs }} };
+        {%-   endif %}
+        {%- endfor %}
+
         // Convert the arguments from Rust, into jsi::Values.
         // We'll use the Bridging class to do this…
         {%- for arg in callback.arguments_no_return() %}
         {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
-        {%-   let arg_t = arg.type_().borrow()|ffi_type_name_from_js %}
         {%-   let arg_nm = arg.name()|var_name|fmt("js_{}") %}
         auto {{ arg_nm }} = {{ arg.type_().borrow()|bridging_class(ci) }}::toJs(rt, callInvoker, {{ arg_nm_rs }});
         {%- endfor %}
@@ -140,8 +155,16 @@ namespace {{ ns }} {
         //
         // If rsLamda is null, then there is no runtime to call into.
         if (rsLambda == nullptr) {
-            // This only occurs when destructors are calling into Rust free/drop,
-            // which causes the JS callback to be dropped.
+            // Rust can still call after the runtime is gone: a destructor dropping
+            // the JS callback, or a Rust thread calling one of its methods.
+            {#- Any RustBuffer arguments are still ours, so free them before returning. #}
+            {%- for arg in callback.arguments_no_return() %}
+            {%-   let arg_nm_rs = arg.name()|var_name|fmt("rs_{}") %}
+            {%-   let arg_t = arg.type_().borrow()|ffi_type_name_from_js %}
+            {%-   if arg_t == "RustBuffer" %}
+            {{ arg.type_().borrow()|bridging_class(ci) }}::rustbuffer_free({{ arg_nm_rs }});
+            {%-   endif %}
+            {%- endfor %}
             {%- match return_type %}
             {%- when Some(_) %}
             return 0;

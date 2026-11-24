@@ -93,8 +93,10 @@ template <> struct Bridging<RustBuffer> {
     // View-handoff: hand JS a `Uint8Array` view aliasing the Rust-owned bytes
     // (no boundary copy). The single mandatory copy now happens inside
     // `converter.lift(view)` (string decode, byte-array `set`, field-by-field
-    // record reads). The codegen-emitted try/finally calls `rustbuffer_free`
-    // on the view after `lift` returns, releasing the Rust allocation.
+    // record reads). Whoever calls `toJs` owns the free: for a return value,
+    // the codegen-emitted try/finally calls `rustbuffer_free` on the view
+    // after `lift` returns; for a callback argument, `CallbackFunction.cpp`
+    // frees the buffer when the callback's body exits.
     //
     // Capacity hint: Rust may return a buffer where `capacity > len`. The
     // view's `byteLength` is `len` (so converters that decode the whole view
@@ -105,7 +107,7 @@ template <> struct Bridging<RustBuffer> {
     // `rustbufferAlloc(n)` where `byteLength == capacity` already.
     //
     // CMutableBuffer is non-owning here: its destructor leaves `buf.data`
-    // alone. Only the codegen-emitted `rustbuffer_free` path frees it.
+    // alone. Only those two owners free it.
     auto payload = std::make_shared<uniffi_jsi::CMutableBuffer>(
         buf.data, static_cast<size_t>(buf.len));
     auto view = uniffi_jsi::arraybufferToUint8Array(

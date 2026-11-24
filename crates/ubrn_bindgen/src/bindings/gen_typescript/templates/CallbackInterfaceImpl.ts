@@ -21,6 +21,8 @@ const {{ trait_impl }}: { vtable: any; register: () => {% if module.async_delive
             ()
             {%- endif %}
             : {% call cb::return_type(meth) %} => {
+                {#- Every argument is lifted here, before the first `await`: jsi frees
+                    each RustBuffer argument as soon as this call returns to C++. #}
                 const jsCallback = {{ ffi_converter_name }}.lift(uniffiHandle);
                 return {% if meth.is_ffi_async() %}await {% endif %}jsCallback.{{ meth.name }}(
                     {%- for arg in meth.arguments %}
