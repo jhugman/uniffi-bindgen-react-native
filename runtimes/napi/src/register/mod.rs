@@ -35,9 +35,10 @@ pub(crate) struct Registration {
     /// the capacity is stashed here for `rustbuffer_free(view)` to read back.
     pub(crate) capacity_symbol: CapacitySymbol,
     /// Hidden keys stashing the identity minted for each JS function, used to look
-    /// up a built callback trampoline in core's trampoline map. Without this,
-    /// dispatch rebuilds one per call — a permanent ~3 KB leak, and the async poll
-    /// loop passes its continuation on every poll. See `callback::cache`.
+    /// up a built callback trampoline in core's trampoline map. Without this, every
+    /// call that carries a callback, as an argument or a struct field, builds one —
+    /// a permanent ~3 KB leak, and the async poll loop passes its continuation on
+    /// every poll. See `callback::cache`.
     pub(crate) trampolines: crate::callback::cache::TrampolineCache,
     /// Whether JS may view Rust memory directly, or must be given copies, as under
     /// Electron's memory cage.

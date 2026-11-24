@@ -105,82 +105,15 @@ pub(crate) fn call_ffi_function(
                 // Reuse this function's trampoline if it already has one. Building one is
                 // permanently leaked by design — the library may invoke the pointer from any
                 // thread later — so the intended bound is one per callback type, and building
-                // one per call turns that into unbounded growth.
-                //
-                // The actual trampoline map lives in core, keyed on (callback name, identity).
-                // This engine's job is only to mint and stash a stable identity for the JS
-                // function object — the Symbol belongs to this `register()` call and so to
-                // this env, and never crosses realms — then ask core for the trampoline that
-                // identity maps to. A trampoline holds no per-call state, since callbacks
-                // receive their handle as an ordinary argument, so reuse across calls is safe.
-                //
-                // A hit on both lookups costs only that — nothing below runs until a miss.
-                //
-                // SAFETY: `js_val` is a value from the current callback scope, so `raw()`
-                // yields a `napi_value` valid for that scope without transferring ownership.
-                let raw_fn_val = unsafe { js_val.raw() };
-                // SAFETY: `env` is the active env for this call and `raw_fn_val` is the value
-                // read above; a lookup miss is reported as `Ok(None)`, so a JS function
-                // carrying no marker is simply minted a fresh identity below rather than
-                // misread.
-                let stashed = unsafe {
-                    registration
-                        .trampolines
-                        .get(env.raw(), raw_fn_val, cb_name)?
-                };
-                let cached = stashed.and_then(|identity| module.trampoline_for(cb_name, identity));
-                let fn_ptr = match cached {
-                    Some(fn_ptr) => fn_ptr,
-                    None => {
-                        // SAFETY: `raw_fn_val` is a `napi_value` from this callback scope.
-                        // `from_raw` errors rather than aborting if it is not a function, and
-                        // the declared arg type is `Callback`, so a non-function here is a
-                        // caller error surfaced as a JS exception.
-                        let js_fn = unsafe { napi::JsFunction::from_raw(env.raw(), raw_fn_val)? };
-                        // Minted and stashed here, past the function check but before
-                        // anything is built: `set` writes a hidden marker onto the caller's
-                        // own value, and a value that turns out not to be a function is
-                        // handed back untouched. Stashing first means a build failure below
-                        // leaves only an identity with no map entry, which the miss path
-                        // above already handles. Building first would leak the trampoline,
-                        // its userdata and the strong function ref on a failed `set`, and
-                        // leak them again on every retry.
-                        let identity = match stashed {
-                            Some(identity) => identity,
-                            None => {
-                                let identity = registration.trampolines.next_identity();
-                                // SAFETY: same env and value as the lookup above.
-                                unsafe {
-                                    registration.trampolines.set(
-                                        env.raw(),
-                                        raw_fn_val,
-                                        cb_name,
-                                        identity,
-                                    )?
-                                };
-                                identity
-                            }
-                        };
-                        let user_data = callback::create_callback_user_data(
-                            env,
-                            js_fn,
-                            cb_name,
-                            module,
-                            registration,
-                        )?;
-                        let fn_ptr = module
-                            .make_callback_trampoline(
-                                cb_name,
-                                callback::on_js_thread,
-                                callback::dispatch_to_js_thread,
-                                callback::is_js_thread,
-                                user_data,
-                            )
-                            .map_err(core_err)?;
-                        module.remember_trampoline(cb_name, identity, fn_ptr);
-                        fn_ptr
-                    }
-                };
+                // one per call turns that into unbounded growth. A non-function here is a
+                // caller error, surfaced as a JS exception.
+                let fn_ptr = callback::cache::trampoline_for_js_fn(
+                    env,
+                    &js_val,
+                    cb_name,
+                    module,
+                    registration,
+                )?;
                 slot::write_pointer(slot, fn_ptr);
             }
             _ => {
