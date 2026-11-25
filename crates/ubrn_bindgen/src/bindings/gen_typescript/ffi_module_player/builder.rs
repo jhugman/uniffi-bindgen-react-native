@@ -6,9 +6,9 @@
 
 use std::collections::HashMap;
 
-use heck::ToLowerCamelCase;
 use uniffi_bindgen::pipeline::general;
 
+use super::super::api_module::arg_name;
 use super::nodes::*;
 use super::type_mapping::ffi_type_to_player;
 use crate::bindings::gen_typescript::config::TsConfig;
@@ -318,7 +318,7 @@ impl PlayerFfiModule {
             .arguments
             .iter()
             .map(|arg| FfiArgDecl {
-                name: arg.name.to_lower_camel_case(),
+                name: arg_name(&arg.name),
                 type_name: ffi_type_to_ts(&arg.ty.ty),
             })
             .collect();

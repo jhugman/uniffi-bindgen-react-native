@@ -234,7 +234,7 @@ pub(super) fn fn_name(nm: &str) -> String {
     }
 }
 
-pub(super) fn arg_name(nm: &str) -> String {
+pub(in crate::bindings::gen_typescript) fn arg_name(nm: &str) -> String {
     rewrite_keywords(nm.to_lower_camel_case())
 }
 

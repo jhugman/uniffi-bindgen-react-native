@@ -4,9 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/
  */
 
-use heck::{ToLowerCamelCase, ToUpperCamelCase};
+use heck::ToUpperCamelCase;
 use uniffi_bindgen::pipeline::general;
 
+use super::super::api_module::arg_name;
 use super::nodes::*;
 use super::type_mapping::{ffi_type_to_ts, ffi_type_to_ts_native};
 use crate::switches::AbiFlavor;
@@ -114,7 +115,7 @@ impl TsFfiModule {
             .arguments
             .iter()
             .map(|arg| FfiArgDecl {
-                name: arg.name.to_lower_camel_case(),
+                name: arg_name(&arg.name),
                 type_name: type_mapper(&arg.ty.ty),
             })
             .collect();
@@ -254,7 +255,7 @@ impl TsFfiModule {
             .iter()
             .filter(|a| a.name != "uniffi_out_return" && a.name != "uniffi_out_dropped_callback")
             .map(|arg| FfiArgDecl {
-                name: arg.name.to_lower_camel_case(),
+                name: arg_name(&arg.name),
                 type_name: ffi_type_to_ts(&arg.ty.ty),
             })
             .collect();

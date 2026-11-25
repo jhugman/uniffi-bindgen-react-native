@@ -202,6 +202,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ffi_signatures_escape_reserved_parameter_names() -> Result<()> {
+        use uniffi_bindgen::pipeline::general;
+
+        let arguments = || {
+            vec![
+                general::FfiArgument::new("with", general::FfiType::UInt8),
+                general::FfiArgument::new("event_id", general::FfiType::UInt8),
+            ]
+        };
+        let function = general::FfiFunction {
+            name: general::RustFfiFunctionName("uniffi_test_fn_func_echo".into()),
+            arguments: arguments(),
+            kind: general::FfiFunctionKind::Scaffolding,
+            ..Default::default()
+        };
+        let callback = general::FfiFunctionType {
+            name: general::FfiFunctionTypeName("EchoCallback".into()),
+            arguments: arguments(),
+            return_type: general::FfiReturnType { ty: None },
+            has_rust_call_status_arg: false,
+        };
+        let namespace = general::Namespace {
+            name: "test".into(),
+            ffi_definitions: [function.into(), callback.into()].into_iter().collect(),
+            ..Default::default()
+        };
+        let config = Config::default();
+        let jsi = generate_lowlevel_code(ffi_module::TsFfiModule::from_general(
+            &namespace,
+            &AbiFlavor::Jsi,
+            &config,
+        ))?;
+        let jsi2 =
+            generate_player_lowlevel_code(ffi_module_player::PlayerFfiModule::from_general(
+                &namespace,
+                &config,
+                &AbiFlavor::Jsi2,
+                "test".into(),
+                None,
+            ))?;
+
+        for code in [jsi, jsi2] {
+            assert!(code.contains("uniffi_test_fn_func_echo(with_: number, eventId: number)"));
+            assert!(code.contains("type UniffiEchoCallback = (with_: number, eventId: number)"));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn stale_async_index_files_are_removed_but_the_apps_are_kept() -> Result<()> {
         let dir = camino::Utf8PathBuf::try_from(std::env::temp_dir())?
             .join(format!("ubrn-stale-async-index-{}", std::process::id()));
