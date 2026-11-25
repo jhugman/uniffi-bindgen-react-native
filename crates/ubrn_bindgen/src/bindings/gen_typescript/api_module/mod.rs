@@ -29,6 +29,8 @@ use self::builders::*;
 use self::docstring::format_docstring;
 use self::nodes::*;
 
+pub(super) use self::type_helpers::arg_name;
+
 pub(crate) use self::nodes::{
     InitializationIR, TsCallable, TsCallbackInterface, TsCustomType, TsEnum, TsExternalType,
     TsFunction, TsObject, TsRecord, TsSimpleWrapper, TsTypeDefinition, TsUniffiTrait,
